@@ -28,6 +28,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			R.drawable.s60_settings_alt,     // 桌面组件设置
 			R.drawable.s60_settings,         // 按键绑定
 			R.drawable.s60_settings,         // 按键绑定向导
+			R.drawable.ic_nokia_home,        // 默认桌面设置
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -36,7 +37,17 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			"桌面组件设置",
 			"按键绑定",
 			"按键绑定向导",
+			"默认桌面设置",
 	};
+
+	/** 取列表项名称：第 5 项（默认桌面设置）根据是否已设为默认桌面动态展示状态。 */
+	private String getItemDisplayName(int index) {
+		if (index == 5) {
+			boolean isDefault = ((NokiaDesktopActivity) requireActivity()).isDefaultLauncher();
+			return isDefault ? "默认桌面：已设置" : "默认桌面设置";
+		}
+		return ITEM_NAMES[index];
+	}
 
 	private View[] itemViews;
 	private int focusIndex = -1;
@@ -92,7 +103,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			TextView tvName = new TextView(requireContext());
 			tvName.setLayoutParams(new LinearLayout.LayoutParams(
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-			tvName.setText(ITEM_NAMES[i]);
+			tvName.setText(getItemDisplayName(i));
 			tvName.setTextColor(0xFFFFFFFF);
 			tvName.setTextSize(12);
 			row.addView(tvName);
@@ -178,6 +189,10 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 						.replace(R.id.midPanel, new NokiaKeyBindWizardFragment())
 						.addToBackStack(null)
 						.commit();
+				return true;
+			case 5:
+				NokiaLog.i("DesktopSettings", "默认桌面设置：引导设为默认桌面");
+				host.requestSetDefaultLauncher();
 				return true;
 			default:
 				return false;

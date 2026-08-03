@@ -13,6 +13,9 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import ru.playsoftware.j2meloader.R;
 
 /**
@@ -235,7 +238,29 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaPage, N
 					.replace(R.id.midPanel, new NokiaDesktopFragment())
 					.commit();
 			NokiaLog.i("KeyWizard", "返回桌面待机屏");
+			// 向导结束后：若尚未是默认桌面，则询问是否设为默认桌面
+			askSetDefaultLauncher();
 		}, 1200);
+	}
+
+	/** 向导完成后（返回桌面时）询问用户是否将本应用设为系统默认桌面。 */
+	private void askSetDefaultLauncher() {
+		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		if (host.isDefaultLauncher()) {
+			// 已是默认桌面，无需询问
+			NokiaLog.i("KeyWizard", "已是默认桌面，跳过询问");
+			return;
+		}
+		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_home, "设置默认桌面", true, false,
+				() -> {
+					NokiaLog.i("KeyWizard", "用户选择设置默认桌面");
+					host.requestSetDefaultLauncher();
+				}));
+		items.add(new NokiaOptionsDialog.OptionItem(0, "稍后再说", true, false,
+				() -> NokiaLog.i("KeyWizard", "用户选择稍后再说")));
+		NokiaOptionsDialog.show(host.getSupportFragmentManager(), "设为默认桌面？", items);
+		NokiaLog.i("KeyWizard", "弹出默认桌面询问窗");
 	}
 
 	// ---- NokiaFocusHost（仅 INTRO 状态使用）----

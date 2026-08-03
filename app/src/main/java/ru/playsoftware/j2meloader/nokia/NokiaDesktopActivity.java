@@ -1,8 +1,12 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.app.role.RoleManager;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
@@ -79,6 +83,64 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	public NokiaKeyBinding getKeyBinding() {
 		return keyBinding;
 	}
+
+	/**
+	 * 判断本应用当前是否已被系统设为默认桌面（Home / Launcher）。
+	 * 用于「桌面设置 → 默认桌面设置」文案状态展示与向导结束后的询问。
+	 */
+	public boolean isDefaultLauncher() {
+		try {
+			Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+			homeIntent.addCategory(Intent.CATEGORY_HOME);
+			homeIntent.addCategory(Intent.CATEGORY_DEFAULT);
+			ResolveInfo resolve = getPackageManager().resolveActivity(homeIntent,
+					PackageManager.MATCH_DEFAULT_ONLY);
+			if (resolve == null || resolve.activityInfo == null) {
+				return false;
+			}
+			String curPkg = resolve.activityInfo.packageName;
+			boolean isDefault = getPackageName().equals(curPkg);
+			NokiaLog.i("Desktop", "isDefaultLauncher=" + isDefault + " resolvedPkg=" + curPkg);
+			return isDefault;
+		} catch (Exception e) {
+			NokiaLog.e("Desktop", "isDefaultLauncher 判断失败", e);
+			return false;
+		}
+	}
+
+	/**
+	 * 引导用户把本应用设为默认桌面。
+	 * <ul>
+	 *   <li>API 29+：走 {@link RoleManager} 的 {@code ROLE_HOME} 申请流程（系统会弹出选择器）；</li>
+	 *   <li>旧版本：直接启动一个 ACTION_MAIN+CATEGORY_HOME 的隐式 Intent，
+	 *       由系统弹出默认启动器选择框。</li>
+	 * </ul>
+	 * 在 4.4 (API 19) 上同样走旧版隐式 Intent 兜底，不调用高版本 API。
+	 */
+	public void requestSetDefaultLauncher() {
+		NokiaLog.i("Desktop", "requestSetDefaultLauncher 调用，api=" + Build.VERSION.SDK_INT);
+		try {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+				RoleManager roleManager = (RoleManager) getSystemService(ROLE_SERVICE);
+				if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
+					Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME);
+					startActivityForResult(intent, REQ_SET_DEFAULT_LAUNCHER);
+					return;
+				}
+			}
+			// 旧版本 / RoleManager 不可用时：用隐式 Intent 拉起系统桌面选择器
+			Intent intent = new Intent(Intent.ACTION_MAIN);
+			intent.addCategory(Intent.CATEGORY_HOME);
+			intent.addCategory(Intent.CATEGORY_DEFAULT);
+			intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			startActivity(intent);
+		} catch (Exception e) {
+			NokiaLog.e("Desktop", "requestSetDefaultLauncher 失败", e);
+		}
+	}
+
+	/** 申请默认桌面流程的请求码（RoleManager 路径会回调 onActivityResult）。 */
+	private static final int REQ_SET_DEFAULT_LAUNCHER = 1001;
 
 	/** 返回 midPanel 的当前真实像素高度（可能为 0 若尚未布局完成）。用于行数空间预算的实测反推。 */
 	public int getMidPanelHeight() {
