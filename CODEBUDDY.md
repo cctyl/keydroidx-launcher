@@ -400,8 +400,8 @@ Other flavors: replace `Open` with `Play`/`Fdroid`/`Dev`/`Midlet` (e.g. `assembl
 
 ## Environment prerequisites (already configured in this checkout)
 
-- `local.properties` points to the Android SDK (`sdk.dir`).
-- `gradle.properties` sets a Java proxy (`127.0.0.1:7897`, Clash) and `org.gradle.java.home` to a **JDK 17 (Temurin/OpenJDK)**. Do NOT use GraalVM; do NOT use JDK 8/11 or a bare JRE.
+- `local.properties` points to the Android SDK (`sdk.dir`). It is **git-ignored** and also holds per-developer environment settings that must NOT live in the repo: the Java proxy (`systemProp.https.proxyHost/Port`, e.g. `127.0.0.1:7897` Clash) and `org.gradle.java.home` pointing to a **JDK 17 (Temurin/OpenJDK)**. Do NOT use GraalVM; do NOT use JDK 8/11 or a bare JRE. `gradle.properties` applies this file via `apply from: 'local.properties'`, so each developer edits only `local.properties` — no conflicts.
+- The shared `gradle.properties` contains only project-wide Gradle settings (no machine-specific values).
 - `settings.gradle` and `gradle-wrapper.properties` use Tencent/Aliyun mirrors + jitpack. Keep `jitpack.io` — many dependencies are `com.github.*` GitHub libraries.
 - NDK version is pinned to `22.1.7171670` in `build.gradle` (`ext.NDK_VERSION`); install it via sdkmanager if missing.
 - Release signing reads `app/test.jks` via `keystore.properties`. Both are git-ignored; do not commit them.
