@@ -246,11 +246,6 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaPage, N
 	/** 向导完成后（返回桌面时）询问用户是否将本应用设为系统默认桌面。 */
 	private void askSetDefaultLauncher() {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		if (host.isDefaultLauncher()) {
-			// 已是默认桌面，无需询问
-			NokiaLog.i("KeyWizard", "已是默认桌面，跳过询问");
-			return;
-		}
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
 		items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_home, "设置默认桌面", true, false,
 				() -> {
