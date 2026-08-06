@@ -1,12 +1,17 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -119,6 +124,30 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 	/** 防止 S60 图标异步扫描完成后重复刷新当前页图标 */
 	private boolean iconRefreshDone = false;
 
+	/**
+	 * 包安装/卸载/替换广播接收器：应用列表实时跟随系统变化。
+	 * 卸载（ACTION_DELETE）会切到系统卸载页，Fragment 只是 onPause 不销毁，
+	 * 因此注册放在 onViewCreated / onDestroyView 生命周期内，能覆盖卸载完成返回的场景。
+	 */
+	private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			String action = intent.getAction();
+			if (action == null) return;
+			// ACTION_PACKAGE_REPLACED 只关心包名，这里统一在刷新时重新 queryIntentActivities
+			NokiaLog.i("Menu", "收到包变化广播: " + action + " data=" + intent.getDataString());
+			// 稍作延迟等系统包表稳定，避免偶发仍能查到底层已卸载的残留
+			View v = getView();
+			if (v != null) {
+				v.postDelayed(() -> {
+					if (isAdded()) refreshAppList();
+				}, 300);
+			} else {
+				refreshAppList();
+			}
+		}
+	};
+
 	/** 应用显示名内存缓存（进程内复用，避免每次进入功能表反复 loadLabel IPC） */
 	private static final Map<String, String> labelCache = new HashMap<>();
 
@@ -151,6 +180,19 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配（左右触摸由 Activity bindBottomBarTouch 统一处理）
 		host.refreshPageBar();
 
+		// 监听包安装/卸载/替换，实时刷新应用列表
+		IntentFilter pkgFilter = new IntentFilter();
+		pkgFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+		pkgFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+		pkgFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
+		pkgFilter.addDataScheme("package");
+		try {
+			requireContext().registerReceiver(packageReceiver, pkgFilter);
+			NokiaLog.i("Menu", "已注册包变化广播接收器（ADDED/REMOVED/REPLACED）");
+		} catch (Exception e) {
+			NokiaLog.e("Menu", "注册包变化广播失败", e);
+		}
+
 		appGrid = view.findViewById(R.id.appGrid);
 		tvPage = view.findViewById(R.id.menuPage);
 
@@ -171,6 +213,17 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 			NokiaLog.i("Menu", "功能表初始化完成（延迟到 panelH 可用）：共 " + items.size() + " 项，"
 					+ totalPages + " 页，每页 " + perPage + " 格（" + COLS + "×" + rowsPerPage + "）");
 		});
+	}
+
+	@Override
+	public void onDestroyView() {
+		try {
+			requireContext().unregisterReceiver(packageReceiver);
+			NokiaLog.i("Menu", "已注销包变化广播接收器");
+		} catch (Exception ignore) {
+			// 未注册或已注销，忽略
+		}
+		super.onDestroyView();
 	}
 
 	// ---- 分辨率自适应：计算每页行数 ----
@@ -343,6 +396,31 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 				refreshAfterIconInit();
 			}
 		});
+	}
+
+	/**
+	 * 包安装/卸载/替换后刷新应用列表：重新枚举并重建当前页，尽量保持当前页与焦点位置。
+	 * 卸载导致当前页变空（越界）时，焦点收敛到新列表末尾。
+	 */
+	private void refreshAppList() {
+		if (!isAdded() || getView() == null) return;
+		NokiaLog.i("Menu", "刷新应用列表（包变化触发）");
+		int oldPage = pageIndex;
+		int oldFocus = focusPos;
+		// 允许本次刷新后再次应用 S60 图标缓存（新装应用也走一次）
+		iconRefreshDone = false;
+		loadApps();
+		// 若卸载后总页数减少，收敛到最后一页
+		if (pageIndex > totalPages - 1) {
+			pageIndex = Math.max(0, totalPages - 1);
+		}
+		buildCurrentPage();
+		// 焦点保持原位置，越界则收敛到当前页末尾
+		int count = Math.min(perPage, items.size() - pageIndex * perPage);
+		int newFocus = Math.min(oldFocus, Math.max(0, count - 1));
+		setFocusPos(newFocus);
+		NokiaLog.i("Menu", "刷新完成: page=" + (pageIndex + 1) + "/" + totalPages
+				+ " focus=" + newFocus + " 共 " + items.size() + " 项");
 	}
 
 	/**
@@ -717,7 +795,62 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 
 	@Override
 	public boolean onSoftLeft() {
-		return onSelect(); // 左软键 = "选择"
+		// 左软键 = "选项"：仅对安卓原生应用弹出选项菜单；特殊入口保持原确认动作
+		int global = pageIndex * perPage + focusPos;
+		if (global >= 0 && global < items.size()) {
+			NokiaAppItem item = items.get(global);
+			if (item != null && item.type == NokiaAppItem.TYPE_APP) {
+				showAppOptionsMenu(item);
+				return true;
+			}
+		}
+		return onSelect();
+	}
+
+	/**
+	 * 弹出诺基亚风格选项菜单（卸载 / 应用设置），仅针对安卓原生应用。
+	 */
+	private void showAppOptionsMenu(NokiaAppItem item) {
+		if (item == null || item.launchIntent == null) {
+			NokiaLog.w("Menu", "showAppOptionsMenu: item 或 launchIntent 为 null，忽略");
+			return;
+		}
+		String resolvedPkg = item.launchIntent.getPackage();
+		if (TextUtils.isEmpty(resolvedPkg) && item.launchIntent.getComponent() != null) {
+			resolvedPkg = item.launchIntent.getComponent().getPackageName();
+		}
+		if (TextUtils.isEmpty(resolvedPkg)) {
+			NokiaLog.w("Menu", "showAppOptionsMenu: 无法解析包名，忽略 " + item.label);
+			return;
+		}
+		final String pkg = resolvedPkg;
+		NokiaLog.i("Menu", "弹出选项菜单: " + item.label + " pkg=" + pkg);
+		List<NokiaOptionsDialog.OptionItem> options = new ArrayList<>();
+		options.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
+				"卸载", true, false, () -> {
+			NokiaLog.i("Menu", "选项菜单-卸载: " + item.label + " pkg=" + pkg);
+			try {
+				Intent uninstall = new Intent(Intent.ACTION_DELETE,
+						Uri.fromParts("package", pkg, null));
+				uninstall.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				startActivity(uninstall);
+			} catch (Exception e) {
+				NokiaLog.e("Menu", "卸载跳转失败 " + item.label, e);
+			}
+		}));
+		options.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_manage,
+				"应用设置", true, false, () -> {
+			NokiaLog.i("Menu", "选项菜单-应用设置: " + item.label + " pkg=" + pkg);
+			try {
+				Intent settings = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+						Uri.fromParts("package", pkg, null));
+				settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				startActivity(settings);
+			} catch (Exception e) {
+				NokiaLog.e("Menu", "应用设置跳转失败 " + item.label, e);
+			}
+		}));
+		NokiaOptionsDialog.show(getParentFragmentManager(), item.label, options);
 	}
 
 	@Override
@@ -741,7 +874,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 
 	@Override
 	public String getSoftLeftText() {
-		return "选择";
+		return "选项";
 	}
 
 	@Override
