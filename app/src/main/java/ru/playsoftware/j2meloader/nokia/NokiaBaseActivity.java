@@ -44,6 +44,18 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	@Override
 	protected void attachBaseContext(Context newBase) {
 		Configuration config = newBase.getResources().getConfiguration();
+		// 用户字体缩放（桌面设置 → 字体大小）：统一应用内文字大小，
+		// 同时剥离系统字体缩放，避免系统设置干扰应用内一致性。
+		float userFontScale = 1f;
+		try {
+			userFontScale = NokiaSettingsStorage.getFontScale(newBase);
+		} catch (Exception ignored) {
+			userFontScale = 1f;
+		}
+		if (userFontScale <= 0f) {
+			userFontScale = 1f;
+		}
+		NokiaDimens.sUserFontScale = userFontScale;
 		int dpi = config.densityDpi;
 		int fixed = dpi;
 		int[] standards = {120, 160, 213, 240, 320, 480, 640};
@@ -72,14 +84,19 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 			}
 			fixed = nearest;
 		}
-		if (fixed != dpi) {
-			Configuration newConfig = new Configuration(config);
-			newConfig.densityDpi = fixed;
-			super.attachBaseContext(newBase.createConfigurationContext(newConfig));
-		} else {
-			super.attachBaseContext(newBase);
-		}
+	if (fixed != dpi) {
+		Configuration newConfig = new Configuration(config);
+		newConfig.densityDpi = fixed;
+		newConfig.fontScale = userFontScale;   // 应用用户字体缩放，忽略系统字体设置
+		super.attachBaseContext(newBase.createConfigurationContext(newConfig));
+	} else {
+		// 即便 density 已是标准值，也要显式设置 fontScale（系统字体缩放可能非 1，
+		// 否则 sp 字号会跟随系统字体被放大，导致顶栏溢出、底栏标题截断）。
+		Configuration cfg = new Configuration(config);
+		cfg.fontScale = userFontScale;
+		super.attachBaseContext(newBase.createConfigurationContext(cfg));
 	}
+}
 
 	private TextView tvTime;
 	private final Handler clockHandler = new Handler();
@@ -201,7 +218,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		} else {
 			tv.setText(text);
 			if (isCenter) {
-				// 长界面名动态缩字号：≤4 字 12sp，5-6 字 11sp，≥7 字 10sp
+				// 长界面名动态缩字号（dp 单位，不跟随系统字体）：≤4 字 12dp，5-6 字 11dp，≥7 字 10dp
 				int len = text.length();
 				float size;
 				if (len <= 4) {
@@ -211,10 +228,36 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 				} else {
 					size = 10f;
 				}
-				tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, size);
+				NokiaDimens.textSize(tv, size);
+				fitCenterTextToWidth(tv);
 			}
 			tv.setVisibility(View.VISIBLE);
 		}
+	}
+
+	/**
+	 * 根据实际可用宽度动态缩小底部中间标题字号（dp 单位），
+	 * 保证长标题完整显示、不出现省略号截断（如「桌面组件设置」）。
+	 * 在布局完成后执行：若文字测量宽度超出 TextView 宽度，逐步降字号直至放得下。
+	 */
+	private void fitCenterTextToWidth(final TextView tv) {
+		tv.post(new Runnable() {
+			@Override
+			public void run() {
+				if (tv.getVisibility() != View.VISIBLE || tv.getWidth() <= 0) {
+					return;
+				}
+				final float density = getResources().getDisplayMetrics().density;
+				final android.graphics.Paint paint = tv.getPaint();
+				while (tv.getTextSize() > 6f * density) {
+					if (paint.measureText(tv.getText().toString()) <= tv.getWidth()) {
+						break;
+					}
+					tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP,
+							Math.max(6f, tv.getTextSize() / density - 0.5f));
+				}
+			}
+		});
 	}
 
 	/**
@@ -229,6 +272,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		} else {
 			bc.setText(text);
 			bc.setVisibility(View.VISIBLE);
+			fitCenterTextToWidth(bc);
 		}
 	}
 

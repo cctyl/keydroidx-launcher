@@ -205,7 +205,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 				tv.setPadding(NokiaDimens.dp(getResources(), 10), 0, 0, 0);
 			}
 			tv.setText(item.label);
-			tv.setTextSize(14);
+			NokiaDimens.textSize(tv, 14);
 			tv.setSingleLine(true);
 			tv.setTextColor(item.enabled ? 0xFFFFFFFF : 0xFF666666);
 			row.addView(tv);

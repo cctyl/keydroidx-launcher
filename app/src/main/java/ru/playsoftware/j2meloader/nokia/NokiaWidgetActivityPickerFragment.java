@@ -360,7 +360,7 @@ public class NokiaWidgetActivityPickerFragment extends Fragment implements Nokia
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tv.setText(entry.label);
 			tv.setTextColor(0xFFFFFFFF);
-			tv.setTextSize(11);
+			NokiaDimens.textSize(tv, 11);
 			tv.setSingleLine(true);
 			tv.setEllipsize(TextUtils.TruncateAt.END);
 			row.addView(tv);

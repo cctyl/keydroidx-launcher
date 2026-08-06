@@ -170,7 +170,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 			hint.setGravity(Gravity.CENTER);
 			hint.setText("（无快捷应用）");
 			hint.setTextColor(0xFF888888);
-			hint.setTextSize(10);
+			NokiaDimens.textSize(hint, 10);
 			container.addView(hint);
 		} else {
 			for (int i = 0; i < apps.size(); i++) {
@@ -223,7 +223,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 					0, 0);
 			hint.setText("无更多备忘");
 			hint.setTextColor(0xFF888888);
-			hint.setTextSize(10);
+			NokiaDimens.textSize(hint, 10);
 			notifArea.addView(hint);
 			NokiaLog.i("Desktop", "组件区为空");
 		} else {
@@ -293,7 +293,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		labelTv.setLayoutParams(labelLp);
 		labelTv.setText(item.label);
 		labelTv.setTextColor(0xFFFFFFFF);
-		labelTv.setTextSize(11);
+		NokiaDimens.textSize(labelTv, 11);
 		labelTv.setSingleLine(true);
 		row.addView(labelTv);
 
@@ -333,7 +333,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		percentTv.setLayoutParams(pctLp);
 		percentTv.setText(percentText);
 		percentTv.setTextColor(0x80FFFFFF);
-		percentTv.setTextSize(9);
+		NokiaDimens.textSize(percentTv, 9);
 		percentTv.setSingleLine(true);
 		row.addView(percentTv);
 
@@ -370,7 +370,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 		labelTv.setText(getWidgetLabel(item));
 		labelTv.setTextColor(0xFFFFFFFF);
-		labelTv.setTextSize(11);
+		NokiaDimens.textSize(labelTv, 11);
 		labelTv.setSingleLine(true);
 		row.addView(labelTv);
 
@@ -379,7 +379,7 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 		infoTv.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		infoTv.setTextColor(0xFFAAAAAA);
-		infoTv.setTextSize(10);
+		NokiaDimens.textSize(infoTv, 10);
 		infoTv.setGravity(Gravity.END);
 		infoTv.setSingleLine(true);
 		infoTv.setText(getWidgetInfoText(item));

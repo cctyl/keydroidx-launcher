@@ -311,7 +311,7 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaPage, N
 
 	@Override
 	public String getPageTitle() {
-		return "按键绑定向导";
+		return "应用向导";
 	}
 
 	@Override

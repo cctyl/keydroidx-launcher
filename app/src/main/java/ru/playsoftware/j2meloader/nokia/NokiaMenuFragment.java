@@ -574,7 +574,7 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 							LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 					tv.setText(item.label);
 					tv.setTextColor(0xFFFFFFFF);
-					tv.setTextSize(9);
+					NokiaDimens.textSize(tv, 9);
 					tv.setSingleLine(true);
 					tv.setEllipsize(TextUtils.TruncateAt.END);
 					tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));

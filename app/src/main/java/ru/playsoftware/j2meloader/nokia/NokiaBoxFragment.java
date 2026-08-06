@@ -256,7 +256,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		tv.setText("安装");
 		tv.setTextColor(0xFFFFFFFF);
-		tv.setTextSize(9);
+		NokiaDimens.textSize(tv, 9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
 		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
@@ -277,7 +277,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		tv.setText("JAR 全局设置");
 		tv.setTextColor(0xFFFFFFFF);
-		tv.setTextSize(9);
+		NokiaDimens.textSize(tv, 9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
 		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
@@ -304,7 +304,7 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		tv.setText(app.getTitle());
 		tv.setTextColor(0xFFFFFFFF);
-		tv.setTextSize(9);
+		NokiaDimens.textSize(tv, 9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
 		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));

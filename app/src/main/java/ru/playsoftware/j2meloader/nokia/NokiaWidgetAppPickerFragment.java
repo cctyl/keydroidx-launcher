@@ -561,7 +561,7 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 							LinearLayout.LayoutParams.WRAP_CONTENT,
 							LinearLayout.LayoutParams.WRAP_CONTENT));
 					tv.setText(item.label);
-					tv.setTextSize(9);
+					NokiaDimens.textSize(tv, 9);
 					tv.setSingleLine(true);
 					tv.setEllipsize(TextUtils.TruncateAt.END);
 					tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
@@ -572,7 +572,7 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 					// 右上角 📌 角标（仅当前编辑项）
 					TextView badge = new TextView(requireContext());
 					badge.setText("📌");
-					badge.setTextSize(10);
+					NokiaDimens.textSize(badge, 10);
 					badge.setTextColor(0xFFFFFFFF);
 					FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
 							FrameLayout.LayoutParams.WRAP_CONTENT,

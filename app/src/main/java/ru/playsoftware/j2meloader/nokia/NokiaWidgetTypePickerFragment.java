@@ -165,7 +165,7 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 			tv.setLayoutParams(new LinearLayout.LayoutParams(
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tv.setText(label);
-			tv.setTextSize(12);
+			NokiaDimens.textSize(tv, 12);
 			tv.setSingleLine(true);
 			tv.setEllipsize(TextUtils.TruncateAt.END);
 			tv.setTextColor(enabled ? 0xFFFFFFFF : 0xFF666666);

@@ -120,6 +120,13 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	public void requestSetDefaultLauncher() {
 		NokiaLog.i("Desktop", "requestSetDefaultLauncher 调用，api=" + Build.VERSION.SDK_INT);
 		try {
+			// 需求：即使已设为默认桌面，点击确认也要重新发起一次设置流程。
+			// 已默认时若直接发 HOME 隐式 Intent，系统会解析到本应用自身直接回到桌面
+			// （不弹选择器），因此先解除默认角色/偏好，再走标准申请流程。
+			if (isDefaultLauncher()) {
+				NokiaLog.i("Desktop", "已设为默认桌面，先解除默认以便重新设置");
+				clearDefaultLauncher();
+			}
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 				RoleManager roleManager = (RoleManager) getSystemService(ROLE_SERVICE);
 				if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
@@ -136,6 +143,21 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 			startActivity(intent);
 		} catch (Exception e) {
 			NokiaLog.e("Desktop", "requestSetDefaultLauncher 失败", e);
+		}
+	}
+
+	/**
+	 * 解除本应用对默认桌面的占用，使系统下次能重新弹出默认启动器选择器。
+	 * 使用 {@code clearPackagePreferredActivities}（API 14+ 通用）。
+	 * 注：API 29+ 走 {@link RoleManager#createRequestRoleIntent} 时系统本身会弹出
+	 * 默认启动器设置页（即使已是 holder），无需额外解除角色。
+	 */
+	private void clearDefaultLauncher() {
+		try {
+			getPackageManager().clearPackagePreferredActivities(getPackageName());
+			NokiaLog.i("Desktop", "clearDefaultLauncher 完成");
+		} catch (Exception e) {
+			NokiaLog.e("Desktop", "clearDefaultLauncher 失败", e);
 		}
 	}
 

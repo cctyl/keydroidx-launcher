@@ -172,7 +172,7 @@ public class NokiaBackgroundManagerFragment extends Fragment implements NokiaPag
 			empty.setGravity(Gravity.CENTER);
 			empty.setText(tabProtected ? "暂无保护的应用" : "没有可清理的后台应用");
 			empty.setTextColor(0xFF8A93A5);
-			empty.setTextSize(10);
+			NokiaDimens.textSize(empty, 10);
 			listLayout.addView(empty);
 			clearHighlight();
 			focusIndex = -1;
@@ -230,7 +230,7 @@ public class NokiaBackgroundManagerFragment extends Fragment implements NokiaPag
 				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 		nameTv.setText(t.name);
 		nameTv.setTextColor(0xFFFFFFFF);
-		nameTv.setTextSize(11);
+		NokiaDimens.textSize(nameTv, 11);
 		nameTv.setSingleLine(true);
 		nameTv.setEllipsize(TextUtils.TruncateAt.END);
 		row.addView(nameTv);
@@ -249,7 +249,7 @@ public class NokiaBackgroundManagerFragment extends Fragment implements NokiaPag
 			TextView clearTv = new TextView(ctx);
 			clearTv.setText("可清");
 			clearTv.setTextColor(0xFF55606F);
-			clearTv.setTextSize(9);
+			NokiaDimens.textSize(clearTv, 9);
 			row.addView(clearTv);
 		}
 		return row;

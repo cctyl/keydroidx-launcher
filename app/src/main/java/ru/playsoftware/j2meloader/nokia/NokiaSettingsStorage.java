@@ -369,4 +369,24 @@ public class NokiaSettingsStorage {
 		prefs.edit().putString(KEY_PROTECTED_PACKAGES, arr.toString()).apply();
 		NokiaLog.i("SettingsStorage", "setProtectedPackages: 保存 " + arr.length() + " 个包");
 	}
+
+	// ── 字体大小 ──
+
+	private static final String KEY_FONT_SCALE = "font_scale";
+
+	/**
+	 * 读取用户字体缩放系数（桌面设置 → 字体大小），默认 1.0。
+	 * 静态方法：供 {@link NokiaBaseActivity#attachBaseContext} 在 Activity 早期读取。
+	 */
+	public static float getFontScale(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getFloat(KEY_FONT_SCALE, 1f);
+	}
+
+	/** 保存用户字体缩放系数。 */
+	public static void setFontScale(Context ctx, float scale) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putFloat(KEY_FONT_SCALE, scale).apply();
+		NokiaLog.i("SettingsStorage", "setFontScale: " + scale);
+	}
 }
