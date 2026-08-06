@@ -45,6 +45,7 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 			NokiaWidgetItem.TYPE_STORAGE,
 			NokiaWidgetItem.TYPE_USAGE,
 			NokiaWidgetItem.TYPE_LOCK_SCREEN,
+			NokiaWidgetItem.TYPE_BG_MANAGER,
 	};
 
 	private LinearLayout listLayout;

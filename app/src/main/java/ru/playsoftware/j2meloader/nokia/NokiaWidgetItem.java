@@ -22,7 +22,8 @@ public class NokiaWidgetItem {
 	public static final int TYPE_STORAGE = 5;    // 存储信息（不可编辑）
 	public static final int TYPE_USAGE = 6;      // 使用时长（不可编辑）
 	public static final int TYPE_LOCK_SCREEN = 7; // 锁屏（不可编辑，提示按下绑定键锁屏）
-	public static final int TYPE_COUNT = 8;
+	public static final int TYPE_BG_MANAGER = 8;  // 后台管理（不可编辑，点击打开后台窗口）
+	public static final int TYPE_COUNT = 9;
 
 	public static final int MAX_COUNT = 15;
 
@@ -78,6 +79,7 @@ public class NokiaWidgetItem {
 			case TYPE_STORAGE: return "[存储]";
 			case TYPE_USAGE: return "[时长]";
 			case TYPE_LOCK_SCREEN: return "[锁屏]";
+			case TYPE_BG_MANAGER: return "[后台]";
 			default: return "[" + type + "]";
 		}
 	}
@@ -93,6 +95,7 @@ public class NokiaWidgetItem {
 			case TYPE_STORAGE: return "存储信息";
 			case TYPE_USAGE: return "使用时长";
 			case TYPE_LOCK_SCREEN: return "锁屏";
+			case TYPE_BG_MANAGER: return "后台管理";
 			default: return "未知";
 		}
 	}
@@ -108,6 +111,7 @@ public class NokiaWidgetItem {
 			case TYPE_STORAGE: return "存储信息";
 			case TYPE_USAGE: return "使用时长";
 			case TYPE_LOCK_SCREEN: return "锁屏";
+			case TYPE_BG_MANAGER: return "后台管理";
 			default: return "组件";
 		}
 	}
@@ -139,6 +143,7 @@ public class NokiaWidgetItem {
 			case TYPE_STORAGE: return R.drawable.ic_nokia_widget_storage;
 			case TYPE_USAGE: return R.drawable.ic_nokia_widget_usage;
 			case TYPE_LOCK_SCREEN: return R.drawable.ic_nokia_lock;
+			case TYPE_BG_MANAGER: return R.drawable.ic_nokia_widget_bg_manager;
 			default: return R.drawable.ic_nokia_box;
 		}
 	}

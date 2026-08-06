@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 后台管理窗口：页签（运行/受保护）+ 摘要 + 后台任务列表，行由代码动态构建。
+     左软键 = 全部保护/全部解除，右软键 = 清除，中间标题 = 后台管理。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="240dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@android:color/transparent">
+
+    <!-- 页签行：运行 / 受保护 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingTop="6dp">
+
+        <LinearLayout
+            android:id="@+id/tabRunContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="18dp"
+            android:clickable="true"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tabRun"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="运行"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <View
+                android:id="@+id/tabRunUnderline"
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:layout_marginTop="2dp"
+                android:background="#64B5F6" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tabProtContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tabProt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="受保护"
+                android:textColor="#8A93A5"
+                android:textSize="12sp" />
+
+            <View
+                android:id="@+id/tabProtUnderline"
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:layout_marginTop="2dp"
+                android:background="#64B5F6"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 摘要行 -->
+    <TextView
+        android:id="@+id/tvBgSummary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="3dp"
+        android:textColor="#8A93A5"
+        android:textSize="9sp" />
+
+    <!-- 任务列表（高度由代码约束，底部正好落在可视区底边） -->
+    <ScrollView
+        android:id="@+id/bgScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/bgListLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="6dp" />
+    </ScrollView>
+</LinearLayout>

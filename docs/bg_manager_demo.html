@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>后台管理组件 - 交互原型演示</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #101318;
+    color: #e8e8e8;
+    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  /* ============ 诺基亚机身 ============ */
+  .phone {
+    width: 320px;
+    background: linear-gradient(160deg, #3a3f4a, #23262e);
+    border-radius: 24px;
+    padding: 14px 12px 20px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);
+    flex-shrink: 0;
+  }
+  .phone-brand {
+    text-align: center;
+    color: #9aa3b2;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 2px 0 8px;
+    font-style: italic;
+  }
+  .screen {
+    width: 100%;
+    height: 480px;
+    background: linear-gradient(180deg, #2c313c 0%, #20242d 60%, #1a1d24 100%);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #000;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: inset 0 0 12px rgba(0,0,0,.5);
+  }
+
+  /* ---- 顶栏 ---- */
+  .topbar {
+    background: linear-gradient(180deg, #39404e, #2b303b);
+    padding: 5px 7px 3px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    flex-shrink: 0;
+  }
+  .topbar-row1 { display: flex; align-items: center; justify-content: space-between; }
+  .icons-left { display: flex; align-items: center; gap: 3px; }
+  .sim-no { color: #fff; font-size: 11px; font-weight: bold; }
+  .sig { display: inline-flex; align-items: flex-end; gap: 1px; height: 11px; margin: 0 2px; }
+  .sig b { width: 3px; background: #fff; border-radius: 1px; display: inline-block; }
+  .sig b:nth-child(1){height:4px}.sig b:nth-child(2){height:6px}.sig b:nth-child(3){height:8px}.sig b:nth-child(4){height:11px}
+  .sig b.off { background: rgba(255,255,255,.25); }
+  .wifi, .blu, .air { color: #fff; font-size: 10px; margin-left: 5px; }
+  .batt { display: flex; align-items: center; gap: 4px; }
+  .batt-icon {
+    width: 18px; height: 9px; border: 1px solid #fff; border-radius: 2px;
+    position: relative; padding: 1px;
+  }
+  .batt-icon i { display: block; height: 100%; width: 70%; background: #4fc3f7; border-radius: 1px; }
+  .batt-icon::after {
+    content: ""; position: absolute; right: -3px; top: 2px; width: 2px; height: 4px; background: #fff; border-radius: 1px;
+  }
+  .time { color: #fff; font-size: 12px; font-weight: bold; }
+  .topbar-row2 { display: flex; color: #fff; font-size: 9px; padding: 3px 0 1px; gap: 8px; opacity: .9; }
+
+  /* ---- 内容区 ---- */
+  .content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .dash-line {
+    height: 1px;
+    margin: 0 10px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,.45) 0 3px, transparent 3px 6px);
+  }
+  /* 桌面场景 */
+  .desktop-view { display: flex; flex-direction: column; height: 100%; }
+  .shortcut-bar { display: flex; gap: 2px; padding: 5px 8px 3px; }
+  .shortcut {
+    width: 40px; text-align: center; padding: 3px 0; border-radius: 4px;
+    cursor: pointer; user-select: none;
+  }
+  .shortcut .ic { font-size: 20px; line-height: 1.1; }
+  .shortcut.sel { background: rgba(100,181,246,.3); }
+  .shortcut .label-bubble {
+    display: none; position: absolute; background: rgba(0,0,0,.75); border: 1px solid rgba(100,181,246,.5);
+    border-radius: 3px; padding: 1px 5px; font-size: 9px; margin-top: -20px; white-space: nowrap;
+  }
+  .shortcut.sel .label-bubble { display: block; }
+
+  .widget-area { flex: 1; overflow-y: auto; padding: 2px 8px 4px; }
+  .widget-row {
+    display: flex; align-items: center; padding: 4px 4px; border-radius: 4px;
+    cursor: pointer; user-select: none; min-height: 22px;
+  }
+  .widget-row.sel { background: rgba(100,181,246,.3); }
+  .widget-row .w-ic { font-size: 14px; margin-right: 6px; width: 18px; text-align: center; }
+  .widget-row .w-label { flex: 1; color: #fff; font-size: 11px; white-space: nowrap; }
+  .widget-row .w-info { color: #aaa; font-size: 10px; }
+  .bar-track { width: 50px; height: 4px; background: rgba(255,255,255,.18); border-radius: 2px; margin-right: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; }
+
+  /* 后台管理场景 */
+  .manager-view { display: none; flex-direction: column; height: 100%; }
+  .tabs {
+    display: flex; padding: 6px 10px 0; gap: 14px; flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+  }
+  .tab {
+    font-size: 12px; padding: 2px 2px 5px; color: #8a93a5; cursor: pointer;
+    border-bottom: 2px solid transparent; user-select: none;
+  }
+  .tab.act { color: #fff; font-weight: bold; border-bottom-color: #64b5f6; }
+  .manager-summary { font-size: 9px; color: #8a93a5; padding: 4px 10px 2px; flex-shrink: 0; }
+  .task-list { flex: 1; overflow-y: auto; padding: 2px 6px 6px; }
+  .task-row {
+    display: flex; align-items: center; padding: 5px 6px; border-radius: 4px;
+    cursor: pointer; user-select: none; min-height: 26px;
+  }
+  .task-row.sel { background: rgba(100,181,246,.3); }
+  .task-row .t-ic { font-size: 15px; margin-right: 7px; width: 20px; text-align: center; }
+  .task-row .t-name { flex: 1; color: #fff; font-size: 11px; }
+  .task-row .t-state { font-size: 9px; }
+  .t-shield { color: #81c784; font-size: 10px; padding: 1px 4px; border: 1px solid #81c784; border-radius: 3px; }
+  .t-empty { color: #8a93a5; font-size: 10px; text-align: center; padding: 16px 0; }
+  .t-hint { color: #6f7a8c; font-size: 9px; text-align: center; padding-top: 2px; }
+
+  /* ---- 底栏 ---- */
+  .bottombar {
+    background: linear-gradient(180deg, #39404e, #2b303b);
+    border-top: 1px solid rgba(255,255,255,.08);
+    padding: 5px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0; font-size: 11px; height: 28px;
+  }
+  .softkey { color: #64b5f6; cursor: pointer; user-select: none; }
+  .softkey.dim { color: #55606f; cursor: default; }
+  .title { color: #fff; font-weight: bold; font-size: 12px; }
+
+  /* ---- Toast ---- */
+  .toast {
+    position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%);
+    background: rgba(10,12,16,.92); border: 1px solid rgba(100,181,246,.5);
+    color: #fff; font-size: 11px; padding: 6px 14px; border-radius: 4px;
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 9; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ============ 按键区 ============ */
+  .keys { display: flex; flex-direction: column; align-items: center; padding-top: 14px; gap: 8px; }
+  .keys-row { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  .softkey-btn {
+    width: 68px; height: 22px; border-radius: 4px; background: #454b58;
+    color: #b9c2d0; font-size: 10px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; user-select: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.3);
+  }
+  .softkey-btn:active { background: #565d6c; }
+  .dpad { display: grid; grid-template-columns: 44px 44px 44px; grid-template-rows: 40px 40px 40px; gap: 2px; }
+  .dbtn {
+    background: #454b58; border-radius: 6px; color: #c9d2de; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,.3);
+  }
+  .dbtn:active { background: #565d6c; }
+  .d-up { grid-column: 2; grid-row: 1; }
+  .d-left { grid-column: 1; grid-row: 2; }
+  .d-center { grid-column: 2; grid-row: 2; background: #5b6372; font-weight: bold; }
+  .d-right { grid-column: 3; grid-row: 2; }
+  .d-down { grid-column: 2; grid-row: 3; }
+  .back-btn {
+    width: 74px; height: 26px; border-radius: 13px; background: #454b58;
+    color: #b9c2d0; font-size: 10px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; user-select: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.3);
+  }
+  .back-btn:active { background: #565d6c; }
+
+  /* ============ 说明面板 ============ */
+  .panel {
+    width: 400px; background: #171b23; border: 1px solid #2a3140; border-radius: 12px;
+    padding: 18px 20px; flex-shrink: 0;
+  }
+  .panel h1 { font-size: 18px; margin-bottom: 4px; color: #fff; }
+  .panel .sub { color: #8a93a5; font-size: 12px; margin-bottom: 14px; }
+  .panel h2 { font-size: 13px; color: #64b5f6; margin: 14px 0 6px; }
+  .panel p, .panel li { font-size: 12px; line-height: 1.7; color: #c6cdd8; }
+  .panel ul { padding-left: 18px; }
+  .kbd {
+    background: #2a3140; border: 1px solid #3a4354; border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 6px; font-size: 11px; color: #fff; white-space: nowrap;
+  }
+  table.keys-map { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+  table.keys-map td { padding: 4px 6px; border-bottom: 1px solid #242b38; color: #c6cdd8; }
+  table.keys-map td:first-child { color: #8a93a5; width: 110px; }
+  .state-line {
+    margin-top: 12px; background: #202636; border: 1px solid #2c3547; border-radius: 6px;
+    padding: 8px 12px; font-size: 11px; color: #9fe8a4; line-height: 1.8;
+  }
+  .note {
+    margin-top: 12px; background: #262011; border: 1px solid #4a3d18; border-radius: 6px;
+    padding: 8px 12px; font-size: 11px; color: #e0c981; line-height: 1.7;
+  }
+  .flow { font-size: 11px; color: #c6cdd8; line-height: 1.9; }
+  .flow b { color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ================= 手机 ================= -->
+<div class="phone">
+  <div class="phone-brand">NOKIA</div>
+  <div class="screen" id="screen">
+
+    <!-- 顶栏 -->
+    <div class="topbar">
+      <div class="topbar-row1">
+        <div class="icons-left">
+          <span class="sim-no">1</span><span class="sig"><b></b><b></b><b></b><b></b></span>
+          <span class="sim-no">2</span><span class="sig"><b></b><b class="off"></b><b class="off"></b><b class="off"></b></span>
+          <span class="wifi">📶</span><span class="blu">🔹</span>
+        </div>
+        <div class="batt">
+          <span class="batt-icon"><i></i></span>
+          <span class="time" id="clock">10:24</span>
+        </div>
+      </div>
+      <div class="topbar-row2"><span>中国移动</span><span>联通</span></div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="content">
+
+      <!-- 桌面场景 -->
+      <div class="desktop-view" id="desktopView">
+        <div class="shortcut-bar" id="shortcutBar">
+          <!-- JS 渲染 -->
+        </div>
+        <div class="dash-line"></div>
+        <div class="widget-area" id="widgetArea">
+          <!-- JS 渲染 -->
+        </div>
+      </div>
+
+      <!-- 后台管理场景 -->
+      <div class="manager-view" id="managerView">
+        <div class="tabs">
+          <div class="tab act" id="tabRun" data-tab="run">运行</div>
+          <div class="tab" id="tabProt" data-tab="protected">受保护</div>
+        </div>
+        <div class="manager-summary" id="managerSummary"></div>
+        <div class="task-list" id="taskList"></div>
+      </div>
+    </div>
+
+    <!-- 底栏 -->
+    <div class="bottombar">
+      <div class="softkey" id="softLeft">功能表</div>
+      <div class="title" id="midTitle"></div>
+      <div class="softkey" id="softRight">桌面设置</div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <!-- 按键区 -->
+  <div class="keys">
+    <div class="keys-row">
+      <div class="softkey-btn" id="btnSoftLeft">功能表</div>
+      <div class="softkey-btn" id="btnBack">返回</div>
+      <div class="softkey-btn" id="btnSoftRight">桌面设置</div>
+    </div>
+    <div class="dpad">
+      <div class="dbtn d-up" data-key="up">▲</div>
+      <div class="dbtn d-left" data-key="left">◀</div>
+      <div class="dbtn d-center" data-key="center">OK</div>
+      <div class="dbtn d-right" data-key="right">▶</div>
+      <div class="dbtn d-down" data-key="down">▼</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 说明面板 ================= -->
+<div class="panel">
+  <h1>「后台管理」组件 · 交互原型</h1>
+  <div class="sub">仅演示界面布局与操作逻辑，非真实 Android 代码</div>
+
+  <h2>一、入口设计</h2>
+  <ul>
+    <li>桌面组件设置中新增组件类型 <b>「后台管理」</b>，添加后桌面出现一行：<span style="color:#fff">图标 + 「后台管理」 + 右侧实时后台进程数</span>（如「3 个后台」）。</li>
+    <li>方向键选中该行 → 确认键 → 打开后台管理窗口（全屏 Fragment，复用现有页面导航体系，天然支持方向键）。</li>
+  </ul>
+
+  <h2>二、窗口布局</h2>
+  <ul>
+    <li>顶部页签：<b>「运行」</b> / <b>「受保护」</b>，方向键<b>左右</b>切换。</li>
+    <li>运行页：列出所有后台任务（图标 + 名称），已保护的行右侧显示绿色 <b>「护」</b> 盾牌标记。</li>
+    <li>受保护页：列出所有已保护应用，可在此取消保护。</li>
+    <li>底栏：左软键 = <b>全部保护</b>（一键保护所有后台），中间标题 = 「后台管理」，右软键 = <b>清除</b>（清除全部未保护后台）。</li>
+  </ul>
+
+  <h2>三、操作逻辑（已按你的方案 A/A）</h2>
+  <ul>
+    <li><b>确认键</b>：切换保护状态 —— 运行页 = 加入保护名单（显示盾牌）；受保护页 = 移除保护。盾牌实时切换，无需二级菜单。</li>
+    <li><b>右软键「清除」</b>：一键清除<b>所有未保护</b>的后台应用，跳过保护名单，Toast 提示「已清理 X 个后台应用」。</li>
+    <li><b>左软键</b>：运行页 = 「全部保护」；受保护页 = 「全部解除」。</li>
+    <li><b>返回键</b>：退出后台窗口回桌面，桌面组件行的后台数同步刷新。</li>
+    <li><b>保护名单持久化</b>：存于设置存储，重启不丢；系统关键进程（桌面自身 / 输入法 / midlet 等）永远内置保护，不可清除。</li>
+  </ul>
+
+  <h2>四、按键映射</h2>
+  <table class="keys-map">
+    <tr><td>键盘 ▲▼ / 点击方向键</td><td>移动高亮焦点</td></tr>
+    <tr><td>键盘 ◀▶ / 点击方向键</td><td>切换「运行 / 受保护」页签</td></tr>
+    <tr><td>Enter / OK 键</td><td>确认键：切换保护状态</td></tr>
+    <tr><td>Q 键 / 左软键按钮</td><td>全部保护 / 全部解除</td></tr>
+    <tr><td>E 键 / 右软键按钮</td><td>清除（跳过保护名单）</td></tr>
+    <tr><td>Backspace / 返回按钮</td><td>返回桌面</td></tr>
+  </table>
+
+  <div class="state-line" id="stateLine">当前状态：桌面待机屏</div>
+
+  <div class="note">💡 提示：演示数据为模拟后台进程。真实实现用 <b>ActivityManager.getRunningAppProcesses()</b> 枚举后台进程，<b>killBackgroundProcesses()</b> 清理（无需任何权限），保护名单用包名集合过滤。</div>
+</div>
+
+<script>
+// ============ 数据 ============
+var tasks = [
+  { name: "微信",        ic: "💬", prot: false },
+  { name: "QQ",          ic: "🐧", prot: false },
+  { name: "抖音",        ic: "🎵", prot: true  },
+  { name: "淘宝",        ic: "🛒", prot: false },
+  { name: "网易云音乐",   ic: "🎧", prot: false }
+];
+
+var shortcuts = [
+  { name: "功能表", ic: "☰" },
+  { name: "信息",   ic: "✉" },
+  { name: "联系人", ic: "👤" },
+  { name: "通话记录",ic: "📞" },
+  { name: "百宝箱", ic: "🧰" }
+];
+
+var widgets = [
+  { type: "lock",     label: "按下①键锁屏",      ic: "🔒", info: "" },
+  { type: "memory",   label: "内存使用",         ic: "🧠", info: "62%", bar: 0.62, color: "#4fc3f7" },
+  { type: "storage",  label: "存储空间",         ic: "💾", info: "38%", bar: 0.38, color: "#81c784" },
+  { type: "bg",       label: "后台管理",         ic: "🧹", info: "", dynamic: true }
+];
+
+// ============ 状态 ============
+var state = {
+  scene: "desktop",            // desktop | manager
+  deskFocus: 1,                // 桌面焦点索引（快捷栏 0..4，组件行 5..8）
+  tab: "run",                  // run | protected
+  taskFocus: 0,
+  toastTimer: null
+};
+
+var $ = function(id){ return document.getElementById(id); };
+
+// ============ 渲染 ============
+function renderDesktop() {
+  var sb = $("shortcutBar");
+  sb.innerHTML = "";
+  shortcuts.forEach(function(s, i){
+    var d = document.createElement("div");
+    d.className = "shortcut" + (state.deskFocus === i ? " sel" : "");
+    d.innerHTML = '<span class="ic">' + s.ic + '</span><span class="label-bubble">' + s.name + "</span>";
+    d.onclick = function(){ state.deskFocus = i; renderAll(); };
+    sb.appendChild(d);
+  });
+
+  var wa = $("widgetArea");
+  wa.innerHTML = "";
+  widgets.forEach(function(w, idx){
+    var fi = shortcuts.length + idx;
+    var d = document.createElement("div");
+    d.className = "widget-row" + (state.deskFocus === fi ? " sel" : "");
+    if (w.type === "memory" || w.type === "storage") {
+      d.innerHTML = '<span class="w-ic">' + w.ic + '</span><span class="w-label">' + w.label + '</span>' +
+        '<span class="bar-track"><span class="bar-fill" style="width:' + (w.bar*100) + '%;background:' + w.color + '"></span></span>' +
+        '<span class="w-info">' + w.info + "</span>";
+    } else {
+      var info = w.dynamic ? tasks.length + " 个后台" : w.info;
+      d.innerHTML = '<span class="w-ic">' + w.ic + '</span><span class="w-label">' + w.label + '</span>' +
+        '<span class="w-info">' + info + "</span>";
+    }
+    d.onclick = function(){ state.deskFocus = fi; renderAll(); onConfirm(); };
+    wa.appendChild(d);
+  });
+}
+
+function renderManager() {
+  var isRun = state.tab === "run";
+  $("tabRun").className = "tab" + (isRun ? " act" : "");
+  $("tabProt").className = "tab" + (!isRun ? " act" : "");
+
+  var list = isRun ? tasks : tasks.filter(function(t){ return t.prot; });
+  var protCount = tasks.filter(function(t){ return t.prot; }).length;
+
+  $("managerSummary").textContent = isRun
+    ? "后台进程 " + tasks.length + " 个 · 已保护 " + protCount + " 个"
+    : "已保护 " + protCount + " 个应用（清除时自动跳过）";
+
+  var tl = $("taskList");
+  tl.innerHTML = "";
+  if (state.taskFocus >= list.length) state.taskFocus = Math.max(0, list.length - 1);
+  if (list.length === 0) {
+    tl.innerHTML = '<div class="t-empty">' + (isRun ? "没有后台应用" : "暂无保护的应用") + "</div>";
+    if (isRun) tl.innerHTML += '<div class="t-hint">按 ◀▶ 切换到「受保护」页签查看保护名单</div>';
+  }
+  list.forEach(function(t, i){
+    var d = document.createElement("div");
+    d.className = "task-row" + (state.taskFocus === i ? " sel" : "");
+    var st = t.prot
+      ? '<span class="t-shield">护</span>'
+      : '<span class="t-state" style="color:#55606f">可清</span>';
+    if (!isRun) st = '<span class="t-shield">护</span>';
+    d.innerHTML = '<span class="t-ic">' + t.ic + '</span><span class="t-name">' + t.name + '</span>' + st;
+    d.onclick = function(){ state.taskFocus = i; renderAll(); toggleProtect(list[i]); };
+    tl.appendChild(d);
+  });
+}
+
+function renderBar() {
+  var isManager = state.scene === "manager";
+  if (isManager) {
+    $("softLeft").textContent = state.tab === "run" ? "全部保护" : "全部解除";
+    $("softLeft").className = "softkey";
+    $("btnSoftLeft").textContent = state.tab === "run" ? "全部保护" : "全部解除";
+    $("midTitle").textContent = "后台管理";
+    $("softRight").textContent = "清除";
+    $("btnSoftRight").textContent = "清除";
+  } else {
+    $("softLeft").textContent = "功能表";
+    $("btnSoftLeft").textContent = "功能表";
+    $("midTitle").textContent = "";
+    $("softRight").textContent = "桌面设置";
+    $("btnSoftRight").textContent = "桌面设置";
+  }
+  $("desktopView").style.display = isManager ? "none" : "flex";
+  $("managerView").style.display = isManager ? "flex" : "none";
+}
+
+function renderAll() {
+  renderDesktop();
+  renderManager();
+  renderBar();
+  updateStateLine();
+}
+
+// ============ 动作 ============
+function toast(msg) {
+  var t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(state.toastTimer);
+  state.toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 1600);
+}
+
+function toggleProtect(t) {
+  t.prot = !t.prot;
+  renderAll();
+  toast(t.prot ? "已将「" + t.name + "」加入保护名单" : "已移除「" + t.name + "」的保护");
+}
+
+function clearAll() {
+  var cleared = 0;
+  tasks = tasks.filter(function(t){
+    if (t.prot) return true;
+    cleared++;
+    return false;
+  });
+  if (state.taskFocus >= tasks.length) state.taskFocus = Math.max(0, tasks.length - 1);
+  renderAll();
+  toast(cleared > 0 ? "已清理 " + cleared + " 个后台应用" : "没有可清理的后台应用（均已保护）");
+}
+
+function protectAll() {
+  var n = 0;
+  tasks.forEach(function(t){ if (!t.prot) { t.prot = true; n++; } });
+  renderAll();
+  toast("已保护 " + n + " 个后台应用");
+}
+
+function unprotectAll() {
+  var n = 0;
+  tasks.forEach(function(t){ if (t.prot) { t.prot = false; n++; } });
+  renderAll();
+  toast("已解除 " + n + " 个应用的保护");
+}
+
+function openManager() {
+  state.scene = "manager";
+  state.tab = "run";
+  state.taskFocus = 0;
+  renderAll();
+}
+
+function closeManager() {
+  state.scene = "desktop";
+  renderAll();
+}
+
+function onConfirm() {
+  if (state.scene === "desktop") {
+    var fi = state.deskFocus - shortcuts.length;
+    if (fi >= 0 && fi < widgets.length && widgets[fi].type === "bg") openManager();
+    return;
+  }
+  // manager
+  var list = state.tab === "run" ? tasks : tasks.filter(function(t){ return t.prot; });
+  if (state.taskFocus < list.length) toggleProtect(list[state.taskFocus]);
+}
+
+function onSoftLeft() {
+  if (state.scene !== "manager") { toast("演示：此处为「功能表」"); return; }
+  if (state.tab === "run") protectAll(); else unprotectAll();
+}
+
+function onSoftRight() {
+  if (state.scene !== "manager") { toast("演示：此处为「桌面设置」"); return; }
+  clearAll();
+}
+
+function onBack() {
+  if (state.scene === "manager") closeManager();
+  else toast("演示：桌面按返回无动作");
+}
+
+function onUp() {
+  if (state.scene === "desktop") {
+    if (state.deskFocus >= shortcuts.length) {
+      state.deskFocus = shortcuts.length - 1;
+    } else {
+      state.deskFocus = 0;
+    }
+  } else {
+    var list = state.tab === "run" ? tasks : tasks.filter(function(t){ return t.prot; });
+    if (list.length === 0) return;
+    state.taskFocus = state.taskFocus <= 0 ? 0 : state.taskFocus - 1;
+  }
+  renderAll();
+}
+
+function onDown() {
+  if (state.scene === "desktop") {
+    var total = shortcuts.length + widgets.length;
+    if (state.deskFocus < shortcuts.length) {
+      state.deskFocus = shortcuts.length; // 进入组件区
+    } else if (state.deskFocus < total - 1) {
+      state.deskFocus++;
+    } else {
+      state.deskFocus = 0;
+    }
+  } else {
+    var list = state.tab === "run" ? tasks : tasks.filter(function(t){ return t.prot; });
+    if (list.length === 0) return;
+    state.taskFocus = state.taskFocus >= list.length - 1 ? list.length - 1 : state.taskFocus + 1;
+  }
+  renderAll();
+}
+
+function onLeft() {
+  if (state.scene === "manager") { state.tab = "run"; state.taskFocus = 0; renderAll(); }
+  else toast("演示：桌面按左方向键");
+}
+
+function onRight() {
+  if (state.scene === "manager") { state.tab = "protected"; state.taskFocus = 0; renderAll(); }
+  else toast("演示：桌面按右方向键");
+}
+
+// ============ 状态行 ============
+function updateStateLine() {
+  var s = $("stateLine");
+  if (state.scene === "desktop") {
+    var fi = state.deskFocus;
+    var name = fi < shortcuts.length ? "快捷栏·" + shortcuts[fi].name
+              : "组件·" + widgets[fi - shortcuts.length].label;
+    s.innerHTML = "场景：<b>桌面待机屏</b> ｜ 焦点：" + name + " ｜ 后台进程 " + tasks.length + " 个";
+  } else {
+    var list = state.tab === "run" ? tasks : tasks.filter(function(t){ return t.prot; });
+    var t = list[state.taskFocus];
+    s.innerHTML = "场景：<b>后台管理（" + (state.tab === "run" ? "运行" : "受保护") + "页签）</b> ｜ 焦点：" +
+      (t ? t.name : "—") + (t && t.prot ? "（已保护）" : "") +
+      " ｜ 可清除 " + tasks.filter(function(x){ return !x.prot; }).length + " 个";
+  }
+}
+
+// ============ 事件绑定 ============
+document.addEventListener("keydown", function(e){
+  switch (e.key) {
+    case "ArrowUp": e.preventDefault(); onUp(); break;
+    case "ArrowDown": e.preventDefault(); onDown(); break;
+    case "ArrowLeft": e.preventDefault(); onLeft(); break;
+    case "ArrowRight": e.preventDefault(); onRight(); break;
+    case "Enter": e.preventDefault(); onConfirm(); break;
+    case "q": case "Q": onSoftLeft(); break;
+    case "e": case "E": onSoftRight(); break;
+    case "Backspace": e.preventDefault(); onBack(); break;
+  }
+});
+
+// 页签点击
+$("tabRun").onclick = function(){ if (state.scene === "manager") { state.tab = "run"; state.taskFocus = 0; renderAll(); } };
+$("tabProt").onclick = function(){ if (state.scene === "manager") { state.tab = "protected"; state.taskFocus = 0; renderAll(); } };
+
+// 软键 + 按键区
+$("softLeft").onclick = onSoftLeft;
+$("softRight").onclick = onSoftRight;
+$("btnSoftLeft").onclick = onSoftLeft;
+$("btnSoftRight").onclick = onSoftRight;
+$("btnBack").onclick = onBack;
+document.querySelectorAll(".dbtn").forEach(function(b){
+  b.onclick = function(){ ({up:onUp, down:onDown, left:onLeft, right:onRight, center:onConfirm})[b.dataset.key](); };
+});
+
+// 时钟
+function tick() {
+  var d = new Date();
+  var h = ("0" + d.getHours()).slice(-2);
+  var m = ("0" + d.getMinutes()).slice(-2);
+  $("clock").textContent = h + ":" + m;
+}
+tick(); setInterval(tick, 10000);
+
+renderAll();
+</script>
+</body>
+</html>

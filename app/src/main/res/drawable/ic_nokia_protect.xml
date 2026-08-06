@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 保护盾牌图标：后台管理保护名单标记，绿色实心盾牌 + 白色对勾 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#81C784"
+        android:pathData="M12,1L3,5v6c0,5.55 3.84,10.74 9,12c5.16,-1.26 9,-6.45 9,-12V5L12,1z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10.08,15.58l-3.42,-3.42 1.41,-1.41 2.01,2 4.86,-4.86 1.41,1.41z" />
+</vector>

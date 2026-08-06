@@ -16,9 +16,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 诺基亚桌面设置的 SharedPreferences 封装。
@@ -31,6 +33,7 @@ public class NokiaSettingsStorage {
 	private static final String KEY_WALLPAPER = "wallpaper";
 	private static final String KEY_SOFT_LEFT_ACTION = "soft_left_action";
 	private static final String KEY_SOFT_RIGHT_ACTION = "soft_right_action";
+	private static final String KEY_PROTECTED_PACKAGES = "protected_packages";
 
 	private final SharedPreferences prefs;
 	private final Context context;
@@ -328,5 +331,42 @@ public class NokiaSettingsStorage {
 	public void setSoftRightAction(String action) {
 		prefs.edit().putString(KEY_SOFT_RIGHT_ACTION, action).apply();
 		NokiaLog.i("SettingsStorage", "setSoftRightAction: " + action);
+	}
+
+	// ── 后台管理保护名单 ──
+
+	/**
+	 * 读取后台清理保护名单（包名集合）。
+	 * 清理后台时这些包名的进程会被跳过，不会被 killBackgroundProcesses。
+	 * 存储格式为 JSON 字符串数组；未配置时返回空集合。
+	 */
+	public Set<String> getProtectedPackages() {
+		Set<String> result = new HashSet<>();
+		String json = prefs.getString(KEY_PROTECTED_PACKAGES, null);
+		if (json == null || json.isEmpty()) {
+			return result;
+		}
+		try {
+			JSONArray arr = new JSONArray(json);
+			for (int i = 0; i < arr.length(); i++) {
+				result.add(arr.getString(i));
+			}
+			NokiaLog.i("SettingsStorage", "getProtectedPackages: 读取 " + result.size() + " 个包");
+		} catch (JSONException e) {
+			NokiaLog.e("SettingsStorage", "getProtectedPackages 解析失败", e);
+		}
+		return result;
+	}
+
+	/** 整体保存保护名单（覆盖式写入）。 */
+	public void setProtectedPackages(Set<String> packages) {
+		JSONArray arr = new JSONArray();
+		if (packages != null) {
+			for (String pkg : packages) {
+				arr.put(pkg);
+			}
+		}
+		prefs.edit().putString(KEY_PROTECTED_PACKAGES, arr.toString()).apply();
+		NokiaLog.i("SettingsStorage", "setProtectedPackages: 保存 " + arr.length() + " 个包");
 	}
 }

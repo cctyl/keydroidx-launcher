@@ -410,6 +410,9 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 				return getUsageText();
 			case NokiaWidgetItem.TYPE_LOCK_SCREEN:
 				return ""; // 提示文字已在主标签中，右侧留空
+			case NokiaWidgetItem.TYPE_BG_MANAGER:
+				return NokiaBgManagerHelper.countBackgroundProcesses(requireContext())
+						+ " 个后台";
 			default:
 				return item.getTypeTag();
 		}
@@ -582,6 +585,14 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 				row.setOnClickListener(v -> {
 					NokiaLog.i("Desktop", "锁屏组件点击：执行锁屏");
 					NokiaLockScreen.lock(requireContext());
+				});
+				break;
+			case NokiaWidgetItem.TYPE_BG_MANAGER:
+				// 后台管理组件：点击打开后台管理窗口（运行/受保护页签 + 清除）
+				row.setOnClickListener(v -> {
+					NokiaLog.i("Desktop", "后台管理组件点击：打开后台窗口");
+					((NokiaDesktopActivity) requireActivity())
+							.openFragment(new NokiaBackgroundManagerFragment());
 				});
 				break;
 			default:

@@ -302,6 +302,16 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		int action = keyBinding.resolveAction(event);
 
 		if (action < 0) {
+			// 数字键 0：在后台管理窗口内一键清理（0 键默认未绑定任何动作，仅在目标页面生效）
+			if (event.getKeyCode() == KeyEvent.KEYCODE_0) {
+				Fragment bgHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+				if (bgHost instanceof NokiaBackgroundManagerFragment) {
+					NokiaLog.i("Desktop", "数字键 0：后台管理一键清理");
+					((NokiaBackgroundManagerFragment) bgHost).onCleanKey();
+					lastHandledDownKeyCode = event.getKeyCode();
+					return true;
+				}
+			}
 			// 返回键未绑定时兜底为导航返回（非桌面 Fragment），否则交给系统。
 			if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
 				Fragment backHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
