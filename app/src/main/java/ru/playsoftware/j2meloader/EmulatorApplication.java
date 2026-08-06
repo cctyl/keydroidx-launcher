@@ -42,6 +42,7 @@ import java.util.Arrays;
 
 import javax.microedition.util.ContextHolder;
 
+import ru.playsoftware.j2meloader.nokia.NokiaLog;
 import ru.playsoftware.j2meloader.util.Constants;
 
 public class EmulatorApplication extends Application {
@@ -76,6 +77,9 @@ public class EmulatorApplication extends Application {
 		// ACRA 崩溃上报初始化（含签名校验 IPC）延迟到主线程约 2s 后执行，
 		// 避免冷启动进程阶段阻塞首帧；仅主进程延迟，:midlet 子进程保持同步初始化（游戏崩溃上报不受影响）。
 		if (isMainProcess()) {
+			// 文件日志 + 崩溃堆栈落盘：尽早初始化，覆盖冷启动阶段的崩溃。
+			NokiaLog.init(this);
+			installCrashHandler();
 			new Handler(Looper.getMainLooper()).postDelayed(this::initAcra, 2000);
 		} else {
 			initAcra();
@@ -105,8 +109,33 @@ public class EmulatorApplication extends Application {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		// ACRA 已注册自己的默认异常处理器，重新包装为「先落盘崩溃堆栈，再交给 ACRA」的链式处理。
+		installCrashHandler();
 		long elapsed = System.currentTimeMillis() - start;
 		android.util.Log.i("EmulatorApp", "ACRA 初始化完成，耗时 " + elapsed + "ms");
+	}
+
+	/**
+	 * 注册崩溃堆栈落盘：任何未捕获异常先同步写入当日日志文件，
+	 * 再交给链上原有处理器（系统默认弹「已停止运行」/ ACRA 上报）。
+	 * 可多次调用：每次以当前默认处理器为链尾，保证本方法始终在最外层。
+	 */
+	private void installCrashHandler() {
+		try {
+			final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+			Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+				NokiaLog.fileCrash("未捕获异常（主进程）", throwable);
+				if (prev != null) {
+					prev.uncaughtException(thread, throwable);
+				} else {
+					android.os.Process.killProcess(android.os.Process.myPid());
+					System.exit(1);
+				}
+			});
+			android.util.Log.i("EmulatorApp", "崩溃落盘处理器已安装");
+		} catch (Exception e) {
+			android.util.Log.w("EmulatorApp", "installCrashHandler 失败", e);
+		}
 	}
 
 	/** 读取 /proc/self/cmdline 判断当前是否为主进程（轻量文件读取，无 Binder IPC）。 */

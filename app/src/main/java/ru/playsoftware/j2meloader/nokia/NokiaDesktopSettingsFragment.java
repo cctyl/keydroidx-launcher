@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,6 +29,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 
 	private static final int[] ITEM_ICONS = {
 			R.drawable.s60_settings,       // 字体大小
+			R.drawable.s60_settings,       // 日志记录
 			R.drawable.ic_nokia_settings,  // 快捷栏设置
 			R.drawable.s60_gallery,        // 壁纸设置
 			R.drawable.s60_settings_alt,   // 桌面组件设置
@@ -38,6 +40,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 
 	private static final String[] ITEM_NAMES = {
 			"字体大小",
+			"日志记录",
 			"顶部快捷栏设置",
 			"壁纸设置",
 			"桌面组件设置",
@@ -50,7 +53,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 	private static final float[] FONT_SCALES = {0.85f, 1.0f, 1.15f, 1.3f};
 	private static final String[] FONT_LABELS = {"较小", "标准", "较大", "最大"};
 
-	/** 取列表项名称：第 0 项（字体大小）显示当前档位；第 6 项（默认桌面设置）根据状态动态展示。 */
+	/** 取列表项名称：字体大小显示当前档位；日志记录显示开关状态；默认桌面根据状态动态展示。 */
 	private String getItemDisplayName(int index) {
 		if (index == 0) {
 			float cur = NokiaSettingsStorage.getFontScale(requireContext());
@@ -63,7 +66,11 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			}
 			return "字体大小：" + label;
 		}
-		if (index == 6) {
+		if (index == 1) {
+			return NokiaSettingsStorage.isFileLogEnabled(requireContext())
+					? "日志记录：开启" : "日志记录：关闭";
+		}
+		if (index == 7) {
 			boolean isDefault = ((NokiaDesktopActivity) requireActivity()).isDefaultLauncher();
 			return isDefault ? "默认桌面：已设置" : "默认桌面设置";
 		}
@@ -71,6 +78,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 	}
 
 	private View[] itemViews;
+	private TextView[] tvNames;
 	private ScrollView settingsScroll;
 	private int focusIndex = -1;
 	private View selectedView = null;
@@ -104,6 +112,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 		constrainScrollHeight(view);
 
 		itemViews = new View[ITEM_NAMES.length];
+		tvNames = new TextView[ITEM_NAMES.length];
 		for (int i = 0; i < ITEM_NAMES.length; i++) {
 			LinearLayout row = new LinearLayout(requireContext());
 			row.setOrientation(LinearLayout.HORIZONTAL);
@@ -132,6 +141,7 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 			tvName.setText(getItemDisplayName(i));
 			tvName.setTextColor(0xFFFFFFFF);
 			NokiaDimens.textSize(tvName, 12);
+			tvNames[i] = tvName;
 			row.addView(tvName);
 
 			// 箭头
@@ -198,34 +208,54 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 				showFontScaleDialog();
 				return true;
 			case 1:
+				NokiaLog.i("DesktopSettings", "日志记录开关");
+				toggleLogEnabled();
+				return true;
+			case 2:
 				NokiaLog.i("DesktopSettings", "进入快捷栏设置");
 				host.openFragment(new NokiaShortcutSettingsFragment());
 				return true;
-			case 2:
+			case 3:
 				NokiaLog.i("DesktopSettings", "壁纸设置（待实现）");
 				// TODO: 壁纸设置
 				return true;
-			case 3:
+			case 4:
 				NokiaLog.i("DesktopSettings", "进入桌面组件设置");
 				host.openFragment(new NokiaWidgetSettingsFragment());
 				return true;
-			case 4:
+			case 5:
 				NokiaLog.i("DesktopSettings", "按键绑定");
 				host.openFragment(new NokiaKeyBindFragment());
 				return true;
-			case 5:
+			case 6:
 				NokiaLog.i("DesktopSettings", "进入应用向导");
 				host.getSupportFragmentManager().beginTransaction()
 						.replace(R.id.midPanel, new NokiaKeyBindWizardFragment())
 						.addToBackStack(null)
 						.commit();
 				return true;
-			case 6:
+			case 7:
 				NokiaLog.i("DesktopSettings", "默认桌面设置：引导设为默认桌面");
 				host.requestSetDefaultLauncher();
 				return true;
 			default:
 				return false;
+		}
+	}
+
+	/**
+	 * 切换日志记录开关并实时生效：
+	 * 开启=输出详细日志（全级别）；关闭=仅输出 ERROR 及以上。
+	 * 默认值：debug 版开启，release 版关闭。
+	 */
+	private void toggleLogEnabled() {
+		boolean next = !NokiaSettingsStorage.isFileLogEnabled(requireContext());
+		NokiaSettingsStorage.setFileLogEnabled(requireContext(), next);
+		NokiaLog.setFileMinLevel(next ? Log.DEBUG : Log.ERROR);
+		NokiaLog.i("DesktopSettings", "日志记录切换为: " + (next ? "开启(详细)" : "关闭(仅错误)"));
+		// 刷新当前项文案，立即显示新状态
+		if (tvNames != null && tvNames.length > 1 && tvNames[1] != null) {
+			tvNames[1].setText(getItemDisplayName(1));
 		}
 	}
 

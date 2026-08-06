@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import ru.playsoftware.j2meloader.BuildConfig;
+
 /**
  * 诺基亚桌面设置的 SharedPreferences 封装。
  * 管理快捷栏应用列表、壁纸、软键映射等设置项的读写。
@@ -388,5 +390,29 @@ public class NokiaSettingsStorage {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putFloat(KEY_FONT_SCALE, scale).apply();
 		NokiaLog.i("SettingsStorage", "setFontScale: " + scale);
+	}
+
+	// ── 日志记录开关 ──
+
+	private static final String KEY_LOG_FILE = "log_file_enabled";
+
+	/**
+	 * 是否输出详细文件日志（桌面设置 → 日志记录）。
+	 * 未设置过时按构建类型给默认：debug 开启、release 关闭。
+	 * 关闭时文件只记录 ERROR 及以上；开启时记录全部详细日志。
+	 */
+	public static boolean isFileLogEnabled(Context ctx) {
+		SharedPreferences sp = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+		if (!sp.contains(KEY_LOG_FILE)) {
+			return BuildConfig.DEBUG;
+		}
+		return sp.getBoolean(KEY_LOG_FILE, true);
+	}
+
+	/** 保存日志记录开关（true=详细日志）。 */
+	public static void setFileLogEnabled(Context ctx, boolean enabled) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putBoolean(KEY_LOG_FILE, enabled).apply();
+		NokiaLog.i("SettingsStorage", "setFileLogEnabled: " + enabled);
 	}
 }
