@@ -11,10 +11,8 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -61,7 +59,7 @@ import ru.playsoftware.j2meloader.config.Config;
  * 已添加应用灰色不可选；EDIT 模式当前编辑项浅蓝底 + 📌 角标、光标初始定位其上。
  * ACTIVITY_ADD / ACTIVITY_EDIT 模式不做已添加标记（Activity快捷可与应用组件共存）。
  */
-public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage {
+public class NokiaWidgetAppPickerFragment extends NokiaPageFragment {
 
 	private static final String TAG = "WidgetAppPicker";
 	private static final String EXTRA_MODE = "mode";
@@ -171,27 +169,13 @@ public class NokiaWidgetAppPickerFragment extends Fragment implements NokiaPage 
 		return mode == MODE_ACTIVITY_ADD || mode == MODE_ACTIVITY_EDIT;
 	}
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_widget_app_picker, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_widget_app_picker;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整
-		host.fixMidContentHeight(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		Bundle args = getArguments();
 		if (args != null) {
 			mode = args.getInt(EXTRA_MODE, MODE_ADD);

@@ -10,7 +10,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -37,7 +36,7 @@ import ru.playsoftware.j2meloader.R;
  * S2 选项菜单与 S3 删除子菜单均为底部弹出的 DialogFragment
  * （样式与「功能表→应用程序→选中JAR的选项菜单」一致），弹窗内已接入 NokiaKeyBinding。
  */
-public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
+public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 
 	private static final String TAG = "WidgetSettings";
 
@@ -66,11 +65,9 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 
 	private Toast toast;
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_widget_settings, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_widget_settings;
 	}
 
 	@Override
@@ -85,20 +82,7 @@ public class NokiaWidgetSettingsFragment extends Fragment implements NokiaPage {
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整
-		host.fixMidContentHeight(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		storage = new NokiaWidgetStorage(requireContext());
 		listLayout = view.findViewById(R.id.widgetListLayout);
 		scroll = view.findViewById(R.id.widgetScroll);

@@ -14,10 +14,8 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -43,7 +41,7 @@ import ru.playsoftware.j2meloader.R;
  * 方向键在页内移动焦点：左/右到边界时翻到上/下一页；确认键启动对应 APP。
  * 末尾追加「百宝箱」「按键绑定」两个特殊入口，保留原功能可达性。
  */
-public class NokiaMenuFragment extends Fragment implements NokiaPage {
+public class NokiaMenuFragment extends NokiaPageFragment {
 
 	/**
 	 * 第一页固定槽位（参照诺基亚 S60 功能表布局）。
@@ -160,26 +158,13 @@ public class NokiaMenuFragment extends Fragment implements NokiaPage {
 	/** 复用于根视图与每个 cell 的滑动手势监听 */
 	private View.OnTouchListener swipeTouchListener;
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_menu, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_menu;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配（左右触摸由 Activity bindBottomBarTouch 统一处理）
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		// 监听包安装/卸载/替换，实时刷新应用列表
 		IntentFilter pkgFilter = new IntentFilter();
 		pkgFilter.addAction(Intent.ACTION_PACKAGE_ADDED);

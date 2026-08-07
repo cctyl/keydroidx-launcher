@@ -3,7 +3,6 @@ package ru.playsoftware.j2meloader.nokia;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -25,7 +24,7 @@ import ru.playsoftware.j2meloader.R;
  * 桌面设置主菜单。纵向列表展示各项设置入口。
  * 支持方向键导航（实现 NokiaFocusHost），风格延续 S60 菜单。
  */
-public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage {
+public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 
 	private static final int[] ITEM_ICONS = {
 			R.drawable.s60_settings,       // 字体大小
@@ -89,29 +88,13 @@ public class NokiaDesktopSettingsFragment extends Fragment implements NokiaPage 
 	private int focusIndex = -1;
 	private View selectedView = null;
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_desktop_settings, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_desktop_settings;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整，
-		// 否则 320x480 等高屏下内容不铺满、右侧/底部露缝。
-		host.fixMidContentHeight(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		// 构建设置列表
 		LinearLayout listLayout = view.findViewById(R.id.settingsList);
 		if (listLayout == null) return;

@@ -4,9 +4,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -28,7 +26,7 @@ import ru.playsoftware.j2meloader.R;
  * 本页只做两件事：展示服务状态，以及告诉普通用户如何激活。左软键无对应操作
  * （返回 null 隐藏），保留「刷新状态」按钮供激活后检测在线状态。
  */
-public class ShizukuFragment extends Fragment implements NokiaPage {
+public class ShizukuFragment extends NokiaPageFragment {
 
 	private TextView statusText;
 	private ScrollView contentScroll;
@@ -40,25 +38,13 @@ public class ShizukuFragment extends Fragment implements NokiaPage {
 			"刷新状态",
 	};
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_shizuku, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_shizuku;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		statusText = view.findViewById(R.id.shizukuStatus);
 		contentScroll = view.findViewById(R.id.shizukuScroll);
 		actionList = view.findViewById(R.id.shizukuActions);

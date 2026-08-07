@@ -8,7 +8,6 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -43,7 +42,7 @@ import ru.playsoftware.j2meloader.config.Config;
  * 快捷栏应用选择界面。展示所有可选应用（安卓 + J2ME），多选后保存。
  * 支持方向键导航，SELECT 切换选中状态，左软键保存，右软键返回。
  */
-public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage {
+public class NokiaShortcutSettingsFragment extends NokiaPageFragment {
 
 	private LinearLayout appListLayout;
 	private ScrollView appScroll;
@@ -57,28 +56,13 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 	private View selectedView = null;
 	private TextView tvSelectedCount;
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_shortcut_settings, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_shortcut_settings;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整
-		host.fixMidContentHeight(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 		appListLayout = view.findViewById(R.id.appListLayout);
 		appScroll = view.findViewById(R.id.appScroll);

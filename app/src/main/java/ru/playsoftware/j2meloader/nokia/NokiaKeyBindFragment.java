@@ -5,9 +5,7 @@ import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -25,7 +23,7 @@ import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
  * 列出所有 8 个动作及对应按键，支持方向键导航选中 + 确认键进入录制模式，
  * 按下任意物理键即完成绑定。
  */
-public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKeyRecorder {
+public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyRecorder {
 
 	private NokiaKeyBinding keyBinding;
 	private View[] itemViews = new View[NokiaKeyBinding.ACTION_COUNT];
@@ -52,48 +50,15 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 	private TextView recordStatusText;
 	private TextView titleText;
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_key_bind, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_key_bind;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		// 记录进入时间，用于防抖：进入界面的残留确认键（key repeat）会被忽略，不触发录制
 		enteredAt = SystemClock.uptimeMillis();
-
-		// 动态调整根视图高度 = panelH / scale，使内容视觉高度恰好填满中间容器：
-		// - 视觉高 < panelH：高度拉高，ScrollView(weight=1) 吸收多余空间（避免底部留白）；
-		// - 视觉高 > panelH：若保持布局固定 262dp，scaleMidContent 会触发"缩小分支"
-		//   （finalScale = panelH / contentH），宽度随比例同步缩小、右侧出现缝隙
-		//   （如 ldpi 的 4a24ecf：宽度缩到 232px，容器 240px，右缝 8px）。
-		//   改为目标高度后 visualH == panelH，不触发缩小，宽度保持铺满。
-		view.post(() -> {
-			View panel = (View) view.getParent();
-			if (panel == null || panel.getHeight() <= 0 || view.getHeight() <= 0) {
-				return;
-			}
-			// 统一使用 getScale() 获取缩放比（与基类算法一致）
-			float scale = host.getScale();
-			int panelH = panel.getHeight();
-			int targetH = Math.round(panelH / scale);
-			ViewGroup.LayoutParams lp = view.getLayoutParams();
-			if (lp.height != targetH) {
-				lp.height = targetH;
-				view.setLayoutParams(lp);
-				NokiaLog.i("KeyBind", "调整内容高度=" + targetH + "px 使视觉高=panelH=" + panelH
-						+ "px scale=" + scale);
-				// 高度变化触发重新布局后，重新执行等比缩放（此时 visualH == panelH，
-				// 不触发缩小分支，宽度保持铺满）
-				view.post(() -> host.scaleMidContent(view, true));
-			}
-		});
 
 		keyBinding = new NokiaKeyBinding(requireContext());
 
@@ -108,15 +73,6 @@ public class NokiaKeyBindFragment extends Fragment implements NokiaPage, NokiaKe
 			NokiaLog.i("KeyBind", "触摸点击录制状态栏 -> 取消录制");
 			onSkipCurrent();
 		});
-
-		// 壁纸设为桌面深蓝渐变，与诺基亚桌面画风一致
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
-		host.refreshPageBar();
 
 		buildList();
 

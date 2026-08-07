@@ -3,9 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -30,7 +28,7 @@ import ru.playsoftware.j2meloader.R;
  * 仅首次启动弹出（由 NokiaKeyBinding.isWizardDone 控制，清数据后重置）。
  * 整个流程完全由物理按键驱动，复用 NokiaKeyRecorder 的录制捕获机制。
  */
-public class NokiaKeyBindWizardFragment extends Fragment implements NokiaPage, NokiaKeyRecorder {
+public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements NokiaKeyRecorder {
 
 	private static final int STATE_INTRO = 0;
 	private static final int STATE_RECORDING = 1;
@@ -50,51 +48,14 @@ public class NokiaKeyBindWizardFragment extends Fragment implements NokiaPage, N
 	private TextView recordProgress;
 	private TextView stepBadge;
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_key_bind_wizard, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_key_bind_wizard;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-
-		// 动态调整根视图高度 = panelH / scale，使内容视觉高度恰好填满中间容器，
-		// 避免 contentFillsPanel=true 时跳过二次缩小导致内容偏下（320×480 设备尤其明显）。
-		// 与 NokiaKeyBindFragment 逻辑一致，scale 走 getScale() 单一来源。
-		view.post(() -> {
-			View panel = (View) view.getParent();
-			if (panel == null || panel.getHeight() <= 0 || view.getHeight() <= 0) {
-				return;
-			}
-			float scale = host.getScale();
-			int panelH = panel.getHeight();
-			int targetH = Math.round(panelH / scale);
-			ViewGroup.LayoutParams lp = view.getLayoutParams();
-			if (lp.height != targetH) {
-				lp.height = targetH;
-				view.setLayoutParams(lp);
-				NokiaLog.i("KeyWizard", "调整内容高度=" + targetH + "px 使视觉高=panelH=" + panelH
-						+ "px scale=" + scale);
-				// 高度变化后重新执行等比缩放（此时 visualH == panelH，不触发缩小分支）
-				view.post(() -> host.scaleMidContent(view, true));
-			}
-		});
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		keyBinding = new NokiaKeyBinding(requireContext());
-
-		// 壁纸设为桌面深蓝渐变，与诺基亚桌面画风一致
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
-		host.refreshPageBar();
 
 		introCard = view.findViewById(R.id.introCard);
 		recordingLayout = view.findViewById(R.id.recordingLayout);

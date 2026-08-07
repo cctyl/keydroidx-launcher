@@ -7,7 +7,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -40,7 +39,7 @@ import ru.playsoftware.j2meloader.R;
  * </ul>
  * 保护名单持久化于 {@link NokiaSettingsStorage}，重启不丢。
  */
-public class NokiaBackgroundManagerFragment extends Fragment implements NokiaPage {
+public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 
 	private static final String TAG = "BgManager";
 
@@ -63,28 +62,13 @@ public class NokiaBackgroundManagerFragment extends Fragment implements NokiaPag
 	private Toast toast;
 	private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_bg_manager, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_bg_manager;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		// 贴顶布局：与桌面设置等列表页一致，避免页面整体下移留白
-		host.scaleMidContent(view, true);
-		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整
-		host.fixMidContentHeight(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 		protectedSet = settingsStorage.getProtectedPackages();
 

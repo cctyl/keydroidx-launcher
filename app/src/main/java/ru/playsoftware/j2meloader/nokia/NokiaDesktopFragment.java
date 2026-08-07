@@ -13,9 +13,7 @@ import android.os.Looper;
 import android.os.StatFs;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -43,7 +41,7 @@ import ru.playsoftware.j2meloader.config.Config;
  * 支持方向键在快捷应用栏（动态数量）和桌面组件区之间导航。
  * 桌面组件由用户在桌面设置中配置，动态加载自 NokiaWidgetStorage。
  */
-public class NokiaDesktopFragment extends Fragment implements NokiaPage {
+public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	private final List<View> focusTargets = new ArrayList<>();
 	private final List<ShortcutApp> shortcutApps = new ArrayList<>();
@@ -66,19 +64,18 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 	/** 快捷栏第一个焦点索引 */
 	private static final int SHORTCUT_FIRST = 0;
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_desktop, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_desktop;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
+	protected int getWallpaperRes() {
+		return R.drawable.bg_nokia_desktop;
+	}
 
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		shortcutBar = view.findViewById(R.id.shortcutBar);
 		shortcutNameBubble = view.findViewById(R.id.shortcutNameBubble);
 		bubbleHandler = new Handler(Looper.getMainLooper());
@@ -95,12 +92,6 @@ public class NokiaDesktopFragment extends Fragment implements NokiaPage {
 
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 		widgetStorage = new NokiaWidgetStorage(requireContext());
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_desktop);
-		}
-		host.refreshPageBar();
 
 		focusTargets.clear();
 		shortcutApps.clear();

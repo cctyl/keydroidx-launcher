@@ -6,9 +6,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -43,7 +41,7 @@ import ru.woesss.j2me.installer.NokiaInstallerDialog;
  * 确认键直接启动应用，左软键弹出选项菜单（启动/设置/卸载）。
  * 方向键导航，复用 J2ME-Loader 原有的安装与启动逻辑。
  */
-public class NokiaBoxFragment extends Fragment implements NokiaPage {
+public class NokiaBoxFragment extends NokiaPageFragment {
 
 	// ---- 网格常量 ----
 	private static final int COLS = 3;
@@ -91,26 +89,24 @@ public class NokiaBoxFragment extends Fragment implements NokiaPage {
 		appRepository = appListModel.getAppRepository();
 	}
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_box, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_box;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, false);
+	protected boolean isTopAlign() {
+		// 百宝箱垂直居中（内容矮于面板时居中，不贴顶）
+		return false;
+	}
 
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_box);
-		}
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
-		host.refreshPageBar();
+	@Override
+	protected int getWallpaperRes() {
+		return R.drawable.bg_nokia_box;
+	}
 
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		appScroll = view.findViewById(R.id.appScroll);
 		appContainer = view.findViewById(R.id.appContainer);
 

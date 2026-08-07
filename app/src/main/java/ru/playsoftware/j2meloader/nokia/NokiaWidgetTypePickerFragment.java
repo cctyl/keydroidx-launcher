@@ -4,7 +4,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -32,7 +31,7 @@ import ru.playsoftware.j2meloader.R;
  * 「使用时长」依赖 UsageStatsManager（API 21+），Android 4.4 及以下显示为灰色、
  * 光标跳过、确认键无响应。
  */
-public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage {
+public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 
 	private static final String TAG = "WidgetTypePicker";
 
@@ -58,28 +57,13 @@ public class NokiaWidgetTypePickerFragment extends Fragment implements NokiaPage
 	private NokiaWidgetStorage storage;
 	private Toast toast;
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_widget_type_picker, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_widget_type_picker;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整
-		host.fixMidContentHeight(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		storage = new NokiaWidgetStorage(requireContext());
 		listLayout = view.findViewById(R.id.typeListLayout);
 		scroll = view.findViewById(R.id.typeScroll);

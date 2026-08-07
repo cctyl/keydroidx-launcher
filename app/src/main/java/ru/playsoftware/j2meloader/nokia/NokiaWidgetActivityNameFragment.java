@@ -2,9 +2,7 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -25,7 +23,7 @@ import ru.playsoftware.j2meloader.R;
  * 接收 Bundle 参数：mode (ADD/EDIT), packageName, className, activityLabel, editIndex(EDIT模式)。
  * 名称字段预填 Activity label，用户可直接确认或修改后保存。
  */
-public class NokiaWidgetActivityNameFragment extends Fragment implements NokiaPage {
+public class NokiaWidgetActivityNameFragment extends NokiaPageFragment {
 
 	private static final String TAG = "WidgetActivityName";
 
@@ -83,27 +81,13 @@ public class NokiaWidgetActivityNameFragment extends Fragment implements NokiaPa
 		return f;
 	}
 
-	@Nullable
 	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		return inflater.inflate(R.layout.fragment_nokia_widget_activity_name, container, false);
+	protected int getLayoutRes() {
+		return R.layout.fragment_nokia_widget_activity_name;
 	}
 
 	@Override
-	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.scaleMidContent(view, true);
-		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整
-		host.fixMidContentHeight(view, true);
-
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			wall.setBackgroundResource(R.drawable.bg_nokia_menu);
-		}
-		host.refreshPageBar();
-
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		Bundle args = getArguments();
 		if (args != null) {
 			mode = args.getString(EXTRA_MODE, MODE_ADD);

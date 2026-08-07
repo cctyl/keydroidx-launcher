@@ -163,6 +163,22 @@
 
 **关键约束：不改动「240 基准 + 整体缩放」架构，不引入资源限定符目录（如 values-sw320dp、layout-hdpi 等），避免与代码缩放双轨冲突。**
 
+### 页面 Fragment 必须继承 NokiaPageFragment（强制，防漏缩放）
+
+**所有中间内容区的页面 Fragment 一律继承 `NokiaPageFragment`（模板方法基类），禁止直接 `extends Fragment implements NokiaPage`。** 基类用 `final` 方法固化每个页面都必须执行的样板，子类**无法绕过**：
+
+- `final onCreateView` → 自动 inflate 子类声明的 `getLayoutRes()` 布局；
+- `final onViewCreated` → 自动执行 `scaleMidContent` 缩放 + `fixMidContentHeight` 高度调整（topAlign 时）+ 壁纸 + `refreshPageBar()` 底栏装配，随后调用子类 `onPageCreated()` 钩子。
+
+子类只需实现：
+- `getLayoutRes()`：返回布局（根宽固定 240dp、根高 match_parent）；
+- `onPageCreated(View, Bundle)`：自己的初始化（findViewById / 建列表 / 设焦点等）；
+- 特殊页面覆写 `isTopAlign()`（默认 true；百宝箱等居中页返回 false）与 `getWallpaperRes()`（默认 `bg_nokia_menu`；桌面 `bg_nokia_desktop`、百宝箱 `bg_nokia_box`）。
+
+> 历史教训：缩放/高度/壁纸/底栏这四件套曾被每个页面手抄 17 处，漏抄/写错一处就出「右侧露缝/内容偏下」类 bug。收进基类 final 方法后，新页面想漏都不可能（留着旧 `onCreateView`/`onViewCreated` 覆写会直接编译失败）。
+>
+> 已迁移（2026-08）：`NokiaDesktopFragment`、`NokiaMenuFragment`、`NokiaBoxFragment`、`NokiaDesktopSettingsFragment`、`NokiaShortcutSettingsFragment`、`NokiaWidgetSettingsFragment`、`NokiaWidgetTypePickerFragment`、`NokiaWidgetActivityNameFragment`、`NokiaWidgetActivityPickerFragment`、`NokiaWidgetAppPickerFragment`、`NokiaWidgetUrlEditFragment`、`NokiaBackgroundManagerFragment`、`NokiaKeyBindFragment`、`NokiaKeyBindWizardFragment`、`ShizukuFragment`。
+
 ### 尺寸规范
 
 #### 统一尺寸工具类 NokiaDimens
@@ -294,6 +310,8 @@ public void fixMidContentHeight(final View content, final boolean topAlign) {
 
 新增或修改任何 nokia 界面时，逐项自查：
 
+- [ ] 页面 Fragment **继承 `NokiaPageFragment`**（禁止裸 `extends Fragment implements NokiaPage`），且未覆写 `onCreateView`/`onViewCreated`（final，覆写即编译错）
+- [ ] 已正确实现 `getLayoutRes()` 与 `onPageCreated()`；特殊页面按需覆写 `isTopAlign()`/`getWallpaperRes()`
 - [ ] 尺寸换算走 `NokiaDimens.dp()`，无裸 `(int)(v*density)`
 - [ ] 布局无 px 写死值（LayoutParams 高度/宽度、padding、margin 等）
 - [ ] Fragment 根布局高度为 `match_parent`（非 262dp）
