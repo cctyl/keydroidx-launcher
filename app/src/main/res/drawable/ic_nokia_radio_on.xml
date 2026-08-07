@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 圆形单选按钮 - 选中态：外圈 + 内实心小圆 -->
+<!-- 圆形单选按钮 - 选中态：外圈 + 内实心小圆。API 19 兼容：inset 控制 layer bounds。整体 14×14dp。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
+    <!-- 外圈 14×14 -->
+    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
         <shape android:shape="oval">
             <solid android:color="@android:color/transparent" />
             <stroke android:color="#2196F3" android:width="1.5dp" />
             <size android:width="14dp" android:height="14dp" />
         </shape>
     </item>
-    <item
-        android:width="7dp"
-        android:height="7dp"
-        android:gravity="center">
+    <!-- 内实心圆 7×7 居中 -->
+    <item android:left="3.5dp" android:top="3.5dp" android:right="3.5dp" android:bottom="3.5dp">
         <shape android:shape="oval">
             <solid android:color="#2196F3" />
         </shape>

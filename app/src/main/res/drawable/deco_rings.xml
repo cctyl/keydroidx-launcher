@@ -1,19 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 环状装饰。API 19 兼容：用 inset 控制 layer bounds。整体 60×60dp。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="60dp"
-        android:height="60dp"
-        android:gravity="center">
+    <!-- 外环 60×60 -->
+    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
         <shape android:shape="oval">
             <stroke
                 android:width="3dp"
                 android:color="#4a90d9" />
         </shape>
     </item>
-    <item
-        android:width="40dp"
-        android:height="40dp"
-        android:gravity="center">
+    <!-- 内环 40×40 居中 -->
+    <item android:left="10dp" android:top="10dp" android:right="10dp" android:bottom="10dp">
         <shape android:shape="oval">
             <stroke
                 android:width="2dp"

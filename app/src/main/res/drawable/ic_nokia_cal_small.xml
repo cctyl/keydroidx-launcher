@@ -1,30 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 日历小图标。API 19 兼容：inset 控制 layer bounds。整体 14×12dp。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="14dp"
-        android:height="12dp"
-        android:gravity="center">
+    <!-- 主体 14×12 -->
+    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
         <shape android:shape="rectangle">
             <solid android:color="#FFFFFF" />
             <corners android:radius="1dp" />
         </shape>
     </item>
-    <item
-        android:width="3dp"
-        android:height="3dp"
-        android:gravity="top|left"
-        android:left="3dp"
-        android:top="-2dp">
+    <!-- 左上挂环 3×3 -->
+    <item android:left="3dp" android:top="-2dp" android:right="8dp" android:bottom="11dp">
         <shape android:shape="rectangle">
             <solid android:color="#F44336" />
         </shape>
     </item>
-    <item
-        android:width="3dp"
-        android:height="3dp"
-        android:gravity="top|right"
-        android:right="3dp"
-        android:top="-2dp">
+    <!-- 右上挂环 3×3 -->
+    <item android:left="8dp" android:top="-2dp" android:right="3dp" android:bottom="11dp">
         <shape android:shape="rectangle">
             <solid android:color="#F44336" />
         </shape>

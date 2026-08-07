@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 文件夹图标。API 19 兼容：inset 控制 layer bounds。整体 24×18dp。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="10dp"
-        android:height="4dp"
-        android:gravity="top|left">
+    <!-- 标签页 10×4 左上角 -->
+    <item android:left="0dp" android:top="0dp" android:right="14dp" android:bottom="14dp">
         <shape android:shape="rectangle">
             <solid android:color="#1976D2" />
             <corners
@@ -11,10 +10,8 @@
                 android:topRightRadius="2dp" />
         </shape>
     </item>
-    <item
-        android:width="24dp"
-        android:height="18dp"
-        android:gravity="bottom|left">
+    <!-- 主体 24×18 -->
+    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
         <shape android:shape="rectangle">
             <solid android:color="#2196F3" />
             <corners android:radius="2dp" />

@@ -1,19 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 收音机图标。API 19 兼容：inset 控制 layer bounds。整体 16×12dp，橙色指示条溢出于右侧 3dp。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="16dp"
-        android:height="12dp"
-        android:gravity="center_vertical|left">
+    <!-- 主体 16×12 -->
+    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
         <shape android:shape="rectangle">
             <solid android:color="#2196F3" />
             <corners android:radius="2dp" />
         </shape>
     </item>
-    <item
-        android:width="4dp"
-        android:height="6dp"
-        android:gravity="center_vertical|right"
-        android:right="-3dp">
+    <!-- 橙色条 4×6，垂直居中、右缘超出 3dp -->
+    <item android:left="15dp" android:top="3dp" android:right="-3dp" android:bottom="3dp">
         <shape android:shape="rectangle">
             <solid android:color="#FF9800" />
             <corners android:radius="2dp" />

@@ -1,26 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 信息图标。API 19 兼容：inset 控制 layer bounds。整体 26×18dp。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="26dp"
-        android:height="18dp"
-        android:gravity="center">
+    <!-- 主体 26×18 -->
+    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
         <shape android:shape="rectangle">
             <solid android:color="#FFEB3B" />
             <corners android:radius="2dp" />
         </shape>
     </item>
-    <item
-        android:width="26dp"
-        android:height="2dp"
-        android:gravity="top|center">
+    <!-- 顶部折线 26×2 -->
+    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="16dp">
         <shape android:shape="rectangle">
             <solid android:color="#FBC02D" />
         </shape>
     </item>
-    <item
-        android:width="14dp"
-        android:height="9dp"
-        android:gravity="bottom|center">
+    <!-- 底部折角 14×9 -->
+    <item android:left="6dp" android:top="9dp" android:right="6dp" android:bottom="0dp">
         <shape android:shape="rectangle">
             <solid android:color="#FBC02D" />
         </shape>
