@@ -356,6 +356,43 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		});
 	}
 
+	/**
+	 * 修复「match_parent 根布局 + topAlign=true 的二次缩放陷阱」。
+	 * 在调用了 {@link #scaleMidContent(View, boolean)} 之后必须调用本方法：
+	 * 延迟到布局完成后把根视图高度动态调整为 panelH / scale，
+	 * 使内容视觉高度恰好填满中间容器：
+	 * - 视觉高 &lt; panelH：高度拉高，内部 ScrollView 吸收多余空间（避免底部留白）；
+	 * - 视觉高 &gt; panelH：若保持 wrap_content 的矮内容高度，scaleMidContent 的
+	 *   二次缩小分支（finalScale = panelH / contentH）会让宽度随比例同步缩小、
+	 *   右侧露出缝隙。改为目标高度后 visualH == panelH，不触发缩小，宽度保持铺满。
+	 * 参考已修复的 NokiaKeyBindFragment（布局根 match_parent + 本方法）。
+	 *
+	 * @param content  碎片根视图（与 scaleMidContent 同一个 view）
+	 * @param topAlign 与 scaleMidContent 传值保持一致
+	 */
+	public void fixMidContentHeight(final View content, final boolean topAlign) {
+		content.post(() -> {
+			View panel = (View) content.getParent();
+			if (panel == null || panel.getHeight() <= 0 || content.getHeight() <= 0) {
+				return;
+			}
+			// 统一使用 getScale() 获取缩放比（与基类算法一致）
+			float scale = getScale();
+			int panelH = panel.getHeight();
+			int targetH = Math.round(panelH / scale);
+			ViewGroup.LayoutParams lp = content.getLayoutParams();
+			if (lp.height != targetH) {
+				lp.height = targetH;
+				content.setLayoutParams(lp);
+				NokiaLog.i("NokiaScale", "fixMidContentHeight: 根视图高度=" + targetH
+						+ "px 使视觉高=panelH=" + panelH + "px scale=" + scale);
+				// 高度变化触发重新布局后，重新执行等比缩放（此时 visualH == panelH，
+				// 不触发缩小分支，宽度保持铺满）
+				content.post(() -> scaleMidContent(content, topAlign));
+			}
+		});
+	}
+
 	/** 获取系统状态栏高度；如无法取得则返回 0。 */
 	private int getStatusBarHeight() {
 		int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");

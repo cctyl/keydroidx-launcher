@@ -3,7 +3,7 @@
      顶部标题 + 搜索框 + 宫格容器，宫格由代码动态构建。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="240dp"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@android:color/transparent">
 

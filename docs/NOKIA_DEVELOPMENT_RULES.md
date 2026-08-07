@@ -231,41 +231,44 @@ view.setBackground(new NokiaDashedLineDrawable(0x60FFFFFF, 3, 3)); // 旧构造�
 - **时序**：`computeRowsPerPage()` 和 `buildGrid()/buildCurrentPage()` 必须延迟到 midPanel 布局完成后执行（`view.post(() -> { ... })`），确保 panelH > 0。
 - **禁止**：自行计算 scale；写死 `BAR_H_DP` 等假设值；行高写死固定 dp；在 panelH=0 时提前建页。
 
-### match_parent 根布局的二次缩放陷阱（重要）
+### topAlign 缩放 + 根高不匹配 panelH 的二次缩放陷阱（重要）
 
-**使用 `match_parent` 根布局 + `scaleMidContent(view, true)`（topAlign）的 Fragment，必须补充 `view.post` 动态高度调整逻辑，否则 scale > 1 时内容视觉偏下。**
+**任何调用 `scaleMidContent(view, true)`（topAlign）的 Fragment，根布局高度都必须用 `match_parent`，并补充动态高度调整（推荐调用 `host.fixMidContentHeight(view, true)`），否则在 scale ≠ 1 的设备上不是「内容整体偏下」就是「右侧/底部露缝」。**
 
-背景与原因：
+背景与原因（触发条件有两条，标题旧版只写了 match_parent 那条，2026-08 桌面设置系列再次踩坑）：
 
-1. 根布局 `match_parent` → 内容高度 = panelH。`scaleMidContent` 判定 `contentFillsPanel=true` 跳过二次缩小。
-2. 但 `topAlign=true` + `setPivotY(0)` + `content.setScaleX/Y(scale)`，视觉高度 = panelH × scale。
-3. scale > 1 时（如 320×480 设备 scale≈1.33），visualH > panelH，缩放后视觉位置从顶部偏移，内容整体偏下。
-4. 240×320 设备 scale=1 不受影响，因此此 bug 只在较高分辨率设备上暴露。
+1. **根高 `wrap_content`（内容矮于 panelH）→ 触发二次缩小分支，右侧露缝。** `scaleMidContent` 中：`visualH = contentH × scale`，若 `visualH > panelH` 且 `contentH != panelH`（wrap_content 必然不等），则 `finalScale = panelH / contentH < scale`，**宽度随比例同步缩小** → 240dp×finalScale < 屏幕宽 → 右侧露缝。240×320（scale=1）下内容高通常 ≤ panelH 不触发，掩盖 bug；320×480（scale>1）一放大就露馅。这正是「桌面设置/快捷栏设置/组件设置」等 9 个列表页的问题。
+2. **根高 `match_parent` → 跳过二次缩小但视觉偏下。** 内容高 = panelH，`contentFillsPanel=true` 跳过缩小，宽度铺满；但 `topAlign` + `setScaleX/Y(scale)` 后视觉高 = panelH × scale > panelH，内容整体偏下。
 
-正确做法（`NokiaKeyBindFragment` / `NokiaKeyBindWizardFragment` 已有正确实现）：
+正确做法（统一走 `NokiaBaseActivity.fixMidContentHeight(view, topAlign)`，封装了 `NokiaKeyBindFragment` 验证过的逻辑）：
 
 ```java
-// 在 onViewCreated 中 scaleMidContent 之后
+// 在 onViewCreated 中 scaleMidContent 之后（两处 topAlign 传值必须一致）
 host.scaleMidContent(view, true);
-
-view.post(() -> {
-    View panel = (View) view.getParent();
-    if (panel == null || panel.getHeight() <= 0 || view.getHeight() <= 0) return;
-    float scale = host.getScale();
-    int panelH = panel.getHeight();
-    int targetH = Math.round(panelH / scale);  // 使缩放后视觉高恰好 = panelH
-    ViewGroup.LayoutParams lp = view.getLayoutParams();
-    if (lp.height != targetH) {
-        lp.height = targetH;
-        view.setLayoutParams(lp);
-        // 高度变化后重新缩放：此时 visualH == panelH，不触发缩小分支
-        view.post(() -> host.scaleMidContent(view, true));
-    }
-});
+host.fixMidContentHeight(view, true);
 ```
 
-- **禁止**：`match_parent` + `topAlign=true` 的 Fragment 不加此调整；自行计算 scale（走 `getScale()` 单一来源）。
-- 已修复的案例：`NokiaKeyBindFragment`（已有）、`NokiaKeyBindWizardFragment`（补上后修复 320×480 偏下）。
+```java
+// NokiaBaseActivity 内已实现的公共方法（新 Fragment 不必手写 view.post）：
+public void fixMidContentHeight(final View content, final boolean topAlign) {
+    content.post(() -> {
+        View panel = (View) content.getParent();
+        if (panel == null || panel.getHeight() <= 0 || content.getHeight() <= 0) return;
+        float scale = getScale();                       // 走 getScale() 单一来源
+        int panelH = panel.getHeight();
+        int targetH = Math.round(panelH / scale);       // 使缩放后视觉高恰好 = panelH
+        ViewGroup.LayoutParams lp = content.getLayoutParams();
+        if (lp.height != targetH) {
+            lp.height = targetH;
+            content.setLayoutParams(lp);
+            content.post(() -> scaleMidContent(content, topAlign)); // 重新缩放，visualH==panelH 不缩宽度
+        }
+    });
+}
+```
+
+- **禁止**：根高 `wrap_content`（矮内容触发缩小分支露缝）；`match_parent` + `topAlign=true` 不加高度调整；自行计算 scale（走 `getScale()` 单一来源）。
+- 已修复的案例：`NokiaKeyBindFragment`、`NokiaKeyBindWizardFragment`（早期），`NokiaDesktopSettingsFragment`、`NokiaShortcutSettingsFragment`、`NokiaWidgetSettingsFragment`、`NokiaWidgetTypePickerFragment`、`NokiaWidgetActivityNameFragment`、`NokiaWidgetActivityPickerFragment`、`NokiaWidgetAppPickerFragment`、`NokiaWidgetUrlEditFragment`、`NokiaBackgroundManagerFragment`（2026-08 一次性对齐修复）。
 
 ### Fragment 根布局宽度必须固定 240dp，禁止 match_parent（重要）
 

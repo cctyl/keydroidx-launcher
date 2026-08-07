@@ -3,7 +3,7 @@
      标题 + 名称字段 + 网址字段 + 保存按钮。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="240dp"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@android:color/transparent">
 

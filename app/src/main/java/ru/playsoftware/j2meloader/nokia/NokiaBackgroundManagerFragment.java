@@ -76,6 +76,8 @@ public class NokiaBackgroundManagerFragment extends Fragment implements NokiaPag
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		// 贴顶布局：与桌面设置等列表页一致，避免页面整体下移留白
 		host.scaleMidContent(view, true);
+		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整
+		host.fixMidContentHeight(view, true);
 
 		View wall = host.findViewById(R.id.wallpaper);
 		if (wall != null) {

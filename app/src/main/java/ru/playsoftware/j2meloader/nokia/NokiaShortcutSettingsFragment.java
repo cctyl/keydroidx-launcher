@@ -69,6 +69,8 @@ public class NokiaShortcutSettingsFragment extends Fragment implements NokiaPage
 		super.onViewCreated(view, savedInstanceState);
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.scaleMidContent(view, true);
+		// match_parent 根布局 + topAlign=true 的二次缩放陷阱：补动态高度调整
+		host.fixMidContentHeight(view, true);
 
 		View wall = host.findViewById(R.id.wallpaper);
 		if (wall != null) {
