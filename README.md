@@ -99,5 +99,4 @@ Android 7 及以上请使用官方 Shizuku；本次未集成官方 Shizuku 客�
 
 ## 致谢
 
-本项目是 [J2meLoader](https://github.com/NaikSoftware/J2meLoader) 的 fork。
-感谢 [woesss](https://github.com/woesss)（[JL-Mod](https://github.com/woesss/JL-Mod) 作者）提供的开源 Mascot Capsule 实现。
+本项目基于 [J2ME-Loader](https://github.com/nikita36078/J2ME-Loader) 开发，感谢原作者。
