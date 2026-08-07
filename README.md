@@ -67,6 +67,36 @@
 
 ---
 
+## 老设备权限（mini_shizuku）
+
+部分功能需要系统级（shell/adb）权限。官方 [Shizuku](https://shizuku.rikka.app/) 只支持 **Android 7（API 24）及以上**，Android 7 以下的老手机无法使用。
+
+为了让 Android 7 以下、没有 root 的老手机也能获得同样的系统权限，本应用内置了 **mini_shizuku**：服务端以 `app_process`（shell 身份）运行在手机上，应用通过本地 TCP 通道以 shell 权限执行系统命令。
+
+### 什么时候需要它
+
+- 手机是 **Android 7 以下**，且无法使用官方 Shizuku。
+- 桌面设置里的「mini_shizuku」页面显示「离线」。
+
+### 激活步骤（只需一次，需要电脑 + USB 数据线）
+
+1. 手机开启「开发者选项 → USB 调试」，用数据线连接电脑。
+2. 从本仓库或发布页下载 `mini_shizuku.sh`（仓库根目录）。
+3. 在电脑命令行执行：
+
+   ```bash
+   adb push mini_shizuku.sh /data/local/tmp/
+   adb shell sh /data/local/tmp/mini_shizuku.sh
+   ```
+
+4. 手机回到「桌面设置 → mini_shizuku」，按「刷新状态」，看到「在线」即激活成功。
+
+> 提示：手机重启后服务会停止，重新执行第 3 步即可。激活后请及时断开 USB 调试，注意保护手机安全。
+
+Android 7 及以上请使用官方 Shizuku；本次未集成官方 Shizuku 客户端，后续版本会加入。
+
+---
+
 ## 致谢
 
 本项目是 [J2meLoader](https://github.com/NaikSoftware/J2meLoader) 的 fork。

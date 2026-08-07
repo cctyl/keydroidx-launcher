@@ -49,6 +49,7 @@ android {
             jniDebuggable true
             multiDexEnabled true
             multiDexKeepProguard file('multidex-config.pro')
+            signingConfig signingConfigs.release
         }
     }
 
@@ -170,6 +171,7 @@ dependencies {
     def autoServiceVersion = "1.0"
 
     implementation project(':dexlib')
+    implementation project(':mini_shizuku')
 
     // Android Jetpack
     implementation "androidx.room:room-runtime:$roomVersion"
