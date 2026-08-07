@@ -1,16 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 信号强度 0 级：4 格全灰（无信号）。竖条加粗至 3dp，低 DPI 下更实。 -->
+<!-- 信号强度 0 级：4 格全灰（无信号）。
+     API 19 兼容：用 inset(left/top/right/bottom) 精确控制每个 layer 的绘制区域 = 图层期望大小 (3×h)，
+     shape 在该区域内填充。layer-list intrinsic 大小 = max(inset 累计) = 15×7dp。
+     不使用 android:width/height（API 23+）和 item gravity（layer bounds 已是图形 bounds，gravity 无效）。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:width="3dp" android:height="4dp" android:gravity="bottom|left">
-        <shape android:shape="rectangle"><solid android:color="#5A5A5A" /></shape>
+    <!-- 条1: 3×4, 底部对齐, x=0..3, y=3..7 -->
+    <item android:left="0dp" android:top="3dp" android:right="12dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#5A5A5A" />
+            <size android:width="3dp" android:height="4dp" />
+        </shape>
     </item>
-    <item android:width="3dp" android:height="5dp" android:gravity="bottom|left" android:left="4dp">
-        <shape android:shape="rectangle"><solid android:color="#5A5A5A" /></shape>
+    <!-- 条2: 3×5, x=4..7, y=2..7 -->
+    <item android:left="4dp" android:top="2dp" android:right="8dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#5A5A5A" />
+            <size android:width="3dp" android:height="5dp" />
+        </shape>
     </item>
-    <item android:width="3dp" android:height="6dp" android:gravity="bottom|left" android:left="8dp">
-        <shape android:shape="rectangle"><solid android:color="#5A5A5A" /></shape>
+    <!-- 条3: 3×6, x=8..11, y=1..7 -->
+    <item android:left="8dp" android:top="1dp" android:right="4dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#5A5A5A" />
+            <size android:width="3dp" android:height="6dp" />
+        </shape>
     </item>
-    <item android:width="3dp" android:height="7dp" android:gravity="bottom|left" android:left="12dp">
-        <shape android:shape="rectangle"><solid android:color="#5A5A5A" /></shape>
+    <!-- 条4: 3×7, x=12..15, y=0..7 -->
+    <item android:left="12dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#5A5A5A" />
+            <size android:width="3dp" android:height="7dp" />
+        </shape>
     </item>
 </layer-list>

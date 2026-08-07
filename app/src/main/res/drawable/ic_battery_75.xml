@@ -1,31 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 电量 51-75%：前 3 格绿色 -->
+<!-- 电量 51-75%：前 3 格绿色。API 19 兼容：inset 控制 layer bounds。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 电池外框（仅描边，使未填充区域可见） -->
-    <item android:width="15dp" android:height="9dp" android:gravity="center_vertical|left">
+    <item android:left="0dp" android:top="0dp" android:right="3dp" android:bottom="0dp">
         <shape android:shape="rectangle">
             <stroke android:width="1dp" android:color="#FFFFFF"/>
             <corners android:radius="1dp"/>
             <solid android:color="#00000000"/>
+            <size android:width="15dp" android:height="9dp"/>
         </shape>
     </item>
-    <!-- 第 1 格 x=2..4 -->
-    <item android:width="2dp" android:height="5dp" android:gravity="top|left" android:left="2dp" android:top="2dp">
-        <shape android:shape="rectangle"><solid android:color="#4CAF50"/></shape>
+    <item android:left="2dp" android:top="2dp" android:right="14dp" android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#4CAF50"/>
+            <size android:width="2dp" android:height="5dp"/>
+        </shape>
     </item>
-    <!-- 第 2 格 x=5..7 -->
-    <item android:width="2dp" android:height="5dp" android:gravity="top|left" android:left="5dp" android:top="2dp">
-        <shape android:shape="rectangle"><solid android:color="#4CAF50"/></shape>
+    <item android:left="5dp" android:top="2dp" android:right="11dp" android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#4CAF50"/>
+            <size android:width="2dp" android:height="5dp"/>
+        </shape>
     </item>
-    <!-- 第 3 格 x=8..10 -->
-    <item android:width="2dp" android:height="5dp" android:gravity="top|left" android:left="8dp" android:top="2dp">
-        <shape android:shape="rectangle"><solid android:color="#4CAF50"/></shape>
+    <item android:left="8dp" android:top="2dp" android:right="8dp" android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#4CAF50"/>
+            <size android:width="2dp" android:height="5dp"/>
+        </shape>
     </item>
-    <!-- 电池帽：紧贴外框右缘 -->
-    <item android:width="3dp" android:height="5dp" android:gravity="top|left" android:left="15dp" android:top="2dp">
+    <item android:left="15dp" android:top="2dp" android:right="0dp" android:bottom="2dp">
         <shape android:shape="rectangle">
             <solid android:color="#FFFFFF"/>
             <corners android:radius="1dp"/>
+            <size android:width="3dp" android:height="5dp"/>
         </shape>
     </item>
 </layer-list>
