@@ -160,4 +160,121 @@ public static boolean isSupported() {
 
 - [x] 扩展 mini_shizuku 服务端：ShellUtil 新增带输出+退出码执行方法，MsgProcess 支持带输出命令前缀并回写输出与结束标记
 - [x] 扩展 ShizukuClient 新增 execWithOutput()（发命令并读回显至结束标记），并保证现有 exec 兼容
-- [x] 扩展 Shizuku 门面：新增 isSupported() 版本分流（API
+- [x] 扩展 Shizuku 门面：新增 isSupported() 版本分流（API>=24 走官方预留占位，<24 走 mini_shizuku）
+- [x] 桌面设置新增「mini_shizuku」设置项：展示在线/离线状态、adb 启动命令、测试连通
+
+## 正确执行路径（2026-08 实测，务必照此执行）
+
+> 目标：在 Android 4.4 ~ 6.x 老手机上以 shell 身份启动 mini_shizuku 服务，使主 app 能执行系统命令。
+
+### 前置：确认应用已安装且为含 mini_shizuku 服务的版本
+
+1. **构建并安装应用**（debug 版带 `.debug` 后缀包名）：
+   ```bash
+   .\gradlew.bat assembleOpenDebug -x lint
+   adb install -r app/build/outputs/apk/open/debug/J2ME_Loader-*-open-debug.apk
+   ```
+   > **必须使用最新构建的 APK**。旧 APK 可能因 multidex 拆分问题（见下方「已知坑」）导致服务无法启动。
+
+2. **确认设备是 Android 7 以下**（`Shizuku.isSupported()` 只在 API < 24 时走 mini_shizuku）：
+   ```bash
+   adb shell getprop ro.build.version.sdk   # 19=4.4 / 21=5.0 / 22=5.1 / 23=6.0
+   ```
+   - SDK < 24：支持，按本流程执行
+   - SDK >= 24：官方 Shizuku 未集成，设置页会显示不可用，无需启动服务
+
+### 启动服务（两步命令）
+
+在项目根目录执行（脚本文件为 `mini_shizuku.sh`，多设备必须带 `-s <serial>`）：
+
+```bash
+# 1. 推送脚本到设备
+adb -s <serial> push mini_shizuku.sh /data/local/tmp/
+
+# 2. 以 shell 身份启动服务
+adb -s <serial> shell sh /data/local/tmp/mini_shizuku.sh
+```
+
+预期输出：`MiniShizuku started for io.github.cctyl.nokia.debug`
+
+### 验证是否成功
+
+方法一：进程存活检查
+```bash
+adb -s <serial> shell "ps | grep app_process"
+# 应看到一条 app_process ... ru.playsoftware.mini_shizuku.server.AdbProcess
+```
+
+方法二：日志检查
+```bash
+adb -s <serial> shell cat /data/local/tmp/minishizuku.log
+# 正常情况下为空或仅启动信息；若报 "could not find class" 说明 APK 缺 mini_shizuku 主 dex（见已知坑）
+```
+
+方法三：应用内检查
+手机回到「桌面设置 → mini_shizuku」，状态应显示「在线」。
+
+### 注意事项
+
+- **手机重启后服务会停止**：重新执行上面两条命令即可（脚本已留在 `/data/local/tmp/`）。
+- **包名自动识别**：脚本会先找正式版 `io.github.cctyl.nokia`，找不到再找调试版 `io.github.cctyl.nokia.debug`，无需手工指定。
+- **多设备**：所有 adb 命令都要带 `-s <serial>`，避免误装/误操作其他设备。
+- **无线设备掉线**：`adb connect <ip>:5555` 重连后设备列表会刷新，直接执行脚本即可。
+
+## 已知坑：Android 4.4 Dalvik 只加载主 dex（multidex 拆分问题）
+
+### 现象
+
+Android 4.4（SDK 19，Dalvik VM）设备上执行启动脚本后：
+- 日志 `/data/local/tmp/minishizuku.log` 报 `ERROR: could not find class 'ru.playsoftware.mini_shizuku.server.AdbProcess'` 后 abort
+- 应用内 mini_shizuku 显示「离线」
+- 但同 APK 在 Android 5+（ART）设备上一切正常
+
+### 根因
+
+1. 应用方法数超过 65536 触发 multidex，R8 将类拆分到 `classes.dex` / `classes2.dex` / `classes3.dex`；
+2. 服务主类 `ru.playsoftware.mini_shizuku.server.AdbProcess` 被 R8 拆分到了 `classes3.dex`；
+3. Android 4.4 的 Dalvik 通过 `app_process -Djava.class.path=<apk>` 启动时**只读取主 `classes.dex`**，不支持加载 multidex 的 secondary dex；
+4. 于是找不到 `AdbProcess` → abort → 服务离线。
+5. ART（Android 5.0+）的 app_process 支持完整 multidex，所以 Android 5+ 设备无此问题——这就是"高版本正常、4.4 挂掉"的差异来源。
+
+### 修复：把 mini_shizuku 服务端类强制保留在主 dex
+
+在 `app/multidex-config.pro` 增加 keep 规则（已添加，2026-08）：
+
+```pro
+# mini_shizuku 服务端：必须留在主 dex（classes.dex）。
+# 原因：Android 4.4 的 Dalvik 通过 app_process -Djava.class.path=<apk> 加载时
+# 只读取主 classes.dex，不支持 multidex 的 secondary dex（classes2/classes3）。
+# 若服务端类（AdbProcess 等）被 R8 拆分到 classes2/3，则 app_process 报
+# "could not find class ru.playsoftware.mini_shizuku.server.AdbProcess" 并 abort，
+# 表现为 mini_shizuku 服务离线（Android 5+ 的 ART 无此问题）。
+-keep class ru.playsoftware.mini_shizuku.server.** { *; }
+-keep class ru.playsoftware.mini_shizuku.** { *; }
+```
+
+### 验证修复
+
+构建后检查 APK 内 dex 分布，`AdbProcess` 必须出现在**主 `classes.dex`**：
+
+```python
+# 用 python 检查（Windows 直接运行）
+import zipfile
+z = zipfile.ZipFile(r'app/build/outputs/apk/open/debug/J2ME_Loader-*-open-debug.apk')
+for dex in [n for n in z.namelist() if n.endswith('.dex')]:
+    data = z.read(dex)
+    print(dex, 'AdbProcess:', b'ru/playsoftware/mini_shizuku/server/AdbProcess' in data)
+```
+
+`classes.dex` 输出 `AdbProcess: True` 即修复生效。
+
+### 排查要点（遇到离线先按此顺序）
+
+1. `ps | grep app_process` —— 进程是否存在（不存在 → 启动失败）
+2. `cat /data/local/tmp/minishizuku.log` —— 是否有 `could not find class`（有 → multidex 问题，重建 APK）
+3. 用真实安装路径手动前台运行看报错：
+   ```bash
+   adb -s <serial> shell "path=$(pm path <pkg>); path=${path#package:}; app_process -Djava.class.path=$path /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess"
+   ```
+4. 对比：同 APK 在 Android 5+ 设备上是否正常（正常 → 基本锁定 Dalvik 主 dex 问题）
+5. 注意：`dalvik-cache` 不可写（`Dex cache directory isn't writable`）是另一类问题，通常出现在 APK 被复制到 `/data/local/tmp` 等非安装路径时；用真实安装路径（`pm path`）启动可走系统已生成的缓存，规避此问题
