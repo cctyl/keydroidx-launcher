@@ -7,16 +7,13 @@ import ru.playsoftware.mini_shizuku.client.ShizukuClient;
 /**
  * MiniShizuku 统一门面，供应用调用。
  * <p>
- * 版本分流：本实现（app_process + TCP 的 mini_shizuku）仅用于 Android 7.0 以下
- * （API &lt; 24）。Android 7.0+（API &ge; 24）应改用官方 Shizuku 授权，本次不集成，
- * 由 {@link #isSupported()} 返回 {@code false} 占位，供将来扩展。
+ * 本实现（app_process + TCP 的 mini_shizuku）是<strong>所有 Android 版本</strong>统一的
+ * 权限通道，不再按系统版本分流（不依赖官方 Shizuku）。服务端由用户在电脑上通过 adb 以
+ * shell 身份拉起，客户端通过本门面检测状态并执行命令。
  * <p>
  * 主 app 一律通过本门面调用，不直接接触底层 client/server 类。
  */
 public final class Shizuku {
-
-    /** 官方 Shizuku 的最低 API（Android 7.0）。 */
-    private static final int SHIZUKU_MIN_API = 24;
 
     private Shizuku() {
     }
@@ -24,12 +21,13 @@ public final class Shizuku {
     /**
      * 当前 Android 版本是否在本通道（mini_shizuku）的支持范围内。
      * <p>
-     * mini_shizuku 仅用于 Android 7.0 以下；7.0+ 需官方 Shizuku（本次不集成），返回 false。
+     * mini_shizuku 通过 {@code app_process} + TCP 实现，链路在所有 Android 版本均成立，
+     * 故恒返回 {@code true}（Android 4.4 至最新版本均支持）。
      *
-     * @return true 表示 API &lt; 24，可使用 mini_shizuku。
+     * @return 恒为 {@code true}，所有版本均支持 mini_shizuku。
      */
     public static boolean isSupported() {
-        return Build.VERSION.SDK_INT < SHIZUKU_MIN_API;
+        return true;
     }
 
     /**

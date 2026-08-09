@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- mini_shizuku root 激活占位页：240dp 宽，match_parent 高，提示居中 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="240dp"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_nokia_menu">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:lineSpacingExtra="2dp"
+        android:text="Root 激活功能即将推出"
+        android:textColor="#9fb3d1"
+        android:textSize="11sp" />
+</FrameLayout>

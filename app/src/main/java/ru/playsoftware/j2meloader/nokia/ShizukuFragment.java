@@ -12,19 +12,22 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.mini_shizuku.Shizuku;
 
 /**
  * mini_shizuku 服务页面。
  * <p>
- * mini_shizuku 是让无法使用官方 Shizuku（Android 7 以下）的设备也能获得系统级
- * （shell/adb）权限的方案：服务端由用户在电脑上通过 adb 执行发布包附带的
- * {@code mini_shizuku.sh} 脚本拉起（app_process 以 shell 身份运行）。
+ * 所有 Android 版本统一使用 mini_shizuku 权限通道。服务端由用户在电脑上通过 adb 执行
+ * 发布包附带的 {@code mini_shizuku.sh} 脚本拉起（app_process 以 shell 身份运行）。
  * <p>
- * 本页只做两件事：展示服务状态，以及告诉普通用户如何激活。左软键无对应操作
- * （返回 null 隐藏），保留「刷新状态」按钮供激活后检测在线状态。
+ * 页面结构：
+ * <ul>
+ *     <li>顶部状态行：显示当前通道与服务在线状态；</li>
+ *     <li>主体为两条可导航菜单（adb 激活 / root 激活），方向键选中、确认键进入对应子页；</li>
+ *     <li>左软键「刷新」：重新检测服务在线状态；右软键「返回」：返回上一层。</li>
+ * </ul>
  */
 public class ShizukuFragment extends NokiaPageFragment {
 
@@ -35,7 +38,8 @@ public class ShizukuFragment extends NokiaPageFragment {
 	private int focusIndex = -1;
 
 	private static final String[] ACTION_NAMES = {
-			"刷新状态",
+			"adb 激活",
+			"root 激活",
 	};
 
 	@Override
@@ -57,7 +61,7 @@ public class ShizukuFragment extends NokiaPageFragment {
 		setFocusIndex(0);
 	}
 
-	/** 构建底部可导航操作列表（方向键 + 确认键触发），目前只有「刷新状态」。 */
+	/** 构建底部可导航操作列表（方向键 + 确认键触发）。 */
 	private void buildActionList() {
 		actionList.removeAllViews();
 		actionViews = new View[ACTION_NAMES.length];
@@ -101,7 +105,7 @@ public class ShizukuFragment extends NokiaPageFragment {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				final boolean running = ru.playsoftware.mini_shizuku.Shizuku.isRunning();
+				final boolean running = Shizuku.isRunning();
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
@@ -115,18 +119,23 @@ public class ShizukuFragment extends NokiaPageFragment {
 
 	private void updateStatusText(boolean running) {
 		if (statusText == null) return;
-		boolean supported = ru.playsoftware.mini_shizuku.Shizuku.isSupported();
-		String supportInfo = supported
-				? "适用（Android 7 以下）"
-				: "不适用（Android 7+ 请用官方 Shizuku）";
-		statusText.setText("当前设备：" + supportInfo + "\n服务状态：" + (running ? "在线" : "离线"));
+		statusText.setText("当前通道：mini_shizuku\n服务状态：" + (running ? "在线" : "离线"));
 		statusText.setTextColor(running ? 0xFF64B5F6 : 0xFFFF8A80);
 	}
 
 	private void onAction(int index) {
-		if (index == 0) {
-			refreshStatus();
-			Toast.makeText(requireContext(), "状态已刷新", Toast.LENGTH_SHORT).show();
+		if (index < 0 || index >= ACTION_NAMES.length) return;
+		switch (index) {
+			case 0:
+				NokiaLog.i("Shizuku", "进入 adb 激活说明页");
+				((NokiaDesktopActivity) requireActivity()).openFragment(new ShizukuAdbFragment());
+				break;
+			case 1:
+				NokiaLog.i("Shizuku", "进入 root 激活页（占位）");
+				((NokiaDesktopActivity) requireActivity()).openFragment(new ShizukuRootFragment());
+				break;
+			default:
+				break;
 		}
 	}
 
@@ -165,7 +174,9 @@ public class ShizukuFragment extends NokiaPageFragment {
 
 	@Override
 	public boolean onSoftLeft() {
-		// 左软键无对应操作，静默消费
+		// 左软键 = 刷新状态
+		refreshStatus();
+		Toast.makeText(requireContext(), "状态已刷新", Toast.LENGTH_SHORT).show();
 		return true;
 	}
 
@@ -190,8 +201,7 @@ public class ShizukuFragment extends NokiaPageFragment {
 
 	@Override
 	public String getSoftLeftText() {
-		// 返回 null 隐藏左软键（无对应操作）
-		return null;
+		return "刷新";
 	}
 
 	@Override

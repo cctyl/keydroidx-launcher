@@ -69,6 +69,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 				loadDesktopFragment();
 			}
 		}
+
 	}
 
 	/** 重新从 SharedPreferences 加载按键绑定到内存（向导/绑定界面完成后调用，确保立即生效）。 */

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- mini_shizuku adb 激活说明页：240dp 宽，match_parent 高，内容可滚动适配小屏 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="240dp"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_nokia_menu">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="adb 激活 mini_shizuku"
+                android:textColor="#ffffff"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:lineSpacingExtra="2dp"
+                android:text="无需 root，只需电脑 + USB 数据线，一次性激活。"
+                android:textColor="#9fb3d1"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="步骤"
+                android:textColor="#ffffff"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:lineSpacingExtra="2dp"
+                android:text="① 手机开启「开发者选项 → USB 调试」，用数据线连电脑\n② 电脑上下载本脚本 mini_shizuku.sh\n③ 电脑命令行执行：\n   adb push mini_shizuku.sh /data/local/tmp/\n   adb shell sh /data/local/tmp/mini_shizuku.sh\n④ 回到 mini_shizuku 页面，按左软键「刷新」，看到「在线」即激活成功"
+                android:textColor="#9fb3d1"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="2dp"
+                android:text="提示：手机重启后服务会停止，重新执行第③步即可。详细说明见项目 README 的「老设备权限（mini_shizuku）」一节。"
+                android:textColor="#8a9ab5"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

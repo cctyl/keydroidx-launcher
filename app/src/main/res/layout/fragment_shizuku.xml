@@ -26,7 +26,7 @@
         android:layout_height="1dp"
         android:background="#2a4a7a" />
 
-    <!-- 可滚动内容区：激活说明 -->
+    <!-- 可滚动内容区：激活方式菜单 -->
     <ScrollView
         android:id="@+id/shizukuScroll"
         android:layout_width="match_parent"
@@ -38,51 +38,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
 
-            <TextView
+            <!-- 菜单项由代码动态构建（adb 激活 / root 激活） -->
+            <LinearLayout
+                android:id="@+id/shizukuActions"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="什么是 mini_shizuku"
-                android:textColor="#ffffff"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:lineSpacingExtra="2dp"
-                android:text="官方 Shizuku 只支持 Android 7 及以上。老手机（Android 7 以下）可以用 mini_shizuku 获得同样的系统权限，无需 root。"
-                android:textColor="#9fb3d1"
-                android:textSize="10sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="如何激活（只需一次）"
-                android:textColor="#ffffff"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:lineSpacingExtra="2dp"
-                android:text="① 手机开启「开发者选项 → USB 调试」，用数据线连电脑\n② 从本应用发布页下载 mini_shizuku.sh 脚本（见 README 说明）\n③ 电脑命令行执行：\n   adb push mini_shizuku.sh /data/local/tmp/\n   adb shell sh /data/local/tmp/mini_shizuku.sh\n④ 回到本页按「刷新状态」，看到「在线」即激活成功"
-                android:textColor="#9fb3d1"
-                android:textSize="10sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:lineSpacingExtra="2dp"
-                android:text="提示：手机重启后服务会停止，重新执行第③步即可。详细说明见项目 README 的「老设备权限（mini_shizuku）」一节。"
-                android:textColor="#8a9ab5"
-                android:textSize="10sp" />
+                android:orientation="vertical" />
         </LinearLayout>
     </ScrollView>
 
@@ -91,12 +55,4 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#2a4a7a" />
-
-    <!-- 操作列表（刷新状态） -->
-    <LinearLayout
-        android:id="@+id/shizukuActions"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="2dp" />
 </LinearLayout>
