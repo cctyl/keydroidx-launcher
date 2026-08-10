@@ -415,25 +415,4 @@ public class NokiaSettingsStorage {
 				.edit().putBoolean(KEY_LOG_FILE, enabled).apply();
 		NokiaLog.i("SettingsStorage", "setFileLogEnabled: " + enabled);
 	}
-
-	// ── 挂机键拦截（无障碍）开关 ──
-
-	private static final String KEY_POWER_KEY_INTERCEPTOR = "power_key_interceptor_enabled";
-
-	/**
-	 * 挂机键拦截（无障碍）是否开启。
-	 * 该开关是无障碍服务 {@link NokiaAccessibilityService} 的总闸：
-	 * 关闭时服务完全放行 power 键，系统默认行为不受影响。
-	 */
-	public static boolean isPowerKeyInterceptorEnabled(Context ctx) {
-		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-				.getBoolean(KEY_POWER_KEY_INTERCEPTOR, false);
-	}
-
-	/** 保存挂机键拦截（无障碍）开关。 */
-	public static void setPowerKeyInterceptorEnabled(Context ctx, boolean enabled) {
-		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-				.edit().putBoolean(KEY_POWER_KEY_INTERCEPTOR, enabled).apply();
-		NokiaLog.i("SettingsStorage", "setPowerKeyInterceptorEnabled: " + enabled);
-	}
 }
