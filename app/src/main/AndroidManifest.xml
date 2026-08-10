@@ -200,6 +200,22 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+
+        <!-- 挂机键拦截（无障碍按键过滤，方案四）：FLAG_REQUEST_FILTER_KEY_EVENTS
+             在 InputDispatcher 层拦截 power 键，实现挂机键语义（回桌面/锁屏/唤醒）。
+             无需 root/shell/adb，用户开启无障碍服务后重启依然生效。 -->
+        <service
+            android:name=".nokia.NokiaAccessibilityService"
+            android:label="@string/nokia_a11y_label"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/nokia_accessibility_config" />
+        </service>
     </application>
 
 </manifest>

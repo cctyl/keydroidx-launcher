@@ -44,13 +44,54 @@ void simulate_key(int fd, int code) {
     emit(fd, EV_SYN, SYN_REPORT, 0);
 }
 
-// 查找包含指定按键的输入设备
+// 查询设备是否声明了指定按键
+static int device_has_key(int fd, int key_code) {
+    unsigned long key_bitmask[NBITS(KEY_MAX)];
+    memset(key_bitmask, 0, sizeof(key_bitmask));
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bitmask)), key_bitmask) < 0) {
+        return 0;
+    }
+    return test_bit(key_code, key_bitmask);
+}
+
+// 读取设备名（ioctl EVIOCGNAME），失败返回空串
+static void device_get_name(int fd, char *name, size_t max_len) {
+    name[0] = '\0';
+    if (ioctl(fd, EVIOCGNAME((int)max_len - 1), name) < 0) {
+        name[0] = '\0';
+    }
+}
+
+// 判断设备是否为「物理按键设备」：含目标键 + 不含 FN 功能键 + 非 uinput 虚拟设备。
+// 背景：部分手机多个设备声明同一按键（如 madev 声明 KEY_POWER 的 FN 功能键设备，
+// 以及本方案创建的 virtual-nokia-keypad 回放设备），readdir 顺序可能先遇到它们，
+// 导致 grab 错设备（物理电源键在 gpio-keys，却抓到 madev）。此处按特征优先物理设备。
+static int is_physical_key_device(int fd, int key_code) {
+    if (!device_has_key(fd, key_code)) {
+        return 0;
+    }
+    // FN 功能键设备（KEY_FN_F1..）非物理电源键设备
+    if (device_has_key(fd, KEY_FN_F1) || device_has_key(fd, KEY_FN_F2)) {
+        return 0;
+    }
+    // 跳过本方案创建的 uinput 回放设备
+    char name[128];
+    device_get_name(fd, name, sizeof(name));
+    if (strstr(name, "virtual") != NULL || strstr(name, "uinput") != NULL
+            || strstr(name, "Virtual") != NULL) {
+        return 0;
+    }
+    return 1;
+}
+
+// 查找包含指定按键的输入设备：优先物理按键设备，退化取第一个含目标键的设备。
 int find_device_with_key(int key_code, char *dev_path, size_t max_len) {
     DIR *dir = opendir("/dev/input");
     if (!dir) return -1;
 
     struct dirent *ent;
-    unsigned long key_bitmask[NBITS(KEY_MAX)];
+    char fallback[256];
+    int fallback_found = 0;
 
     while ((ent = readdir(dir)) != NULL) {
         if (strncmp(ent->d_name, "event", 5) != 0) continue;
@@ -61,19 +102,28 @@ int find_device_with_key(int key_code, char *dev_path, size_t max_len) {
         int fd = open(path, O_RDONLY);
         if (fd < 0) continue;
 
-        memset(key_bitmask, 0, sizeof(key_bitmask));
-        if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bitmask)), key_bitmask) >= 0) {
-            if (test_bit(key_code, key_bitmask)) {
+        if (device_has_key(fd, key_code)) {
+            if (!fallback_found) {
+                strncpy(fallback, path, sizeof(fallback) - 1);
+                fallback[sizeof(fallback) - 1] = '\0';
+                fallback_found = 1;
+            }
+            if (is_physical_key_device(fd, key_code)) {
                 strncpy(dev_path, path, max_len);
                 close(fd);
                 closedir(dir);
-                return 0; // Found
+                return 0; // 命中物理按键设备
             }
         }
         close(fd);
     }
 
     closedir(dir);
+
+    if (fallback_found) {
+        strncpy(dev_path, fallback, max_len);
+        return 0; // 退化：任意含目标键的设备
+    }
     return -1;
 }
 
@@ -140,7 +190,10 @@ void* interceptor_run(void* arg) {
 
     LOGI("Found KEY_POWER on device: %s", dev_path);
 
-    power_key_fd = open(dev_path, O_RDWR);
+    // 注意：必须用 O_RDONLY 打开。Android 5.0+ SELinux enforcing 下，shell 域对
+    // input_device 类型只允许读（写会被 avc 拒绝，O_RDWR 打开直接失败）。
+    // EVIOCGRAB 独占抓取与 read 事件流仅需读权限即可正常工作（实测验证）。
+    power_key_fd = open(dev_path, O_RDONLY);
     if (power_key_fd < 0) {
         LOGE("Failed to open %s", dev_path);
         is_running = 0;

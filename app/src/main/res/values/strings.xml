@@ -4,6 +4,10 @@
     <string name="navigation_drawer_open" translatable="false">Open navigation drawer</string>
     <string name="navigation_drawer_close" translatable="false">Close navigation drawer</string>
 
+    <!-- 挂机键拦截（无障碍）服务 -->
+    <string name="nokia_a11y_label" translatable="false">诺基亚桌面挂机键拦截</string>
+    <string name="nokia_a11y_desc" translatable="false">将物理电源键作为挂机键：在任意应用按挂机键回到诺基亚桌面，在桌面按挂机键锁屏，锁屏时按挂机键唤醒。需先在「桌面设置 → 挂机键拦截」开启后生效。</string>
+
     <string name="close">Close</string>
     <string name="exit">Exit</string>
     <string name="about">About</string>

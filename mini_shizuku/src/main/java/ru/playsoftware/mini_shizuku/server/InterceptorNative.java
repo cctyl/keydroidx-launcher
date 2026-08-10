@@ -53,8 +53,11 @@ public class InterceptorNative {
     public static boolean prepareLibrary(String outPath) {
         try {
             File out = new File(outPath);
+            // 强制覆盖：删除旧文件后从 APK 重新解压，避免「旧 so 残留导致加载旧版」。
+            // 注意：同一进程内 System.load 对同一路径不会重新加载新内容（dlopen 路径缓存），
+            // 因此更新 so 后必须重启服务进程（重新 sh mini_shizuku.sh）才能加载最新版。
             if (out.exists() && out.length() > 0) {
-                return true;
+                out.delete();
             }
 
             String apkPath = findApkPath();

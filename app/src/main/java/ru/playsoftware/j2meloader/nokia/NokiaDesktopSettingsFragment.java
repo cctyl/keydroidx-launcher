@@ -1,6 +1,8 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -9,6 +11,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -36,6 +39,7 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 			R.drawable.s60_settings,       // 应用向导
 			R.drawable.ic_nokia_home,      // 默认桌面设置
 			R.drawable.ic_nokia_settings,  // mini_shizuku
+			R.drawable.s60_settings,       // 挂机键拦截
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -48,6 +52,7 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 			"应用向导",
 			"默认桌面设置",
 			"mini_shizuku",
+			"挂机键拦截",
 	};
 
 	/** 字体大小档位（桌面设置 → 字体大小），作用于全部应用内文字。 */
@@ -78,6 +83,15 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 		if (index == 8) {
 			// 基础文案；在线/离线状态由 refreshShizukuStatus() 异步刷新
 			return "mini_shizuku";
+		}
+		if (index == 9) {
+			// 挂机键拦截：显示开关状态；开启但无障碍服务未启用时给出提示
+			boolean enabled = NokiaSettingsStorage.isPowerKeyInterceptorEnabled(requireContext());
+			if (!enabled) {
+				return "挂机键拦截：关闭";
+			}
+			boolean svcOn = NokiaAccessibilityService.isServiceEnabled(requireContext());
+			return svcOn ? "挂机键拦截：开启" : "挂机键拦截：开启（服务未启用）";
 		}
 		return ITEM_NAMES[index];
 	}
@@ -259,6 +273,10 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 				NokiaLog.i("DesktopSettings", "进入 mini_shizuku 服务");
 				host.openFragment(new ShizukuFragment());
 				return true;
+			case 9:
+				NokiaLog.i("DesktopSettings", "挂机键拦截开关");
+				togglePowerKeyInterceptor();
+				return true;
 			default:
 				return false;
 		}
@@ -277,6 +295,37 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 		// 刷新当前项文案，立即显示新状态
 		if (tvNames != null && tvNames.length > 1 && tvNames[1] != null) {
 			tvNames[1].setText(getItemDisplayName(1));
+		}
+	}
+
+	/**
+	 * 切换挂机键拦截（无障碍）开关：
+	 * 开启 → 写入开关 + 检测无障碍服务是否已启用，未启用则跳转系统无障碍设置引导；
+	 * 关闭 → 写入开关（服务仍在运行但完全放行 power 键）。
+	 */
+	private void togglePowerKeyInterceptor() {
+		boolean next = !NokiaSettingsStorage.isPowerKeyInterceptorEnabled(requireContext());
+		NokiaSettingsStorage.setPowerKeyInterceptorEnabled(requireContext(), next);
+		NokiaLog.i("DesktopSettings", "挂机键拦截切换为: " + (next ? "开启" : "关闭"));
+		if (next) {
+			if (NokiaAccessibilityService.isServiceEnabled(requireContext())) {
+				Toast.makeText(requireContext(), "挂机键拦截已开启", Toast.LENGTH_SHORT).show();
+			} else {
+				Toast.makeText(requireContext(),
+						"请在系统无障碍设置中开启「诺基亚桌面挂机键拦截」服务", Toast.LENGTH_LONG).show();
+				try {
+					Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+					startActivity(intent);
+				} catch (Exception e) {
+					NokiaLog.e("DesktopSettings", "跳转无障碍设置失败", e);
+				}
+			}
+		} else {
+			Toast.makeText(requireContext(), "挂机键拦截已关闭", Toast.LENGTH_SHORT).show();
+		}
+		// 刷新当前项文案，立即显示新状态
+		if (tvNames != null && tvNames.length > 9 && tvNames[9] != null) {
+			tvNames[9].setText(getItemDisplayName(9));
 		}
 	}
 
