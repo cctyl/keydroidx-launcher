@@ -24,6 +24,8 @@ public class MsgProcess implements Runnable {
     private static final String TAG = "MiniShizuku";
     private static final String PREFIX_SILENT = "EXEC|";
     private static final String PREFIX_OUTPUT = "EXEC_OUT|";
+    private static final String CMD_INTERCEPTOR_START = "INTERCEPTOR_START";
+    private static final String CMD_INTERCEPTOR_STOP = "INTERCEPTOR_STOP";
     private static final String EXIT_PREFIX = "EXIT:";
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -46,14 +48,25 @@ public class MsgProcess implements Runnable {
                 }
                 if (command.startsWith(PREFIX_OUTPUT)) {
                     handleExecWithOutput(command.substring(PREFIX_OUTPUT.length()));
-                } else if (command.startsWith(PREFIX_SILENT)) {
-                    String cmd = command.substring(PREFIX_SILENT.length()).trim();
-                    Log.i(TAG, "exec(silent): " + cmd);
-                    ShellUtil.execute(cmd);
                 } else {
-                    // 兼容旧客户端：未加前缀的命令按静默处理
-                    Log.i(TAG, "exec(silent/legacy): " + command);
-                    ShellUtil.execute(command);
+                    // 先剥掉 EXEC| 前缀（客户端 exec() 会带上前缀），再判断是否拦截器命令
+                    String cmd = command;
+                    if (cmd.startsWith(PREFIX_SILENT)) {
+                        cmd = cmd.substring(PREFIX_SILENT.length()).trim();
+                    }
+                    if (cmd.equals(CMD_INTERCEPTOR_START)) {
+                        handleInterceptorStart();
+                    } else if (cmd.equals(CMD_INTERCEPTOR_STOP)) {
+                        handleInterceptorStop();
+                    } else if (cmd.startsWith(PREFIX_SILENT)) {
+                        String real = cmd.substring(PREFIX_SILENT.length()).trim();
+                        Log.i(TAG, "exec(silent): " + real);
+                        ShellUtil.execute(real);
+                    } else {
+                        // 兼容旧客户端：未加前缀的命令按静默处理
+                        Log.i(TAG, "exec(silent/legacy): " + cmd);
+                        ShellUtil.execute(cmd);
+                    }
                 }
             }
         } catch (IOException e) {
@@ -64,6 +77,28 @@ public class MsgProcess implements Runnable {
             } catch (IOException ignored) {
             }
         }
+    }
+
+    /**
+     * 处理拦截器启动：先确保原生库部署到 /data/local/tmp，再加载并启动。
+     */
+    private void handleInterceptorStart() {
+        Log.i(TAG, "interceptor start requested");
+        if (InterceptorNative.prepareLibrary("/data/local/tmp/libnokiainterceptor.so")) {
+            InterceptorNative.loadLibrary("/data/local/tmp/libnokiainterceptor.so");
+            InterceptorNative.startInterceptor();
+            Log.i(TAG, "interceptor started");
+        } else {
+            Log.e(TAG, "interceptor start failed: library not deployed");
+        }
+    }
+
+    /**
+     * 处理拦截器停止。
+     */
+    private void handleInterceptorStop() {
+        Log.i(TAG, "interceptor stop requested");
+        InterceptorNative.stopInterceptor();
     }
 
     /**

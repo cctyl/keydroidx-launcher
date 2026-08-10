@@ -45,3 +45,11 @@ ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
 endif
 
 include $(BUILD_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE    := nokiainterceptor
+LOCAL_SRC_FILES := interceptor/interceptor.c
+LOCAL_CFLAGS    := -O2
+LOCAL_LDLIBS := -llog
+include $(BUILD_SHARED_LIBRARY)
+

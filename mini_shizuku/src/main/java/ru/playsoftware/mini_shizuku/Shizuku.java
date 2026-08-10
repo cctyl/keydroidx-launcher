@@ -55,7 +55,23 @@ public final class Shizuku {
      * @param command 要执行的命令。
      * @return 命令输出；服务不可用或执行失败返回 {@code null}。
      */
+    /**
+     * 开启/关闭电源键拦截（evdev grab 由服务端以 shell 身份执行）。
+     * <p>
+     * 开启后：power 键所在输入设备被 EVIOCGRAB 独占抓取，power 事件被消费丢弃，
+     * 系统收不到 power 键，从而避免桌面因 power 键退出/回到系统桌面。
+     * 注意：shell 无法写 /dev/uinput 时为纯消费模式，该设备上的其它按键（如音量键）
+     * 也会一并被吞掉。
+     *
+     * @param enable true 开启拦截，false 关闭。
+     * @return 命令是否成功发送（服务在线且写入成功）。
+     */
+    public static boolean enablePowerInterceptor(boolean enable) {
+        return ShizukuClient.exec(enable ? "INTERCEPTOR_START" : "INTERCEPTOR_STOP");
+    }
+
     public static String execWithOutput(String command) {
         return ShizukuClient.execWithOutput(command);
     }
 }
+
