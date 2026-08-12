@@ -26,6 +26,7 @@ public class MsgProcess implements Runnable {
     private static final String PREFIX_OUTPUT = "EXEC_OUT|";
     private static final String CMD_INTERCEPTOR_START = "INTERCEPTOR_START";
     private static final String CMD_INTERCEPTOR_STOP = "INTERCEPTOR_STOP";
+    private static final String CMD_PAGE_STATE = "PAGE_STATE|";
     private static final String EXIT_PREFIX = "EXIT:";
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -58,6 +59,8 @@ public class MsgProcess implements Runnable {
                         handleInterceptorStart();
                     } else if (cmd.equals(CMD_INTERCEPTOR_STOP)) {
                         handleInterceptorStop();
+                    } else if (cmd.startsWith(CMD_PAGE_STATE)) {
+                        handlePageState(cmd.substring(CMD_PAGE_STATE.length()));
                     } else if (cmd.startsWith(PREFIX_SILENT)) {
                         String real = cmd.substring(PREFIX_SILENT.length()).trim();
                         Log.i(TAG, "exec(silent): " + real);
@@ -86,6 +89,7 @@ public class MsgProcess implements Runnable {
         Log.i(TAG, "interceptor start requested");
         if (InterceptorNative.prepareLibrary("/data/local/tmp/libnokiainterceptor.so")) {
             InterceptorNative.loadLibrary("/data/local/tmp/libnokiainterceptor.so");
+            InterceptorNative.applyCachedPageState();
             InterceptorNative.startInterceptor();
             Log.i(TAG, "interceptor started");
             reply("OK:interceptor started");
@@ -102,6 +106,18 @@ public class MsgProcess implements Runnable {
         Log.i(TAG, "interceptor stop requested");
         InterceptorNative.stopInterceptor();
         reply("OK:interceptor stopped");
+    }
+
+    /**
+     * 处理页面状态上报：App 通过 TCP 发送 "PAGE_STATE|0" 或 "PAGE_STATE|1"，
+     * 服务端调用 JNI 更新 native 全局变量，供拦截器状态机区分主界面/子页面。
+     *
+     * @param value "1"=主界面（待机屏），"0"=子页面
+     */
+    private void handlePageState(String value) {
+        boolean isMain = "1".equals(value.trim());
+        Log.i(TAG, "page state: " + (isMain ? "main" : "sub"));
+        InterceptorNative.setPageState(isMain);
     }
 
     /**

@@ -33,6 +33,11 @@
 #define INJECT_DEBOUNCE_MS 1000
 // 状态轮询间隔（微秒）：500ms 轮询 dumpsys 更新缓存。
 #define STATE_POLL_US      (500 * 1000)
+// 长按判定阈值（毫秒）：按下超过此时间仍未抬起视为长按，转发给系统。
+#define LONG_PRESS_THRESHOLD_MS 500
+// 系统电源键长按超时（毫秒）：系统检测长按的时间，注入 DOWN 后至少保持此时长
+// 才能让系统弹出开关机菜单。
+#define SYSTEM_LONG_PRESS_MS 500
 
 static pthread_t interceptor_thread;
 static pthread_t state_thread;
@@ -43,9 +48,22 @@ static int power_key_fd = -1;
 // ---- 状态缓存（由状态线程 500ms 轮询 dumpsys 更新，按键时直接读） ----
 static volatile int screen_awake = 1;        // 屏幕是否亮（默认亮，避免首次按键误锁屏）
 static volatile int front_is_nokia = 0;      // 前台窗口是否为本应用
+static volatile int front_is_keyguard = 0;   // 前台窗口是否为锁屏界面（Keyguard）
 static char front_package[128] = "";         // 当前前台包名（日志用）
 static char nokia_package[128] = "";         // 探测到的有效本应用包名（缓存，go home 用）
 static long long last_inject_ms = 0;         // 上次注入时间（防抖）
+
+// ---- 页面状态（由 App 通过 JNI 上报，区分诺基亚主界面 vs 子页面） ----
+// 1 = 主界面（待机屏 NokiaDesktopFragment），0 = 子页面（功能表/设置/百宝箱等）
+static volatile int page_is_main = 1;
+
+// ---- 长按追踪 ----
+static volatile int power_is_down = 0;          // 电源键当前是否处于按下状态
+static volatile long long power_down_time_ms = 0; // 按下时刻
+static volatile int long_press_injected = 0;     // 是否已通过 uinput 注入长按 DOWN
+static volatile long long long_press_inject_time_ms = 0; // 注入 DOWN 的时刻
+static pthread_t long_press_thread;
+static volatile int long_press_thread_created = 0; // 长按监控线程是否已创建（防 join 未初始化句柄）
 
 // ---- 工具 ----
 
@@ -285,15 +303,16 @@ static int is_nokia_package(const char *pkg) {
 
 // 更新屏幕状态缓存：dumpsys power → mWakefulness。
 static void update_screen_state() {
-    char output[8192];
-    if (run_cmd_output("dumpsys power 2>/dev/null", output, sizeof(output)) < 0) {
+    char output[256];
+    if (run_cmd_output("dumpsys power 2>/dev/null | grep mWakefulness",
+                       output, sizeof(output)) < 0) {
         LOGW("state: dumpsys power failed");
         return;
     }
     char val[32];
     extract_after(output, "mWakefulness=", val, sizeof(val));
     if (!val[0]) {
-        LOGW("state: mWakefulness not found in dumpsys power (len=%d)", (int)strlen(output));
+        LOGW("state: mWakefulness not found (output=%s)", output);
         return;
     }
     int awake = (strcmp(val, "Awake") == 0);
@@ -304,10 +323,14 @@ static void update_screen_state() {
     }
 }
 
-// 更新前台窗口缓存：dumpsys window windows | grep mCurrentFocus。
+// 更新前台窗口缓存：dumpsys window | grep mCurrentFocus。
+// 注意：必须用 "dumpsys window"（不带 "windows"），实测部分 ROM 下
+// "dumpsys window windows" 不返回 mCurrentFocus 字段。
+// 锁屏界面检测：锁屏时 mCurrentFocus 通常为 NotificationShade / StatusBar / Keyguard
+// （无 / 分隔符，包名解析失败），或包名为 com.android.systemui。
 static void update_front_window() {
     char output[4096];
-    if (run_cmd_output("dumpsys window windows 2>/dev/null | grep mCurrentFocus",
+    if (run_cmd_output("dumpsys window 2>/dev/null | grep mCurrentFocus",
                        output, sizeof(output)) < 0) {
         LOGW("state: dumpsys window failed");
         return;
@@ -315,16 +338,30 @@ static void update_front_window() {
     char pkg[128];
     extract_front_package(output, pkg, sizeof(pkg));
     if (!pkg[0]) {
-        LOGW("state: mCurrentFocus parse failed (output=%s)", output);
+        // mCurrentFocus 无 / 分隔符（如 NotificationShade / StatusBar），
+        // 检查是否为锁屏/通知栏窗口
+        int isKg = (strstr(output, "NotificationShade") != NULL
+                    || strstr(output, "StatusBar") != NULL
+                    || strstr(output, "keyguard") != NULL
+                    || strstr(output, "Keyguard") != NULL) ? 1 : 0;
+        if (isKg != front_is_keyguard) {
+            LOGI("state: keyguard=%d (no pkg, raw=%s)", isKg, output);
+            front_is_keyguard = isKg;
+        }
+        // 解析失败时不改变 front_is_nokia / front_package（保守保持上一次有效值）
         return;
     }
     int isNokia = is_nokia_package(pkg);
-    if (isNokia != front_is_nokia || strcmp(pkg, front_package) != 0) {
-        LOGI("state: front window pkg=%s isNokia=%d (was pkg=%s isNokia=%d)",
-             pkg, isNokia, front_package, front_is_nokia);
+    // SystemUI 包名承载锁屏界面（Keyguard）
+    int isKeyguard = (strcmp(pkg, "com.android.systemui") == 0) ? 1 : 0;
+    if (isNokia != front_is_nokia || strcmp(pkg, front_package) != 0
+            || isKeyguard != front_is_keyguard) {
+        LOGI("state: front window pkg=%s isNokia=%d isKeyguard=%d (was pkg=%s isNokia=%d isKeyguard=%d)",
+             pkg, isNokia, isKeyguard, front_package, front_is_nokia, front_is_keyguard);
         strncpy(front_package, pkg, sizeof(front_package) - 1);
         front_package[sizeof(front_package) - 1] = '\0';
         front_is_nokia = isNokia;
+        front_is_keyguard = isKeyguard;
     }
 }
 
@@ -340,7 +377,10 @@ static void* state_thread_run(void* arg) {
     return NULL;
 }
 
-// 注入：回诺基亚桌面（am start 精确拉起，不依赖 HOME 归属）。
+// 注入：回诺基亚桌面主界面。
+// 使用 -a MAIN -c HOME + -n 显式组件：-n 直接拉起诺基亚桌面（绕过 ROM 写死的内置桌面
+// 归属），HOME action/category 触发 NokiaDesktopActivity.onNewIntent→goHome()→回到待机屏。
+// launchMode=singleTask 确保无论 Activity 在前台(子页面)还是后台，都能收到 onNewIntent。
 static void inject_go_home() {
     // 探测有效包名（缓存，仅首次探测）
     if (nokia_package[0] == '\0') {
@@ -357,16 +397,25 @@ static void inject_go_home() {
         }
         LOGI("go home: resolved package=%s", nokia_package);
     }
-    char cmd[300];
-    snprintf(cmd, sizeof(cmd), "am start -n %s/%s", nokia_package, NOKIA_ACTIVITY);
+    char cmd[400];
+    snprintf(cmd, sizeof(cmd),
+             "am start -a android.intent.action.MAIN -c android.intent.category.HOME "
+             "-n %s/%s -f 0x14000000",
+             nokia_package, NOKIA_ACTIVITY);
     int rc = run_cmd(cmd);
     LOGI("go home: rc=%d cmd=%s", rc, cmd);
 }
 
-// 注入：锁屏（input keyevent 26=POWER，走 InputManager 不受 evdev grab 影响）。
+// 注入：锁屏+息屏。
+// 使用 input keyevent 223 (KEYCODE_SLEEP) 直接息屏——实测部分 ROM 下
+// input keyevent 26 (POWER) 不触发息屏（电源键注入被系统拦截），223 更可靠。
 static void inject_lock() {
-    int rc = run_cmd("input keyevent 26");
-    LOGI("lock: input keyevent 26 rc=%d", rc);
+    int rc = run_cmd("input keyevent 223");
+    LOGI("lock: input keyevent 223 (SLEEP) rc=%d", rc);
+    if (rc != 0) {
+        LOGW("lock: 223 failed, fallback to 26 (POWER)");
+        run_cmd("input keyevent 26");
+    }
 }
 
 // 注入：唤醒（input keyevent 224=WAKEUP；部分 ROM 不支持时回退 26）。
@@ -379,29 +428,98 @@ static void inject_wake() {
     }
 }
 
-// 决策状态机：power 键按下时执行（方案1核心）。
-static void handle_power_pressed() {
+// 决策状态机：短按 power 键时执行（5 态：A/B/C/E/F）。
+// 在 UP（短按判定后）调用，非 DOWN 时直接调用。
+static void handle_short_press() {
     long long now = now_ms();
     if (last_inject_ms != 0 && now - last_inject_ms < INJECT_DEBOUNCE_MS) {
         LOGI("power: consumed (debounce, %lldms since last inject)", now - last_inject_ms);
         return;
     }
-    LOGI("power: pressed -> screen=%s frontIsNokia=%d frontPkg='%s'",
-         screen_awake ? "awake" : "asleep", front_is_nokia, front_package);
+    LOGI("power: short press -> screen=%s frontIsNokia=%d isKeyguard=%d pageIsMain=%d frontPkg='%s'",
+         screen_awake ? "awake" : "asleep", front_is_nokia, front_is_keyguard, page_is_main, front_package);
+
     if (!screen_awake) {
-        // 屏幕灭 → 唤醒
-        LOGI("power: decision=wake (screen asleep)");
+        // E 息屏 → 唤醒，显示锁屏界面
+        LOGI("power: decision=wake [E->F] (screen asleep)");
         inject_wake();
-    } else if (!front_is_nokia) {
-        // 屏幕亮 + 前台非本应用 → 回桌面
-        LOGI("power: decision=go_home (screen awake, front is other app)");
-        inject_go_home();
-    } else {
-        // 屏幕亮 + 前台本应用 → 锁屏
-        LOGI("power: decision=lock (screen awake, front is nokia)");
+    } else if (front_is_keyguard) {
+        // F 亮屏·锁屏界面 → 再次锁屏（熄屏）
+        LOGI("power: decision=lock [F->E] (keyguard showing)");
         inject_lock();
+    } else if (front_is_nokia && page_is_main) {
+        // C 亮屏·诺基亚桌面主界面 → 锁屏（熄屏）
+        LOGI("power: decision=lock [C->E] (nokia main page)");
+        inject_lock();
+    } else {
+        // A 亮屏·非诺基亚应用 → 回诺基亚桌面主界面
+        // B 亮屏·诺基亚桌面其他界面 → 回诺基亚桌面主界面（不锁屏）
+        LOGI("power: decision=go_home [A/B->C] (front=%s, nokia=%d, main=%d)",
+             front_package, front_is_nokia, page_is_main);
+        inject_go_home();
     }
     last_inject_ms = now_ms();
+}
+
+// ---- 长按转发 ----
+
+// 长按监控线程：DOWN 后启动，若按住超过阈值仍未抬起，通过 uinput 注入 KEY_POWER DOWN
+// 给系统，让系统自行检测长按并弹出开关机菜单。
+static void* long_press_watch(void* arg) {
+    while (is_running && power_is_down && !long_press_injected) {
+        long long held = now_ms() - power_down_time_ms;
+        if (held >= LONG_PRESS_THRESHOLD_MS) {
+            long_press_injected = 1;
+            long_press_inject_time_ms = now_ms();
+            LOGI("power: long press detected (%lldms held), forwarding to system", held);
+            if (uinput_fd >= 0) {
+                // 方案1：通过 uinput 注入 KEY_POWER DOWN，系统开始长按计时
+                emit(uinput_fd, EV_KEY, KEY_POWER, 1);
+                emit(uinput_fd, EV_SYN, SYN_REPORT, 0);
+                LOGI("power: long press DOWN injected via uinput");
+            } else {
+                // 方案2（纯消费）：释放 grab 让系统看到后续物理事件，
+                // 并 best-effort 尝试 input keyevent --longpress（部分 ROM 有效）
+                LOGW("power: long press in consume-only mode, releasing grab");
+                if (power_key_fd >= 0) {
+                    ioctl(power_key_fd, EVIOCGRAB, 0);
+                }
+                run_cmd("input keyevent --longpress 26");
+            }
+            break;
+        }
+        usleep(20 * 1000); // 每 20ms 检查一次
+    }
+    return NULL;
+}
+
+// 长按 UP 处理：完成注入序列或恢复 grab。
+static void handle_long_press_up() {
+    if (uinput_fd >= 0) {
+        // 方案1：确保系统看到足够长的按住时间（≥ SYSTEM_LONG_PRESS_MS），
+        // 否则系统会把短按当休眠处理。若用户提前松手，延迟补足 UP 注入。
+        long long held_since_inject = now_ms() - long_press_inject_time_ms;
+        if (held_since_inject < SYSTEM_LONG_PRESS_MS) {
+            long long wait = SYSTEM_LONG_PRESS_MS - held_since_inject;
+            LOGI("power: long press UP deferred %lldms (held_only_%lldms_since_inject)",
+                 wait, held_since_inject);
+            long long deadline = now_ms() + wait;
+            while (now_ms() < deadline) {
+                if (!is_running) break;
+                usleep(20 * 1000);
+            }
+        }
+        emit(uinput_fd, EV_KEY, KEY_POWER, 0);
+        emit(uinput_fd, EV_SYN, SYN_REPORT, 0);
+        LOGI("power: long press UP injected via uinput (total_held=%lldms)",
+             now_ms() - power_down_time_ms);
+    } else {
+        // 方案2：重新 grab 恢复拦截
+        if (power_key_fd >= 0) {
+            ioctl(power_key_fd, EVIOCGRAB, 1);
+            LOGI("power: re-grabbed after long press (consume-only)");
+        }
+    }
 }
 
 // ---- 主拦截线程 ----
@@ -465,11 +583,35 @@ void* interceptor_run(void* arg) {
 
         if (ev.type == EV_KEY && ev.code == KEY_POWER) {
             if (ev.value == 1) {
-                // 方案1：power 按下 → 决策状态机（唤醒/回桌面/锁屏）
-                handle_power_pressed();
+                // DOWN：记录时间，启动长按监控线程，暂不处理（等判定短按/长按）
+                power_is_down = 1;
+                long_press_injected = 0;
+                long_press_thread_created = 0;
+                power_down_time_ms = now_ms();
+                LOGI("power: DOWN (starting long-press watcher, threshold=%dms)",
+                     LONG_PRESS_THRESHOLD_MS);
+                if (pthread_create(&long_press_thread, NULL, long_press_watch, NULL) == 0) {
+                    long_press_thread_created = 1;
+                }
+            } else if (ev.value == 2) {
+                // REPEAT：消费丢弃，长按由监控线程处理
+                // 不打日志（REPEAT 事件频繁）
             } else {
-                // power 抬起一律消费丢弃
-                LOGI("power: UP consumed");
+                // UP (value==0)：等待监控线程退出，按短按/长按分别处理
+                power_is_down = 0;
+                if (long_press_thread_created) {
+                    pthread_join(long_press_thread, NULL);
+                    long_press_thread_created = 0;
+                }
+                if (long_press_injected) {
+                    // 长按已转发：完成 uinput UP 注入（或恢复 grab）
+                    handle_long_press_up();
+                } else {
+                    // 短按：执行决策状态机
+                    LOGI("power: UP short press (%lldms held)",
+                         now_ms() - power_down_time_ms);
+                    handle_short_press();
+                }
             }
         } else if (ev.type == EV_KEY || ev.type == EV_SYN) {
             // 有 uinput 时非 power 键事件原样回放，保证其它按键行为不变；
@@ -529,4 +671,15 @@ Java_ru_playsoftware_mini_1shizuku_server_InterceptorNative_stopInterceptor(JNIE
 JNIEXPORT void JNICALL
 Java_ru_playsoftware_mini_1shizuku_server_InterceptorNative_setInterceptEnabled(JNIEnv *env, jclass clazz, jboolean enabled) {
     // 预留：动态开关拦截。当前 start/stop 已满足需求，先留空。
+}
+
+// 由 App 通过 TCP→服务端 JNI 调用，上报当前页面状态。
+// state: 1 = 诺基亚桌面主界面（待机屏），0 = 子页面（功能表/设置/百宝箱等）
+JNIEXPORT void JNICALL
+Java_ru_playsoftware_mini_1shizuku_server_InterceptorNative_nativeSetPageState(JNIEnv *env, jclass clazz, jint state) {
+    int s = state ? 1 : 0;
+    if (s != page_is_main) {
+        LOGI("page state: %s -> %s", page_is_main ? "main" : "sub", s ? "main" : "sub");
+        page_is_main = s;
+    }
 }

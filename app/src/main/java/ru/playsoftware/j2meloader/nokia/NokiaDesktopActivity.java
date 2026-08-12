@@ -8,6 +8,8 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.View;
@@ -18,6 +20,7 @@ import androidx.fragment.app.FragmentManager;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 import ru.playsoftware.j2meloader.nokia.NokiaLog;
+import ru.playsoftware.mini_shizuku.Shizuku;
 
 /**
  * 诺基亚风格界面的单一宿主 Activity。
@@ -43,6 +46,8 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	 * 复位为 KEYCODE_UNKNOWN 表示当前无待配对事件。
 	 */
 	private int lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+	/** 最近一次上报给拦截器的页面状态，避免重复发送 TCP */
+	private String lastReportedPageState = null;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +61,9 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 
 		statusBarController = new StatusBarController(this);
 		keyBinding = new NokiaKeyBinding(this);
+
+		// 监听返回栈变化，自动上报页面状态给拦截器（覆盖 goHome/switchFragment/exitCurrent）
+		getSupportFragmentManager().addOnBackStackChangedListener(() -> postReportPageState());
 
 		// 确保全局 JAR 设置 profile 存在并设为默认
 		NokiaGlobalProfile.ensureGlobalProfile(this);
@@ -215,6 +223,8 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		// 状态栏系统信息（信号/运营商/WiFi/电池等）查询延迟到首帧渲染后执行，
 		// 避免冷启动时同步 Binder 调用阻塞首帧；延迟回调前若已 pause 则跳过（防重复注册）。
 		scheduleStatusBarStart();
+		// 上报当前页面状态给拦截器（从其他应用返回时确保状态正确）
+		reportPageState();
 		NokiaLog.i("Desktop", "onResume 已调度 StatusBarController 延迟启动");
 	}
 
@@ -500,6 +510,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		getSupportFragmentManager().beginTransaction()
 				.replace(R.id.midPanel, new NokiaKeyBindWizardFragment())
 				.commit();
+		postReportPageState();
 	}
 
 	// ---- 导航方法 ----
@@ -536,6 +547,37 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		}
 	}
 
+	// ---- 页面状态上报（供拦截器区分主界面 vs 子页面） ----
+
+	/**
+	 * 延迟到主线程下一帧上报页面状态，确保 Fragment 事务已提交。
+	 */
+	private void postReportPageState() {
+		new Handler(Looper.getMainLooper()).post(this::reportPageState);
+	}
+
+	/**
+	 * 检测当前 Fragment 是否为桌面主界面（NokiaDesktopFragment），通过 TCP 上报给
+	 * mini_shizuku 服务端，服务端经 JNI 更新 native 全局变量 page_is_main。
+	 * 拦截器状态机据此区分：亮屏+诺基亚主界面→锁屏，亮屏+诺基亚子页面→回桌面。
+	 * 相同状态不重复发送。
+	 */
+	private void reportPageState() {
+		Fragment f = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+		String state = (f instanceof NokiaDesktopFragment) ? "main" : "sub";
+		if (state.equals(lastReportedPageState)) return;
+		lastReportedPageState = state;
+		NokiaLog.i("Desktop", "上报页面状态: " + state
+				+ " (fragment=" + (f != null ? f.getClass().getSimpleName() : "null") + ")");
+		new Thread(() -> {
+			try {
+				Shizuku.setPageState("main".equals(state));
+			} catch (Exception e) {
+				NokiaLog.w("Desktop", "上报页面状态失败: " + e.getMessage());
+			}
+		}, "nokia-page-state").start();
+	}
+
 	// ---- 内部方法 ----
 
 	private void goHome() {
@@ -545,6 +587,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		fm.beginTransaction()
 				.replace(R.id.midPanel, new NokiaDesktopFragment())
 				.commit();
+		postReportPageState();
 	}
 
 	private boolean isHomeIntent(Intent intent) {
@@ -561,6 +604,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		getSupportFragmentManager().beginTransaction()
 				.replace(R.id.midPanel, new NokiaDesktopFragment())
 				.commit();
+		postReportPageState();
 	}
 
 	private void switchFragment(Fragment fragment) {
@@ -570,5 +614,6 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 				.replace(R.id.midPanel, fragment)
 				.addToBackStack(null)
 				.commit();
+		postReportPageState();
 	}
 }

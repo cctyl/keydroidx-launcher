@@ -70,6 +70,19 @@ public final class Shizuku {
         return ShizukuClient.execInterceptor(enable ? "INTERCEPTOR_START" : "INTERCEPTOR_STOP");
     }
 
+    /**
+     * 上报当前页面状态给拦截器，使其能区分诺基亚桌面主界面（待机屏）与子页面。
+     * <p>
+     * 拦截器状态机需要此信息来决定：亮屏+诺基亚时，主界面→锁屏，子页面→回桌面。
+     * 服务端通过 JNI 更新 native 全局变量；服务离线时静默失败（不影响 UI）。
+     *
+     * @param isMain true=主界面（待机屏 NokiaDesktopFragment），false=子页面
+     * @return 命令是否成功发送。
+     */
+    public static boolean setPageState(boolean isMain) {
+        return ShizukuClient.exec("PAGE_STATE|" + (isMain ? "1" : "0"));
+    }
+
     public static String execWithOutput(String command) {
         return ShizukuClient.execWithOutput(command);
     }

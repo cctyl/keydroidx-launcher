@@ -14,6 +14,8 @@ import java.util.zip.ZipFile;
 public class InterceptorNative {
     private static final String TAG = "MiniShizuku";
     private static boolean isLoaded = false;
+    // 页面状态缓存：1=主界面, 0=子页面。库未加载时缓存，加载后 apply。
+    private static int cachedPageState = 1;
 
     /**
      * 获取当前进程支持的 ABI 列表（按优先级排序）。
@@ -166,7 +168,42 @@ public class InterceptorNative {
         }
     }
 
+    /**
+     * 设置当前页面状态（由 App 通过 TCP 上报）。
+     * <p>
+     * 库已加载时直接调用 native 方法；未加载时缓存，待 {@link #applyCachedPageState()}
+     * 在库加载后统一应用，避免 native 库未就绪时丢失状态。
+     *
+     * @param isMain true=诺基亚桌面主界面（待机屏），false=子页面
+     */
+    public static void setPageState(boolean isMain) {
+        int state = isMain ? 1 : 0;
+        cachedPageState = state;
+        if (isLoaded) {
+            try {
+                nativeSetPageState(state);
+            } catch (Throwable t) {
+                Log.e(TAG, "nativeSetPageState failed", t);
+            }
+        }
+    }
+
+    /**
+     * 库加载完成后调用，将缓存的页面状态应用到 native 层。
+     */
+    public static void applyCachedPageState() {
+        if (isLoaded) {
+            try {
+                nativeSetPageState(cachedPageState);
+                Log.i(TAG, "applyCachedPageState: " + cachedPageState);
+            } catch (Throwable t) {
+                Log.e(TAG, "applyCachedPageState failed", t);
+            }
+        }
+    }
+
     public static native void startInterceptor();
     public static native void stopInterceptor();
     public static native void setInterceptEnabled(boolean enabled);
+    public static native void nativeSetPageState(int state);
 }
