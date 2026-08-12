@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -149,6 +150,7 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 
 		private final Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 		private final Paint thumbPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+		private final RectF trackRect = new RectF();
 
 		NokiaSwitchView(Context context, boolean checked) {
 			super(context);
@@ -179,9 +181,12 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 
 		@Override
 		protected void onDraw(Canvas canvas) {
-			// 跑道形轨道：圆角半径 = height/2 形成左右两端半圆
+			// 跑道形轨道：圆角半径 = height/2 形成左右两端半圆。
+			// 只能用 drawRoundRect(RectF, ...) 的 API 1 重载：7 参数 float 重载是 API 21 才有，
+			// Android 4.4（API 19）上会 NoSuchMethodError 闪退。
 			trackPaint.setColor(checked ? COLOR_TRACK_ON : COLOR_TRACK_OFF);
-			canvas.drawRoundRect(0, 0, trackW, trackH, trackH / 2f, trackH / 2f, trackPaint);
+			trackRect.set(0, 0, trackW, trackH);
+			canvas.drawRoundRect(trackRect, trackH / 2f, trackH / 2f, trackPaint);
 			// 圆形滑块：开启靠右、关闭靠左
 			thumbPaint.setColor(COLOR_THUMB);
 			float cx = checked ? (trackW - margin - thumbS / 2f) : (margin + thumbS / 2f);
