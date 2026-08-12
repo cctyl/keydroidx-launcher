@@ -36,6 +36,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	private static final String CATEGORY_HOME = Intent.CATEGORY_HOME;
 	private StatusBarController statusBarController;
 	private NokiaKeyBinding keyBinding;
+	private NokiaLockServer lockServer;
 	/** Activity 是否处于 resumed 状态（延迟任务防重入校验用） */
 	private boolean resumedFlag = false;
 	/**
@@ -61,6 +62,10 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 
 		statusBarController = new StatusBarController(this);
 		keyBinding = new NokiaKeyBinding(this);
+
+		// 启动锁屏指令服务器（供 native 拦截器 socket 直连，替代 am broadcast）
+		lockServer = new NokiaLockServer(this);
+		lockServer.start();
 
 		// 监听返回栈变化，自动上报页面状态给拦截器（覆盖 goHome/switchFragment/exitCurrent）
 		getSupportFragmentManager().addOnBackStackChangedListener(() -> postReportPageState());
@@ -274,6 +279,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		if (statusBarController != null) {
 			statusBarController.stop();
 		}
+	}
+
+	@Override
+	protected void onDestroy() {
+		if (lockServer != null) {
+			lockServer.stop();
+		}
+		super.onDestroy();
 	}
 
 	@Override

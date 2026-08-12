@@ -11,6 +11,9 @@
 #include <pthread.h>
 #include <time.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <errno.h>
 #include <android/log.h>
 
@@ -307,24 +310,37 @@ static int is_nokia_package(const char *pkg) {
     return strcmp(pkg, PKG_NOKIA_RELEASE) == 0 || strcmp(pkg, PKG_NOKIA_DEBUG) == 0;
 }
 
-// 更新屏幕状态缓存：dumpsys power → mWakefulness。
+// 更新屏幕状态缓存。
+// 优先读 /sys/class/leds/lcd-backlight/brightness（文件读取 ~1ms），
+// 不可用时回退 dumpsys power（~300ms）。
 static void update_screen_state() {
-    char output[256];
-    if (run_cmd_output("dumpsys power 2>/dev/null | grep mWakefulness",
-                       output, sizeof(output)) < 0) {
-        LOGW("state: dumpsys power failed");
-        return;
+    int awake = -1;
+    // 快速路径：读背光亮度
+    FILE *f = fopen("/sys/class/leds/lcd-backlight/brightness", "r");
+    if (f) {
+        char buf[16];
+        if (fgets(buf, sizeof(buf), f)) {
+            int val = atoi(buf);
+            awake = (val > 0) ? 1 : 0;
+        }
+        fclose(f);
     }
-    char val[32];
-    extract_after(output, "mWakefulness=", val, sizeof(val));
-    if (!val[0]) {
-        LOGW("state: mWakefulness not found (output=%s)", output);
-        return;
+    // 回退：dumpsys power
+    if (awake < 0) {
+        char output[256];
+        if (run_cmd_output("dumpsys power 2>/dev/null | grep mWakefulness",
+                           output, sizeof(output)) >= 0) {
+            char val[32];
+            extract_after(output, "mWakefulness=", val, sizeof(val));
+            if (val[0]) {
+                awake = (strcmp(val, "Awake") == 0) ? 1 : 0;
+            }
+        }
     }
-    int awake = (strcmp(val, "Awake") == 0);
+    if (awake < 0) return; // 两种方式都失败，保持当前值
     if (awake != screen_awake) {
-        LOGI("state: screen %s -> %s (mWakefulness=%s)",
-             screen_awake ? "awake" : "asleep", awake ? "awake" : "asleep", val);
+        LOGI("state: screen %s -> %s",
+             screen_awake ? "awake" : "asleep", awake ? "awake" : "asleep");
         screen_awake = awake;
     }
 }
@@ -371,20 +387,22 @@ static void update_front_window() {
     }
 }
 
-// 状态轮询线程：500ms 刷新屏幕/前台缓存，状态变化才打日志。
-// 息屏时加快轮询（50ms），以便快速检测亮屏后重新 grab。
-// 同时管理 grab：息屏→释放 grab（系统原生处理唤醒），亮屏→重新 grab。
+// 状态轮询线程：
+// - 屏幕状态：每 50ms 通过背光文件快速检测（~1ms），用于 grab 管理
+// - 前台窗口：仅亮屏时每 2000ms 通过 dumpsys 检测（~300ms），减少 CPU 占用
+// - grab 管理：息屏→释放（系统原生处理唤醒），亮屏→重新 grab
 static void* state_thread_run(void* arg) {
-    LOGI("state: polling thread started (interval %dms)", STATE_POLL_US / 1000);
+    LOGI("state: polling thread started");
+    long long last_window_check = 0;
     while (is_running) {
+        // 快速屏幕状态检测（文件读取，~1ms）
         update_screen_state();
-        update_front_window();
 
-        // grab 管理：息屏时释放（系统原生处理唤醒），亮屏时重抓
+        // grab 管理
         if (!screen_awake && grab_active && power_key_fd >= 0) {
             ioctl(power_key_fd, EVIOCGRAB, 0);
             grab_active = 0;
-            LOGI("state: grab released (screen asleep, system handles wake)");
+            LOGI("state: grab released (screen asleep)");
         } else if (screen_awake && !grab_active && power_key_fd >= 0) {
             if (ioctl(power_key_fd, EVIOCGRAB, 1) == 0) {
                 grab_active = 1;
@@ -392,8 +410,16 @@ static void* state_thread_run(void* arg) {
             }
         }
 
-        // 息屏时快速轮询（50ms），亮屏时正常轮询（500ms）
-        usleep(screen_awake ? STATE_POLL_US : (50 * 1000));
+        // 前台窗口检测：仅亮屏时，每 2 秒一次（dumpsys 较慢）
+        if (screen_awake) {
+            long long now = now_ms();
+            if (now - last_window_check >= 2000) {
+                update_front_window();
+                last_window_check = now;
+            }
+        }
+
+        usleep(50 * 1000); // 50ms 固定轮询（屏幕状态检测极快）
     }
     LOGI("state: polling thread stopped");
     return NULL;
@@ -439,38 +465,66 @@ static int ensure_nokia_package() {
     return 1;
 }
 
-// 注入：回诺基亚桌面主界面（异步）。
-// -a MAIN -c HOME + -n 显式组件绕过 ROM 内置桌面；HOME action 触发 onNewIntent→goHome()。
-static void inject_go_home() {
-    if (!ensure_nokia_package()) return;
-    char cmd[400];
-    snprintf(cmd, sizeof(cmd),
-             "am start -a android.intent.action.MAIN -c android.intent.category.HOME "
-             "-n %s/%s -f 0x14000000",
-             nokia_package, NOKIA_ACTIVITY);
-    LOGI("go home: async cmd=%s", cmd);
-    inject_async(cmd);
+// 通过 socket 直连 App 的 NokiaLockServer 发送指令（~2ms，无进程创建开销）。
+// 返回 0=成功，-1=失败（App 未运行等）。
+static int send_via_socket(const char* msg) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return -1;
+    struct timeval tv = {0, 100000}; // 100ms 超时
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(10501);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        close(sock);
+        return -1;
+    }
+    send(sock, msg, strlen(msg), 0);
+    close(sock);
+    return 0;
 }
 
-// 注入：锁屏（异步广播 → Device Admin lockNow）。
-// 不依赖 input keyevent（各 ROM 兼容性差），通过 am broadcast 触发 App 的
-// NokiaLockReceiver → NokiaLockScreen.lock() → DevicePolicyManager.lockNow()。
-// 发送广播后立即释放 grab，让系统原生处理后续唤醒。
+// 注入：回诺基亚桌面主界面。
+// 优先 socket 直连（~2ms，App 内 startActivity），失败时 fallback 到 am start（异步）。
+static void inject_go_home() {
+    if (send_via_socket("HOME\n") == 0) {
+        LOGI("go home: sent via socket (fast path)");
+    } else {
+        LOGW("go home: socket failed, fallback to am start");
+        if (!ensure_nokia_package()) return;
+        char cmd[400];
+        snprintf(cmd, sizeof(cmd),
+                 "am start -a android.intent.action.MAIN -c android.intent.category.HOME "
+                 "-n %s/%s -f 0x14000000",
+                 nokia_package, NOKIA_ACTIVITY);
+        inject_async(cmd);
+    }
+}
+
+// 注入：锁屏。
+// 优先 socket 直连（~2ms），失败时 fallback 到 am broadcast（异步）。
+// 锁屏后释放 grab，让系统原生处理后续唤醒。
 static void inject_lock() {
-    if (!ensure_nokia_package()) return;
-    char cmd[400];
-    snprintf(cmd, sizeof(cmd),
-             "am broadcast -a ru.playsoftware.j2meloader.nokia.LOCK_SCREEN "
-             "-n %s/ru.playsoftware.j2meloader.nokia.NokiaLockReceiver",
-             nokia_package);
-    LOGI("lock: async broadcast cmd=%s", cmd);
-    inject_async(cmd);
+    if (send_via_socket("LOCK\n") == 0) {
+        LOGI("lock: sent via socket (fast path)");
+    } else {
+        LOGW("lock: socket failed, fallback to am broadcast");
+        if (!ensure_nokia_package()) return;
+        char cmd[400];
+        snprintf(cmd, sizeof(cmd),
+                 "am broadcast -a ru.playsoftware.j2meloader.nokia.LOCK_SCREEN "
+                 "-n %s/ru.playsoftware.j2meloader.nokia.NokiaLockReceiver",
+                 nokia_package);
+        inject_async(cmd);
+    }
 
     // 释放 grab：锁屏后屏幕将息屏，系统需原生处理唤醒按键
     if (power_key_fd >= 0 && grab_active) {
         ioctl(power_key_fd, EVIOCGRAB, 0);
         grab_active = 0;
-        LOGI("lock: grab released (system will handle wake natively)");
+        LOGI("lock: grab released");
     }
 }
 
