@@ -29,8 +29,9 @@
 #define PKG_NOKIA_DEBUG   "io.github.cctyl.nokia.debug"
 #define NOKIA_ACTIVITY    "ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity"
 
-// 注入防抖间隔（毫秒）：避免与系统 power 防误触策略冲突导致注入被忽略。
-#define INJECT_DEBOUNCE_MS 1000
+// 注入防抖间隔（毫秒）：仅对亮屏态动作（锁屏/回桌面）生效，防止快速连按导致
+// 注入被系统忽略。息屏态（唤醒）不设防抖。500ms 足够系统完成状态切换 + 状态线程更新。
+#define INJECT_DEBOUNCE_MS 500
 // 状态轮询间隔（微秒）：500ms 轮询 dumpsys 更新缓存。
 #define STATE_POLL_US      (500 * 1000)
 // 长按判定阈值（毫秒）：按下超过此时间仍未抬起视为长按，转发给系统。
@@ -274,15 +275,19 @@ static void extract_after(const char *text, const char *key, char *out, size_t o
 }
 
 // 从 dumpsys window 输出提取前台窗口包名：
-// mCurrentFocus=Window{41d3c660 u0 com.android.settings/com.android.settings.Settings}
+// 格式：mCurrentFocus=Window{<hash> u0 <package>/<activity>}-[Surface(name=...)/@...]
+// 只在 Window{...} 内部找 '/'（忽略 } 后面的 Surface 部分中的 '/'），
 // 取 '/' 前最后一个空白后的 token 作为包名。
 static void extract_front_package(const char *text, char *out, size_t out_sz) {
     out[0] = '\0';
     const char *p = strstr(text, "mCurrentFocus=Window{");
     if (!p) return;
     p += strlen("mCurrentFocus=Window{");
+    // 找到 Window{...} 的闭合 }，只在其内部查找 /
+    const char *close = strchr(p, '}');
+    if (!close) return;
     const char *slash = strchr(p, '/');
-    if (!slash) return; // 无组件名（纯 Window token / null），保持原值
+    if (!slash || slash >= close) return; // Window{...} 内无 /（如 NotificationShade）
     const char *start = p;
     const char *scan = p;
     while (scan < slash) {
@@ -432,7 +437,9 @@ static void inject_wake() {
 // 在 UP（短按判定后）调用，非 DOWN 时直接调用。
 static void handle_short_press() {
     long long now = now_ms();
-    if (last_inject_ms != 0 && now - last_inject_ms < INJECT_DEBOUNCE_MS) {
+    // 防抖仅对亮屏态动作（锁屏/回桌面）生效；息屏态（唤醒）不设防抖，
+    // 让用户锁屏后能立即按亮屏幕，无需等待。
+    if (screen_awake && last_inject_ms != 0 && now - last_inject_ms < INJECT_DEBOUNCE_MS) {
         LOGI("power: consumed (debounce, %lldms since last inject)", now - last_inject_ms);
         return;
     }
@@ -443,22 +450,25 @@ static void handle_short_press() {
         // E 息屏 → 唤醒，显示锁屏界面
         LOGI("power: decision=wake [E->F] (screen asleep)");
         inject_wake();
+        // 唤醒不设防抖：允许锁屏后立即唤醒
     } else if (front_is_keyguard) {
         // F 亮屏·锁屏界面 → 再次锁屏（熄屏）
         LOGI("power: decision=lock [F->E] (keyguard showing)");
         inject_lock();
+        last_inject_ms = now_ms();
     } else if (front_is_nokia && page_is_main) {
         // C 亮屏·诺基亚桌面主界面 → 锁屏（熄屏）
         LOGI("power: decision=lock [C->E] (nokia main page)");
         inject_lock();
+        last_inject_ms = now_ms();
     } else {
         // A 亮屏·非诺基亚应用 → 回诺基亚桌面主界面
         // B 亮屏·诺基亚桌面其他界面 → 回诺基亚桌面主界面（不锁屏）
         LOGI("power: decision=go_home [A/B->C] (front=%s, nokia=%d, main=%d)",
              front_package, front_is_nokia, page_is_main);
         inject_go_home();
+        last_inject_ms = now_ms();
     }
-    last_inject_ms = now_ms();
 }
 
 // ---- 长按转发 ----
