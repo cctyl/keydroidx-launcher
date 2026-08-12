@@ -27,7 +27,7 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  * <ul>
  *     <li>mini_shizuku：进入服务激活页（adb / root）；</li>
  *     <li>电源键拦截设置：行尾只读开关展示当前开/关状态（关闭 或 任一方案），
- *         点击/确认整行进入方案选择页（关闭 / 方案1 / 方案2 / 方案3）。</li>
+ *         点击/确认整行进入方案选择页（关闭 / 方案1 / 方案2）；root 激活见 mini_shizuku。</li>
  * </ul>
  * 顶部提示：本页面的功能均需要 mini_shizuku 支持。
  */
@@ -145,8 +145,8 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 	}
 
 	/**
-	 * 电源键拦截当前是否开启：仅方案1/2 算开启；关闭与方案3（root 未实现，等效关闭）算关。
-	 * 与 {@link NokiaPowerInterceptFragment} 的实际底层动作保持一致（方案3 选择后发 STOP）。
+	 * 电源键拦截当前是否开启：仅方案1/2 算开启，关闭算关。
+	 * 与 {@link NokiaPowerInterceptFragment} 的实际底层动作保持一致。
 	 */
 	private boolean isInterceptorOn() {
 		int mode = NokiaSettingsStorage.getPowerInterceptorMode(requireContext());

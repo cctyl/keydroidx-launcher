@@ -424,15 +424,23 @@ public class NokiaSettingsStorage {
 	public static final int POWER_INTERCEPTOR_MODE_1 = 1;
 	/** 电源键拦截：方案2 evdev grab 纯消费（安卓4.4 有效，现行为）。 */
 	public static final int POWER_INTERCEPTOR_MODE_2 = 2;
-	/** 电源键拦截：方案3 root（预留扩展点）。 */
+	/**
+	 * 电源键拦截：方案3 root（已废弃）。root 激活已移入 mini_shizuku 页面，
+	 * 不再在拦截设置中展示；保留常量以兼容已存储的旧值（读取时视为关闭）。
+	 */
 	public static final int POWER_INTERCEPTOR_MODE_3 = 3;
 
 	private static final String KEY_POWER_INTERCEPTOR_MODE = "power_interceptor_mode";
 
-	/** 读取电源键拦截方案（高级设置 → 电源键拦截设置），默认关闭。 */
+	/**
+	 * 读取电源键拦截方案（高级设置 → 电源键拦截设置），默认关闭。
+	 * 旧版本曾存储方案3（root），现已废弃（root 激活移入 mini_shizuku 页面），
+	 * 读取到该值时归一化为关闭，避免下游逻辑遇到未知模式。
+	 */
 	public static int getPowerInterceptorMode(Context ctx) {
-		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+		int mode = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.getInt(KEY_POWER_INTERCEPTOR_MODE, POWER_INTERCEPTOR_MODE_OFF);
+		return mode == POWER_INTERCEPTOR_MODE_3 ? POWER_INTERCEPTOR_MODE_OFF : mode;
 	}
 
 	/** 保存电源键拦截方案。 */

@@ -1,17 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- mini_shizuku root 激活占位页：240dp 宽，match_parent 高，提示居中 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- mini_shizuku root 激活页：240dp 宽，match_parent 高自适应中间容器 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="240dp"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="@drawable/bg_nokia_menu">
 
+    <!-- 状态行：root 权限 + 服务状态 -->
     <TextView
-        android:layout_width="wrap_content"
+        android:id="@+id/shizukuRootStatus"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:lineSpacingExtra="2dp"
-        android:text="Root 激活功能即将推出"
+        android:gravity="start"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp"
+        android:text="状态检测中..."
         android:textColor="#9fb3d1"
         android:textSize="11sp" />
-</FrameLayout>
+
+    <!-- 分隔线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#2a4a7a" />
+
+    <!-- 可滚动内容区：激活操作菜单 -->
+    <ScrollView
+        android:id="@+id/shizukuRootScroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
+
+            <!-- 菜单项由代码动态构建（root 激活 / 刷新状态） -->
+            <LinearLayout
+                android:id="@+id/shizukuRootActions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- 分隔线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#2a4a7a" />
+</LinearLayout>

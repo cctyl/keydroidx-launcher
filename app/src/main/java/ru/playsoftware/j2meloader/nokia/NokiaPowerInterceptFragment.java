@@ -22,13 +22,14 @@ import ru.playsoftware.mini_shizuku.Shizuku;
 /**
  * 电源键拦截设置页（高级设置 → 电源键拦截设置）。
  * <p>
- * 展示 4 个可选方案供用户选择：
+ * 展示 3 个可选方案供用户选择：
  * <ul>
  *     <li>关闭：不拦截挂机键（发送 INTERCEPTOR_STOP）；</li>
- *     <li>方案1：evdev grab + uinput 回放 + 决策状态机（安卓13 目标方案，实现中，本次仅记录选择）；</li>
- *     <li>方案2：evdev grab 纯消费（安卓4.4 有效，发送 INTERCEPTOR_START）；</li>
- *     <li>方案3：root（预留扩展点，本次仅记录选择）。</li>
+ *     <li>方案1：evdev grab + uinput 回放 + 决策状态机（在 mini_shizuku 以 root 身份运行时
+ *         回放完整生效；shell 身份时若无 /dev/uinput 写权限自动降级为方案2 行为）；</li>
+ *     <li>方案2：evdev grab 纯消费（发送 INTERCEPTOR_START）。</li>
  * </ul>
+ * root 激活入口位于 mini_shizuku 页面（{@link ShizukuRootFragment}），不在此页重复提供。
  * 选择结果持久化到 {@link NokiaSettingsStorage#setPowerInterceptorMode}，进入页面时回显当前方案。
  * 所有选择与底层调用均打详细日志（sub: PowerIntercept），便于真机排障。
  */
@@ -38,21 +39,18 @@ public class NokiaPowerInterceptFragment extends NokiaPageFragment {
 			R.drawable.ic_nokia_home,      // 关闭
 			R.drawable.ic_nokia_settings,  // 方案1
 			R.drawable.ic_nokia_settings,  // 方案2
-			R.drawable.ic_nokia_lock,      // 方案3
 	};
 
 	private static final int[] ITEM_MODES = {
 			NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_OFF,
 			NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_1,
 			NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_2,
-			NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_3,
 	};
 
 	private static final String[] ITEM_NAMES = {
 			"关闭拦截",
 			"方案1：grab+回放",
 			"方案2：纯消费",
-			"方案3：root",
 	};
 
 	private View[] itemViews;
@@ -176,9 +174,6 @@ public class NokiaPowerInterceptFragment extends NokiaPageFragment {
 			case NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_2:
 				applyMode2();
 				break;
-			case NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_3:
-				applyMode3();
-				break;
 			default:
 				NokiaLog.w("PowerIntercept", "未知拦截模式: " + mode);
 				break;
@@ -201,16 +196,6 @@ public class NokiaPowerInterceptFragment extends NokiaPageFragment {
 	private void applyMode1() {
 		NokiaLog.i("PowerIntercept", "执行方案1（grab + uinput 回放 + 决策状态机）启动拦截");
 		execWithService(true, "方案1");
-	}
-
-	/** 方案3：root 通道未实现，选择后关闭拦截（避免残留方案1/2 的拦截生效）。 */
-	private void applyMode3() {
-		NokiaLog.i("PowerIntercept", "执行方案3：root 通道未实现，发送 INTERCEPTOR_STOP 关闭拦截");
-		execWithService(false, "方案3");
-		if (isAdded()) {
-			Toast.makeText(requireContext(), "方案3 需 root，暂未支持，已关闭拦截",
-					Toast.LENGTH_SHORT).show();
-		}
 	}
 
 	/**

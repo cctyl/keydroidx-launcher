@@ -173,6 +173,10 @@ dependencies {
     implementation project(':dexlib')
     implementation project(':mini_shizuku')
 
+    // libsu：root 通道（RootShell/Shell API），用于 root 激活 mini_shizuku。
+    // 仅用 core 模块（minSdk 19 ≤ 4.4），不引入 io/nio/service（minSdk 21）。
+    implementation 'com.github.topjohnwu.libsu:core:5.2.2'
+
     // Android Jetpack
     implementation "androidx.room:room-runtime:$roomVersion"
     implementation "androidx.room:room-rxjava2:$roomVersion"

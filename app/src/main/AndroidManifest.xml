@@ -25,7 +25,12 @@
     <!-- 后台清理组件：killBackgroundProcesses() 所需（normal 级，安装即授予） -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
-    <uses-sdk tools:overrideLibrary="com.arthenica.mobileffmpeg" />
+    <!-- libsu（minSdk 19）与 mobileffmpeg（minSdk 高于 14）一样高于本工程 MIN_SDK=14，
+         通过 overrideLibrary 绕过 manifest merger 的 minSdk 校验；运行时代码中已按
+         Build.VERSION.SDK_INT < 19 守卫（仅 root 激活功能用到 libsu）。
+         注意：overrideLibrary 值必须是库的 manifest package（libsu 为 com.topjohnwu.superuser），
+         不是 maven 坐标 com.github.topjohnwu.libsu。 -->
+    <uses-sdk tools:overrideLibrary="com.arthenica.mobileffmpeg,com.topjohnwu.superuser" />
 
     <!-- Android 11+ 包可见性：声明可查询带 LAUNCHER 入口的应用，
          以便功能表枚举并展示真实已安装的安卓 APP。 -->
