@@ -206,6 +206,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- 锁屏广播接收器：供 native 拦截器通过 am broadcast 触发 Device Admin 锁屏 -->
+        <receiver
+            android:name=".nokia.NokiaLockReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="ru.playsoftware.j2meloader.nokia.LOCK_SCREEN" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

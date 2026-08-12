@@ -65,6 +65,7 @@ static volatile int long_press_injected = 0;     // 是否已通过 uinput 注�
 static volatile long long long_press_inject_time_ms = 0; // 注入 DOWN 的时刻
 static pthread_t long_press_thread;
 static volatile int long_press_thread_created = 0; // 长按监控线程是否已创建（防 join 未初始化句柄）
+static volatile int grab_active = 0;            // EVIOCGRAB 是否处于抓取状态（0=已释放，系统原生处理）
 
 // ---- 工具 ----
 
@@ -371,74 +372,111 @@ static void update_front_window() {
 }
 
 // 状态轮询线程：500ms 刷新屏幕/前台缓存，状态变化才打日志。
+// 息屏时加快轮询（50ms），以便快速检测亮屏后重新 grab。
+// 同时管理 grab：息屏→释放 grab（系统原生处理唤醒），亮屏→重新 grab。
 static void* state_thread_run(void* arg) {
     LOGI("state: polling thread started (interval %dms)", STATE_POLL_US / 1000);
     while (is_running) {
         update_screen_state();
         update_front_window();
-        usleep(STATE_POLL_US);
+
+        // grab 管理：息屏时释放（系统原生处理唤醒），亮屏时重抓
+        if (!screen_awake && grab_active && power_key_fd >= 0) {
+            ioctl(power_key_fd, EVIOCGRAB, 0);
+            grab_active = 0;
+            LOGI("state: grab released (screen asleep, system handles wake)");
+        } else if (screen_awake && !grab_active && power_key_fd >= 0) {
+            if (ioctl(power_key_fd, EVIOCGRAB, 1) == 0) {
+                grab_active = 1;
+                LOGI("state: re-grabbed (screen awake)");
+            }
+        }
+
+        // 息屏时快速轮询（50ms），亮屏时正常轮询（500ms）
+        usleep(screen_awake ? STATE_POLL_US : (50 * 1000));
     }
     LOGI("state: polling thread stopped");
     return NULL;
 }
 
-// 注入：回诺基亚桌面主界面。
-// 使用 -a MAIN -c HOME + -n 显式组件：-n 直接拉起诺基亚桌面（绕过 ROM 写死的内置桌面
-// 归属），HOME action/category 触发 NokiaDesktopActivity.onNewIntent→goHome()→回到待机屏。
-// launchMode=singleTask 确保无论 Activity 在前台(子页面)还是后台，都能收到 onNewIntent。
-static void inject_go_home() {
-    // 探测有效包名（缓存，仅首次探测）
-    if (nokia_package[0] == '\0') {
-        char out[256];
-        if (run_cmd_output("pm path " PKG_NOKIA_RELEASE " 2>/dev/null", out, sizeof(out)) >= 0
-                && strstr(out, "package:")) {
-            strcpy(nokia_package, PKG_NOKIA_RELEASE);
-        } else if (run_cmd_output("pm path " PKG_NOKIA_DEBUG " 2>/dev/null", out, sizeof(out)) >= 0
-                && strstr(out, "package:")) {
-            strcpy(nokia_package, PKG_NOKIA_DEBUG);
-        } else {
-            LOGE("go home: cannot find nokia package (release/debug)");
-            return;
-        }
-        LOGI("go home: resolved package=%s", nokia_package);
+// ---- 异步注入（分离线程执行 shell 命令，不阻塞事件循环） ----
+
+static void* inject_thread_fn(void* arg) {
+    char* cmd = (char*)arg;
+    int rc = run_cmd(cmd);
+    LOGI("async inject: rc=%d cmd=%s", rc, cmd);
+    free(cmd);
+    return NULL;
+}
+
+static void inject_async(const char* cmd) {
+    char* copy = strdup(cmd);
+    if (!copy) return;
+    pthread_t t;
+    if (pthread_create(&t, NULL, inject_thread_fn, copy) == 0) {
+        pthread_detach(t);
+    } else {
+        run_cmd(copy);
+        free(copy);
     }
+}
+
+// 探测有效包名（缓存，仅首次探测），供 inject_go_home / inject_lock 共用。
+static int ensure_nokia_package() {
+    if (nokia_package[0] != '\0') return 1;
+    char out[256];
+    if (run_cmd_output("pm path " PKG_NOKIA_RELEASE " 2>/dev/null", out, sizeof(out)) >= 0
+            && strstr(out, "package:")) {
+        strcpy(nokia_package, PKG_NOKIA_RELEASE);
+    } else if (run_cmd_output("pm path " PKG_NOKIA_DEBUG " 2>/dev/null", out, sizeof(out)) >= 0
+            && strstr(out, "package:")) {
+        strcpy(nokia_package, PKG_NOKIA_DEBUG);
+    } else {
+        LOGE("cannot find nokia package (release/debug)");
+        return 0;
+    }
+    LOGI("resolved package=%s", nokia_package);
+    return 1;
+}
+
+// 注入：回诺基亚桌面主界面（异步）。
+// -a MAIN -c HOME + -n 显式组件绕过 ROM 内置桌面；HOME action 触发 onNewIntent→goHome()。
+static void inject_go_home() {
+    if (!ensure_nokia_package()) return;
     char cmd[400];
     snprintf(cmd, sizeof(cmd),
              "am start -a android.intent.action.MAIN -c android.intent.category.HOME "
              "-n %s/%s -f 0x14000000",
              nokia_package, NOKIA_ACTIVITY);
-    int rc = run_cmd(cmd);
-    LOGI("go home: rc=%d cmd=%s", rc, cmd);
+    LOGI("go home: async cmd=%s", cmd);
+    inject_async(cmd);
 }
 
-// 注入：锁屏+息屏。
-// 使用 input keyevent 223 (KEYCODE_SLEEP) 直接息屏——实测部分 ROM 下
-// input keyevent 26 (POWER) 不触发息屏（电源键注入被系统拦截），223 更可靠。
+// 注入：锁屏（异步广播 → Device Admin lockNow）。
+// 不依赖 input keyevent（各 ROM 兼容性差），通过 am broadcast 触发 App 的
+// NokiaLockReceiver → NokiaLockScreen.lock() → DevicePolicyManager.lockNow()。
+// 发送广播后立即释放 grab，让系统原生处理后续唤醒。
 static void inject_lock() {
-    int rc = run_cmd("input keyevent 223");
-    LOGI("lock: input keyevent 223 (SLEEP) rc=%d", rc);
-    if (rc != 0) {
-        LOGW("lock: 223 failed, fallback to 26 (POWER)");
-        run_cmd("input keyevent 26");
-    }
-}
+    if (!ensure_nokia_package()) return;
+    char cmd[400];
+    snprintf(cmd, sizeof(cmd),
+             "am broadcast -a ru.playsoftware.j2meloader.nokia.LOCK_SCREEN "
+             "-n %s/ru.playsoftware.j2meloader.nokia.NokiaLockReceiver",
+             nokia_package);
+    LOGI("lock: async broadcast cmd=%s", cmd);
+    inject_async(cmd);
 
-// 注入：唤醒（input keyevent 224=WAKEUP；部分 ROM 不支持时回退 26）。
-static void inject_wake() {
-    int rc = run_cmd("input keyevent 224");
-    LOGI("wake: input keyevent 224 rc=%d", rc);
-    if (rc != 0) {
-        LOGW("wake: 224 failed, fallback to 26");
-        run_cmd("input keyevent 26");
+    // 释放 grab：锁屏后屏幕将息屏，系统需原生处理唤醒按键
+    if (power_key_fd >= 0 && grab_active) {
+        ioctl(power_key_fd, EVIOCGRAB, 0);
+        grab_active = 0;
+        LOGI("lock: grab released (system will handle wake natively)");
     }
 }
 
 // 决策状态机：短按 power 键时执行（5 态：A/B/C/E/F）。
-// 在 UP（短按判定后）调用，非 DOWN 时直接调用。
 static void handle_short_press() {
     long long now = now_ms();
-    // 防抖仅对亮屏态动作（锁屏/回桌面）生效；息屏态（唤醒）不设防抖，
-    // 让用户锁屏后能立即按亮屏幕，无需等待。
     if (screen_awake && last_inject_ms != 0 && now - last_inject_ms < INJECT_DEBOUNCE_MS) {
         LOGI("power: consumed (debounce, %lldms since last inject)", now - last_inject_ms);
         return;
@@ -447,17 +485,22 @@ static void handle_short_press() {
          screen_awake ? "awake" : "asleep", front_is_nokia, front_is_keyguard, page_is_main, front_package);
 
     if (!screen_awake) {
-        // E 息屏 → 唤醒，显示锁屏界面
-        LOGI("power: decision=wake [E->F] (screen asleep)");
-        inject_wake();
-        // 唤醒不设防抖：允许锁屏后立即唤醒
+        // E 息屏 → 唤醒：grab 应已被状态线程释放，系统原生处理。
+        // 此分支为竞态兜底（grab 尚未释放时用户已按键）：手动释放 grab。
+        LOGI("power: decision=wake [E->F] (screen asleep, fallback grab release)");
+        if (power_key_fd >= 0 && grab_active) {
+            ioctl(power_key_fd, EVIOCGRAB, 0);
+            grab_active = 0;
+            LOGW("power: E state fallback, grab released manually");
+        }
+        // 用户需再按一次让系统看到完整 DOWN→UP（竞态窗口极小，通常 grab 已释放）
     } else if (front_is_keyguard) {
-        // F 亮屏·锁屏界面 → 再次锁屏（熄屏）
+        // F 亮屏·锁屏界面 → Device Admin 锁屏（熄屏）
         LOGI("power: decision=lock [F->E] (keyguard showing)");
         inject_lock();
         last_inject_ms = now_ms();
     } else if (front_is_nokia && page_is_main) {
-        // C 亮屏·诺基亚桌面主界面 → 锁屏（熄屏）
+        // C 亮屏·诺基亚桌面主界面 → Device Admin 锁屏（熄屏）
         LOGI("power: decision=lock [C->E] (nokia main page)");
         inject_lock();
         last_inject_ms = now_ms();
@@ -493,6 +536,7 @@ static void* long_press_watch(void* arg) {
                 LOGW("power: long press in consume-only mode, releasing grab");
                 if (power_key_fd >= 0) {
                     ioctl(power_key_fd, EVIOCGRAB, 0);
+                    grab_active = 0;
                 }
                 run_cmd("input keyevent --longpress 26");
             }
@@ -525,8 +569,9 @@ static void handle_long_press_up() {
              now_ms() - power_down_time_ms);
     } else {
         // 方案2：重新 grab 恢复拦截
-        if (power_key_fd >= 0) {
+        if (power_key_fd >= 0 && !grab_active) {
             ioctl(power_key_fd, EVIOCGRAB, 1);
+            grab_active = 1;
             LOGI("power: re-grabbed after long press (consume-only)");
         }
     }
@@ -563,6 +608,7 @@ void* interceptor_run(void* arg) {
         is_running = 0;
         return NULL;
     }
+    grab_active = 1;
 
     // 创建 uinput 虚拟设备用于回放。某些设备上 shell 无 /dev/uinput 写权限，
     // 打不开时退化为"纯消费模式"：非 power 键一并丢弃。
@@ -589,6 +635,11 @@ void* interceptor_run(void* arg) {
             if (ret < 0 && errno == EINTR) continue;
             // 设备断开 / 被关闭 / 出错 → 退出循环
             break;
+        }
+
+        // grab 已释放（息屏态）：系统原生处理所有按键，事件循环仅读取并丢弃
+        if (!grab_active) {
+            continue;
         }
 
         if (ev.type == EV_KEY && ev.code == KEY_POWER) {
