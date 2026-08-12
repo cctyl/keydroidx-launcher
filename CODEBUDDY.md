@@ -3,7 +3,7 @@
 
 ## 目标概述
 
-本应用的目标是成为**诺基亚风格的全功能安卓桌面启动器（Launcher）**，在 J2ME-Loader 基础上修改而来，并作为系统默认 Home 桌面运行。核心诉求：
+本应用是诺基亚风格的全功能安卓桌面启动器（Launcher）在 J2ME-Loader 基础上修改而来，并作为系统默认 Home 桌面运行。核心诉求：
 
 1. **外观**：模仿诺基亚 S40/S60 风格——顶部状态栏 + 中间内容区 + 底部软键栏。
 2. **融合 J2ME 与安卓**：JAR 应用与安卓原生应用视觉上无缝融合，但 JAR 只在「百宝箱」展示，不混入功能表。
@@ -52,26 +52,8 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 
 调试方面，使用adb截图理解，再使用adb 模拟点击来操作。常用调试命令（多设备一律加 `-s <serial>` 指定目标，避免误装到别的设备）：
 
-```bash
-# 一键：构建 openDebug 并安装到全部/指定设备（开发主路径，详见 Common commands）
-.\build_install_debug.bat                 # 全部设备
-.\build_install_debug.bat <serial>        # 只装指定设备
-
-# 截图到本地（先看当前界面再决定点哪里）
-adb -s <serial> exec-out screencap -p > shot.png
-
-# 看日志（J2ME-Loader 日志 TAG 多，过滤关键项）
-adb -s <serial> logcat -s JL-Debug:* nokia:* AndroidRuntime:E
-
-# 模拟点击 / 按键
-adb -s <serial> shell input tap <x> <y>
-adb -s <serial> shell input keyevent KEYCODE_DPAD_CENTER   # 确认键
-adb -s <serial> shell input keyevent KEYCODE_HOME          # 回桌面
-adb -s <serial> shell input keyevent KEYCODE_MENU          # 左软键
-
 # 直接启动诺基亚桌面（跳过 HOME）
 adb shell am start -n io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity
-```
 
 
 ## Common commands
