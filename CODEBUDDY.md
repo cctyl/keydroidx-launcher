@@ -1,9 +1,11 @@
-# CODEBUDDY.md This file provides guidance to CodeBuddy when working with code in this repository.
+# CODEBUDDY.md 本文档为 CodeBuddy 在本仓库中处理代码时提供指引。
 
 
 ## 目标概述
 
-本应用是诺基亚风格的全功能安卓桌面启动器（Launcher）在 J2ME-Loader 基础上修改而来，并作为系统默认 Home 桌面运行。核心诉求：
+本应用是诺基亚风格的全功能安卓桌面启动器（Launcher），
+在 J2ME-Loader 基础上修改而来，具备运行j2me应用的能力。
+核心功能：
 
 1. **外观**：模仿诺基亚 S40/S60 风格——顶部状态栏 + 中间内容区 + 底部软键栏。
 2. **融合 J2ME 与安卓**：JAR 应用与安卓原生应用视觉上无缝融合，但 JAR 只在「百宝箱」展示，不混入功能表。
@@ -32,9 +34,7 @@ NokiaDesktopActivity， 就是按下HOME返回的界面，这里展示一些信�
 - 桌面设置
 从桌面按下右键进入桌面设置，主要是 诺基亚桌面自身的一些设置。比如，按键绑定，顶部快捷栏设置，壁纸设置，桌面组件设置等。
 
-## J2ME-Loader介绍
 
-J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Java ME games by reimplementing the J2ME APIs on top of the Android runtime and translating MIDlet bytecode to run on Android. This repo is a fork of J2meLoader. It is a standard multi-module Gradle/Android project (Groovy DSL, AGP 8.5.1, Gradle 8.7). A skill documenting the local Gradle network/signing fixes lives at `.claude/skills/android-gradle-build` (read it before changing build config or signing).
 
 
 ## 设计文档索引（改某个子系统前先读对应文档）
@@ -56,66 +56,71 @@ J2ME-Loader is a J2ME (MIDP/CLDC) emulator for Android. It runs legacy 2D/3D Jav
 adb shell am start -n io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity
 
 
-## Common commands
+## 常用命令
 
-Build a release APK (recommended local flavor `open`):
+构建 release APK（推荐本地 flavor `open`）：
 ```
 .\gradlew.bat assembleOpenRelease -x lint
 ```
-The `-x lint` flag is needed because the project's Lint config can otherwise abort the build. Output: `app/build/outputs/apk/open/release/J2ME_Loader-*-open-release.apk`. Requires `keystore.properties` + `app/test.jks` (already present) and NDK 22.1.7171670.
+需要 `-x lint` 参数，是因为本工程的 Lint 配置在出错时会中断构建。输出位置：`app/build/outputs/apk/open/release/J2ME_Loader-*-open-release.apk`。需要 `keystore.properties` + `app/test.jks`（已存在）以及 NDK 22.1.7171670。
 
-Build a debug APK:
+构建 debug APK：
 ```
 .\gradlew.bat assembleOpenDebug
 ```
-Debug variant gets a `.debug` applicationId suffix and runs as `JL-Debug`. Use `installOpenDebug` to push to a connected device/emulator.
+Debug 变体会追加 `.debug` 到 applicationId 后缀，并以 `JL-Debug` 名义运行。使用 `installOpenDebug` 把产物推送到已连接的设备/模拟器。
 
-One-click build + install debug (fast dev loop; read the docs before changing build config):
+一键构建 + 安装 debug（快速开发循环；改动构建配置前请先阅读文档）：
 ```
-.\build_install_debug.bat                 # build openDebug + install to ALL connected devices
-.\build_install_debug.bat <serial>        # build + install only to the given device
+.\build_install_debug.bat                 # 构建 openDebug 并安装到所有已连接的设备
+.\build_install_debug.bat <serial>        # 仅构建并安装到指定设备
 ```
-`build_install_debug.bat` runs `assembleOpenDebug` then `install_debug.py` (which installs to every device in parallel, one failing device doesn't block others). `install_debug.py` reads the APK directly from the build output dir, so there's no stale `/dist` cache issue. Use `.\install_debug.bat [serial]` when the APK is already built.
+`build_install_debug.bat` 先运行 `assembleOpenDebug`，再运行 `install_debug.py`（它会并行向所有设备安装，单个设备失败不会阻塞其他设备）。`install_debug.py` 直接从构建输出目录读取 APK，因此不存在 `/dist` 缓存过期的问题。APK 已构建好时可改用 `.\install_debug.bat [serial]`。
 
-Run unit tests:
+运行单元测试：
 ```
 .\gradlew.bat testOpenDebugUnitTest
 ```
-Instrumentation (on-device) tests: `.\gradlew.bat connectedOpenDebugAndroidTest`.
+插桩（设备上）测试：`.\gradlew.bat connectedOpenDebugAndroidTest`。
 
-Clean and reconfigure:
+清理并重新配置：
 ```
 .\gradlew.bat clean
 .\gradlew.bat --stop
 ```
 
-Other flavors: replace `Open` with `Play`/`Fdroid`/`Dev`/`Midlet` (e.g. `assemblePlayRelease -x lint`). The `dev` flavor computes a version code from git history at config time.
+其他 flavor：把 `Open` 替换为 `Play`/`Fdroid`/`Dev`/`Midlet`（例如 `assemblePlayRelease -x lint`）。`dev` flavor 会在配置期根据 git 历史计算出一个 version code。
 
-## Environment prerequisites (already configured in this checkout)
+## 环境前置要求（本检出中已配置好）
 
-- `local.properties` points to the Android SDK (`sdk.dir`). It is **git-ignored** and also holds per-developer environment settings that must NOT live in the repo: the Java proxy (`systemProp.https.proxyHost/Port`, e.g. `127.0.0.1:7897` Clash) and `org.gradle.java.home` pointing to a **JDK 17 (Temurin/OpenJDK)**. Do NOT use GraalVM; do NOT use JDK 8/11 or a bare JRE. `gradle.properties` applies this file via `apply from: 'local.properties'`, so each developer edits only `local.properties` — no conflicts.
-- The shared `gradle.properties` contains only project-wide Gradle settings (no machine-specific values).
-- `settings.gradle` and `gradle-wrapper.properties` use Tencent/Aliyun mirrors + jitpack. Keep `jitpack.io` — many dependencies are `com.github.*` GitHub libraries.
-- NDK version is pinned to `22.1.7171670` in `build.gradle` (`ext.NDK_VERSION`); install it via sdkmanager if missing.
-- Release signing reads `app/test.jks` via `keystore.properties`. Both are git-ignored; do not commit them.
+- `local.properties` 指向 Android SDK（`sdk.dir`）。它是 **git 忽略** 的，并且还保存着每个开发者各自的、不应进入仓库的环境设置：Java 代理（`systemProp.https.proxyHost/Port`，例如 Clash 的 `127.0.0.1:7897`）以及指向 **JDK 17（Temurin/OpenJDK）** 的 `org.gradle.java.home`。不要使用 GraalVM；也不要使用 JDK 8/11 或裸 JRE。`gradle.properties` 通过 `apply from: 'local.properties'` 引入该文件，因此每个开发者只需修改自己的 `local.properties` —— 不会冲突。
+- 共享的 `gradle.properties` 只保存工程级别的 Gradle 设置（不含机器相关的值）。
+- `settings.gradle` 与 `gradle-wrapper.properties` 使用腾讯/阿里云镜像 + jitpack。请保留 `jitpack.io` —— 许多依赖都是 `com.github.*` 形式的 GitHub 库。
+- NDK 版本在 `build.gradle`（`ext.NDK_VERSION`）中固定为 `22.1.7171670`；若缺失可通过 sdkmanager 安装。
+- Release 签名通过 `keystore.properties` 读取 `app/test.jks`。两者都是 git 忽略的，请勿提交它们。
 
-## Architecture
 
-This is not a normal app — it is an emulator, so most of the "application logic" is a faithful reimplementation of the Java ME platform.
 
-**Two Gradle modules.** `:app` is the emulator Android app. `:dexlib` (`com.android.dx`) is a fork of Android's `dx`/dexlib toolchain, compiled into the app and used at runtime to convert J2ME class files into Android-executable `.dex` so a MIDlet's own classes can be loaded and run on the ART runtime.
+## J2ME-Loader介绍
 
-**J2ME API reimplemented in `javax.microedition.*`.** The largest source tree (`app/src/main/java/javax/...`, ~324 files) is the project's own implementation of the MIDP/CLDC classes — `MIDlet`, LCDUI (`Display`, `Canvas`, `Form`), RMS record store, media, networking, `m3g` (Mascot Capsule 3D), etc. A J2ME game's bytecode calls these classes, and the implementation bridges them to Android widgets, Canvas, and the native 3D libs. This package is the emulator's core; changes here directly affect game compatibility.
+J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它通过重新实现 J2ME API（构建于 Android 运行时之上）并把 MIDlet 字节码转译为可在 Android 上运行的形式，来运行老式的 2D/3D Java ME 游戏。本仓库是 J2meLoader 的一个分支（fork）。它是一个标准的多模块 Gradle/Android 工程（采用 Groovy DSL，AGP 8.5.1，Gradle 8.7）。
+### 架构
 
-**Emulator core `org.microemu`.** A fork of the MicroEmu Java ME emulator handles class loading, the MIDlet lifecycle, and the event loop. `javax.microedition.shell.MicroActivity` (plus `MidletThread`/`MidletSystem`) is what actually starts and drives a MIDlet.
+这不是一个普通应用 —— 它是一个模拟器，因此大部分「应用逻辑」都是对 Java ME 平台的高保真重新实现。
 
-**Two-process isolation.** `MainActivity` (the original J2ME-Loader launcher, file picker, app list) runs in the default process — note that it is **no longer the app's main UI**; the actual Home/desktop entry is `NokiaDesktopActivity` (see 开发重心与入口说明). The game itself runs in a separate `:midlet` process via `MicroActivity` (`android:process=":midlet"`, see `AndroidManifest.xml`), so a crashing MIDlet does not take down the host app. `com.nokia.mid.ui.NotificationBroadcastReceiver` also lives in `:midlet`.
+**两个 Gradle 模块。** `:app` 是模拟器安卓应用。`:dexlib`（`com.android.dx`）是 Android `dx`/dexlib 工具链的 fork，编译进应用内，并在运行时把 J2ME 类文件转换为 Android 可执行的 `.dex`，从而让 MIDlet 自身的类能被加载并在 ART 运行时上运行。
 
-**Native 3D via NDK.** `app/src/main/cpp` builds two shared libraries through ndkBuild (`Android.mk`): `javam3g` (Mascot Capsule 3D `m3g` over OpenGL ES 1.1, providing `javax.microedition.m3g`) and `micro3d` (Micro3D V3 engine bindings). This native code is why the project pins the older NDK 22.1.7171670 and why Gradle needs the NDK installed.
+**在 `javax.microedition.*` 中重新实现的 J2ME API。** 最大的源码树（`app/src/main/java/javax/...`，约 324 个文件）是工程自己对 MIDP/CLDC 类的实现 —— `MIDlet`、LCDUI（`Display`、`Canvas`、`Form`）、RMS 记录存储、媒体、网络、`m3g`（Mascot Capsule 3D）等。J2ME 游戏的字节码会调用这些类，而该实现把调用桥接到 Android 控件、Canvas 以及原生 3D 库。这一包是模拟器的核心；在此处的改动会直接影响游戏兼容性。
 
-**App shell in `ru.playsoftware.j2meloader`.** The Android-side UI and services: `MainActivity` (legacy J2ME-Loader launcher, not the main UI anymore), `NokiaDesktopActivity` (the real Home/desktop — the current development focus), `ConfigActivity`, `SettingsActivity`, `KeyMapperActivity`, Room database (per-app configs), file picker, and `storage.DocumentProvider`. The Nokia desktop code lives under `ru.playsoftware.j2meloader.nokia.*`. `com.*`/`mmpp.*` hold Nokia UI extensions (`com.nokia.mid.ui`) and Mascot Capsule helpers.
+**模拟器核心 `org.microemu`。** MicroEmu Java ME 模拟器的 fork，负责类加载、MIDlet 生命周期与事件循环。`javax.microedition.shell.MicroActivity`（连同 `MidletThread`/`MidletSystem`）才是真正启动并驱动一个 MIDlet 的东西。
 
-**Nokia desktop internals (`ru.playsoftware.j2meloader.nokia.*`) — this is the main development surface.** High-level layering to understand before touching any UI:
+**双进程隔离。** `MainActivity`（原 J2ME-Loader 启动器、文件选择器、应用列表）运行在默认进程中 —— 注意它 **已不再是应用的主界面**；真正的 Home/桌面入口是 `NokiaDesktopActivity`（见开发重心与入口说明）。游戏本身通过 `MicroActivity` 运行在独立的 `:midlet` 进程中（`android:process=":midlet"`，见 `AndroidManifest.xml`），因此崩溃的 MIDlet 不会拖垮宿主应用。`com.nokia.mid.ui.NotificationBroadcastReceiver` 也处在 `:midlet` 进程中。
+
+**基于 NDK 的原生 3D。** `app/src/main/cpp` 通过 ndkBuild（`Android.mk`）构建两个共享库：`javam3g`（基于 OpenGL ES 1.1 的 Mascot Capsule 3D `m3g`，提供 `javax.microedition.m3g`）与 `micro3d`（Micro3D V3 引擎绑定）。正是这段原生代码使得工程固定使用较旧的 NDK 22.1.7171670，并且 Gradle 需要安装 NDK。
+
+**`ru.playsoftware.j2meloader` 中的应用外壳。** 安卓侧的 UI 与服务：`MainActivity`（遗留的 J2ME-Loader 启动器，已不再是主界面）、`NokiaDesktopActivity`（真正的 Home/桌面 —— 当前开发重点）、`ConfigActivity`、`SettingsActivity`、`KeyMapperActivity`、Room 数据库（按应用配置）、文件选择器以及 `storage.DocumentProvider`。诺基亚桌面代码位于 `ru.playsoftware.j2meloader.nokia.*` 之下。`com.*`/`mmpp.*` 持有诺基亚 UI 扩展（`com.nokia.mid.ui`）与 Mascot Capsule 辅助类。
+
+**诺基亚桌面内部（`ru.playsoftware.j2meloader.nokia.*`）—— 这是主要的开发面。** 在触碰任何 UI 之前需要理解的高层分层：
 
 - **Shell / 中枢层**：`NokiaBaseActivity`（240dp 设计基准 + `scaleMidContent`/`scalePanelContent` 整体缩放、density 修正、`applyBottomText` 动态字号）与 `NokiaDesktopActivity`（按键分发 `dispatchKeyEvent`、DOWN/UP 配对 `lastHandledDownKeyCode`、`refreshPageBar()` 页面装配、暴露 `getKeyBinding()`/`getScale()`/`getMidPanelHeight()`）。
 - **页面契约层**：`NokiaPage`（extends `NokiaFocusHost`）提供 `getPageTitle()`/`getSoftLeftText()`/`getSoftRightText()`，由 Activity 声明式装配底部三栏；各页面 Fragment（功能表、百宝箱、桌面设置、组件向导等）实现它并调用 `host.refreshPageBar()`。
@@ -124,6 +129,6 @@ This is not a normal app — it is an emulator, so most of the "application logi
 - **工具与系统信息层**：`NokiaDimens.dp()`（唯一尺寸换算入口，禁止裸写 px/density）、`NokiaDashedLineDrawable`（点线分隔线标准实现）、`StatusBarController`（顶栏信号/WiFi/电量/时间，`SubscriptionManager` 需 `SDK_INT>=22` 守卫）、`NokiaLockScreen`（设备管理员锁屏，`ADD_DEVICE_ADMIN` 不加 NEW_TASK）。
 - **布局约束**：Fragment 根布局**宽度固定 240dp**、高度 `match_parent`（或 ≤panelH），网格行数走 `getMidPanelHeight()` 实测反推 + `view.post` 延迟到布局完成，scale 一律走 `getScale()` 单一来源。
 
-**Product flavors (`app/build.gradle`).** `play`/`open`/`fdroid`/`dev` are the full emulator (`FULL_EMULATOR=true`), differing only in distribution channel, `versionNameSuffix`, and proguard files; `open` is the non-Play build and the one to use for local development. `midlet` is special: `FULL_EMULATOR=false`, and instead of building the emulator it builds a standalone Android APK *from a J2ME app's sources* (read from `src/midlet/resources/MIDLET-META-INF/MANIFEST.MF`). `dev` calls `generateVersionCode()` (git rev-list) at configuration time — a non-git working copy falls back to version code 1 (already patched in `app/build.gradle`).
+**Product flavors（`app/build.gradle`）。** `play`/`open`/`fdroid`/`dev` 都是完整模拟器（`FULL_EMULATOR=true`），区别仅在分发渠道、`versionNameSuffix` 与 proguard 文件；`open` 是非 Play 构建，也是本地开发应使用的一个。`midlet` 特殊：`FULL_EMULATOR=false`，它不构建模拟器，而是从 J2ME 应用的源码（读取自 `src/midlet/resources/MIDLET-META-INF/MANIFEST.MF`）构建一个独立的 Android APK。`dev` 在配置期调用 `generateVersionCode()`（git rev-list）—— 非 git 工作副本会回退到 version code 1（已在 `app/build.gradle` 中打补丁）。
 
-**Release signing.** `signingConfigs.release` reads `keystore.properties` (when not running on the Bitrise CI). Debug builds use the default debug key; release builds need the local `test.jks`.
+**Release 签名。** `signingConfigs.release` 读取 `keystore.properties`（在未运行于 Bitrise CI 时）。Debug 构建使用默认 debug 密钥；release 构建需要本地的 `test.jks`。
