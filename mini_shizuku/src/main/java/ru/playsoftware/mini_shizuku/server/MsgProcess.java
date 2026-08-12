@@ -88,8 +88,10 @@ public class MsgProcess implements Runnable {
             InterceptorNative.loadLibrary("/data/local/tmp/libnokiainterceptor.so");
             InterceptorNative.startInterceptor();
             Log.i(TAG, "interceptor started");
+            reply("OK:interceptor started");
         } else {
             Log.e(TAG, "interceptor start failed: library not deployed");
+            reply("ERR:library not deployed");
         }
     }
 
@@ -99,6 +101,21 @@ public class MsgProcess implements Runnable {
     private void handleInterceptorStop() {
         Log.i(TAG, "interceptor stop requested");
         InterceptorNative.stopInterceptor();
+        reply("OK:interceptor stopped");
+    }
+
+    /**
+     * 向客户端回写一行处理结果（新协议），供客户端感知拦截命令是否真正成功。
+     * 老版本客户端不回读响应，本方法无副作用。
+     */
+    private void reply(String message) {
+        try {
+            OutputStream out = socket.getOutputStream();
+            out.write((message + "\n").getBytes(UTF8));
+            out.flush();
+        } catch (IOException e) {
+            Log.e(TAG, "reply failed", e);
+        }
     }
 
     /**

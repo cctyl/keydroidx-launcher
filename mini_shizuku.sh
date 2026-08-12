@@ -46,7 +46,8 @@ if [ -z "$PACKAGE" ]; then
 fi
 
 # 用 -Djava.class.path 指定 APK（Android 4.4 的 CLASSPATH 环境变量方式不可用）
-app_process -Djava.class.path="$path" /system/bin \
+# -Dapp.package 供服务端在 APK 重装后通过 pm path 重新定位，避免旧路径失效
+app_process -Djava.class.path="$path" -Dapp.package="$PACKAGE" /system/bin \
     ru.playsoftware.mini_shizuku.server.AdbProcess \
     >> /data/local/tmp/minishizuku.log 2>&1 &
 echo "MiniShizuku started for $PACKAGE"

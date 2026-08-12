@@ -9,6 +9,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <time.h>
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <android/log.h>
@@ -22,10 +23,37 @@
 #define NBITS(x) ((((x)-1)/BITS_PER_LONG)+1)
 #define test_bit(bit, array) ((array[bit/BITS_PER_LONG] >> (bit%BITS_PER_LONG)) & 1)
 
+// 诺基亚桌面应用包名候选（release 无后缀 / debug 带 .debug）。
+// 回桌面注入时先探测已安装的包；前台判断也用它。
+#define PKG_NOKIA_RELEASE "io.github.cctyl.nokia"
+#define PKG_NOKIA_DEBUG   "io.github.cctyl.nokia.debug"
+#define NOKIA_ACTIVITY    "ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity"
+
+// 注入防抖间隔（毫秒）：避免与系统 power 防误触策略冲突导致注入被忽略。
+#define INJECT_DEBOUNCE_MS 1000
+// 状态轮询间隔（微秒）：500ms 轮询 dumpsys 更新缓存。
+#define STATE_POLL_US      (500 * 1000)
+
 static pthread_t interceptor_thread;
+static pthread_t state_thread;
 static volatile int is_running = 0;
 static int uinput_fd = -1;
 static int power_key_fd = -1;
+
+// ---- 状态缓存（由状态线程 500ms 轮询 dumpsys 更新，按键时直接读） ----
+static volatile int screen_awake = 1;        // 屏幕是否亮（默认亮，避免首次按键误锁屏）
+static volatile int front_is_nokia = 0;      // 前台窗口是否为本应用
+static char front_package[128] = "";         // 当前前台包名（日志用）
+static char nokia_package[128] = "";         // 探测到的有效本应用包名（缓存，go home 用）
+static long long last_inject_ms = 0;         // 上次注入时间（防抖）
+
+// ---- 工具 ----
+
+static long long now_ms() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
 
 void emit(int fd, int type, int code, int val) {
     struct input_event ie;
@@ -179,6 +207,205 @@ int setup_uinput(int evdev_fd) {
     return fd;
 }
 
+// ---- 方案1：决策状态机（power 键语义） ----
+
+// 执行 shell 命令并丢弃输出（注入通道；命令很快，同步执行）。
+// 返回 pclose 的退出码（0=成功，-1=popen 失败）。
+static int run_cmd(const char *cmd) {
+    FILE *p = popen(cmd, "r");
+    if (!p) {
+        LOGE("popen failed: %s", cmd);
+        return -1;
+    }
+    char buf[256];
+    while (fgets(buf, sizeof(buf), p) != NULL) { /* 读空输出，避免管道阻塞 */ }
+    return pclose(p);
+}
+
+// 执行命令并捕获输出到 out（截断）。返回 pclose 退出码。
+static int run_cmd_output(const char *cmd, char *out, size_t out_sz) {
+    if (out_sz <= 0) return -1;
+    FILE *p = popen(cmd, "r");
+    if (!p) {
+        LOGE("popen failed: %s", cmd);
+        return -1;
+    }
+    size_t total = 0;
+    while (total < out_sz - 1) {
+        size_t n = fread(out + total, 1, out_sz - 1 - total, p);
+        if (n <= 0) break;
+        total += n;
+    }
+    out[total] = '\0';
+    return pclose(p);
+}
+
+// 在文本中查找 key= 后的值（值到行尾或空白/逗号），供 mWakefulness= 等使用。
+static void extract_after(const char *text, const char *key, char *out, size_t out_sz) {
+    out[0] = '\0';
+    const char *p = strstr(text, key);
+    if (!p) return;
+    p += strlen(key);
+    while (*p == ' ' || *p == '\t') p++;
+    size_t i = 0;
+    while (*p && *p != '\n' && *p != '\r' && *p != ' ' && *p != '\t'
+            && *p != ',' && *p != '}' && i < out_sz - 1) {
+        out[i++] = *p++;
+    }
+    out[i] = '\0';
+}
+
+// 从 dumpsys window 输出提取前台窗口包名：
+// mCurrentFocus=Window{41d3c660 u0 com.android.settings/com.android.settings.Settings}
+// 取 '/' 前最后一个空白后的 token 作为包名。
+static void extract_front_package(const char *text, char *out, size_t out_sz) {
+    out[0] = '\0';
+    const char *p = strstr(text, "mCurrentFocus=Window{");
+    if (!p) return;
+    p += strlen("mCurrentFocus=Window{");
+    const char *slash = strchr(p, '/');
+    if (!slash) return; // 无组件名（纯 Window token / null），保持原值
+    const char *start = p;
+    const char *scan = p;
+    while (scan < slash) {
+        if (*scan == ' ' || *scan == '\t') start = scan + 1;
+        scan++;
+    }
+    size_t len = (size_t)(slash - start);
+    if (len <= 0 || len >= out_sz) return;
+    memcpy(out, start, len);
+    out[len] = '\0';
+}
+
+// 判断包名是否为本应用（release / debug）。
+static int is_nokia_package(const char *pkg) {
+    if (!pkg || !pkg[0]) return 0;
+    return strcmp(pkg, PKG_NOKIA_RELEASE) == 0 || strcmp(pkg, PKG_NOKIA_DEBUG) == 0;
+}
+
+// 更新屏幕状态缓存：dumpsys power → mWakefulness。
+static void update_screen_state() {
+    char output[8192];
+    if (run_cmd_output("dumpsys power 2>/dev/null", output, sizeof(output)) < 0) {
+        LOGW("state: dumpsys power failed");
+        return;
+    }
+    char val[32];
+    extract_after(output, "mWakefulness=", val, sizeof(val));
+    if (!val[0]) {
+        LOGW("state: mWakefulness not found in dumpsys power (len=%d)", (int)strlen(output));
+        return;
+    }
+    int awake = (strcmp(val, "Awake") == 0);
+    if (awake != screen_awake) {
+        LOGI("state: screen %s -> %s (mWakefulness=%s)",
+             screen_awake ? "awake" : "asleep", awake ? "awake" : "asleep", val);
+        screen_awake = awake;
+    }
+}
+
+// 更新前台窗口缓存：dumpsys window windows | grep mCurrentFocus。
+static void update_front_window() {
+    char output[4096];
+    if (run_cmd_output("dumpsys window windows 2>/dev/null | grep mCurrentFocus",
+                       output, sizeof(output)) < 0) {
+        LOGW("state: dumpsys window failed");
+        return;
+    }
+    char pkg[128];
+    extract_front_package(output, pkg, sizeof(pkg));
+    if (!pkg[0]) {
+        LOGW("state: mCurrentFocus parse failed (output=%s)", output);
+        return;
+    }
+    int isNokia = is_nokia_package(pkg);
+    if (isNokia != front_is_nokia || strcmp(pkg, front_package) != 0) {
+        LOGI("state: front window pkg=%s isNokia=%d (was pkg=%s isNokia=%d)",
+             pkg, isNokia, front_package, front_is_nokia);
+        strncpy(front_package, pkg, sizeof(front_package) - 1);
+        front_package[sizeof(front_package) - 1] = '\0';
+        front_is_nokia = isNokia;
+    }
+}
+
+// 状态轮询线程：500ms 刷新屏幕/前台缓存，状态变化才打日志。
+static void* state_thread_run(void* arg) {
+    LOGI("state: polling thread started (interval %dms)", STATE_POLL_US / 1000);
+    while (is_running) {
+        update_screen_state();
+        update_front_window();
+        usleep(STATE_POLL_US);
+    }
+    LOGI("state: polling thread stopped");
+    return NULL;
+}
+
+// 注入：回诺基亚桌面（am start 精确拉起，不依赖 HOME 归属）。
+static void inject_go_home() {
+    // 探测有效包名（缓存，仅首次探测）
+    if (nokia_package[0] == '\0') {
+        char out[256];
+        if (run_cmd_output("pm path " PKG_NOKIA_RELEASE " 2>/dev/null", out, sizeof(out)) >= 0
+                && strstr(out, "package:")) {
+            strcpy(nokia_package, PKG_NOKIA_RELEASE);
+        } else if (run_cmd_output("pm path " PKG_NOKIA_DEBUG " 2>/dev/null", out, sizeof(out)) >= 0
+                && strstr(out, "package:")) {
+            strcpy(nokia_package, PKG_NOKIA_DEBUG);
+        } else {
+            LOGE("go home: cannot find nokia package (release/debug)");
+            return;
+        }
+        LOGI("go home: resolved package=%s", nokia_package);
+    }
+    char cmd[300];
+    snprintf(cmd, sizeof(cmd), "am start -n %s/%s", nokia_package, NOKIA_ACTIVITY);
+    int rc = run_cmd(cmd);
+    LOGI("go home: rc=%d cmd=%s", rc, cmd);
+}
+
+// 注入：锁屏（input keyevent 26=POWER，走 InputManager 不受 evdev grab 影响）。
+static void inject_lock() {
+    int rc = run_cmd("input keyevent 26");
+    LOGI("lock: input keyevent 26 rc=%d", rc);
+}
+
+// 注入：唤醒（input keyevent 224=WAKEUP；部分 ROM 不支持时回退 26）。
+static void inject_wake() {
+    int rc = run_cmd("input keyevent 224");
+    LOGI("wake: input keyevent 224 rc=%d", rc);
+    if (rc != 0) {
+        LOGW("wake: 224 failed, fallback to 26");
+        run_cmd("input keyevent 26");
+    }
+}
+
+// 决策状态机：power 键按下时执行（方案1核心）。
+static void handle_power_pressed() {
+    long long now = now_ms();
+    if (last_inject_ms != 0 && now - last_inject_ms < INJECT_DEBOUNCE_MS) {
+        LOGI("power: consumed (debounce, %lldms since last inject)", now - last_inject_ms);
+        return;
+    }
+    LOGI("power: pressed -> screen=%s frontIsNokia=%d frontPkg='%s'",
+         screen_awake ? "awake" : "asleep", front_is_nokia, front_package);
+    if (!screen_awake) {
+        // 屏幕灭 → 唤醒
+        LOGI("power: decision=wake (screen asleep)");
+        inject_wake();
+    } else if (!front_is_nokia) {
+        // 屏幕亮 + 前台非本应用 → 回桌面
+        LOGI("power: decision=go_home (screen awake, front is other app)");
+        inject_go_home();
+    } else {
+        // 屏幕亮 + 前台本应用 → 锁屏
+        LOGI("power: decision=lock (screen awake, front is nokia)");
+        inject_lock();
+    }
+    last_inject_ms = now_ms();
+}
+
+// ---- 主拦截线程 ----
+
 void* interceptor_run(void* arg) {
     char dev_path[256];
 
@@ -210,16 +437,21 @@ void* interceptor_run(void* arg) {
     }
 
     // 创建 uinput 虚拟设备用于回放。某些设备上 shell 无 /dev/uinput 写权限，
-    // 打不开时退化为"纯消费模式"：拦截 power 键并丢弃，其它按键一并丢弃
-    // （可接受，因为该设备一般只有 power 与音量键）。
+    // 打不开时退化为"纯消费模式"：非 power 键一并丢弃。
     uinput_fd = setup_uinput(power_key_fd);
     if (uinput_fd < 0) {
-        LOGW("uinput unavailable, running in consume-only mode");
+        LOGW("uinput unavailable, running in consume-only mode (方案2)");
     } else {
-        LOGI("uinput replay device created");
+        LOGI("uinput replay device created (方案1)");
     }
 
     LOGI("Interceptor started successfully");
+
+    // 启动状态轮询线程，并立即刷新一次缓存，避免首次按键状态不准
+    is_running = 1;
+    pthread_create(&state_thread, NULL, state_thread_run, NULL);
+    update_screen_state();
+    update_front_window();
 
     struct input_event ev;
     while (is_running) {
@@ -232,9 +464,12 @@ void* interceptor_run(void* arg) {
         }
 
         if (ev.type == EV_KEY && ev.code == KEY_POWER) {
-            // 拦截 power 键：消费掉（按下/抬起都丢弃），系统收不到 power 事件。
             if (ev.value == 1) {
-                LOGI("Power key consumed");
+                // 方案1：power 按下 → 决策状态机（唤醒/回桌面/锁屏）
+                handle_power_pressed();
+            } else {
+                // power 抬起一律消费丢弃
+                LOGI("power: UP consumed");
             }
         } else if (ev.type == EV_KEY || ev.type == EV_SYN) {
             // 有 uinput 时非 power 键事件原样回放，保证其它按键行为不变；
@@ -246,6 +481,9 @@ void* interceptor_run(void* arg) {
     }
 
     LOGI("Interceptor stopped");
+
+    // 停止状态线程（is_running 已被 stopInterceptor 置 0，sleep 醒来后退出）
+    pthread_join(state_thread, NULL);
 
     if (uinput_fd >= 0) {
         ioctl(uinput_fd, UI_DEV_DESTROY);

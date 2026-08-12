@@ -188,44 +188,47 @@ public class NokiaPowerInterceptFragment extends NokiaPageFragment {
 	/** 关闭：发送 INTERCEPTOR_STOP（需要服务在线）。 */
 	private void applyOff() {
 		NokiaLog.i("PowerIntercept", "执行关闭拦截");
-		execWithService(false);
+		execWithService(false, "关闭");
 	}
 
-	/** 方案2：发送 INTERCEPTOR_START（当前纯消费实现，安卓4.4 有效）。 */
+	/** 方案2：发送 INTERCEPTOR_START（grab 纯消费，uinput 不可用时兜底）。 */
 	private void applyMode2() {
 		NokiaLog.i("PowerIntercept", "执行方案2（grab 纯消费）启动拦截");
-		execWithService(true);
+		execWithService(true, "方案2");
 	}
 
-	/** 方案1：实现未完成（决策状态机未接入），仅记录选择。 */
+	/** 方案1：evdev grab + uinput 回放 + 决策状态机，发送 INTERCEPTOR_START（需要服务在线）。 */
 	private void applyMode1() {
-		NokiaLog.i("PowerIntercept", "方案1 已选择，但实现未完成（evdev grab + uinput 回放 + "
-				+ "决策状态机未接入），本次仅记录选择，不启动拦截");
-		if (isAdded()) {
-			Toast.makeText(requireContext(), "方案1 实现中，暂未生效", Toast.LENGTH_SHORT).show();
-		}
+		NokiaLog.i("PowerIntercept", "执行方案1（grab + uinput 回放 + 决策状态机）启动拦截");
+		execWithService(true, "方案1");
 	}
 
-	/** 方案3：root 通道未支持，仅记录选择。 */
+	/** 方案3：root 通道未实现，选择后关闭拦截（避免残留方案1/2 的拦截生效）。 */
 	private void applyMode3() {
-		NokiaLog.i("PowerIntercept", "方案3（root）已选择，但当前未支持 root 通道，本次仅记录选择");
+		NokiaLog.i("PowerIntercept", "执行方案3：root 通道未实现，发送 INTERCEPTOR_STOP 关闭拦截");
+		execWithService(false, "方案3");
 		if (isAdded()) {
-			Toast.makeText(requireContext(), "方案3 需 root，暂未支持", Toast.LENGTH_SHORT).show();
+			Toast.makeText(requireContext(), "方案3 需 root，暂未支持，已关闭拦截",
+					Toast.LENGTH_SHORT).show();
 		}
 	}
 
 	/**
 	 * 依赖服务的底层动作（启动/停止拦截）：TCP 探测/发送为网络操作，必须后台执行；
 	 * 服务离线时提示先激活，不静默失败。
+	 *
+	 * @param enable  true=INTERCEPTOR_START，false=INTERCEPTOR_STOP
+	 * @param modeName 当前方案名（日志/提示用，如「方案1」「方案2」「关闭」）
 	 */
-	private void execWithService(final boolean enable) {
+	private void execWithService(final boolean enable, final String modeName) {
 		final String cmdName = enable ? "INTERCEPTOR_START" : "INTERCEPTOR_STOP";
 		final Handler mainHandler = new Handler(Looper.getMainLooper());
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
 				if (!Shizuku.isRunning()) {
-					NokiaLog.w("PowerIntercept", "发送 " + cmdName + " 失败：mini_shizuku 服务未在线");
+					NokiaLog.w("PowerIntercept", "[" + modeName + "] 发送 " + cmdName
+							+ " 失败：mini_shizuku 服务未在线");
 					mainHandler.post(new Runnable() {
 						@Override
 						public void run() {
@@ -237,14 +240,20 @@ public class NokiaPowerInterceptFragment extends NokiaPageFragment {
 					return;
 				}
 				final boolean ok = Shizuku.enablePowerInterceptor(enable);
-				NokiaLog.i("PowerIntercept", "发送 " + cmdName + " 结果: ok=" + ok);
+				NokiaLog.i("PowerIntercept", "[" + modeName + "] 发送 " + cmdName + " 结果: ok=" + ok);
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
 						if (!isAdded()) return;
-						Toast.makeText(requireContext(),
-								enable ? "拦截已启动（方案2）" : "拦截已关闭",
-								Toast.LENGTH_SHORT).show();
+						if (ok) {
+							Toast.makeText(requireContext(),
+									enable ? "拦截已启动（" + modeName + "）" : "拦截已关闭",
+									Toast.LENGTH_SHORT).show();
+						} else {
+							Toast.makeText(requireContext(),
+									enable ? "拦截启动失败，请查看 mini_shizuku 日志" : "拦截关闭失败",
+									Toast.LENGTH_SHORT).show();
+						}
 					}
 				});
 			}

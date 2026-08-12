@@ -23,6 +23,7 @@ public final class ShizukuClient {
     private static final String HOST = "127.0.0.1";
     private static final int PORT = 10500;
     private static final int CONNECT_TIMEOUT = 500;
+    private static final int READ_TIMEOUT = 3000;
     private static final String PREFIX_SILENT = "EXEC|";
     private static final String PREFIX_OUTPUT = "EXEC_OUT|";
     private static final String EXIT_PREFIX = "EXIT:";
@@ -59,6 +60,42 @@ public final class ShizukuClient {
             out.write((PREFIX_SILENT + command + "\n").getBytes(UTF8));
             out.flush();
             return true;
+        } catch (IOException e) {
+            return false;
+        } finally {
+            closeQuietly(socket);
+        }
+    }
+
+    /**
+     * 发送拦截器控制命令（INTERCEPTOR_START/STOP），并读取服务端回写的一行结果。
+     * <p>
+     * 服务端处理完成后会回写 {@code OK:...} 或 {@code ERR:...}；老版本服务端不回写，
+     * 读超时后视为成功（保持旧行为，仅保证写入成功）。这样客户端能感知拦截是否真正启动，
+     * 避免「服务端部署失败但客户端误报成功」。
+     *
+     * @return true 表示服务端确认成功（或老服务端已收到命令）；false 表示服务端处理失败。
+     */
+    public static boolean execInterceptor(String command) {
+        Socket socket = new Socket();
+        try {
+            socket.connect(new InetSocketAddress(HOST, PORT), CONNECT_TIMEOUT);
+            OutputStream out = socket.getOutputStream();
+            out.write((PREFIX_SILENT + command + "\n").getBytes(UTF8));
+            out.flush();
+            socket.setSoTimeout(READ_TIMEOUT);
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(socket.getInputStream(), UTF8));
+            try {
+                String line = reader.readLine();
+                if (line != null && line.startsWith("ERR:")) {
+                    return false;
+                }
+                return true;
+            } catch (java.net.SocketTimeoutException e) {
+                // 老服务端不回写响应，写入成功即视为成功
+                return true;
+            }
         } catch (IOException e) {
             return false;
         } finally {

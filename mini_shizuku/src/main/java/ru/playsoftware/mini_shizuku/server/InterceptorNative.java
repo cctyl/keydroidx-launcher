@@ -52,6 +52,11 @@ public class InterceptorNative {
      */
     public static boolean prepareLibrary(String outPath) {
         try {
+            // 库已加载进内存后，native 方法可直接调用，无需再部署/解压 so 文件。
+            // 避免「APK 重装后 java.class.path 失效」导致误判为未部署而拒绝启动拦截。
+            if (isLoaded) {
+                return true;
+            }
             File out = new File(outPath);
             // 强制覆盖：删除旧文件后从 APK 重新解压，避免「旧 so 残留导致加载旧版」。
             // 注意：同一进程内 System.load 对同一路径不会重新加载新内容（dlopen 路径缓存），
@@ -107,17 +112,36 @@ public class InterceptorNative {
     }
 
     /**
-     * 从 {@code java.class.path} 中找第一个存在的 .apk 路径。
+     * 定位当前应用的 APK 路径。
+     * <p>
+     * 优先读 {@code java.class.path}（服务端启动时由脚本注入）；若其中指向的 APK 已失效
+     * （应用被重新安装后旧文件被删除），则用 {@code pm path <包名>} 按包名重新定位，
+     * 包名来自启动脚本注入的 {@code -Dapp.package}。
      */
     private static String findApkPath() {
         String cp = System.getProperty("java.class.path");
-        if (cp == null || cp.isEmpty()) {
-            return null;
+        if (cp != null && !cp.isEmpty()) {
+            for (String part : cp.split(":")) {
+                String p = part.trim();
+                if (!p.isEmpty() && p.endsWith(".apk") && new File(p).exists()) {
+                    return p;
+                }
+            }
         }
-        for (String part : cp.split(":")) {
-            String p = part.trim();
-            if (!p.isEmpty() && p.endsWith(".apk") && new File(p).exists()) {
-                return p;
+        String pkg = System.getProperty("app.package");
+        if (pkg != null && !pkg.isEmpty()) {
+            ShellUtil.Result r = ShellUtil.execWithOutputAndCode("pm path " + pkg);
+            if (r != null && r.output != null) {
+                for (String line : r.output.split("\n")) {
+                    String t = line.trim();
+                    if (t.startsWith("package:")) {
+                        String path = t.substring("package:".length()).trim();
+                        if (!path.isEmpty() && new File(path).exists()) {
+                            Log.i(TAG, "findApkPath: relocated via pm path: " + path);
+                            return path;
+                        }
+                    }
+                }
             }
         }
         return null;

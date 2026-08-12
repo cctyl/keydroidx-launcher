@@ -67,7 +67,7 @@ public final class Shizuku {
      * @return 命令是否成功发送（服务在线且写入成功）。
      */
     public static boolean enablePowerInterceptor(boolean enable) {
-        return ShizukuClient.exec(enable ? "INTERCEPTOR_START" : "INTERCEPTOR_STOP");
+        return ShizukuClient.execInterceptor(enable ? "INTERCEPTOR_START" : "INTERCEPTOR_STOP");
     }
 
     public static String execWithOutput(String command) {

@@ -144,10 +144,14 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 		return ITEM_NAMES[index];
 	}
 
-	/** 电源键拦截当前是否开启：非「关闭」模式即视为开启（方案1/2/3）。 */
+	/**
+	 * 电源键拦截当前是否开启：仅方案1/2 算开启；关闭与方案3（root 未实现，等效关闭）算关。
+	 * 与 {@link NokiaPowerInterceptFragment} 的实际底层动作保持一致（方案3 选择后发 STOP）。
+	 */
 	private boolean isInterceptorOn() {
-		return NokiaSettingsStorage.getPowerInterceptorMode(requireContext())
-				!= NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_OFF;
+		int mode = NokiaSettingsStorage.getPowerInterceptorMode(requireContext());
+		return mode == NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_1
+				|| mode == NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_2;
 	}
 
 	/**
