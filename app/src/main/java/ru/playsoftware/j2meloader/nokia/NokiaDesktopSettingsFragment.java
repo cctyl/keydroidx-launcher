@@ -36,7 +36,7 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 			R.drawable.s60_settings,       // 按键绑定
 			R.drawable.s60_settings,       // 应用向导
 			R.drawable.ic_nokia_home,      // 默认桌面设置
-			R.drawable.ic_nokia_settings,  // mini_shizuku
+			R.drawable.ic_nokia_settings,  // 高级设置
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -48,7 +48,7 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 			"按键绑定",
 			"应用向导",
 			"默认桌面设置",
-			"mini_shizuku",
+			"高级设置",
 	};
 
 	/** 字体大小档位（桌面设置 → 字体大小），作用于全部应用内文字。 */
@@ -75,10 +75,6 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 		if (index == 7) {
 			boolean isDefault = ((NokiaDesktopActivity) requireActivity()).isDefaultLauncher();
 			return isDefault ? "默认桌面：已设置" : "默认桌面设置";
-		}
-		if (index == 8) {
-			// 基础文案；在线/离线状态由 refreshShizukuStatus() 异步刷新
-			return "mini_shizuku";
 		}
 		return ITEM_NAMES[index];
 	}
@@ -159,31 +155,7 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 		// 默认选中第一项
 		setFocusIndex(0);
 
-		// 异步刷新 "mini_shizuku" 项的状态文案（TCP 探测可能短暂阻塞，放后台线程）
-		refreshShizukuStatus();
-
 		NokiaLog.i("DesktopSettings", "桌面设置菜单初始化完成");
-	}
-
-	/** 后台检测 mini_shizuku 服务是否在线，回主线程刷新列表第 9 项（index 8）的文案。 */
-	private void refreshShizukuStatus() {
-		final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				final boolean running = ru.playsoftware.mini_shizuku.Shizuku.isRunning();
-				mainHandler.post(new Runnable() {
-					@Override
-					public void run() {
-						if (!isAdded() || tvNames == null || tvNames.length <= 8 || tvNames[8] == null) {
-							return;
-						}
-						tvNames[8].setText("mini_shizuku：" + (running ? "在线" : "离线"));
-						NokiaLog.i("DesktopSettings", "mini_shizuku 状态: " + (running ? "在线" : "离线"));
-					}
-				});
-			}
-		}, "shizuku-status-check").start();
 	}
 
 	// ---- NokiaFocusHost ----
@@ -257,8 +229,8 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 				host.requestSetDefaultLauncher();
 				return true;
 		case 8:
-			NokiaLog.i("DesktopSettings", "进入 mini_shizuku 服务");
-			host.openFragment(new ShizukuFragment());
+			NokiaLog.i("DesktopSettings", "进入高级设置");
+			host.openFragment(new NokiaAdvancedSettingsFragment());
 			return true;
 		default:
 			return false;

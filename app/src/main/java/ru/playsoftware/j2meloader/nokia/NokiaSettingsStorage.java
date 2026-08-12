@@ -415,4 +415,21 @@ public class NokiaSettingsStorage {
 				.edit().putBoolean(KEY_LOG_FILE, enabled).apply();
 		NokiaLog.i("SettingsStorage", "setFileLogEnabled: " + enabled);
 	}
+
+	// ── 电源键拦截开关（高级设置） ──
+
+	private static final String KEY_POWER_INTERCEPTOR = "power_interceptor_enabled";
+
+	/** 读取电源键拦截开关状态（高级设置 → 电源键拦截），默认关闭。 */
+	public static boolean isPowerInterceptorEnabled(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getBoolean(KEY_POWER_INTERCEPTOR, false);
+	}
+
+	/** 保存电源键拦截开关状态。 */
+	public static void setPowerInterceptorEnabled(Context ctx, boolean enabled) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putBoolean(KEY_POWER_INTERCEPTOR, enabled).apply();
+		NokiaLog.i("SettingsStorage", "setPowerInterceptorEnabled: " + enabled);
+	}
 }

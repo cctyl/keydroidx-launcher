@@ -28,6 +28,8 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  *     <li>主体为两条可导航菜单（adb 激活 / root 激活），方向键选中、确认键进入对应子页；</li>
  *     <li>左软键「刷新」：重新检测服务在线状态；右软键「返回」：返回上一层。</li>
  * </ul>
+ * <p>
+ * 电源键拦截开关已移至「高级设置」（{@link NokiaAdvancedSettingsFragment}）。
  */
 public class ShizukuFragment extends NokiaPageFragment {
 
@@ -36,13 +38,10 @@ public class ShizukuFragment extends NokiaPageFragment {
 	private LinearLayout actionList;
 	private View[] actionViews;
 	private int focusIndex = -1;
-	/** 电源键拦截当前开关状态（仅内存，重启后默认关闭）。 */
-	private boolean interceptorEnabled = false;
 
 	private static final String[] ACTION_NAMES = {
 			"adb 激活",
 			"root 激活",
-			"电源键拦截",
 	};
 
 	@Override
@@ -137,53 +136,9 @@ public class ShizukuFragment extends NokiaPageFragment {
 				NokiaLog.i("Shizuku", "进入 root 激活页（占位）");
 				((NokiaDesktopActivity) requireActivity()).openFragment(new ShizukuRootFragment());
 				break;
-			case 2:
-				togglePowerInterceptor();
-				break;
 			default:
 				break;
 		}
-	}
-
-	/**
-	 * 切换电源键拦截开关。要求 mini_shizuku 服务在线；离线时提示先激活。
-	 * <p>
-	 * 内部 TCP 探测/发送均为网络操作，必须在后台线程执行，避免主线程触发
-	 * {@code NetworkOnMainThreadException}；结果回主线程更新 UI。
-	 */
-	private void togglePowerInterceptor() {
-		final Handler mainHandler = new Handler(Looper.getMainLooper());
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				if (!Shizuku.isRunning()) {
-					mainHandler.post(new Runnable() {
-						@Override
-						public void run() {
-							if (!isAdded()) return;
-							Toast.makeText(requireContext(), "服务未在线，请先激活", Toast.LENGTH_SHORT).show();
-						}
-					});
-					return;
-				}
-				final boolean enable = !interceptorEnabled;
-				final boolean ok = Shizuku.enablePowerInterceptor(enable);
-				mainHandler.post(new Runnable() {
-					@Override
-					public void run() {
-						if (!isAdded()) return;
-						if (ok) {
-							interceptorEnabled = enable;
-							NokiaLog.i("Shizuku", "电源键拦截已" + (enable ? "开启" : "关闭"));
-							Toast.makeText(requireContext(), enable ? "电源键拦截已开启" : "电源键拦截已关闭",
-									Toast.LENGTH_SHORT).show();
-						} else {
-							Toast.makeText(requireContext(), "发送命令失败", Toast.LENGTH_SHORT).show();
-						}
-					}
-				});
-			}
-		}, "shizuku-interceptor-toggle").start();
 	}
 
 	// ---- NokiaFocusHost ----
