@@ -14,7 +14,7 @@ android {
         minSdk MIN_SDK
         targetSdk TARGET_SDK
         versionCode 102
-        versionName "1.1"
+        versionName "1.2"
         resValue 'string', 'app_name', 'NokiaLauncher'
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
