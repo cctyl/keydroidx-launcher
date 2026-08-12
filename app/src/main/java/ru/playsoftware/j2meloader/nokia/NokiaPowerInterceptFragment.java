@@ -1,9 +1,5 @@
 package ru.playsoftware.j2meloader.nokia;
 
-import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.RectF;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,6 +10,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -23,24 +20,39 @@ import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
 /**
- * 高级设置。集中存放依赖 mini_shizuku 服务的高级功能入口：
+ * 电源键拦截设置页（高级设置 → 电源键拦截设置）。
+ * <p>
+ * 展示 4 个可选方案供用户选择：
  * <ul>
- *     <li>mini_shizuku：进入服务激活页（adb / root）；</li>
- *     <li>电源键拦截设置：行尾只读开关展示当前开/关状态（关闭 或 任一方案），
- *         点击/确认整行进入方案选择页（关闭 / 方案1 / 方案2 / 方案3）。</li>
+ *     <li>关闭：不拦截挂机键（发送 INTERCEPTOR_STOP）；</li>
+ *     <li>方案1：evdev grab + uinput 回放 + 决策状态机（安卓13 目标方案，实现中，本次仅记录选择）；</li>
+ *     <li>方案2：evdev grab 纯消费（安卓4.4 有效，发送 INTERCEPTOR_START）；</li>
+ *     <li>方案3：root（预留扩展点，本次仅记录选择）。</li>
  * </ul>
- * 顶部提示：本页面的功能均需要 mini_shizuku 支持。
+ * 选择结果持久化到 {@link NokiaSettingsStorage#setPowerInterceptorMode}，进入页面时回显当前方案。
+ * 所有选择与底层调用均打详细日志（sub: PowerIntercept），便于真机排障。
  */
-public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
+public class NokiaPowerInterceptFragment extends NokiaPageFragment {
 
 	private static final int[] ITEM_ICONS = {
-			R.drawable.ic_nokia_settings,  // mini_shizuku
-			R.drawable.ic_nokia_lock,      // 电源键拦截设置
+			R.drawable.ic_nokia_home,      // 关闭
+			R.drawable.ic_nokia_settings,  // 方案1
+			R.drawable.ic_nokia_settings,  // 方案2
+			R.drawable.ic_nokia_lock,      // 方案3
+	};
+
+	private static final int[] ITEM_MODES = {
+			NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_OFF,
+			NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_1,
+			NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_2,
+			NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_3,
 	};
 
 	private static final String[] ITEM_NAMES = {
-			"mini_shizuku",
-			"电源键拦截设置",
+			"关闭拦截",
+			"方案1：grab+回放",
+			"方案2：纯消费",
+			"方案3：root",
 	};
 
 	private View[] itemViews;
@@ -49,16 +61,18 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 	private int focusIndex = -1;
 	private View selectedView = null;
 
-	// 电源键拦截开关（行尾只读展示，index 1 专属；点击整行进入方案选择页）
-	private NokiaSwitchView interceptorSwitch;
-
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_advanced_settings;
+		return R.layout.fragment_nokia_settings_group;
 	}
 
 	@Override
 	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+		TextView title = view.findViewById(R.id.settingsTitle);
+		if (title != null) {
+			title.setText("电源键拦截设置");
+		}
+
 		LinearLayout listLayout = view.findViewById(R.id.settingsList);
 		if (listLayout == null) return;
 
@@ -66,7 +80,7 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 		constrainScrollHeight(view);
 
 		int curMode = NokiaSettingsStorage.getPowerInterceptorMode(requireContext());
-		NokiaLog.i("AdvancedSettings", "进入高级设置页，当前电源键拦截方案=" + curMode
+		NokiaLog.i("PowerIntercept", "进入电源键拦截设置页，当前模式=" + curMode
 				+ " (" + NokiaSettingsStorage.getPowerInterceptorModeName(curMode) + ")");
 
 		itemViews = new View[ITEM_NAMES.length];
@@ -93,32 +107,18 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 			// 间距
 			row.addView(spaceView(NokiaDimens.dp(getResources(), 8), 1));
 
-			// 名称（电源键拦截设置项动态显示当前方案）
+			// 名称（当前方案追加「（当前）」）
 			TextView tvName = new TextView(requireContext());
 			tvName.setLayoutParams(new LinearLayout.LayoutParams(
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-			tvName.setText(getItemDisplayName(i));
 			tvName.setTextColor(0xFFFFFFFF);
 			NokiaDimens.textSize(tvName, 12);
 			tvNames[i] = tvName;
 			row.addView(tvName);
 
-			// 行尾控件：mini_shizuku 用箭头；电源键拦截设置用只读开关（开/关状态）
-			if (i == 0) {
-				TextView tvArrow = new TextView(requireContext());
-				tvArrow.setLayoutParams(new LinearLayout.LayoutParams(
-						LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-				tvArrow.setText(">");
-				tvArrow.setTextColor(0xFFAAAAAA);
-				NokiaDimens.textSize(tvArrow, 14);
-				row.addView(tvArrow);
-			} else {
-				interceptorSwitch = new NokiaSwitchView(requireContext(), isInterceptorOn());
-				row.addView(interceptorSwitch);
-			}
-
 			final int index = i;
 			row.setOnClickListener(v -> {
+				NokiaLog.d("PowerIntercept", "点击列表行 index=" + index);
 				setFocusIndex(index);
 				onSelect();
 			});
@@ -127,123 +127,128 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 			itemViews[i] = row;
 		}
 
-		// 默认选中第一项
+		refreshListNames();
 		setFocusIndex(0);
 
-		// 异步刷新 mini_shizuku 在线状态，更新第 1 项（index 0）文案
-		refreshShizukuStatus();
-
-		NokiaLog.i("AdvancedSettings", "高级设置初始化完成");
+		// 异步探测服务在线状态（仅打日志，帮助排障）
+		refreshServiceStatus();
 	}
 
-	/** 列表项名称：mini_shizuku 动态显示在线状态；电源键拦截设置固定名称（开/关由行尾开关展示）。 */
-	private String getItemDisplayName(int index) {
-		if (index == 0) {
-			return ITEM_NAMES[0];
-		}
-		return ITEM_NAMES[index];
-	}
-
-	/** 电源键拦截当前是否开启：非「关闭」模式即视为开启（方案1/2/3）。 */
-	private boolean isInterceptorOn() {
-		return NokiaSettingsStorage.getPowerInterceptorMode(requireContext())
-				!= NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_OFF;
-	}
-
-	/**
-	 * 页面重新可见时刷新电源键拦截开关状态：
-	 * 从「电源键拦截设置」方案选择页返回本页时，行尾开关要与最新方案同步。
-	 */
-	@Override
-	public void onResume() {
-		super.onResume();
-		if (interceptorSwitch != null) {
-			boolean on = isInterceptorOn();
-			interceptorSwitch.setChecked(on);
-			NokiaLog.d("AdvancedSettings", "onResume 刷新电源键拦截开关: "
-					+ (on ? "开" : "关") + " 方案=" + NokiaSettingsStorage.getPowerInterceptorModeName(
-							NokiaSettingsStorage.getPowerInterceptorMode(requireContext())));
+	/** 刷新列表名称：当前选中方案追加「（当前）」。 */
+	private void refreshListNames() {
+		int cur = NokiaSettingsStorage.getPowerInterceptorMode(requireContext());
+		if (tvNames == null) return;
+		for (int i = 0; i < tvNames.length; i++) {
+			if (tvNames[i] == null) continue;
+			String text = ITEM_NAMES[i];
+			if (ITEM_MODES[i] == cur) {
+				text += "（当前）";
+			}
+			tvNames[i].setText(text);
 		}
 	}
 
-	/** 构建行内自绘开关（诺基亚风格：跑道形轨道 + 圆形滑块），仅展示状态、不响应点击。 */
-	private static class NokiaSwitchView extends View {
-		private static final int COLOR_TRACK_OFF = 0xFF445566;
-		private static final int COLOR_TRACK_ON = 0xFF64B5F6;
-		private static final int COLOR_THUMB = 0xFFFFFFFF;
-
-		private boolean checked;
-		private final int trackW;
-		private final int trackH;
-		private final int thumbS;
-		private final int margin;
-
-		private final Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-		private final Paint thumbPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-		private final RectF trackRect = new RectF();
-
-		NokiaSwitchView(Context context, boolean checked) {
-			super(context);
-			this.checked = checked;
-			trackW = NokiaDimens.dp(context.getResources(), 34);
-			trackH = NokiaDimens.dp(context.getResources(), 16);
-			thumbS = trackH - NokiaDimens.dp(context.getResources(), 4);
-			margin = NokiaDimens.dp(context.getResources(), 2);
-			trackPaint.setStyle(Paint.Style.FILL);
-			thumbPaint.setStyle(Paint.Style.FILL);
-		}
-
-		/** 切换开关状态并重绘（仅展示，不做点击切换）。 */
-		void setChecked(boolean checked) {
-			this.checked = checked;
-			invalidate();
-		}
-
-		boolean isChecked() {
-			return checked;
-		}
-
-		@Override
-		protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-			// 固定 34×16dp，所有分辨率下尺寸一致（视觉缩放由 Activity 整体 scale 接管）
-			setMeasuredDimension(trackW, trackH);
-		}
-
-		@Override
-		protected void onDraw(Canvas canvas) {
-			// 跑道形轨道：圆角半径 = height/2 形成左右两端半圆。
-			// 只能用 drawRoundRect(RectF, ...) 的 API 1 重载：7 参数 float 重载是 API 21 才有，
-			// Android 4.4（API 19）上会 NoSuchMethodError 闪退。
-			trackPaint.setColor(checked ? COLOR_TRACK_ON : COLOR_TRACK_OFF);
-			trackRect.set(0, 0, trackW, trackH);
-			canvas.drawRoundRect(trackRect, trackH / 2f, trackH / 2f, trackPaint);
-			// 圆形滑块：开启靠右、关闭靠左
-			thumbPaint.setColor(COLOR_THUMB);
-			float cx = checked ? (trackW - margin - thumbS / 2f) : (margin + thumbS / 2f);
-			float cy = trackH / 2f;
-			canvas.drawCircle(cx, cy, thumbS / 2f, thumbPaint);
-		}
-	}
-
-	/** 后台检测 mini_shizuku 服务是否在线，回主线程刷新第 1 项文案。 */
-	private void refreshShizukuStatus() {
-		final Handler mainHandler = new Handler(Looper.getMainLooper());
+	/** 后台探测 mini_shizuku 服务是否在线，打日志（不依赖 UI）。 */
+	private void refreshServiceStatus() {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
 				final boolean running = Shizuku.isRunning();
+				NokiaLog.i("PowerIntercept", "mini_shizuku 服务探测结果: "
+						+ (running ? "在线" : "离线"));
+			}
+		}, "shizuku-status-check").start();
+	}
+
+	/** 应用用户选择的方案：保存模式 + 打日志 + 按方案执行底层动作。 */
+	private void applyMode(int mode) {
+		NokiaSettingsStorage.setPowerInterceptorMode(requireContext(), mode);
+		refreshListNames();
+		NokiaLog.i("PowerIntercept", "用户选择电源键拦截方案: " + mode
+				+ " (" + NokiaSettingsStorage.getPowerInterceptorModeName(mode) + ")");
+		switch (mode) {
+			case NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_OFF:
+				applyOff();
+				break;
+			case NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_1:
+				applyMode1();
+				break;
+			case NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_2:
+				applyMode2();
+				break;
+			case NokiaSettingsStorage.POWER_INTERCEPTOR_MODE_3:
+				applyMode3();
+				break;
+			default:
+				NokiaLog.w("PowerIntercept", "未知拦截模式: " + mode);
+				break;
+		}
+	}
+
+	/** 关闭：发送 INTERCEPTOR_STOP（需要服务在线）。 */
+	private void applyOff() {
+		NokiaLog.i("PowerIntercept", "执行关闭拦截");
+		execWithService(false);
+	}
+
+	/** 方案2：发送 INTERCEPTOR_START（当前纯消费实现，安卓4.4 有效）。 */
+	private void applyMode2() {
+		NokiaLog.i("PowerIntercept", "执行方案2（grab 纯消费）启动拦截");
+		execWithService(true);
+	}
+
+	/** 方案1：实现未完成（决策状态机未接入），仅记录选择。 */
+	private void applyMode1() {
+		NokiaLog.i("PowerIntercept", "方案1 已选择，但实现未完成（evdev grab + uinput 回放 + "
+				+ "决策状态机未接入），本次仅记录选择，不启动拦截");
+		if (isAdded()) {
+			Toast.makeText(requireContext(), "方案1 实现中，暂未生效", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	/** 方案3：root 通道未支持，仅记录选择。 */
+	private void applyMode3() {
+		NokiaLog.i("PowerIntercept", "方案3（root）已选择，但当前未支持 root 通道，本次仅记录选择");
+		if (isAdded()) {
+			Toast.makeText(requireContext(), "方案3 需 root，暂未支持", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	/**
+	 * 依赖服务的底层动作（启动/停止拦截）：TCP 探测/发送为网络操作，必须后台执行；
+	 * 服务离线时提示先激活，不静默失败。
+	 */
+	private void execWithService(final boolean enable) {
+		final String cmdName = enable ? "INTERCEPTOR_START" : "INTERCEPTOR_STOP";
+		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				if (!Shizuku.isRunning()) {
+					NokiaLog.w("PowerIntercept", "发送 " + cmdName + " 失败：mini_shizuku 服务未在线");
+					mainHandler.post(new Runnable() {
+						@Override
+						public void run() {
+							if (!isAdded()) return;
+							Toast.makeText(requireContext(), "服务未在线，请先激活 mini_shizuku",
+									Toast.LENGTH_SHORT).show();
+						}
+					});
+					return;
+				}
+				final boolean ok = Shizuku.enablePowerInterceptor(enable);
+				NokiaLog.i("PowerIntercept", "发送 " + cmdName + " 结果: ok=" + ok);
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
-						if (!isAdded() || tvNames == null || tvNames.length < 1 || tvNames[0] == null) {
-							return;
-						}
-						tvNames[0].setText("mini_shizuku：" + (running ? "在线" : "离线"));
-						NokiaLog.i("AdvancedSettings", "mini_shizuku 状态: " + (running ? "在线" : "离线"));
+						if (!isAdded()) return;
+						Toast.makeText(requireContext(),
+								enable ? "拦截已启动（方案2）" : "拦截已关闭",
+								Toast.LENGTH_SHORT).show();
 					}
 				});
 			}
-		}, "shizuku-status-check").start();
+		}, "power-interceptor-apply").start();
 	}
 
 	// ---- NokiaFocusHost ----
@@ -256,12 +261,15 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 			setFocusIndex(0);
 			return true;
 		}
+		int oldIndex = focusIndex;
 		switch (direction) {
 			case NokiaKeyBinding.ACTION_UP:
 				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
+				NokiaLog.d("PowerIntercept", "onDirection 上：old=" + oldIndex + " new=" + focusIndex);
 				return true;
 			case NokiaKeyBinding.ACTION_DOWN:
 				if (focusIndex < count - 1) setFocusIndex(focusIndex + 1);
+				NokiaLog.d("PowerIntercept", "onDirection 下：old=" + oldIndex + " new=" + focusIndex);
 				return true;
 			case NokiaKeyBinding.ACTION_LEFT:
 			case NokiaKeyBinding.ACTION_RIGHT:
@@ -273,19 +281,12 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 
 	@Override
 	public boolean onSelect() {
-		if (focusIndex < 0) return false;
-		switch (focusIndex) {
-			case 0:
-				NokiaLog.i("AdvancedSettings", "进入 mini_shizuku 服务");
-				((NokiaDesktopActivity) requireActivity()).openFragment(new ShizukuFragment());
-				return true;
-			case 1:
-				NokiaLog.i("AdvancedSettings", "进入电源键拦截设置");
-				((NokiaDesktopActivity) requireActivity()).openFragment(new NokiaPowerInterceptFragment());
-				return true;
-			default:
-				return false;
-		}
+		if (focusIndex < 0 || focusIndex >= ITEM_MODES.length) return false;
+		int mode = ITEM_MODES[focusIndex];
+		NokiaLog.d("PowerIntercept", "onSelect 选中 index=" + focusIndex + " mode=" + mode
+				+ " (" + NokiaSettingsStorage.getPowerInterceptorModeName(mode) + ")");
+		applyMode(mode);
+		return true;
 	}
 
 	@Override
@@ -309,7 +310,7 @@ public class NokiaAdvancedSettingsFragment extends NokiaPageFragment {
 
 	@Override
 	public String getPageTitle() {
-		return "高级设置";
+		return "电源键拦截设置";
 	}
 
 	@Override

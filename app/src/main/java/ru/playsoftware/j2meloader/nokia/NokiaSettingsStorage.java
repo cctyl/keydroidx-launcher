@@ -416,20 +416,41 @@ public class NokiaSettingsStorage {
 		NokiaLog.i("SettingsStorage", "setFileLogEnabled: " + enabled);
 	}
 
-	// ── 电源键拦截开关（高级设置） ──
+	// ── 电源键拦截方案（高级设置 → 电源键拦截设置） ──
 
-	private static final String KEY_POWER_INTERCEPTOR = "power_interceptor_enabled";
+	/** 电源键拦截：关闭。 */
+	public static final int POWER_INTERCEPTOR_MODE_OFF = 0;
+	/** 电源键拦截：方案1 evdev grab + uinput 回放 + 决策状态机（安卓13 目标方案，实现中）。 */
+	public static final int POWER_INTERCEPTOR_MODE_1 = 1;
+	/** 电源键拦截：方案2 evdev grab 纯消费（安卓4.4 有效，现行为）。 */
+	public static final int POWER_INTERCEPTOR_MODE_2 = 2;
+	/** 电源键拦截：方案3 root（预留扩展点）。 */
+	public static final int POWER_INTERCEPTOR_MODE_3 = 3;
 
-	/** 读取电源键拦截开关状态（高级设置 → 电源键拦截），默认关闭。 */
-	public static boolean isPowerInterceptorEnabled(Context ctx) {
+	private static final String KEY_POWER_INTERCEPTOR_MODE = "power_interceptor_mode";
+
+	/** 读取电源键拦截方案（高级设置 → 电源键拦截设置），默认关闭。 */
+	public static int getPowerInterceptorMode(Context ctx) {
 		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-				.getBoolean(KEY_POWER_INTERCEPTOR, false);
+				.getInt(KEY_POWER_INTERCEPTOR_MODE, POWER_INTERCEPTOR_MODE_OFF);
 	}
 
-	/** 保存电源键拦截开关状态。 */
-	public static void setPowerInterceptorEnabled(Context ctx, boolean enabled) {
+	/** 保存电源键拦截方案。 */
+	public static void setPowerInterceptorMode(Context ctx, int mode) {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-				.edit().putBoolean(KEY_POWER_INTERCEPTOR, enabled).apply();
-		NokiaLog.i("SettingsStorage", "setPowerInterceptorEnabled: " + enabled);
+				.edit().putInt(KEY_POWER_INTERCEPTOR_MODE, mode).apply();
+		NokiaLog.i("SettingsStorage", "setPowerInterceptorMode: " + mode
+				+ " (" + getPowerInterceptorModeName(mode) + ")");
+	}
+
+	/** 电源键拦截方案中文名（菜单展示 / 日志复用）。 */
+	public static String getPowerInterceptorModeName(int mode) {
+		switch (mode) {
+			case POWER_INTERCEPTOR_MODE_OFF: return "关闭";
+			case POWER_INTERCEPTOR_MODE_1:   return "方案1：grab+回放";
+			case POWER_INTERCEPTOR_MODE_2:   return "方案2：纯消费";
+			case POWER_INTERCEPTOR_MODE_3:   return "方案3：root";
+			default: return "未知(" + mode + ")";
+		}
 	}
 }
