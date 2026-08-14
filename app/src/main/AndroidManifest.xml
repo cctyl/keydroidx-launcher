@@ -25,6 +25,11 @@
     <!-- 后台清理组件：killBackgroundProcesses() 所需（normal 级，安装即授予） -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
+    <!-- 卸载应用：Intent.ACTION_DELETE 需要此权限（API 34+ 官方要求，但部分定制 ROM
+         在 API 33 上也会检查；正常权限，安装即授予，不影响旧版 API）。 -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"
+        tools:targetApi="34" />
+
     <!-- libsu（minSdk 19）与 mobileffmpeg（minSdk 高于 14）一样高于本工程 MIN_SDK=14，
          通过 overrideLibrary 绕过 manifest merger 的 minSdk 校验；运行时代码中已按
          Build.VERSION.SDK_INT < 19 守卫（仅 root 激活功能用到 libsu）。
