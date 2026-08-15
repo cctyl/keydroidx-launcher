@@ -58,7 +58,7 @@ public class NokiaKeyBinding {
 			case ACTION_SOFT_LEFT: return "左软键";
 			case ACTION_SOFT_RIGHT: return "右软键";
 			case ACTION_LOCK_SCREEN: return "锁屏";
-			case ACTION_HANGUP: return "挂机";
+			case ACTION_HANGUP: return "拨号键";
 			default: return "未知";
 		}
 	}
