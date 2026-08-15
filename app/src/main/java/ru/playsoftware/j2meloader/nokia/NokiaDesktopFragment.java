@@ -56,6 +56,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private Handler bubbleHandler;
 	private static final long BUBBLE_DURATION = 2000;
 
+	/** 后台管理组件计数缓存（由后台线程刷新，主线程只读，避免 TCP 卡顿）。 */
+	private volatile int cachedBgCount = -1;
+
 	/** 快捷栏项数（动态） */
 	private int shortcutCount = 0;
 	/** 组件区项数（动态，由 widgetItems.size() 决定） */
@@ -116,7 +119,24 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		if (view != null) {
 			rebuildWidgetArea(view);
 		}
+		// 异步刷新后台管理组件计数（countBackgroundProcesses 含 shizuku TCP，不能在主线程）
+		refreshBgCountAsync();
 		NokiaLog.d("Desktop", "桌面 onResume，已刷新组件区");
+	}
+
+	/** 后台线程计算后台进程数并回主线程刷新组件区（避免主线程 TCP 卡顿）。 */
+	private void refreshBgCountAsync() {
+		final Context appCtx = requireContext().getApplicationContext();
+		new Thread(() -> {
+			NokiaBgManagerHelper.probeShizukuSync();
+			int count = NokiaBgManagerHelper.countBackgroundProcesses(appCtx);
+			if (getActivity() == null) return;
+			getActivity().runOnUiThread(() -> {
+				if (!isAdded() || getView() == null) return;
+				cachedBgCount = count;
+				rebuildWidgetArea(getView());
+			});
+		}, "desktop-bg-count").start();
 	}
 
 	// ---- 构建快捷栏 ----
@@ -402,8 +422,13 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			case NokiaWidgetItem.TYPE_LOCK_SCREEN:
 				return ""; // 提示文字已在主标签中，右侧留空
 			case NokiaWidgetItem.TYPE_BG_MANAGER:
-				return NokiaBgManagerHelper.countBackgroundProcesses(requireContext())
-						+ " 个后台";
+				if (!NokiaBgManagerHelper.isBgManagerAvailable()) {
+					return "未激活";
+				}
+				if (cachedBgCount < 0) {
+					return "…";
+				}
+				return cachedBgCount + " 个后台";
 			default:
 				return item.getTypeTag();
 		}

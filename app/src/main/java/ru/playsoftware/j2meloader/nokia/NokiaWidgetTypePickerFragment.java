@@ -118,6 +118,12 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 			if (!enabled) {
 				label += " (需Android 5.0+)";
 			}
+			// 后台管理组件：Android 5.0+ 需 mini_shizuku 才能准确枚举/清理；
+			// 未激活时仍可选可添加（B 方案），但标注提示，加完在桌面显示“未激活”
+			if (type == NokiaWidgetItem.TYPE_BG_MANAGER
+					&& !NokiaBgManagerHelper.isBgManagerAvailable()) {
+				label += " (需激活)";
+			}
 
 			LinearLayout row = new LinearLayout(requireContext());
 			row.setOrientation(LinearLayout.HORIZONTAL);

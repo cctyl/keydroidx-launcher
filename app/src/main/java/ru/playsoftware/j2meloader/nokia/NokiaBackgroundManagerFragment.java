@@ -105,11 +105,22 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 		loadTasksAsync();
 	}
 
-	/** 后台线程枚举任务（含图标加载），完成后主线程渲染。 */
+	/** 后台线程枚举任务（含图标加载），完成后主线程渲染。未激活 mini_shizuku 时跳过枚举。 */
 	private void loadTasksAsync() {
 		final Context appCtx = requireContext().getApplicationContext();
 		final Set<String> protSnapshot = new HashSet<>(protectedSet);
 		new Thread(() -> {
+			// 后台线程同步探测一次状态（含 TCP，主线程会报 NetworkOnMainThreadException）
+			NokiaBgManagerHelper.probeShizukuSync();
+			if (!NokiaBgManagerHelper.isBgManagerAvailable()) {
+				mainHandler.post(() -> {
+					if (!isAdded() || getView() == null) return;
+					tasks.clear();
+					renderList();
+					NokiaLog.w(TAG, "mini_shizuku 未激活，后台管理不可用");
+				});
+				return;
+			}
 			final List<NokiaBgManagerHelper.BgTask> loaded =
 					NokiaBgManagerHelper.enumerateBackgroundTasks(appCtx, protSnapshot);
 			mainHandler.post(() -> {
@@ -147,7 +158,7 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 
 		tvSummary.setText(tabProtected
 				? "已保护 " + protCount + " 个应用（清除时自动跳过）· 按0键清理"
-				: "后台进程 " + tasks.size() + " 个 · 可清理 " + shownList.size() + " 个 · 按0键清理");
+				: buildRunSummary());
 
 		listLayout.removeAllViews();
 		if (shownList.isEmpty()) {
@@ -156,7 +167,11 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 					LinearLayout.LayoutParams.MATCH_PARENT,
 					NokiaDimens.dp(getResources(), 40)));
 			empty.setGravity(Gravity.CENTER);
-			empty.setText(tabProtected ? "暂无保护的应用" : "没有可清理的后台应用");
+			if (!NokiaBgManagerHelper.isBgManagerAvailable()) {
+				empty.setText("未激活 mini_shizuku，左键「选项」可激活");
+			} else {
+				empty.setText(tabProtected ? "暂无保护的应用" : "没有可清理的后台应用");
+			}
 			empty.setTextColor(0xFF8A93A5);
 			NokiaDimens.textSize(empty, 10);
 			listLayout.addView(empty);
@@ -241,6 +256,14 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 		return row;
 	}
 
+	/** 运行页签摘要文字：未激活时提示去激活。 */
+	private String buildRunSummary() {
+		if (!NokiaBgManagerHelper.isBgManagerAvailable()) {
+			return "未激活 mini_shizuku，左键「选项」可激活";
+		}
+		return "后台进程 " + tasks.size() + " 个 · 可清理 " + shownList.size() + " 个 · 按0键清理";
+	}
+
 	// ---- NokiaFocusHost ----
 
 	@Override
@@ -314,6 +337,14 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 	/** 弹出诺基亚风格选项菜单（复用 NokiaOptionsDialog，符合软键栏规范）。 */
 	private void showOptionsDialog() {
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		// Android 5.0+ 未激活 mini_shizuku 时，首要入口为「激活 mini_shizuku」
+		if (!NokiaBgManagerHelper.isBgManagerAvailable()) {
+			items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_widget_bg_manager,
+					"激活 mini_shizuku", true, false, this::requestShizukuActivation));
+			NokiaOptionsDialog.show(getParentFragmentManager(), "后台管理", items);
+			NokiaLog.i(TAG, "弹出选项菜单（仅激活入口）");
+			return;
+		}
 		items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_widget_bg_manager,
 				"清除全部", true, false, this::clearAll));
 		items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_protect,
@@ -322,6 +353,12 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 				"全部解除", true, false, this::unprotectAll));
 		NokiaOptionsDialog.show(getParentFragmentManager(), "后台管理", items);
 		NokiaLog.i(TAG, "弹出选项菜单");
+	}
+
+	/** 引导用户进入 mini_shizuku 服务激活页（ShizukuFragment）。 */
+	private void requestShizukuActivation() {
+		NokiaLog.i(TAG, "请求激活 mini_shizuku");
+		((NokiaDesktopActivity) requireActivity()).openFragment(new ShizukuFragment());
 	}
 
 	/** 全部保护：把当前所有后台加入保护名单。 */
@@ -357,15 +394,38 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 		showToast(n > 0 ? "已解除 " + n + " 个应用的保护" : "没有受保护的应用");
 	}
 
-	/** 清除全部未保护的后台进程（跳过保护名单），并重新枚举刷新。 */
+	/** 清除全部未保护的后台进程（跳过保护名单），并从列表移除已清理项。 */
 	private void clearAll() {
-		int cleared = NokiaBgManagerHelper.clearBackgroundTasks(requireContext(), protectedSet);
-		if (cleared > 0) {
-			showToast("已清理 " + cleared + " 个后台应用");
-			loadTasksAsync();
-		} else {
-			showToast("没有可清理的后台应用");
+		if (!NokiaBgManagerHelper.isBgManagerAvailable()) {
+			showToast("请先激活 mini_shizuku");
+			return;
 		}
+		final Context appCtx = requireContext().getApplicationContext();
+		final Set<String> protSnapshot = new HashSet<>(protectedSet);
+		// 清理涉及 TCP/shell 命令（ps -A、am force-stop），必须在后台线程执行：
+		// 主线程上 Socket 连接会抛 NetworkOnMainThreadException，被 Helper 捕获后返回
+		// 空任务列表，导致「清除全部」永远清理不了任何应用且静默失败。
+		new Thread(() -> {
+			// 先同步探测一次，避免缓存过期（服务已下线）误走无效分支
+			NokiaBgManagerHelper.probeShizukuSync();
+			if (!NokiaBgManagerHelper.isBgManagerAvailable()) {
+				mainHandler.post(() -> showToast("请先激活 mini_shizuku"));
+				return;
+			}
+			final int cleared = NokiaBgManagerHelper.clearBackgroundTasks(appCtx, protSnapshot);
+			mainHandler.post(() -> {
+				if (!isAdded() || getView() == null) return;
+				if (cleared > 0) {
+					// 乐观地从内存列表移除所有未保护任务，立即给用户反馈。
+					// 下次进入页面会重新枚举真实状态。
+					tasks.removeIf(t -> !t.prot);
+					renderList();
+					showToast("已清理 " + cleared + " 个后台应用");
+				} else {
+					showToast("没有可清理的后台应用");
+				}
+			});
+		}, "bg-manager-clear").start();
 	}
 
 	/** 数字键 0 触发：一键清理全部未保护后台（由 Activity 按键分发调用）。 */
