@@ -30,6 +30,13 @@
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"
         tools:targetApi="34" />
 
+    <!-- jar 挂机保活前台服务（API 28+ 必需，缺失会导致 startForeground 抛
+         SecurityException 并使 :midlet 进程崩溃、挂机失效） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- API 34+ 前台服务必须声明类型，本服务用 specialUse（对应权限如下） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        tools:targetApi="34" />
+
     <!-- libsu（minSdk 19）与 mobileffmpeg（minSdk 高于 14）一样高于本工程 MIN_SDK=14，
          通过 overrideLibrary 绕过 manifest merger 的 minSdk 校验；运行时代码中已按
          Build.VERSION.SDK_INT < 19 守卫（仅 root 激活功能用到 libsu）。
@@ -158,6 +165,7 @@
             android:exported="false"
             android:theme="@style/AppTheme.NoActionBar"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
+            android:launchMode="singleTask"
             android:process=":midlet" />
         <activity android:name=".settings.SettingsActivity"
             android:exported="false">
@@ -196,6 +204,24 @@
         </provider>
         <receiver
             android:name="com.nokia.mid.ui.NotificationBroadcastReceiver"
+            android:process=":midlet" />
+
+        <!-- jar 挂机保活前台服务（:midlet 进程，仅挂机期间常驻通知，点击回 jar 续跑）。
+             API 34+ 要求前台服务声明类型，specialUse + 子类型说明。 -->
+        <service
+            android:name=".nokia.NokiaMidletKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:process=":midlet">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keep J2ME midlet process alive while user backgrounds it (hangup feature)" />
+        </service>
+
+        <!-- 挂机 jar 清除通道（后台管理组件显式广播 → :midlet 进程内优雅销毁） -->
+        <receiver
+            android:name=".nokia.NokiaMidletControlReceiver"
+            android:exported="false"
             android:process=":midlet" />
 
         <!-- 设备管理员：仅用于桌面「锁屏」一键锁屏息屏 -->

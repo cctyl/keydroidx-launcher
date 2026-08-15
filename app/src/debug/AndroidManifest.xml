@@ -2,10 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <application tools:ignore="GoogleAppIndexingWarning,MissingApplicationIcon">
-        <activity
-            android:name="javax.microedition.shell.MicroActivity"
-            tools:remove="android:process" />
-    </application>
+    <!--
+      历史上此处用 tools:remove="android:process" 让 debug 变体的 MicroActivity
+      与主进程同进程（上游 J2ME-Loader 为单进程调试方便）。
+      本项目已移除该覆盖：桌面主进程不能被 MIDlet 的 killProcess 连杀，
+      且挂机方案依赖 :midlet 进程隔离（状态校验/保活/清除通道）。
+      debug 与 release 行为保持一致：jar 一律运行在 :midlet 独立进程。
+    -->
 
 </manifest>

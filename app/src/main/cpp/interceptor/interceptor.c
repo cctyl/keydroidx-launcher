@@ -304,10 +304,63 @@ static void extract_front_package(const char *text, char *out, size_t out_sz) {
     out[len] = '\0';
 }
 
+// 从 dumpsys window 输出提取前台 activity 全名（'/' 之后、'}' 之前）：
+// 格式：mCurrentFocus=Window{<hash> u0 <package>/<activity>}-[Surface(name=...)/@...]
+// 与 extract_front_package 配对：包名判归属，activity 名区分桌面与 jar 界面。
+static void extract_front_activity(const char *text, char *out, size_t out_sz) {
+    out[0] = '\0';
+    const char *p = strstr(text, "mCurrentFocus=Window{");
+    if (!p) return;
+    p += strlen("mCurrentFocus=Window{");
+    const char *close = strchr(p, '}');
+    if (!close) return;
+    const char *slash = strchr(p, '/');
+    if (!slash || slash >= close) return;
+    const char *start = slash + 1;
+    size_t len = (size_t)(close - start);
+    if (len <= 0 || len >= out_sz) return;
+    memcpy(out, start, len);
+    out[len] = '\0';
+}
+
 // 判断包名是否为本应用（release / debug）。
 static int is_nokia_package(const char *pkg) {
     if (!pkg || !pkg[0]) return 0;
     return strcmp(pkg, PKG_NOKIA_RELEASE) == 0 || strcmp(pkg, PKG_NOKIA_DEBUG) == 0;
+}
+
+// 从 dumpsys activity activities 输出提取 resumed activity 包名：
+// topResumedActivity=ActivityRecord{<hash> u0 <package>/<activity> ...}（Android 10+）
+// mFocusedActivity=ActivityRecord{<hash> u0 <package>/<activity> ...}（旧版本）
+// 提取 ActivityRecord{ 之后、'/' 之前最后一个空白后的 token。
+static void extract_resumed_package(const char *text, char *out, size_t out_sz) {
+    out[0] = '\0';
+    const char *p = strstr(text, "ActivityRecord{");
+    if (!p) return;
+    p += strlen("ActivityRecord{");
+    const char *slash = strchr(p, '/');
+    if (!slash) return;
+    const char *start = p;
+    const char *scan = p;
+    while (scan < slash) {
+        if (*scan == ' ' || *scan == '\t') start = scan + 1;
+        scan++;
+    }
+    size_t len = (size_t)(slash - start);
+    if (len <= 0 || len >= out_sz) return;
+    memcpy(out, start, len);
+    out[len] = '\0';
+}
+
+// 判断 activity 全名是否为 jar 界面（MicroActivity，debug/release 类路径相同）。
+// jar 界面与桌面同包名、不同进程不同 Activity：只看包名会把它误判成桌面，
+// 导致 jar 内按挂机键走 C 态「锁屏」而非 A 态「回桌面」（bug 361）。
+static int is_midlet_activity(const char *activity) {
+    static const char suffix[] = "MicroActivity";
+    if (!activity || !activity[0]) return 0;
+    size_t alen = strlen(activity);
+    size_t slen = sizeof(suffix) - 1;
+    return alen >= slen && strcmp(activity + alen - slen, suffix) == 0;
 }
 
 // 更新屏幕状态缓存。
@@ -374,6 +427,14 @@ static void update_front_window() {
         return;
     }
     int isNokia = is_nokia_package(pkg);
+    // jar 界面（MicroActivity）归入「非诺基亚应用」（A 态：按挂机键回桌面=挂机），
+    // 行为符合《挂机键行为定义.md》界面分层；page_is_main 此时是桌面上报的陈旧值，不参与。
+    char activity[256];
+    extract_front_activity(output, activity, sizeof(activity));
+    if (isNokia && is_midlet_activity(activity)) {
+        isNokia = 0;
+        LOGI("state: front is MicroActivity (jar) -> treat as non-nokia");
+    }
     // SystemUI 包名承载锁屏界面（Keyguard）
     int isKeyguard = (strcmp(pkg, "com.android.systemui") == 0) ? 1 : 0;
     if (isNokia != front_is_nokia || strcmp(pkg, front_package) != 0
@@ -528,6 +589,46 @@ static void inject_lock() {
     }
 }
 
+// 即时复核前台是否真为桌面主界面（即将走 C 态锁屏前调用，bug 365）。
+// 两层校验（任一发现前台非本应用 → 返回 0，降级 go_home）：
+//   1) fresh mCurrentFocus：轮询缓存最长 2000ms 陈旧，刚切走应用就按键会误判；
+//   2) resumed activity（dumpsys activity）：相机/InCallUI 等浮层窗口可能让
+//      mCurrentFocus 仍指向桌面（浮层非 focusable），resumed activity 反映真实前台。
+// 复核输出解析失败时保守返回 1（不阻断既有锁屏行为）。
+static int verify_front_really_nokia() {
+    char output[4096];
+    // 1) fresh mCurrentFocus
+    if (run_cmd_output("dumpsys window 2>/dev/null | grep mCurrentFocus",
+                       output, sizeof(output)) >= 0 && strstr(output, "mCurrentFocus")) {
+        char pkg[128];
+        char act[256];
+        extract_front_package(output, pkg, sizeof(pkg));
+        extract_front_activity(output, act, sizeof(act));
+        if (pkg[0]) {
+            if (!is_nokia_package(pkg)) {
+                LOGI("verify: fresh focus pkg=%s 非本应用 -> 降级回桌面", pkg);
+                return 0;
+            }
+            if (is_midlet_activity(act)) {
+                LOGI("verify: fresh focus 是 jar 界面 -> 降级回桌面");
+                return 0;
+            }
+        }
+    }
+    // 2) resumed activity 交叉校验（浮层窗口场景）
+    if (run_cmd_output("dumpsys activity activities 2>/dev/null"
+                       " | grep -E 'topResumedActivity|mFocusedActivity'",
+                       output, sizeof(output)) >= 0) {
+        char pkg[128];
+        extract_resumed_package(output, pkg, sizeof(pkg));
+        if (pkg[0] && !is_nokia_package(pkg)) {
+            LOGI("verify: resumed pkg=%s 非本应用(浮层场景) -> 降级回桌面", pkg);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 // 决策状态机：短按 power 键时执行（5 态：A/B/C/E/F）。
 static void handle_short_press() {
     long long now = now_ms();
@@ -554,10 +655,18 @@ static void handle_short_press() {
         inject_lock();
         last_inject_ms = now_ms();
     } else if (front_is_nokia && page_is_main) {
-        // C 亮屏·诺基亚桌面主界面 → Device Admin 锁屏（熄屏）
-        LOGI("power: decision=lock [C->E] (nokia main page)");
-        inject_lock();
-        last_inject_ms = now_ms();
+        // C 亮屏·诺基亚桌面主界面 → Device Admin 锁屏（熄屏）。
+        // 锁屏前即时复核前台（bug 365：相机/拨号浮层 + 2s 轮询陈旧会误判为 C 态），
+        // 复核发现前台非本应用则降级 go_home。
+        if (!verify_front_really_nokia()) {
+            LOGI("power: decision=go_home [C 降级->A/B] (复核发现前台非桌面)");
+            inject_go_home();
+            last_inject_ms = now_ms();
+        } else {
+            LOGI("power: decision=lock [C->E] (nokia main page)");
+            inject_lock();
+            last_inject_ms = now_ms();
+        }
     } else {
         // A 亮屏·非诺基亚应用 → 回诺基亚桌面主界面
         // B 亮屏·诺基亚桌面其他界面 → 回诺基亚桌面主界面（不锁屏）

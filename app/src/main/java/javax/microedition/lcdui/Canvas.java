@@ -1255,7 +1255,6 @@ public abstract class Canvas extends Displayable {
 	}
 
 	private class SoftBar extends AbstractSoftKeysBar implements Layer {
-		private final OverlayView overlayView;
 		private final float padding;
 		private final int textColor;
 		private final int bgColor;
@@ -1268,7 +1267,6 @@ public abstract class Canvas extends Displayable {
 		private SoftBar() {
 			super(Canvas.this, false);
 			MicroActivity activity = ContextHolder.getActivity();
-			this.overlayView = activity.binding.overlayView;
 			DisplayMetrics metrics = activity.getResources().getDisplayMetrics();
 			padding = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 5, metrics);
 			textColor = ContextCompat.getColor(activity, R.color.accent);
@@ -1276,7 +1274,19 @@ public abstract class Canvas extends Displayable {
 			notifyChanged();
 		}
 
+		/**
+		 * 动态获取当前 Activity 的 overlayView。
+		 * 不在构造时缓存引用：挂机恢复（Activity 重建）后旧引用指向已销毁的窗口，
+		 * 软键栏会画到旧 view 上失效；每次使用时取最新的。
+		 */
+		private OverlayView overlayView() {
+			MicroActivity activity = ContextHolder.getActivity();
+			return activity != null && activity.binding != null ? activity.binding.overlayView : null;
+		}
+
 		private void showPopup() {
+			OverlayView overlayView = overlayView();
+			if (overlayView == null) return;
 			PopupWindow popup = prepareMenu(fullscreen ? 0 : 1);
 			popup.setWidth(Math.min(displayWidth, displayHeight) / 2);
 			popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1302,11 +1312,17 @@ public abstract class Canvas extends Displayable {
 						rightLabel = commands.get(0).getAndroidLabel();
 						break;
 					default:
-						leftLabel = overlayView.getResources().getString(R.string.cmd_menu);
+						OverlayView overlayView = overlayView();
+						leftLabel = overlayView != null
+								? overlayView.getResources().getString(R.string.cmd_menu)
+								: "Menu";
 						rightLabel = commands.get(0).getAndroidLabel();
 				}
 			}
-			overlayView.postInvalidate();
+			OverlayView overlayView = overlayView();
+			if (overlayView != null) {
+				overlayView.postInvalidate();
+			}
 		}
 
 		private boolean fireLeftSoft() {

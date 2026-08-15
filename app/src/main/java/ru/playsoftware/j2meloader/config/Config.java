@@ -34,6 +34,7 @@ import androidx.preference.PreferenceManager;
 import ru.playsoftware.j2meloader.BuildConfig;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 
 import static ru.playsoftware.j2meloader.util.Constants.*;
 
@@ -165,6 +166,8 @@ public class Config {
 					context, MicroActivity.class);
 			intent.putExtra(KEY_MIDLET_NAME, name);
 			intent.putExtra(KEY_START_ARGUMENTS, arguments);
+			// 键码表随 intent 传给 :midlet 进程（挂机菜单键/软键识别；extra 缺省时 MicroActivity 回退读 SP）
+			intent.putExtra(KEY_KEYCODES, new NokiaKeyBinding(context).toKeyCodeArray());
 			context.startActivity(intent);
 		} else {
 			// 没有任何兜底配置：仍走设置界面（保持原行为）

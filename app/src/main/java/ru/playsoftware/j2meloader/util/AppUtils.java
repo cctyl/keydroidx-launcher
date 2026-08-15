@@ -114,6 +114,24 @@ public class AppUtils {
 		return null;
 	}
 
+	/** 按挂机状态文件记录的 appPath（= getPathExt）精确匹配已安装的 jar；找不到返回 null。 */
+	public static AppItem findAppByPath(String appPath) {
+		if (appPath == null || appPath.isEmpty()) return null;
+		String appsDir = Config.getAppDir();
+		if (!appPath.startsWith(appsDir)) return null;
+		String folderName = appPath.substring(appsDir.length());
+		if (folderName.startsWith("/")) folderName = folderName.substring(1);
+		File appDir = new File(appsDir, folderName);
+		if (!appDir.isDirectory()) return null;
+		if (!new File(appDir, Config.MIDLET_DEX_FILE).isFile()) return null;
+		try {
+			return getApp(appDir);
+		} catch (Exception e) {
+			Log.w(TAG, "findAppByPath: ", e);
+			return null;
+		}
+	}
+
 	public static void deleteApp(AppItem item) {
 		File appDir = new File(item.getPathExt());
 		FileUtils.deleteDirectory(appDir);

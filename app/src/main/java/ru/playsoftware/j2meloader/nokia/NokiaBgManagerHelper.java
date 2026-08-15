@@ -8,6 +8,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
@@ -21,6 +24,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import ru.playsoftware.j2meloader.applist.AppItem;
+import ru.playsoftware.j2meloader.util.AppUtils;
+import ru.playsoftware.j2meloader.util.MidletStateStore;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
 /**
@@ -253,20 +259,28 @@ public final class NokiaBgManagerHelper {
 		return out;
 	}
 
-	/** 统计当前后台进程数（按包名去重，排除桌面自身与系统应用）。供桌面组件行实时显示。 */
+	/** 统计当前后台进程数（按包名去重，排除桌面自身与系统应用，含挂机 jar）。供桌面组件行实时显示。 */
 	public static int countBackgroundProcesses(Context ctx) {
 		Set<String> pkgs = enumerateBackgroundPackages(ctx);
-		if (pkgs.isEmpty()) return 0;
-		PackageManager pm = ctx.getPackageManager();
-		if (pm == null) return pkgs.size();
 		int n = 0;
-		for (String pkg : pkgs) {
-			try {
-				ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-				if (isSystemApp(ai)) continue;
-			} catch (PackageManager.NameNotFoundException e) {
-				continue;
+		if (!pkgs.isEmpty()) {
+			PackageManager pm = ctx.getPackageManager();
+			if (pm == null) {
+				n = pkgs.size();
+			} else {
+				for (String pkg : pkgs) {
+					try {
+						ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+						if (isSystemApp(ai)) continue;
+					} catch (PackageManager.NameNotFoundException e) {
+						continue;
+					}
+					n++;
+				}
 			}
+		}
+		// 挂机 jar 计入后台进程数（不依赖 shizuku）
+		if (MidletStateStore.getRunning(ctx) != null) {
 			n++;
 		}
 		return n;
@@ -275,17 +289,19 @@ public final class NokiaBgManagerHelper {
 	/**
 	 * 枚举后台任务（含图标与保护状态），按名称排序。
 	 * 可在后台线程调用（内部有 PackageManager 查询 / shizuku 命令）。已卸载的残留进程
-	 * 与系统应用自动跳过。
+	 * 与系统应用自动跳过。挂机 jar 条目（key 形如 {@code midlet:<appPath>}）不依赖
+	 * mini_shizuku / 版本路径，4.4 与 5.0+ 行为一致。
 	 *
-	 * @param protectedSet 保护名单（包名集合）；可为 null
+	 * @param protectedSet 保护名单（包名或挂机条目 key 集合）；可为 null
 	 */
 	public static List<BgTask> enumerateBackgroundTasks(Context ctx, Set<String> protectedSet) {
 		List<BgTask> out = new ArrayList<>();
+		// 挂机 jar 条目优先加入（即使无其它后台应用也显示；自身进程全版本可枚举）
+		appendMidletTask(ctx, protectedSet, out);
 		try {
 			PackageManager pm = ctx.getPackageManager();
 			if (pm == null) return out;
 			Set<String> pkgs = enumerateBackgroundPackages(ctx);
-			if (pkgs.isEmpty()) return out;
 			for (String pkg : pkgs) {
 				try {
 					ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
@@ -315,6 +331,33 @@ public final class NokiaBgManagerHelper {
 		return out;
 	}
 
+	/** 追加挂机 jar 条目（读跨进程状态文件 + 校验 :midlet 进程存活）。 */
+	private static void appendMidletTask(Context ctx, Set<String> protectedSet, List<BgTask> out) {
+		try {
+			MidletStateStore.RunningInfo running = MidletStateStore.getRunning(ctx);
+			if (running == null) return;
+			String key = MidletStateStore.taskKey(running.appPath);
+			boolean prot = protectedSet != null && protectedSet.contains(key);
+			out.add(new BgTask(key, running.appName, loadMidletIcon(ctx, running.appPath), prot));
+		} catch (Exception e) {
+			NokiaLog.w(TAG, "追加挂机 jar 条目失败: " + e);
+		}
+	}
+
+	/** 加载挂机 jar 图标（复用百宝箱 AppItem 图标），失败返回 null（UI 有兜底）。 */
+	private static Drawable loadMidletIcon(Context ctx, String appPath) {
+		try {
+			AppItem item = AppUtils.findAppByPath(appPath);
+			if (item == null) return null;
+			String rel = item.getImagePathExt();
+			if (rel == null || rel.isEmpty()) return null;
+			Bitmap bmp = BitmapFactory.decodeFile(appPath + rel);
+			return bmp == null ? null : new BitmapDrawable(ctx.getResources(), bmp);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 	/**
 	 * 清理所有未保护的后台进程（跳过保护名单），返回实际清理数量。
 	 * <b>必须在后台线程调用</b>（含 TCP / shell 命令）。
@@ -330,19 +373,38 @@ public final class NokiaBgManagerHelper {
 		if (tasks.isEmpty()) return 0;
 		int cleared = 0;
 
+		// 挂机 jar 清理：显式广播 → :midlet 进程内优雅销毁（END 键 → destroyApp(true) →
+		// 清状态 → killProcess）。不依赖 mini_shizuku；严禁 force-stop/killBackgroundProcesses
+		// —— 它们作用于整个包，会连桌面主进程一起杀。
+		for (BgTask t : tasks) {
+			if (t.prot) continue;
+			if (MidletStateStore.isMidletTaskKey(t.pkg)) {
+				Intent intent = new Intent(NokiaMidletControlReceiver.ACTION_DESTROY_MIDLET);
+				intent.setClass(ctx, NokiaMidletControlReceiver.class);
+				ctx.sendBroadcast(intent);
+				cleared++;
+				NokiaLog.i(TAG, "已清理挂机jar(广播销毁): " + t.name);
+			}
+		}
+
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			// Android 5.0+ 只有 mini_shizuku（shell 身份）能清理其它应用的后台进程；
-			// 未激活时 killBackgroundProcesses 只对自身进程生效，禁止走无效分支误报成功。
-			if (!shizukuActivated) return 0;
+			// Android 5.0+ 其它应用清理只有 mini_shizuku（shell 身份）可用；
+			// 未激活时仅挂机 jar 可清（上面已处理），直接返回。
+			if (!shizukuActivated) {
+				if (cleared > 0) {
+					NokiaLog.w(TAG, "mini_shizuku 未激活，本次仅清理了挂机 jar");
+				}
+				return cleared;
+			}
 			// 批量拼接 force-stop，一次 shizuku 调用完成，减少往返
 			StringBuilder cmd = new StringBuilder();
 			for (BgTask t : tasks) {
-				if (t.prot) continue;
+				if (t.prot || MidletStateStore.isMidletTaskKey(t.pkg)) continue;
 				cmd.append("am force-stop ").append(t.pkg).append(";");
 				cleared++;
 				NokiaLog.i(TAG, "已清理后台(force-stop): " + t.name + " (" + t.pkg + ")");
 			}
-			if (cleared > 0) {
+			if (cmd.length() > 0) {
 				boolean ok = Shizuku.exec(cmd.toString());
 				if (!ok) {
 					NokiaLog.w(TAG, "force-stop 批量命令发送失败");
@@ -351,9 +413,9 @@ public final class NokiaBgManagerHelper {
 		} else {
 			// 4.4 降级路径（该版本 getRunningAppProcesses/killBackgroundProcesses 可用）
 			ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
-			if (am == null) return 0;
+			if (am == null) return cleared;
 			for (BgTask t : tasks) {
-				if (t.prot) continue;
+				if (t.prot || MidletStateStore.isMidletTaskKey(t.pkg)) continue;
 				try {
 					am.killBackgroundProcesses(t.pkg);
 					cleared++;

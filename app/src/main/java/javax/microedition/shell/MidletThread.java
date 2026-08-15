@@ -32,6 +32,7 @@ import javax.microedition.util.ContextHolder;
 import androidx.annotation.NonNull;
 
 import ru.playsoftware.j2meloader.config.Config;
+import ru.playsoftware.j2meloader.util.MidletStateStore;
 
 public class MidletThread extends HandlerThread implements Handler.Callback {
 	private static final String TAG = MidletThread.class.getName();
@@ -48,6 +49,17 @@ public class MidletThread extends HandlerThread implements Handler.Callback {
 	private static final int DESTROYED = 3;
 	public static String[] startAfterDestroy;
 	private static MidletThread instance;
+
+	// ---- 挂机状态载体（:midlet 进程内静态，Activity 重建后复用） ----
+	/** 当前运行/挂机的 MIDlet appPath（分支判定与状态文件内容来源） */
+	static volatile String runningAppPath;
+	/** 挂机前最后一刻的 Displayable（Activity 重建后重挂 UI 用） */
+	static volatile Displayable currentDisplayable;
+	/** 首次加载时保存的屏幕方向（跳过 microLoader.init() 后无来源） */
+	static volatile int savedOrientation = -1;
+	/** 首次加载时保存的菜单键码 */
+	static volatile int savedMenuKey = 0;
+
 	private final MicroLoader microLoader;
 	private final String mainClass;
 	private MIDlet midlet;
@@ -67,17 +79,53 @@ public class MidletThread extends HandlerThread implements Handler.Callback {
 		instance = new MidletThread(microLoader, mainClass);
 	}
 
+	/**
+	 * 是否存在可复用的 MIDlet 实例（未在销毁中）。
+	 * state==DESTROYED 表示销毁流程进行中、进程即将死亡，不可复用。
+	 */
+	public static boolean hasInstance() {
+		return instance != null && instance.state != DESTROYED;
+	}
+
+	/** 当前运行/挂机的 MIDlet appPath；无实例返回 null。 */
+	public static String getRunningAppPath() {
+		return hasInstance() ? runningAppPath : null;
+	}
+
+	/** 挂机前最后一刻的 Displayable（Activity 重建后重挂 UI 用）；无实例返回 null。 */
+	public static Displayable getCurrentDisplayable() {
+		return hasInstance() ? currentDisplayable : null;
+	}
+
+	/** 首次加载保存的屏幕方向；未保存返回 -1。 */
+	public static int getSavedOrientation() {
+		return savedOrientation;
+	}
+
+	/** 首次加载保存的菜单键码。 */
+	public static int getSavedMenuKey() {
+		return savedMenuKey;
+	}
+
 	public static void notifyDestroyed() {
 		Thread.setDefaultUncaughtExceptionHandler(uncaughtExceptionHandler);
 		if (instance != null) {
 			instance.state = DESTROYED;
 		}
 		MicroActivity activity = ContextHolder.getActivity();
-		if (activity != null) {
-			activity.finish();
-		}
+		// 清挂机状态文件（须在切换启动之后、killProcess 之前：切换场景新 jar 会随后覆写）
 		if (startAfterDestroy != null) {
 			Config.startApp(ContextHolder.getActivity(), startAfterDestroy[0], startAfterDestroy[1], false, startAfterDestroy[2]);
+		}
+		runningAppPath = null;
+		currentDisplayable = null;
+		try {
+			MidletStateStore.clear(ContextHolder.getAppContext());
+		} catch (Throwable t) {
+			Log.w(TAG, "clear midlet state failed", t);
+		}
+		if (activity != null) {
+			activity.finish();
 		}
 		Process.killProcess(Process.myPid());
 	}
@@ -97,7 +145,8 @@ public class MidletThread extends HandlerThread implements Handler.Callback {
 			instance.handler.obtainMessage(START).sendToTarget();
 	}
 
-	static void destroyApp() {
+	/** 优雅销毁（公开给 nokia 包清除通道）：END 键 → destroyApp(true) → notifyDestroyed（含 1s 强杀兜底）。 */
+	public static void destroyApp() {
 		Thread.setDefaultUncaughtExceptionHandler(uncaughtExceptionHandler);
 		new Thread(() -> {
 			try {
@@ -108,13 +157,15 @@ public class MidletThread extends HandlerThread implements Handler.Callback {
 			Process.killProcess(Process.myPid());
 		}, "ForceDestroyTimer").start();
 		MicroActivity activity = ContextHolder.getActivity();
-		if (activity != null) {
-			Displayable current = activity.getCurrent();
-			if (current instanceof Canvas) {
-				Canvas canvas = (Canvas) current;
-				canvas.postKeyPressed(Canvas.KEY_END);
-				canvas.postKeyReleased(Canvas.KEY_END);
-			}
+		Displayable current = activity != null ? activity.getCurrent() : null;
+		if (current == null) {
+			// 切换场景：ContextHolder 已指向新建的 Activity（current 为空），回退到挂机状态载体
+			current = currentDisplayable;
+		}
+		if (current instanceof Canvas) {
+			Canvas canvas = (Canvas) current;
+			canvas.postKeyPressed(Canvas.KEY_END);
+			canvas.postKeyReleased(Canvas.KEY_END);
 		}
 		if (instance != null) {
 			instance.handler.obtainMessage(DESTROY).sendToTarget();

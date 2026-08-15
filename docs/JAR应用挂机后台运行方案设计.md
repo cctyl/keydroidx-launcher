@@ -1,8 +1,10 @@
 # JAR 应用挂机（后台运行）方案设计
 
-> 版本：v1.0　　日期：2026-08-15
+> 版本：v1.1　　日期：2026-08-15
 > 模块：`:midlet` 进程 / 诺基亚桌面 / native 拦截器
-> 关联 bug 清单条目：343（挂机 jar 显示到后台管理组件、可清除）、361（jar 内按挂机键不应锁屏应回桌面）、362（后期做成挂后台）
+> 关联 bug 清单条目：343（挂机 jar 显示到后台管理组件、可清除）、361（jar 内按挂机键不应锁屏应回桌面）、362（后期做成挂后台）、365（相机/拨号界面按挂机键误锁屏）
+>
+> **v1.1 变更**：真机首轮测试暴露 4 个问题，根因排查与修复见文末《附录 A：首轮实测问题修复记录》。核心教训：**debug 变体曾用 `tools:remove="android:process"` 移除 MicroActivity 的 `:midlet` 进程隔离**（上游遗留），使本方案的全部进程隔离前提失效；现已恢复隔离。
 
 ---
 
@@ -556,3 +558,63 @@ jar 界面（`MicroActivity`，同包名异进程异 Activity）归入「非诺�
 - 按 Home 挂机时弹提示（静默，与现状一致）
 - 后台管理中点击挂机条目直接跳回 jar（保持现有「确认=切保护」语义不变）
 - 红键在 jar 内弹三菜单（红键=直接回桌面，与《挂机键行为定义.md》A 态一致；三菜单仅绿键触发）
+
+---
+
+## 附录 A：首轮实测问题修复记录（v1.1）
+
+真机（320×480 / Android 13）首轮测试暴露 4 个问题 + 1 个连带发现，根因与修复如下。
+
+### A.1 总根因：debug 变体移除 `:midlet` 进程隔离
+
+`app/src/debug/AndroidManifest.xml` 存在上游遗留的 `<activity android:name=".MicroActivity" tools:remove="android:process"/>`，
+导致 **debug 包里 MicroActivity 跑在主进程**（实测 `MidletStateStore write pid=<主进程pid>`），本方案的进程隔离前提全部失效：
+
+| 问题 | 根因链 |
+|---|---|
+| 切换 jar 无提示 + 闪退 + 第二次才能启动 | 状态校验找 `包名:midlet` 恒失败 → 确认弹窗永不弹；分支 S 的 `killProcess` 杀的是**主进程=桌面**（闪退即桌面被杀重启）；`startAfterDestroy` 的 startActivity 与杀进程竞态 → 新 jar 丢失 |
+| 三菜单「退出」卡一下 + 画面变形 | END 键过渡画面 + 1s 强杀计时 + `killProcess` 杀主进程（桌面重启动画） |
+| —（日志实锤） | 保活 Service 在 `:midlet` 进程（未被 remove）拉起**空进程** → `hasInstance()`=false → 僵尸分支直接 `stopSelf` **未先 startForeground** → `ForegroundServiceDidNotStartInTimeException` **崩溃循环**（logcat 反复 `Start proc for service` → crash） |
+
+**修复**：删除 debug manifest 的 `tools:remove`（恢复与 release 一致的 `:midlet` 隔离）；Service 僵尸分支先 `startForeground` 再 `stopSelf`，返回 `START_NOT_STICKY`；`MidletStateStore` 校验放宽为「记录 pid 存活且属于本应用任意自有进程」（防御 flavor 差异）。
+
+### A.2 三菜单白底（不符合诺基亚风格）
+
+自建 `MidletMenuDialog` 用 androidx AlertDialog 默认亮色主题（白底白字），且违反《NOKIA_DEVELOPMENT_RULES.md》
+「所有选项弹窗一律 NokiaOptionsDialog」。
+
+**修复**：删除 `MidletMenuDialog`；`NokiaOptionsDialog` 新增**键码表注入模式**
+`show(fm, title, items, int[] keyCodes)`（不依赖 NokiaDesktopActivity 宿主），
+`NokiaKeyBinding` 抽静态 `resolveAction(int[], KeyEvent)`；三菜单 = NokiaOptionsDialog（底部弹出深色风格），
+绿键/返回=关闭弹窗（=继续）。
+
+### A.3 挂机恢复白屏卡死
+
+R2 恢复直接 `addView(旧 Activity 的 SurfaceView)`。**SurfaceView 是打洞渲染、与所属 Window 绑定，
+跨 Activity 重挂不绘制** → 白屏；且 `Canvas.SoftBar` 构造时缓存旧 `activity.binding.overlayView`，
+重挂后软键层失效。
+
+**修复**：恢复改为「**丢弃旧 view + 惰性重建**」——`clearDisplayableView()` + `setCurrent()`
+（`getDisplayableView()` 按需重建 layout/innerView/回调，`surfaceCreated → repaintInternal → jar paint()` 恢复画面，
+GameCanvas 离屏 buffer 在 Canvas 对象内不丢失）；`SoftBar.overlayView` 改为动态获取当前 Activity。
+
+### A.4 退出/切换体验
+
+三菜单「退出」与分支 S 切换：先 `finish()` 立即回桌面（看不到 END 键过渡画面），销毁在后台完成
+（`:midlet` 隔离恢复后 kill 不再连累桌面）。
+
+### A.5 bug 365：相机/拨号界面按红键误锁屏
+
+native 决策 C 态（front_is_nokia && page_is_main → 锁屏）依赖 2s 轮询缓存，且**相机/InCallUI 等
+浮层窗口可能让 mCurrentFocus 仍指向桌面**，造成误判锁屏。
+
+**修复**（interceptor.c）：C 态锁屏前**即时复核**——fresh `dumpsys window mCurrentFocus` +
+`dumpsys activity` 的 `topResumedActivity`/`mFocusedActivity` 交叉校验（浮层场景 resumed activity
+反映真实前台），任一发现前台非本应用 → 降级 `go_home`。复核解析失败时保守走原锁屏（不改变既有行为）。
+副作用：锁屏动作增加约 600ms dumpsys 延迟，可接受。
+
+### A.6 顺带修正
+
+`NokiaDesktopActivity.reportPageState` 增加 force 参数：从 jar 返回桌面（onResume/goHome）时
+**强制重报**页面状态。原因：jar 前台时 MicroActivity 会把 native 端 `page_is_main` 置 0，
+若桌面按去重逻辑跳过上报，红键在桌面会误判为子页面（应锁屏却回桌面）。

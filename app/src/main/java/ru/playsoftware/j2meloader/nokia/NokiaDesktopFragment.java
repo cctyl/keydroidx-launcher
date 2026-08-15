@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Locale;
 
 import ru.playsoftware.j2meloader.R;
-import ru.playsoftware.j2meloader.config.Config;
+
 
 /**
  * 桌面待机屏中间内容碎片。
@@ -725,7 +725,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				if (intent != null) { startActivity(intent); return; }
 			}
 			if (app.type == ShortcutApp.TYPE_J2ME) {
-				Config.startApp(requireActivity(), app.label, app.appKey, false);
+				NokiaJarLauncher.launch(requireActivity(), app.label, app.appKey);
 			}
 		} catch (Exception e) {
 			NokiaLog.e("Desktop", "启动快捷栏应用失败: " + app.label, e);

@@ -472,7 +472,7 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 		if (appIdx >= 0 && appIdx < appItems.size()) {
 			AppItem app = appItems.get(appIdx);
 			NokiaLog.i("Box", "onSelect: 直接启动 " + app.getTitle());
-			Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
+			NokiaJarLauncher.launch(requireActivity(), app.getTitle(), app.getPathExt());
 			return true;
 		}
 		return false;
@@ -491,7 +491,7 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_media_play,
 				"启动", true, false, () -> {
 			NokiaLog.i("Box", "选项菜单-启动: " + app.getTitle());
-			Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), false);
+			NokiaJarLauncher.launch(requireActivity(), app.getTitle(), app.getPathExt());
 		}));
 		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_manage,
 				"设置", true, false, () -> {

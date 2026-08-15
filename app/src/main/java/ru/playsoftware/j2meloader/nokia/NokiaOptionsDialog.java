@@ -69,6 +69,8 @@ public class NokiaOptionsDialog extends DialogFragment {
 	private LinearLayout listContainer;
 	private LinearLayout[] optionRows;
 	private int focusIndex = -1;
+	/** 键码表注入模式（:midlet 进程等非 NokiaDesktopActivity 宿主）；null=宿主 keyBinding 模式 */
+	private int[] overrideKeyCodes;
 
 	/**
 	 * 静态入口：创建并显示选项弹窗，返回实例以便后续 {@link #setItems(List)} 刷新。
@@ -80,6 +82,23 @@ public class NokiaOptionsDialog extends DialogFragment {
 		args.putString(ARG_TITLE, title);
 		dialog.setArguments(args);
 		dialog.setItemsInternal(items);
+		dialog.show(fm, "NokiaOptions");
+		return dialog;
+	}
+
+	/**
+	 * 静态入口（键码表注入模式）：供宿主不是 NokiaDesktopActivity 的场景使用，
+	 * 如 :midlet 进程内 MicroActivity 的挂机三菜单。按键按注入的键码表解析
+	 * （{@link NokiaKeyBinding#resolveAction(int[], KeyEvent)}），不依赖宿主 keyBinding。
+	 */
+	public static NokiaOptionsDialog show(@NonNull FragmentManager fm, String title,
+										  @NonNull List<OptionItem> items, int[] keyCodes) {
+		NokiaOptionsDialog dialog = new NokiaOptionsDialog();
+		Bundle args = new Bundle();
+		args.putString(ARG_TITLE, title);
+		dialog.setArguments(args);
+		dialog.setItemsInternal(items);
+		dialog.overrideKeyCodes = keyCodes;
 		dialog.show(fm, "NokiaOptions");
 		return dialog;
 	}
@@ -126,8 +145,6 @@ public class NokiaOptionsDialog extends DialogFragment {
 		rebuildList();
 
 		// 接入用户自定义按键映射（禁止写死 keyCode）
-		final NokiaKeyBinding keyBinding =
-				((NokiaDesktopActivity) requireActivity()).getKeyBinding();
 		dialog.setOnKeyListener((d, keyCode, event) -> {
 			if (event.getAction() != KeyEvent.ACTION_DOWN) {
 				return true; // 消费抬起事件
@@ -138,7 +155,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 				dismiss();
 				return true;
 			}
-			int action = keyBinding.resolveAction(event);
+			int action = resolveActionSafe(event);
 			switch (action) {
 				case NokiaKeyBinding.ACTION_UP:
 					moveFocus(-1);
@@ -151,8 +168,9 @@ public class NokiaOptionsDialog extends DialogFragment {
 					// 左软键（选择）等同确认键：执行当前选项
 					trigger(focusIndex);
 					return true;
+				case NokiaKeyBinding.ACTION_HANGUP:
 				case NokiaKeyBinding.ACTION_SOFT_RIGHT:
-					NokiaLog.i(TAG, "右软键：关闭选项弹窗");
+					NokiaLog.i(TAG, "右软键/挂机键：关闭选项弹窗");
 					dismiss();
 					return true;
 				case NokiaKeyBinding.ACTION_LEFT:
@@ -229,6 +247,25 @@ public class NokiaOptionsDialog extends DialogFragment {
 			// 焦点有效但行对象已重建，重刷高亮
 			applyFocus(focusIndex);
 		}
+	}
+
+	/**
+	 * 按键解析（安全版）：
+	 * <ul>
+	 *   <li>键码表注入模式（:midlet 进程宿主）→ 静态查表解析；</li>
+	 *   <li>宿主为 NokiaDesktopActivity → 宿主 keyBinding 实例解析；</li>
+	 *   <li>其余（注入表因进程重建丢失等极端场景）→ 返回 -1，仅 BACK/触屏可用，不崩溃。</li>
+	 * </ul>
+	 */
+	private int resolveActionSafe(KeyEvent event) {
+		if (overrideKeyCodes != null) {
+			return NokiaKeyBinding.resolveAction(overrideKeyCodes, event);
+		}
+		androidx.fragment.app.FragmentActivity host = requireActivity();
+		if (host instanceof NokiaDesktopActivity) {
+			return ((NokiaDesktopActivity) host).getKeyBinding().resolveAction(event);
+		}
+		return -1;
 	}
 
 	private void moveFocus(int step) {

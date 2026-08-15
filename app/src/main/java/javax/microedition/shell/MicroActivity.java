@@ -36,6 +36,7 @@ import android.text.Editable;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.text.method.DigitsKeyListener;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -63,6 +64,7 @@ import org.acra.ErrorReporter;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Objects;
@@ -81,6 +83,12 @@ import javax.microedition.util.ContextHolder;
 import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
 import ru.playsoftware.j2meloader.BuildConfig;
+import ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity;
+import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.NokiaMidletKeepAliveService;
+import ru.playsoftware.j2meloader.nokia.NokiaOptionsDialog;
+import ru.playsoftware.j2meloader.util.MidletStateStore;
+import ru.playsoftware.mini_shizuku.Shizuku;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.databinding.ActivityMicroBinding;
@@ -102,6 +110,8 @@ public class MicroActivity extends AppCompatActivity {
 	private InputMethodManager inputMethodManager;
 	private int menuKey;
 	private String appPath;
+	/** 诺基亚键码表（9 元素，索引=NokiaKeyBinding 动作；Intent extra 优先，SP 兜底） */
+	private int[] nokiaKeyCodes;
 
 	public ActivityMicroBinding binding;
 
@@ -164,7 +174,21 @@ public class MicroActivity extends AppCompatActivity {
 			}
 		}
 		MidletSystem.setProperty("com.nokia.mid.cmdline.instance", "1");
+		loadKeyCodes(intent);
 		microLoader = new MicroLoader(this, appPath);
+		// 挂机复用/切换判定（须在 microLoader.init() 之前：init 会清 MIDlet 缓存目录、
+		// 重复初始化 Display，且新建 MIDlet 会静默抛弃挂机实例）
+		if (MidletThread.hasInstance()) {
+			String running = MidletThread.getRunningAppPath();
+			if (appPath.equals(running)) {
+				// 分支 R2：同一 jar 挂机恢复 —— 复用进程内 MIDlet，重挂 UI
+				restoreFromBackground();
+				return;
+			}
+			// 分支 S：切换到其它 jar —— 销毁当前实例，startAfterDestroy 在进程死后拉起新 jar
+			switchToApp(appName, appPath, arguments);
+			return;
+		}
 		if (!microLoader.init()) {
 			Config.startApp(this, appName, appPath, true, arguments);
 			finish();
@@ -183,6 +207,11 @@ public class MicroActivity extends AppCompatActivity {
 		setOrientation(orientation);
 		menuKey = microLoader.getMenuKeyCode();
 		inputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+		// 分支 N 追加：登记挂机状态（供桌面判定“哪个 jar 在运行/挂机”与 R2 恢复）
+		MidletThread.runningAppPath = appPath;
+		MidletThread.savedOrientation = orientation;
+		MidletThread.savedMenuKey = menuKey;
+		MidletStateStore.write(this, appPath, appName);
 
 		try {
 			loadMIDlet();
@@ -190,6 +219,75 @@ public class MicroActivity extends AppCompatActivity {
 			e.printStackTrace();
 			showErrorDialog(e.toString());
 		}
+	}
+
+	/**
+	 * 分支 R2：同一 jar 挂机恢复（Activity 已销毁、:midlet 进程与 MIDlet 实例存活）。
+	 * 跳过 microLoader.init()（清缓存目录）与 loadMIDlet()（新建 MIDlet），
+	 * 恢复 VK/方向/菜单键后重挂挂机时的 Displayable；onResume → resumeApp() 续跑。
+	 * <p>
+	 * 视图恢复采用「丢弃旧 view + 惰性重建」而非重挂：SurfaceView 是打洞渲染，
+	 * 与所属 Window 绑定，跨 Activity 重挂不会绘制（实测白屏）；getDisplayableView()
+	 * 会按需重建 layout/innerView/回调，surfaceCreated → repaintInternal → jar paint() 恢复画面。
+	 */
+	private void restoreFromBackground() {
+		VirtualKeyboard vk = ContextHolder.getVk();
+		int orientation = MidletThread.getSavedOrientation();
+		if (vk != null) {
+			vk.setView(binding.overlayView);
+			binding.overlayView.addLayer(vk);
+			if (vk.isPhone()) {
+				orientation = ORIENTATION_PORTRAIT;
+			}
+		}
+		setOrientation(orientation >= 0 ? orientation : ORIENTATION_DEFAULT);
+		menuKey = MidletThread.getSavedMenuKey();
+		inputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+		Displayable displayable = MidletThread.getCurrentDisplayable();
+		if (displayable != null) {
+			displayable.clearDisplayableView(); // 丢弃旧 Activity 的 SurfaceView（跨窗口不可重挂）
+			setCurrent(displayable);            // getDisplayableView() 惰性重建 → surfaceCreated → 重绘
+		}
+		Log.i("MicroActivity", "restoreFromBackground: 复用挂机 MIDlet(重建视图) -> " + MidletThread.getRunningAppPath());
+	}
+
+	/** 分支 S：切换到其它 jar —— 销毁当前实例，startAfterDestroy 会在进程死后拉起新 jar。 */
+	private void switchToApp(String appName, String appPath, String arguments) {
+		Log.i("MicroActivity", "switchToApp: " + MidletThread.getRunningAppPath() + " -> " + appPath);
+		MidletThread.startAfterDestroy = new String[]{appName, appPath, arguments};
+		finish(); // 先回桌面（下方是桌面/当前界面），销毁与重启在后台完成
+		MidletThread.destroyApp();
+	}
+
+	/** 读取键码表：Intent extra 优先（桌面传最新绑定），缺省回退 SP（新进程首读必为最新）。 */
+	private void loadKeyCodes(Intent intent) {
+		int[] extra = intent != null ? intent.getIntArrayExtra(Constants.KEY_KEYCODES) : null;
+		if (extra == null || extra.length != NokiaKeyBinding.ACTION_COUNT) {
+			extra = NokiaKeyBinding.loadKeyCodes(this);
+		}
+		nokiaKeyCodes = extra;
+	}
+
+	@Override
+	protected void onNewIntent(Intent intent) {
+		super.onNewIntent(intent);
+		setIntent(intent);
+		loadKeyCodes(intent);
+		if (!MidletThread.hasInstance()) {
+			return; // 销毁竞态/进程刚重启：交给现有流程
+		}
+		String path;
+		if (BuildConfig.FULL_EMULATOR) {
+			Uri data = intent.getData();
+			path = data == null ? null : data.toString();
+		} else {
+			path = appPath;
+		}
+		if (path == null || path.equals(MidletThread.getRunningAppPath())) {
+			return; // 同一 jar：无动作，onResume → resumeApp() 续跑（恢复路径 R1）
+		}
+		switchToApp(intent.getStringExtra(Constants.KEY_MIDLET_NAME), path,
+				intent.getStringExtra(Constants.KEY_START_ARGUMENTS));
 	}
 
 	public void lockNightMode() {
@@ -206,6 +304,8 @@ public class MicroActivity extends AppCompatActivity {
 		super.onResume();
 		visible = true;
 		MidletThread.resumeApp();
+		NokiaMidletKeepAliveService.stop(this);
+		reportMidletForeground();
 	}
 
 	@Override
@@ -214,6 +314,31 @@ public class MicroActivity extends AppCompatActivity {
 		hideSoftInput();
 		MidletThread.pauseApp();
 		super.onPause();
+	}
+
+	@Override
+	protected void onStop() {
+		super.onStop();
+		// 挂机保活：Activity 不可见且 MIDlet 仍在运行（覆盖绿键/红键/Home 全部离开路径；
+		// 绿键「后台运行」路径已在动作内先行启动，此处幂等）
+		if (MidletThread.hasInstance() && MidletThread.getRunningAppPath() != null) {
+			NokiaMidletKeepAliveService.start(this, appName,
+					MidletThread.getRunningAppPath(), nokiaKeyCodes);
+		}
+	}
+
+	/**
+	 * jar 前台快速上报页面状态（false）给 native 拦截器：
+	 * 使红键决策立即落入「回桌面」分支，闭合前台窗口 2s 轮询窗口。
+	 * mini_shizuku 未运行时静默失败（无副作用）；jar 离开后由桌面重新上报真实状态。
+	 */
+	private void reportMidletForeground() {
+		new Thread(() -> {
+			try {
+				Shizuku.setPageState(false);
+			} catch (Exception ignored) {
+			}
+		}, "midlet-page-state").start();
 	}
 
 	private void hideSoftInput() {
@@ -329,6 +454,7 @@ public class MicroActivity extends AppCompatActivity {
 	}
 
 	public void setCurrent(Displayable displayable) {
+		MidletThread.currentDisplayable = displayable; // 挂机状态载体同步（R2 重挂 UI 用）
 		ViewHandler.postEvent(new SetCurrentEvent(current, displayable));
 		current = displayable;
 	}
@@ -358,8 +484,67 @@ public class MicroActivity extends AppCompatActivity {
 		alertBuilder.create().show();
 	}
 
+	/** 弹出挂机三菜单（绿键）：继续 / 退出 / 后台运行。复用 NokiaOptionsDialog（键码表注入模式）。 */
+	private void showHangupMenu() {
+		java.util.List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_media_play,
+				"继续", true, false, null)); // 仅关闭弹窗继续运行
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_close_clear_cancel,
+				"退出", true, false, this::exitMidlet));
+		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_more,
+				"后台运行", true, false, this::runInBackground));
+		NokiaOptionsDialog.show(getSupportFragmentManager(), appName, items, nokiaKeyCodes);
+	}
+
+	/** 三菜单「退出」：先 finish 立即回桌面（用户不必看到 END 键过渡画面），销毁在后台完成。 */
+	private void exitMidlet() {
+		hideSoftInput();
+		finish();
+		MidletThread.destroyApp();
+	}
+
+	/**
+	 * 三菜单「后台运行」：显式回诺基亚桌面（不设默认桌面也能回到本桌面），
+	 * 本 Activity 保持 stopped（singleTask 不销毁），jar 转挂机，下次进入走 R1 快速续跑。
+	 */
+	private void runInBackground() {
+		hideSoftInput();
+		// 挂机动作发生时 Activity 仍前台：立即起保活通知（规避 Android 12+ 后台 FGS 限制）
+		if (MidletThread.hasInstance() && MidletThread.getRunningAppPath() != null) {
+			NokiaMidletKeepAliveService.start(this, appName,
+					MidletThread.getRunningAppPath(), nokiaKeyCodes);
+		}
+		Intent intent = new Intent(Intent.ACTION_MAIN);
+		intent.addCategory(Intent.CATEGORY_HOME);
+		intent.setClassName(this, NokiaDesktopActivity.class.getName());
+		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		try {
+			startActivity(intent);
+		} catch (Exception e) {
+			// 极端场景（桌面不可用）：退回隐式 HOME
+			Log.e("MicroActivity", "runInBackground: 显式回桌面失败", e);
+			Intent fallback = new Intent(Intent.ACTION_MAIN);
+			fallback.addCategory(Intent.CATEGORY_HOME);
+			fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			startActivity(fallback);
+		}
+	}
+
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
+		// 挂机菜单键（绿键）拦截：仅 jar 内生效，未绑定则透传给 MIDlet/系统。
+		// 位于 onKeyUp 之前，即使绿键被绑成 BACK/MENU 也天然优先，无冲突。
+		int hangupKey = nokiaKeyCodes == null ? KeyEvent.KEYCODE_UNKNOWN
+				: nokiaKeyCodes[NokiaKeyBinding.ACTION_HANGUP];
+		if (hangupKey != KeyEvent.KEYCODE_UNKNOWN && event.getKeyCode() == hangupKey) {
+			if (event.getAction() == KeyEvent.ACTION_UP
+					&& (event.getFlags() & KeyEvent.FLAG_CANCELED) == 0
+					&& !isFinishing()) {
+				showHangupMenu();
+			}
+			// DOWN/REPEAT/CANCELED UP 一律消费，不转发 MIDlet（防长按重复弹窗）
+			return true;
+		}
 		if (event.getKeyCode() == KeyEvent.KEYCODE_MENU)
 			if (current instanceof Canvas && binding.displayableContainer.dispatchKeyEvent(event)) {
 				return true;

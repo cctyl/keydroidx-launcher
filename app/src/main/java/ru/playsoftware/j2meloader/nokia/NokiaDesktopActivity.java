@@ -228,8 +228,9 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		// 状态栏系统信息（信号/运营商/WiFi/电池等）查询延迟到首帧渲染后执行，
 		// 避免冷启动时同步 Binder 调用阻塞首帧；延迟回调前若已 pause 则跳过（防重复注册）。
 		scheduleStatusBarStart();
-		// 上报当前页面状态给拦截器（从其他应用返回时确保状态正确）
-		reportPageState();
+		// 上报当前页面状态给拦截器（强制：jar 曾把 native 端 page_is_main 改为 0，
+		// 从 jar 返回桌面时须无条件重报，否则红键在桌面会被误判为子页面）
+		reportPageState(true);
 		NokiaLog.i("Desktop", "onResume 已调度 StatusBarController 延迟启动");
 	}
 
@@ -566,19 +567,25 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	 * 延迟到主线程下一帧上报页面状态，确保 Fragment 事务已提交。
 	 */
 	private void postReportPageState() {
-		new Handler(Looper.getMainLooper()).post(this::reportPageState);
+		postReportPageState(false);
+	}
+
+	private void postReportPageState(boolean force) {
+		new Handler(Looper.getMainLooper()).post(() -> reportPageState(force));
 	}
 
 	/**
 	 * 检测当前 Fragment 是否为桌面主界面（NokiaDesktopFragment），通过 TCP 上报给
 	 * mini_shizuku 服务端，服务端经 JNI 更新 native 全局变量 page_is_main。
 	 * 拦截器状态机据此区分：亮屏+诺基亚主界面→锁屏，亮屏+诺基亚子页面→回桌面。
-	 * 相同状态不重复发送。
+	 * force=true 时跳过去重强制上报（jar 前台时 MicroActivity 会把 native 端改为 0，
+	 * 从 jar 返回桌面/挂机回桌面时本进程缓存的 lastReportedPageState 可能仍是 main，
+	 * 去重会导致漏报、红键在桌面误判为子页面）。
 	 */
-	private void reportPageState() {
+	private void reportPageState(boolean force) {
 		Fragment f = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 		String state = (f instanceof NokiaDesktopFragment) ? "main" : "sub";
-		if (state.equals(lastReportedPageState)) return;
+		if (!force && state.equals(lastReportedPageState)) return;
 		lastReportedPageState = state;
 		NokiaLog.i("Desktop", "上报页面状态: " + state
 				+ " (fragment=" + (f != null ? f.getClass().getSimpleName() : "null") + ")");
@@ -600,7 +607,8 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		fm.beginTransaction()
 				.replace(R.id.midPanel, new NokiaDesktopFragment())
 				.commit();
-		postReportPageState();
+		// jar 挂机/红键回桌面场景：native page_is_main 可能已被 MicroActivity 置 0，须强制重报
+		postReportPageState(true);
 	}
 
 	private boolean isHomeIntent(Intent intent) {

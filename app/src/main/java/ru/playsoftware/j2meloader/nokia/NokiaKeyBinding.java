@@ -6,7 +6,7 @@ import android.view.KeyEvent;
 
 /**
  * 按键绑定存储类。
- * 管理 7 个动作到 Android KeyCode 的映射，持久化在 SharedPreferences 中。
+ * 管理 9 个动作到 Android KeyCode 的映射，持久化在 SharedPreferences 中。
  * 默认值适合大多数安卓设备（方向键、确认键、音量键模拟左右软键）。
  */
 public class NokiaKeyBinding {
@@ -20,14 +20,16 @@ public class NokiaKeyBinding {
 	public static final int ACTION_SOFT_LEFT = 5;
 	public static final int ACTION_SOFT_RIGHT = 6;
 	public static final int ACTION_LOCK_SCREEN = 7;
+	/** 挂机菜单键（绿键/拨号键）：仅在 jar 应用内生效，弹出 继续/退出/后台运行 三菜单 */
+	public static final int ACTION_HANGUP = 8;
 
-	public static final int ACTION_COUNT = 8;
+	public static final int ACTION_COUNT = 9;
 
 	private static final String PREFS_NAME = "nokia_key_bindings";
 
 	private static final String[] PREF_KEYS = {
 			"up", "down", "left", "right",
-			"select", "soft_left", "soft_right", "lock_screen"
+			"select", "soft_left", "soft_right", "lock_screen", "hangup"
 	};
 
 	// 首次启动按键绑定向导是否已完成（仅首次启动弹出，清数据后重置）
@@ -43,6 +45,7 @@ public class NokiaKeyBinding {
 			KeyEvent.KEYCODE_SOFT_LEFT,             // soft_left
 			KeyEvent.KEYCODE_SOFT_RIGHT,            // soft_right
 			KeyEvent.KEYCODE_ENDCALL,               // lock_screen（默认挂机键）
+			KeyEvent.KEYCODE_CALL,                  // hangup 挂机菜单键（默认绿色拨号键）
 	};
 
 	public static String getActionName(int action) {
@@ -55,6 +58,7 @@ public class NokiaKeyBinding {
 			case ACTION_SOFT_LEFT: return "左软键";
 			case ACTION_SOFT_RIGHT: return "右软键";
 			case ACTION_LOCK_SCREEN: return "锁屏";
+			case ACTION_HANGUP: return "挂机";
 			default: return "未知";
 		}
 	}
@@ -163,6 +167,24 @@ public class NokiaKeyBinding {
 		return keycodes[action];
 	}
 
+	/** 序列化当前全部绑定为 int[]（跨进程经 Intent extra 传给 :midlet 进程使用）。 */
+	public int[] toKeyCodeArray() {
+		return keycodes.clone();
+	}
+
+	/**
+	 * 直接从 SharedPreferences 读取全部绑定（不走实例缓存）。
+	 * 供 :midlet 进程兜底使用：新进程首次加载 SP 必然读到最新文件值，无跨进程缓存陈旧问题。
+	 */
+	public static int[] loadKeyCodes(Context context) {
+		SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+		int[] out = new int[ACTION_COUNT];
+		for (int i = 0; i < ACTION_COUNT; i++) {
+			out[i] = prefs.getInt(PREF_KEYS[i], DEFAULT_KEYCODES[i]);
+		}
+		return out;
+	}
+
 	/** 根据 KeyCode 反查动作，找不到返回 -1。 */
 	public int getActionForKeyCode(int keycode) {
 		for (int i = 0; i < ACTION_COUNT; i++) {
@@ -210,6 +232,34 @@ public class NokiaKeyBinding {
 
 		NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(keyCode)
 				+ " -> 未绑定(-1)");
+		return -1;
+	}
+
+	/**
+	 * 静态版按键解析（无实例，按传入键码表查表 + 同款兜底）。
+	 * 供无法取得 NokiaKeyBinding 实例的场景使用：如 :midlet 进程内的弹窗
+	 * （NokiaOptionsDialog 注入键码表模式，MicroActivity 宿主不是 NokiaDesktopActivity）。
+	 * 语义与实例版 {@link #resolveAction(KeyEvent)} 完全一致（不含日志）。
+	 */
+	public static int resolveAction(int[] keycodes, KeyEvent event) {
+		if (event == null || event.getAction() != KeyEvent.ACTION_DOWN) {
+			return -1;
+		}
+		int keyCode = event.getKeyCode();
+		if (keycodes != null) {
+			for (int i = 0; i < keycodes.length && i < ACTION_COUNT; i++) {
+				if (keycodes[i] == keyCode) return i;
+			}
+		}
+		if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+				|| keyCode == KeyEvent.KEYCODE_ENTER
+				|| keyCode == KeyEvent.KEYCODE_SPACE
+				|| keyCode == KeyEvent.KEYCODE_BUTTON_A) {
+			return ACTION_SELECT;
+		}
+		if (keyCode == KeyEvent.KEYCODE_MENU) {
+			return ACTION_SOFT_LEFT;
+		}
 		return -1;
 	}
 
