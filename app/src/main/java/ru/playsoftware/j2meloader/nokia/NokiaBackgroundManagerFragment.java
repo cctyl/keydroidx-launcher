@@ -22,6 +22,7 @@ import androidx.fragment.app.Fragment;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -418,7 +419,13 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 				if (cleared > 0) {
 					// 乐观地从内存列表移除所有未保护任务，立即给用户反馈。
 					// 下次进入页面会重新枚举真实状态。
-					tasks.removeIf(t -> !t.prot);
+					// 注意：不用 removeIf——它依赖 java.util.function.Predicate（API 24+），
+					// 项目未开启 core library desugaring，在 Android 4.4 上会因找不到父接口
+					// 而抛 NoClassDefFoundError。用迭代器显式删除兼容 4.4。
+					Iterator<NokiaBgManagerHelper.BgTask> it = tasks.iterator();
+					while (it.hasNext()) {
+						if (!it.next().prot) it.remove();
+					}
 					renderList();
 					showToast("已清理 " + cleared + " 个后台应用");
 				} else {
