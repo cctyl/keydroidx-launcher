@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- mini_shizuku adb 激活说明页：240dp 宽，match_parent 高，内容可滚动适配小屏 -->
+<!-- mini_shizuku adb 激活说明页：240dp 宽，match_parent 高，内容可滚动适配小屏。
+     命令行由代码动态填充（脚本随 APK 分发，进入本页时释放到 getExternalFilesDir()，
+     路径随包名变化，故命令必须动态拼接）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="240dp"
     android:layout_height="match_parent"
@@ -30,7 +32,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
                 android:lineSpacingExtra="2dp"
-                android:text="无需 root，只需电脑 + USB 数据线，一次性激活。"
+                android:text="无需 root，只需电脑 + USB 数据线。脚本已内置在应用里，无需单独下载。"
                 android:textColor="#9fb3d1"
                 android:textSize="10sp" />
 
@@ -48,16 +50,38 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
                 android:lineSpacingExtra="2dp"
-                android:text="① 手机开启「开发者选项 → USB 调试」，用数据线连电脑\n② 电脑上下载本脚本 mini_shizuku.sh\n③ 电脑命令行执行：\n   adb push mini_shizuku.sh /data/local/tmp/\n   adb shell sh /data/local/tmp/mini_shizuku.sh\n④ 回到 mini_shizuku 页面，按左软键「刷新」，看到「在线」即激活成功"
+                android:text="① 手机开启「开发者选项 → USB 调试」，用数据线连电脑\n② 电脑命令行执行下面这条命令（脚本会自动从应用里取出并运行）：\n③ 回到 mini_shizuku 页面，按左软键「刷新」，看到「在线」即激活成功"
                 android:textColor="#9fb3d1"
                 android:textSize="10sp" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="命令（左软键可复制）："
+                android:textColor="#8a9ab5"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/tvAdbCommand"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:background="#222a36"
+                android:padding="4dp"
+                android:textColor="#7ee787"
+                android:textSize="9sp"
+                android:typeface="monospace"
+                android:textIsSelectable="true"
+                android:lineSpacingExtra="1dp"
+                android:text="adb shell sh /sdcard/Android/data/..." />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:lineSpacingExtra="2dp"
-                android:text="提示：手机重启后服务会停止，重新执行第③步即可。详细说明见项目 README 的「老设备权限（mini_shizuku）」一节。"
+                android:text="提示：手机重启后服务会停止，重新执行第②步那条命令即可（脚本已留在手机上，不用再推）。详细说明见项目 README 的「老设备权限（mini_shizuku）」一节。"
                 android:textColor="#8a9ab5"
                 android:textSize="10sp" />
         </LinearLayout>
