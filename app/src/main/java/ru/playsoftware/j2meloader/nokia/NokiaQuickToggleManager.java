@@ -443,12 +443,25 @@ public class NokiaQuickToggleManager {
 	// ==================== 10. 位置信息 / GPS ====================
 
 	public static boolean isLocationOn(Context context) {
+		if (context == null) return false;
+		// 1. Android 4.4+ (API 19+) 官方推荐首选：查询 Secure.LOCATION_MODE
+		try {
+			int mode = Settings.Secure.getInt(context.getContentResolver(),
+					Settings.Secure.LOCATION_MODE, Settings.Secure.LOCATION_MODE_OFF);
+			if (mode != Settings.Secure.LOCATION_MODE_OFF) {
+				return true;
+			}
+		} catch (Exception ignored) {}
+
+		// 2. 降级：检查 GPS 或 Network Provider
 		try {
 			LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-			return lm != null && lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
-		} catch (Exception e) {
-			return false;
-		}
+			if (lm != null) {
+				return lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+						|| lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+			}
+		} catch (Exception ignored) {}
+		return false;
 	}
 
 	public static void toggleLocation(final Context context, final boolean targetOn) {
@@ -456,7 +469,10 @@ public class NokiaQuickToggleManager {
 			@Override
 			public void run() {
 				if (Shizuku.isRunning()) {
-					String cmd = "settings put secure location_mode " + (targetOn ? "3" : "0")
+					int mode = targetOn ? Settings.Secure.LOCATION_MODE_HIGH_ACCURACY : Settings.Secure.LOCATION_MODE_OFF;
+					String providers = targetOn ? "+gps,+network" : "-gps,-network";
+					String cmd = "settings put secure location_mode " + mode
+							+ " ; settings put secure location_providers_allowed " + providers
 							+ " ; cmd location set-location-enabled " + (targetOn ? "true" : "false");
 					Shizuku.exec(cmd);
 					return;
@@ -470,30 +486,89 @@ public class NokiaQuickToggleManager {
 	// ==================== 11. 个人热点 (Hotspot / AP) ====================
 
 	public static boolean isHotspotOn(Context context) {
+		if (context == null) return false;
 		try {
 			WifiManager wm = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 			if (wm != null) {
-				Method method = wm.getClass().getDeclaredMethod("isWifiApEnabled");
-				method.setAccessible(true);
-				return (Boolean) method.invoke(wm);
+				// 优先尝试 isWifiApEnabled (Android 8.0+)
+				try {
+					Method isApEnabled = wm.getClass().getDeclaredMethod("isWifiApEnabled");
+					isApEnabled.setAccessible(true);
+					return Boolean.TRUE.equals(isApEnabled.invoke(wm));
+				} catch (Exception ignored) {}
+
+				// 尝试 getWifiApState (Android 4.4 ~ 7.1)
+				try {
+					Method getApState = wm.getClass().getDeclaredMethod("getWifiApState");
+					getApState.setAccessible(true);
+					int state = (Integer) getApState.invoke(wm);
+					return state == 12 || state == 13; // 12=ENABLING, 13=ENABLED
+				} catch (Exception ignored) {}
 			}
 		} catch (Exception ignored) {}
+
+		// 检查网络接口是否处于热点状态 (wlan/ap/softap)
+		try {
+			ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+			if (cm != null) {
+				Method getTetheredIfaces = cm.getClass().getDeclaredMethod("getTetheredIfaces");
+				getTetheredIfaces.setAccessible(true);
+				String[] ifaces = (String[]) getTetheredIfaces.invoke(cm);
+				if (ifaces != null) {
+					for (String iface : ifaces) {
+						if (iface != null && (iface.contains("ap") || iface.contains("softap") || iface.contains("wlan"))) {
+							return true;
+						}
+					}
+				}
+			}
+		} catch (Exception ignored) {}
+
 		return false;
 	}
 
 	public static void toggleHotspot(final Context context, final boolean targetOn) {
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				if (Shizuku.isRunning()) {
-					String cmd = "cmd connectivity tether " + (targetOn ? "start" : "stop");
-					Shizuku.exec(cmd);
+		// 1. Android 4.4 ~ 7.1 原生反射支持
+		try {
+			WifiManager wm = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+			if (wm != null) {
+				// 开启热点时在 4.4 上若 WiFi 开启需先关闭 WiFi
+				if (targetOn && wm.isWifiEnabled()) {
+					wm.setWifiEnabled(false);
+				}
+				Method setAp = wm.getClass().getDeclaredMethod("setWifiApEnabled",
+						Class.forName("android.net.wifi.WifiConfiguration"), boolean.class);
+				setAp.setAccessible(true);
+				Boolean res = (Boolean) setAp.invoke(wm, null, targetOn);
+				if (Boolean.TRUE.equals(res)) {
 					return;
 				}
-
-				openSettings(context, Settings.ACTION_WIRELESS_SETTINGS);
 			}
-		}).start();
+		} catch (Exception ignored) {}
+
+		// 2. Android 8.0+ 若关闭热点，尝试 stopTethering
+		if (!targetOn) {
+			try {
+				ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+				if (cm != null) {
+					Method stopTethering = cm.getClass().getDeclaredMethod("stopTethering", int.class);
+					stopTethering.setAccessible(true);
+					stopTethering.invoke(cm, 0);
+					return;
+				}
+			} catch (Exception ignored) {}
+		}
+
+		// 3. Fallback: 调起系统热点/网络共享设置页
+		Intent tetherIntent = new Intent();
+		tetherIntent.setClassName("com.android.settings", "com.android.settings.TetherSettings");
+		tetherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		try {
+			context.startActivity(tetherIntent);
+			return;
+		} catch (Exception ignored) {}
+
+		openSettings(context, Settings.ACTION_WIRELESS_SETTINGS);
 	}
 
 	// ==================== 12. 省电模式 (Battery Saver) ====================
