@@ -1,10 +1,14 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.app.ActivityManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -19,6 +23,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -429,8 +434,28 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					return "…";
 				}
 				return cachedBgCount + " 个后台";
+			case NokiaWidgetItem.TYPE_IP:
+				return getWifiIpAddress();
 			default:
 				return item.getTypeTag();
+		}
+	}
+
+	/** 获取 WiFi IPv4 地址；未连接 WiFi 或无 IP 时返回 "未连接"。 */
+	private String getWifiIpAddress() {
+		try {
+			WifiManager wifi = (WifiManager) requireContext().getApplicationContext()
+					.getSystemService(Context.WIFI_SERVICE);
+			if (wifi == null) return "未连接";
+			WifiInfo info = wifi.getConnectionInfo();
+			if (info == null) return "未连接";
+			int ip = info.getIpAddress();
+			if (ip == 0) return "未连接";
+			return String.format(Locale.US, "%d.%d.%d.%d",
+					ip & 0xff, (ip >> 8) & 0xff,
+					(ip >> 16) & 0xff, (ip >> 24) & 0xff);
+		} catch (Exception e) {
+			return "未连接";
 		}
 	}
 
@@ -609,6 +634,24 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					NokiaLog.i("Desktop", "后台管理组件点击：打开后台窗口");
 					((NokiaDesktopActivity) requireActivity())
 							.openFragment(new NokiaBackgroundManagerFragment());
+				});
+				break;
+			case NokiaWidgetItem.TYPE_IP:
+				// IP地址组件：点击刷新 IP 并复制到剪贴板
+				row.setOnClickListener(v -> {
+					String ip = getWifiIpAddress();
+					if (!"未连接".equals(ip)) {
+						ClipboardManager cm = (ClipboardManager) requireContext()
+								.getSystemService(Context.CLIPBOARD_SERVICE);
+						if (cm != null) {
+							cm.setPrimaryClip(ClipData.newPlainText("IP", ip));
+						}
+					}
+					Toast.makeText(requireContext(),
+							"未连接".equals(ip) ? "WiFi未连接" : "已复制: " + ip,
+							Toast.LENGTH_SHORT).show();
+					NokiaLog.i("Desktop", "IP组件点击: ip=" + ip);
+					rebuildWidgetArea(getView());
 				});
 				break;
 			default:

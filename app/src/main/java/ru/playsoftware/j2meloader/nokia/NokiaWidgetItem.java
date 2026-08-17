@@ -23,7 +23,8 @@ public class NokiaWidgetItem {
 	public static final int TYPE_USAGE = 6;      // 使用时长（不可编辑）
 	public static final int TYPE_LOCK_SCREEN = 7; // 锁屏（不可编辑，提示按下绑定键锁屏）
 	public static final int TYPE_BG_MANAGER = 8;  // 后台管理（不可编辑，点击打开后台窗口）
-	public static final int TYPE_COUNT = 9;
+	public static final int TYPE_IP = 9;          // IP地址（不可编辑，点击刷新+复制）
+	public static final int TYPE_COUNT = 10;
 
 	public static final int MAX_COUNT = 15;
 
@@ -80,6 +81,7 @@ public class NokiaWidgetItem {
 			case TYPE_USAGE: return "[时长]";
 			case TYPE_LOCK_SCREEN: return "[锁屏]";
 			case TYPE_BG_MANAGER: return "[后台]";
+			case TYPE_IP: return "[IP]";
 			default: return "[" + type + "]";
 		}
 	}
@@ -96,6 +98,7 @@ public class NokiaWidgetItem {
 			case TYPE_USAGE: return "使用时长";
 			case TYPE_LOCK_SCREEN: return "锁屏";
 			case TYPE_BG_MANAGER: return "后台管理";
+			case TYPE_IP: return "IP地址";
 			default: return "未知";
 		}
 	}
@@ -112,6 +115,7 @@ public class NokiaWidgetItem {
 			case TYPE_USAGE: return "使用时长";
 			case TYPE_LOCK_SCREEN: return "锁屏";
 			case TYPE_BG_MANAGER: return "后台管理";
+			case TYPE_IP: return "IP地址";
 			default: return "组件";
 		}
 	}
@@ -144,6 +148,7 @@ public class NokiaWidgetItem {
 			case TYPE_USAGE: return R.drawable.ic_nokia_widget_usage;
 			case TYPE_LOCK_SCREEN: return R.drawable.ic_nokia_lock;
 			case TYPE_BG_MANAGER: return R.drawable.ic_nokia_widget_bg_manager;
+			case TYPE_IP: return R.drawable.ic_nokia_widget_ip;
 			default: return R.drawable.ic_nokia_box;
 		}
 	}

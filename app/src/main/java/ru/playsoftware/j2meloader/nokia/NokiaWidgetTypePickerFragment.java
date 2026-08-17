@@ -45,6 +45,7 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 			NokiaWidgetItem.TYPE_USAGE,
 			NokiaWidgetItem.TYPE_LOCK_SCREEN,
 			NokiaWidgetItem.TYPE_BG_MANAGER,
+		NokiaWidgetItem.TYPE_IP,
 	};
 
 	private LinearLayout listLayout;
