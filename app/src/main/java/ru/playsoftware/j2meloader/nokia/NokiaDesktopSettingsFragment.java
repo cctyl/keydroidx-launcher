@@ -20,7 +20,7 @@ import ru.playsoftware.j2meloader.R;
  * 外观与显示 / 按键与操作 / 桌面内容 / 系统与权限 / 高级设置。
  * 选中某项后进入对应的二级分组页（{@link NokiaSettingsGroupFragment} 或 {@link NokiaAdvancedSettingsFragment}）。
  */
-public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
+public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 
 	/** 分类入口：图标 + 名称 + 分组 ID（-1 表示高级设置）。 */
 	private static final int[] ITEM_ICONS = {
@@ -47,10 +47,7 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 			-1, // 高级设置（独立页面）
 	};
 
-	private View[] itemViews;
-	private ScrollView settingsScroll;
-	private int focusIndex = -1;
-	private View selectedView = null;
+
 
 	@Override
 	protected int getLayoutRes() {
@@ -62,8 +59,8 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 		LinearLayout listLayout = view.findViewById(R.id.settingsList);
 		if (listLayout == null) return;
 
-		settingsScroll = view.findViewById(R.id.settingsScroll);
-		constrainScrollHeight(view);
+		listScroll = view.findViewById(R.id.settingsScroll);
+		constrainScrollHeight(view, listScroll);
 
 		itemViews = new View[ITEM_NAMES.length];
 		for (int i = 0; i < ITEM_NAMES.length; i++) {
@@ -122,34 +119,6 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 		NokiaLog.i("DesktopSettings", "桌面设置分类菜单初始化完成");
 	}
 
-	// ---- NokiaFocusHost ----
-
-	@Override
-	public boolean onDirection(int direction) {
-		int count = itemViews != null ? itemViews.length : 0;
-		if (count == 0) return false;
-		if (focusIndex < 0) {
-			setFocusIndex(0);
-			return true;
-		}
-		int oldIndex = focusIndex;
-		switch (direction) {
-			case NokiaKeyBinding.ACTION_UP:
-				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
-				NokiaLog.d("DesktopSettings", "onDirection 上：old=" + oldIndex + " new=" + focusIndex);
-				return true;
-			case NokiaKeyBinding.ACTION_DOWN:
-				if (focusIndex < count - 1) setFocusIndex(focusIndex + 1);
-				NokiaLog.d("DesktopSettings", "onDirection 下：old=" + oldIndex + " new=" + focusIndex);
-				return true;
-			case NokiaKeyBinding.ACTION_LEFT:
-			case NokiaKeyBinding.ACTION_RIGHT:
-				return true; // 列表项不响应左右
-			default:
-				return false;
-		}
-	}
-
 	@Override
 	public boolean onSelect() {
 		NokiaLog.d("DesktopSettings", "onSelect 当前 focusIndex=" + focusIndex);
@@ -200,72 +169,7 @@ public class NokiaDesktopSettingsFragment extends NokiaPageFragment {
 		return "返回";
 	}
 
-	// ---- 焦点管理 ----
 
-	private void setFocusIndex(int index) {
-		if (itemViews == null || index < 0 || index >= itemViews.length) return;
-		clearFocusBackground();
-		focusIndex = index;
-		applyFocusBackground();
-		scrollToVisible(index);
-		NokiaLog.d("DesktopSettings", "setFocusIndex -> " + index + " (" + ITEM_NAMES[index] + ")");
-	}
-
-	/** 约束 ScrollView 高度，使列表底部正好落在可视区底边（项目多时可滚动）。 */
-	private void constrainScrollHeight(View root) {
-		if (settingsScroll == null) return;
-		root.post(() -> {
-			View parent = (View) root.getParent();
-			if (!(parent instanceof View)) return;
-			int panelH = ((View) parent).getHeight();
-			float scale = root.getScaleX();
-			if (scale <= 0) scale = 1;
-			int visibleH = (int) (panelH / scale);
-			int headH = settingsScroll.getTop();
-			int scrollH = visibleH - headH;
-			if (scrollH > 0) {
-				ViewGroup.LayoutParams lp = settingsScroll.getLayoutParams();
-				lp.height = scrollH;
-				settingsScroll.setLayoutParams(lp);
-			}
-		});
-	}
-
-	/** 确保焦点行在 ScrollView 可见区域内，方向键导航时自动跟随滚动。 */
-	private void scrollToVisible(int index) {
-		if (settingsScroll == null || itemViews == null
-				|| index < 0 || index >= itemViews.length) return;
-		final View item = itemViews[index];
-		if (item == null) return;
-		settingsScroll.post(() -> {
-			int scrollY = settingsScroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = settingsScroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				settingsScroll.smoothScrollTo(0, itemTop);
-				NokiaLog.d("DesktopSettings", "↑ 滚动至 item " + index + " top=" + itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				settingsScroll.smoothScrollTo(0, itemBottom - svHeight);
-				NokiaLog.d("DesktopSettings", "↓ 滚动至 item " + index + " bottom=" + itemBottom + " svH=" + svHeight);
-			}
-		});
-	}
-
-	private void clearFocusBackground() {
-		if (selectedView != null) {
-			selectedView.setBackgroundResource(0);
-			selectedView = null;
-		}
-	}
-
-	private void applyFocusBackground() {
-		if (focusIndex >= 0 && focusIndex < itemViews.length && itemViews[focusIndex] != null) {
-			itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
-			selectedView = itemViews[focusIndex];
-		}
-	}
 
 	private View spaceView(int w, int h) {
 		View v = new View(requireContext());

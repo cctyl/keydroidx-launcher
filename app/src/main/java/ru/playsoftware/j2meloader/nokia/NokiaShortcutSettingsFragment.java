@@ -42,18 +42,14 @@ import ru.playsoftware.j2meloader.config.Config;
  * 快捷栏应用选择界面。展示所有可选应用（安卓 + J2ME），多选后保存。
  * 支持方向键导航，SELECT 切换选中状态，左软键保存，右软键返回。
  */
-public class NokiaShortcutSettingsFragment extends NokiaPageFragment {
+public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 
 	private LinearLayout appListLayout;
-	private ScrollView appScroll;
 	private final List<NokiaAppItem> allApps = new ArrayList<>();
 	// 已选应用：key("type:appKey") -> ShortcutApp。以已保存列表为基准做增删，
 	// 避免"取消一个"时基于 allApps 重建导致未匹配项（J2ME / 已卸载应用）被静默丢弃。
 	private final Map<String, ShortcutApp> selectedMap = new LinkedHashMap<>();
 	private NokiaSettingsStorage settingsStorage;
-	private View[] itemViews;
-	private int focusIndex = -1;
-	private View selectedView = null;
 	private TextView tvSelectedCount;
 
 	@Override
@@ -65,34 +61,9 @@ public class NokiaShortcutSettingsFragment extends NokiaPageFragment {
 	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 		appListLayout = view.findViewById(R.id.appListLayout);
-		appScroll = view.findViewById(R.id.appScroll);
+		listScroll = view.findViewById(R.id.appScroll);
 		tvSelectedCount = view.findViewById(R.id.tvSelectedCount);
-
-		// 运行时约束 ScrollView 高度，使列表底部正好落在可视区底边
-		view.post(() -> {
-			if (appScroll == null) return;
-			View parent = (View) view.getParent();
-			if (!(parent instanceof View)) {
-				NokiaLog.w("ShortcutSettings", "parent is not a View, skip height constraint");
-				return;
-			}
-			int panelH = ((View) parent).getHeight();
-			float scale = view.getScaleX();
-			if (scale <= 0) scale = 1;
-			int visibleH = (int) (panelH / scale);
-			int headH = appScroll.getTop();
-			int scrollH = visibleH - headH;
-			if (scrollH > 0) {
-				ViewGroup.LayoutParams lp = appScroll.getLayoutParams();
-				lp.height = scrollH;
-				appScroll.setLayoutParams(lp);
-				NokiaLog.i("ShortcutSettings", "约束ScrollView高度: panelH=" + panelH
-						+ " scale=" + scale + " visibleH=" + visibleH
-						+ " headH=" + headH + " scrollH=" + scrollH);
-			} else {
-				NokiaLog.w("ShortcutSettings", "scrollH <= 0, skip height constraint: scrollH=" + scrollH);
-			}
-		});
+		constrainScrollHeight(view, listScroll);
 
 		// 加载已选中的应用（以已保存列表为基准，避免构建列表不完整时丢失）
 		// 安卓应用统一以"包名"作为 key（而非 pkg/className），因为默认快捷栏生成
@@ -468,29 +439,6 @@ public class NokiaShortcutSettingsFragment extends NokiaPageFragment {
 	// ---- NokiaFocusHost ----
 
 	@Override
-	public boolean onDirection(int direction) {
-		int count = itemViews != null ? itemViews.length : 0;
-		if (count == 0) return false;
-		if (focusIndex < 0) {
-			setFocusIndex(0);
-			return true;
-		}
-		switch (direction) {
-			case NokiaKeyBinding.ACTION_UP:
-				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
-				return true;
-			case NokiaKeyBinding.ACTION_DOWN:
-				if (focusIndex < count - 1) setFocusIndex(focusIndex + 1);
-				return true;
-			case NokiaKeyBinding.ACTION_LEFT:
-			case NokiaKeyBinding.ACTION_RIGHT:
-				return true;
-			default:
-				return false;
-		}
-	}
-
-	@Override
 	public boolean onSelect() {
 		if (focusIndex >= 0 && focusIndex < allApps.size()) {
 			toggleSelection(focusIndex);
@@ -535,49 +483,6 @@ public class NokiaShortcutSettingsFragment extends NokiaPageFragment {
 
 	// ---- 焦点管理 ----
 
-	private void setFocusIndex(int index) {
-		if (itemViews == null || index < 0 || index >= itemViews.length) return;
-		clearFocusBackground();
-		focusIndex = index;
-		applyFocusBackground();
-		scrollToVisible(index);
-	}
 
-	/**
-	 * 确保焦点行在 ScrollView 可见区域内，方向键导航时自动跟随滚动。
-	 */
-	private void scrollToVisible(int index) {
-		if (appScroll == null || itemViews == null || index < 0 || index >= itemViews.length) return;
-		View item = itemViews[index];
-		if (item == null) return;
-		appScroll.post(() -> {
-			int scrollY = appScroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = appScroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				appScroll.smoothScrollTo(0, itemTop);
-				NokiaLog.d("ShortcutSettings", "↑ 滚动至 item " + index + " top=" + itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				appScroll.smoothScrollTo(0, itemBottom - svHeight);
-				NokiaLog.d("ShortcutSettings", "↓ 滚动至 item " + index + " bottom=" + itemBottom + " svH=" + svHeight);
-			}
-		});
-	}
-
-	private void clearFocusBackground() {
-		if (selectedView != null) {
-			selectedView.setBackgroundResource(0);
-			selectedView = null;
-		}
-	}
-
-	private void applyFocusBackground() {
-		if (focusIndex >= 0 && focusIndex < itemViews.length && itemViews[focusIndex] != null) {
-			itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
-			selectedView = itemViews[focusIndex];
-		}
-	}
 
 }

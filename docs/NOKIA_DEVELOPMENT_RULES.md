@@ -180,6 +180,34 @@
 >
 > 已迁移（2026-08）：`NokiaDesktopFragment`、`NokiaMenuFragment`、`NokiaBoxFragment`、`NokiaDesktopSettingsFragment`、`NokiaShortcutSettingsFragment`、`NokiaWidgetSettingsFragment`、`NokiaWidgetTypePickerFragment`、`NokiaWidgetActivityNameFragment`、`NokiaWidgetActivityPickerFragment`、`NokiaWidgetAppPickerFragment`、`NokiaWidgetUrlEditFragment`、`NokiaBackgroundManagerFragment`、`NokiaKeyBindFragment`、`NokiaKeyBindWizardFragment`、`ShizukuFragment`。
 
+### 纵向列表页继承 NokiaListPageFragment（循环导航，强制）
+
+**凡纵向单列菜单/列表页面，必须继承 `NokiaListPageFragment`（循环导航基类），禁止直接继承 `NokiaPageFragment` 再手抄焦点三件套。**
+
+`NokiaListPageFragment` 收编了各页面重复手抄的焦点管理方法（`setFocusIndex`、`clearFocusBackground`、`applyFocusBackground`、`scrollToVisible`、`constrainScrollHeight`），并把方向键导航固化为**循环导航**：
+- 列表顶部按「上」→ 跳转到列表末尾；
+- 列表底部按「下」→ 跳转到列表开头；
+- 左右方向键默认消费无效果，子类可通过 `onLeftRight(int)` 钩子实现左右切页签等逻辑；
+- 子类可通过 `isDirectionEnabled()` 钩子临时禁用方向键（如确认弹窗态）。
+
+`onDirection` 声明为 `final`，子类**无法绕过**循环导航——和 `NokiaPageFragment` 的缩放四件套一样的防漏抄思路。
+
+子类只需在 `onPageCreated` 中填充 `itemViews[]` 和 `listScroll`（ScrollView 引用），其余导航/焦点/滚动全部继承。
+
+**已迁移（2026-08）：**
+- `NokiaDesktopSettingsFragment` → 桌面设置主菜单
+- `NokiaSettingsGroupFragment` → 设置二级分组页
+- `NokiaAdvancedSettingsFragment` → 高级设置
+- `NokiaPowerInterceptFragment` → 电源键拦截设置
+- `NokiaShortcutSettingsFragment` → 快捷栏设置
+- `NokiaKeyBindFragment`（仅手动改循环，未迁移基类，因滚动机制不同）
+- `NokiaBackgroundManagerFragment`（仅手动改循环，未迁移基类，因动态列表/左右页签）
+- `NokiaWidgetSettingsFragment`（仅手动改循环 `onListDirection`，未迁移基类，因多模式导航）
+- `ShizukuFragment` → mini_shizuku 页
+- `ShizukuRootFragment` → root 激活页
+
+**不属于本类的页面（网格/分页/特殊页面）：** `NokiaMenuFragment`、`NokiaBoxFragment`、`NokiaWidgetAppPickerFragment`、`NokiaWidgetTypePickerFragment`、`NokiaWidgetActivityNameFragment`、`NokiaWidgetActivityPickerFragment`、`NokiaWidgetUrlEditFragment`、`NokiaKeyBindWizardFragment`、`ShizukuAdbFragment`。这些继续直接继承 `NokiaPageFragment`。
+
 ### 尺寸规范
 
 #### 统一尺寸工具类 NokiaDimens
@@ -312,6 +340,7 @@ public void fixMidContentHeight(final View content, final boolean topAlign) {
 新增或修改任何 nokia 界面时，逐项自查：
 
 - [ ] 页面 Fragment **继承 `NokiaPageFragment`**（禁止裸 `extends Fragment implements NokiaPage`），且未覆写 `onCreateView`/`onViewCreated`（final，覆写即编译错）
+- [ ] 纵向列表页**继承 `NokiaListPageFragment`**（禁止直接继承 `NokiaPageFragment` 再手抄焦点三件套），且未覆写 `onDirection`（final，循环导航强制）
 - [ ] 已正确实现 `getLayoutRes()` 与 `onPageCreated()`；特殊页面按需覆写 `isTopAlign()`/`getWallpaperRes()`
 - [ ] 尺寸换算走 `NokiaDimens.dp()`，无裸 `(int)(v*density)`
 - [ ] 布局无 px 写死值（LayoutParams 高度/宽度、padding、margin 等）

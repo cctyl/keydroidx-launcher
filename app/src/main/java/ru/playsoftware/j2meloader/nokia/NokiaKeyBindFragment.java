@@ -398,10 +398,10 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		}
 		switch (direction) {
 			case NokiaKeyBinding.ACTION_UP:
-				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
+				setFocusIndex(focusIndex > 0 ? focusIndex - 1 : NokiaKeyBinding.ACTION_COUNT - 1);
 				return true;
 			case NokiaKeyBinding.ACTION_DOWN:
-				if (focusIndex < NokiaKeyBinding.ACTION_COUNT - 1) setFocusIndex(focusIndex + 1);
+				setFocusIndex(focusIndex < NokiaKeyBinding.ACTION_COUNT - 1 ? focusIndex + 1 : 0);
 				return true;
 			default:
 				return true; // 左右无效果但消费事件

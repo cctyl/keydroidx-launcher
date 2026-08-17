@@ -31,13 +31,10 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  * <p>
  * 电源键拦截开关已移至「高级设置」（{@link NokiaAdvancedSettingsFragment}）。
  */
-public class ShizukuFragment extends NokiaPageFragment {
+public class ShizukuFragment extends NokiaListPageFragment {
 
 	private TextView statusText;
-	private ScrollView contentScroll;
 	private LinearLayout actionList;
-	private View[] actionViews;
-	private int focusIndex = -1;
 
 	private static final String[] ACTION_NAMES = {
 			"adb 激活",
@@ -52,7 +49,7 @@ public class ShizukuFragment extends NokiaPageFragment {
 	@Override
 	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		statusText = view.findViewById(R.id.shizukuStatus);
-		contentScroll = view.findViewById(R.id.shizukuScroll);
+		listScroll = view.findViewById(R.id.shizukuScroll);
 		actionList = view.findViewById(R.id.shizukuActions);
 
 		buildActionList();
@@ -66,7 +63,7 @@ public class ShizukuFragment extends NokiaPageFragment {
 	/** 构建底部可导航操作列表（方向键 + 确认键触发）。 */
 	private void buildActionList() {
 		actionList.removeAllViews();
-		actionViews = new View[ACTION_NAMES.length];
+		itemViews = new View[ACTION_NAMES.length];
 		for (int i = 0; i < ACTION_NAMES.length; i++) {
 			LinearLayout row = new LinearLayout(requireContext());
 			row.setOrientation(LinearLayout.HORIZONTAL);
@@ -97,7 +94,7 @@ public class ShizukuFragment extends NokiaPageFragment {
 			});
 
 			actionList.addView(row);
-			actionViews[i] = row;
+			itemViews[i] = row;
 		}
 	}
 
@@ -144,29 +141,6 @@ public class ShizukuFragment extends NokiaPageFragment {
 	// ---- NokiaFocusHost ----
 
 	@Override
-	public boolean onDirection(int direction) {
-		int count = actionViews != null ? actionViews.length : 0;
-		if (count == 0) return false;
-		if (focusIndex < 0) {
-			setFocusIndex(0);
-			return true;
-		}
-		switch (direction) {
-			case NokiaKeyBinding.ACTION_UP:
-				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
-				return true;
-			case NokiaKeyBinding.ACTION_DOWN:
-				if (focusIndex < count - 1) setFocusIndex(focusIndex + 1);
-				return true;
-			case NokiaKeyBinding.ACTION_LEFT:
-			case NokiaKeyBinding.ACTION_RIGHT:
-				return true; // 纵向列表，左右无效果但消费
-			default:
-				return false;
-		}
-	}
-
-	@Override
 	public boolean onSelect() {
 		if (focusIndex >= 0 && focusIndex < ACTION_NAMES.length) {
 			onAction(focusIndex);
@@ -211,48 +185,7 @@ public class ShizukuFragment extends NokiaPageFragment {
 		return "返回";
 	}
 
-	// ---- 焦点管理 ----
 
-	private void setFocusIndex(int index) {
-		if (actionViews == null || index < 0 || index >= actionViews.length) return;
-		clearFocusBackground();
-		focusIndex = index;
-		applyFocusBackground();
-		scrollToVisible(index);
-	}
-
-	private void clearFocusBackground() {
-		if (actionViews == null) return;
-		for (View v : actionViews) {
-			if (v != null) v.setBackgroundResource(0);
-		}
-	}
-
-	private void applyFocusBackground() {
-		if (focusIndex >= 0 && focusIndex < actionViews.length && actionViews[focusIndex] != null) {
-			actionViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
-		}
-	}
-
-	private void scrollToVisible(int index) {
-		if (contentScroll == null || actionViews == null || index < 0 || index >= actionViews.length) {
-			return;
-		}
-		final View item = actionViews[index];
-		if (item == null) return;
-		contentScroll.post(() -> {
-			int scrollY = contentScroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = contentScroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				contentScroll.smoothScrollTo(0, itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				contentScroll.smoothScrollTo(0, itemBottom - svHeight);
-			}
-		});
-	}
 }
 
 

@@ -279,11 +279,11 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 			return true;
 		}
 		if (direction == NokiaKeyBinding.ACTION_UP) {
-			if (focusIndex > 0) setFocusIndex(focusIndex - 1);
+			setFocusIndex(focusIndex > 0 ? focusIndex - 1 : shownList.size() - 1);
 			return true;
 		}
 		if (direction == NokiaKeyBinding.ACTION_DOWN) {
-			if (focusIndex < shownList.size() - 1) setFocusIndex(focusIndex + 1);
+			setFocusIndex(focusIndex < shownList.size() - 1 ? focusIndex + 1 : 0);
 			return true;
 		}
 		return true;

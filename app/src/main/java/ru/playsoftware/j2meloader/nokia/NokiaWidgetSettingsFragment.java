@@ -461,10 +461,10 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 		}
 		switch (direction) {
 			case NokiaKeyBinding.ACTION_UP:
-				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
+				setFocusIndex(focusIndex > 0 ? focusIndex - 1 : count - 1);
 				return true;
 			case NokiaKeyBinding.ACTION_DOWN:
-				if (focusIndex < count - 1) setFocusIndex(focusIndex + 1);
+				setFocusIndex(focusIndex < count - 1 ? focusIndex + 1 : 0);
 				return true;
 			default:
 				return true;

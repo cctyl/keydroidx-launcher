@@ -29,7 +29,7 @@ import ru.playsoftware.j2meloader.R;
  * </ul>
  * 由 {@link NokiaDesktopSettingsFragment} 通过 {@link #newInstance(int)} 打开。
  */
-public class NokiaSettingsGroupFragment extends NokiaPageFragment {
+public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 
 	public static final String ARG_GROUP = "group";
 
@@ -98,11 +98,7 @@ public class NokiaSettingsGroupFragment extends NokiaPageFragment {
 	private int group;
 	private int[] itemIcons;
 	private String[] itemNames;
-	private View[] itemViews;
 	private TextView[] tvNames;
-	private ScrollView settingsScroll;
-	private int focusIndex = -1;
-	private View selectedView = null;
 
 	public static NokiaSettingsGroupFragment newInstance(int group) {
 		NokiaSettingsGroupFragment f = new NokiaSettingsGroupFragment();
@@ -133,8 +129,8 @@ public class NokiaSettingsGroupFragment extends NokiaPageFragment {
 		LinearLayout listLayout = view.findViewById(R.id.settingsList);
 		if (listLayout == null) return;
 
-		settingsScroll = view.findViewById(R.id.settingsScroll);
-		constrainScrollHeight(view);
+		listScroll = view.findViewById(R.id.settingsScroll);
+		constrainScrollHeight(view, listScroll);
 
 		itemViews = new View[itemNames.length];
 		tvNames = new TextView[itemNames.length];
@@ -216,34 +212,6 @@ public class NokiaSettingsGroupFragment extends NokiaPageFragment {
 			return isDefault ? "默认桌面：已设置" : "默认桌面设置";
 		}
 		return itemNames[index];
-	}
-
-	// ---- NokiaFocusHost ----
-
-	@Override
-	public boolean onDirection(int direction) {
-		int count = itemViews != null ? itemViews.length : 0;
-		if (count == 0) return false;
-		if (focusIndex < 0) {
-			setFocusIndex(0);
-			return true;
-		}
-		int oldIndex = focusIndex;
-		switch (direction) {
-			case NokiaKeyBinding.ACTION_UP:
-				if (focusIndex > 0) setFocusIndex(focusIndex - 1);
-				NokiaLog.d("SettingsGroup", "onDirection 上：old=" + oldIndex + " new=" + focusIndex);
-				return true;
-			case NokiaKeyBinding.ACTION_DOWN:
-				if (focusIndex < count - 1) setFocusIndex(focusIndex + 1);
-				NokiaLog.d("SettingsGroup", "onDirection 下：old=" + oldIndex + " new=" + focusIndex);
-				return true;
-			case NokiaKeyBinding.ACTION_LEFT:
-			case NokiaKeyBinding.ACTION_RIGHT:
-				return true; // 列表项不响应左右
-			default:
-				return false;
-		}
 	}
 
 	@Override
@@ -395,69 +363,7 @@ public class NokiaSettingsGroupFragment extends NokiaPageFragment {
 		return "返回";
 	}
 
-	// ---- 焦点管理 ----
 
-	private void setFocusIndex(int index) {
-		if (itemViews == null || index < 0 || index >= itemViews.length) return;
-		clearFocusBackground();
-		focusIndex = index;
-		applyFocusBackground();
-		scrollToVisible(index);
-	}
-
-	/** 约束 ScrollView 高度，使列表底部正好落在可视区底边（项目多时可滚动）。 */
-	private void constrainScrollHeight(View root) {
-		if (settingsScroll == null) return;
-		root.post(() -> {
-			View parent = (View) root.getParent();
-			if (!(parent instanceof View)) return;
-			int panelH = ((View) parent).getHeight();
-			float scale = root.getScaleX();
-			if (scale <= 0) scale = 1;
-			int visibleH = (int) (panelH / scale);
-			int headH = settingsScroll.getTop();
-			int scrollH = visibleH - headH;
-			if (scrollH > 0) {
-				ViewGroup.LayoutParams lp = settingsScroll.getLayoutParams();
-				lp.height = scrollH;
-				settingsScroll.setLayoutParams(lp);
-			}
-		});
-	}
-
-	/** 确保焦点行在 ScrollView 可见区域内，方向键导航时自动跟随滚动。 */
-	private void scrollToVisible(int index) {
-		if (settingsScroll == null || itemViews == null
-				|| index < 0 || index >= itemViews.length) return;
-		final View item = itemViews[index];
-		if (item == null) return;
-		settingsScroll.post(() -> {
-			int scrollY = settingsScroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = settingsScroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				settingsScroll.smoothScrollTo(0, itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				settingsScroll.smoothScrollTo(0, itemBottom - svHeight);
-			}
-		});
-	}
-
-	private void clearFocusBackground() {
-		if (selectedView != null) {
-			selectedView.setBackgroundResource(0);
-			selectedView = null;
-		}
-	}
-
-	private void applyFocusBackground() {
-		if (focusIndex >= 0 && focusIndex < itemViews.length && itemViews[focusIndex] != null) {
-			itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
-			selectedView = itemViews[focusIndex];
-		}
-	}
 
 	private View spaceView(int w, int h) {
 		View v = new View(requireContext());
