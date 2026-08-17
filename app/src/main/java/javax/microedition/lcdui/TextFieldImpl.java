@@ -255,20 +255,20 @@ class TextFieldImpl {
 		}
 	}
 
-	/** 构造诺基亚 S40 纸质卡片编辑界面（供 TextBox 使用）。 */
+	/** 构造诺基亚桌面同款深色壁纸卡片编辑界面（供 TextBox 使用）。 */
 	View getScreenContainer(Context context) {
 		if (screenContainer == null) {
 			Resources res = context.getResources();
 			screenContainer = new LinearLayout(context);
 			screenContainer.setOrientation(LinearLayout.VERTICAL);
-			screenContainer.setBackgroundColor(0xFFEAEBED); // 经典冷灰蓝纸质底色
+			screenContainer.setBackgroundColor(0x00000000); // 透明底色，直接透出桌面深海蓝壁纸
 
 			// 1. 顶部标题与字数栏
 			String title = (ownerTextBox != null) ? ownerTextBox.getTitle() : null;
 			LinearLayout header = new LinearLayout(context);
 			header.setOrientation(LinearLayout.HORIZONTAL);
 			header.setGravity(Gravity.CENTER_VERTICAL);
-			header.setBackgroundColor(0xFFD8DCE4);
+			header.setBackgroundColor(0x800D1B3E); // 半透明深蓝黑顶栏
 			int headerH = NokiaDimens.dp(res, 30);
 			int headerPadH = NokiaDimens.dp(res, 10);
 			header.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, headerH));
@@ -278,7 +278,7 @@ class TextFieldImpl {
 			titleTv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 			titleTv.setSingleLine(true);
 			titleTv.setEllipsize(TextUtils.TruncateAt.END);
-			titleTv.setTextColor(0xFF1F2937);
+			titleTv.setTextColor(0xFFFFFFFF); // 纯白标题字
 			titleTv.setTypeface(Typeface.DEFAULT_BOLD);
 			NokiaDimens.textSize(titleTv, 14);
 			if (title != null && !title.trim().isEmpty()) {
@@ -288,7 +288,7 @@ class TextFieldImpl {
 
 			counterTextView = new TextView(context);
 			counterTextView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-			counterTextView.setTextColor(0xFF374151);
+			counterTextView.setTextColor(0xFF93C5FD); // 浅天蓝字数统计
 			counterTextView.setTypeface(Typeface.DEFAULT_BOLD);
 			NokiaDimens.textSize(counterTextView, 13);
 			updateCounter();
@@ -296,30 +296,30 @@ class TextFieldImpl {
 
 			screenContainer.addView(header);
 
-			// 顶部栏下方的微细分隔线
+			// 顶部栏下方的微细半透明分隔线
 			View divider = new View(context);
 			divider.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
-			divider.setBackgroundColor(0xFFCAD0DB);
+			divider.setBackgroundColor(0x30FFFFFF);
 			screenContainer.addView(divider);
 
 			// 2. 中间卡片输入区
 			EditText et = getView(context, null);
 			GradientDrawable cardBg = new GradientDrawable();
 			cardBg.setColor(Color.WHITE);
-			cardBg.setStroke(NokiaDimens.dp(res, 1), 0xFFCCD2DB);
-			cardBg.setCornerRadius(NokiaDimens.dpF(res, 3));
+			cardBg.setStroke(NokiaDimens.dp(res, 1), 0xFF60A5FA); // 细腻天蓝边框
+			cardBg.setCornerRadius(NokiaDimens.dpF(res, 4));
 			et.setBackground(cardBg);
 
-			int pad = NokiaDimens.dp(res, 8);
+			int pad = NokiaDimens.dp(res, 10);
 			et.setPadding(pad, pad, pad, pad);
 			et.setTextColor(0xFF1F2937);
-			et.setHintTextColor(0xFF8A95A5);
-			NokiaDimens.textSize(et, 13);
-			et.setLineSpacing(NokiaDimens.dpF(res, 2), 1.0f);
+			et.setHintTextColor(0xFF9CA3AF);
+			NokiaDimens.textSize(et, 14);
+			et.setLineSpacing(NokiaDimens.dpF(res, 3), 1.0f);
 
 			LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
 					ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f);
-			int margin = NokiaDimens.dp(res, 6);
+			int margin = NokiaDimens.dp(res, 8);
 			etParams.setMargins(margin, margin, margin, margin);
 			et.setLayoutParams(etParams);
 
