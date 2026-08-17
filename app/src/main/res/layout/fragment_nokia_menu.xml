@@ -2,7 +2,7 @@
 <!-- 功能表（真实安卓APP分页网格）中间内容（碎片）：
      240dp 宽，高度随当前页行数自适应，由基类缩放。 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@android:color/transparent">
 

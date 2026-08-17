@@ -5,7 +5,7 @@
      运营商名(中国移动/联通等)已迁到 nokia_top_bar.xml，由 StatusBarController 统一管理。 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent">
 
     <!-- 快捷栏上方的点线分割线（代码覆盖背景为 NokiaDashedLineDrawable 点阵） -->

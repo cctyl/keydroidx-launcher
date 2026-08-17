@@ -2,7 +2,7 @@
 <!-- 桌面组件设置 → 添加Activity快捷 → 步骤3：输入名称。
      标题 + 名称字段 + 保存按钮。单字段表单，复用3号文档的三态模式。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@android:color/transparent">

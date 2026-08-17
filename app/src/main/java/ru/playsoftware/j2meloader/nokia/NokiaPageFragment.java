@@ -68,12 +68,6 @@ public abstract class NokiaPageFragment extends Fragment implements NokiaPage {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		boolean topAlign = isTopAlign();
 		host.scaleMidContent(view, topAlign);
-		// match_parent 根布局 + topAlign 的二次缩放陷阱：
-		// topAlign=true 时必须补动态高度调整，否则 scale>1 设备内容偏下 / 右侧露缝。
-		// 居中模式（false）保持原有行为（内容矮于面板时垂直居中），不调整高度。
-		if (topAlign) {
-			host.fixMidContentHeight(view, true);
-		}
 		// 壁纸
 		int wallRes = getWallpaperRes();
 		if (wallRes != 0) {

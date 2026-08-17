@@ -2,7 +2,7 @@
 <!-- 桌面组件设置 → 添加Activity快捷 → 步骤2：选择Activity。
      标题 + 纵向列表容器 + 页码 + 空状态提示。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@android:color/transparent">

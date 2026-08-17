@@ -117,12 +117,9 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	private static final float BOT_H = 22f;
 	private static final float MID_H = 262f; // 320(设计总高) - 36(顶栏) - 22(底栏)
 
-	/** 缓存的当前缩放比，在 applyScale() 中计算并存储，通过 getScale() 对外暴露。 */
-	private float mCachedScale = 1f;
-
-	/** 返回当前屏幕的缩放比 = max(屏宽dp/240, 屏高dp/320) 并吸附整数（<0.04）。Fragment 计算行数空间预算时必须使用此值。 */
+	/** 响应式原生 DP 模式：所有组件按真实物理像素点对点渲染，scale 恒为 1.0f。 */
 	public float getScale() {
-		return mCachedScale;
+		return 1.0f;
 	}
 
 	/** 计算缩放比：宽度优先，高度溢出时退化为 contain，接近整数时吸附。 */
@@ -163,38 +160,17 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	}
 
 	private void applyScale() {
-		DisplayMetrics dm = getResources().getDisplayMetrics();
-		float density = dm.density;
-		float widthDp = dm.widthPixels / density;
-		float heightDp = dm.heightPixels / density;
-
-		// 宽度优先缩放；若整体高度会超出屏幕则退化为 contain，避免裁切。
-		float scale = computeScale(widthDp, heightDp);
-		mCachedScale = scale;
-		Log.i("NokiaScale", "applyScale densityDpi=" + dm.densityDpi
-				+ " density=" + density + " screenPx=" + dm.widthPixels + "x" + dm.heightPixels
-				+ " widthDp=" + widthDp + " heightDp=" + heightDp + " scale=" + scale);
-
 		View topPanel = findViewById(R.id.topPanel);
-		// 顶栏紧贴屏幕最顶部；FLAG_FULLSCREEN 已隐藏状态栏，不需要再下移。
 		if (topPanel != null) {
 			ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) topPanel.getLayoutParams();
 			lp.topMargin = 0;
 			topPanel.setLayoutParams(lp);
+			topPanel.setVisibility(View.VISIBLE);
 		}
 
-		// 底栏：match_parent 宽度已保证左右铺满、贴顶贴底；
-		// 仅把内层 240dp 内容等比放大，并按比例设置栏高。
-		scalePanelContent(findViewById(R.id.bottomPanel), scale, BOT_H, density, false, true);
-
-		// 顶栏：高度优先级最高，必须完整显示信号/WiFi/飞行模式/运营商等组件。
-		// 因此不再固定为 TOP_H*scale，而是让内容自然撑开（wrap_content）；
-		// 保持"原生分辨率"渲染（不做 setScaleX/Y 缩放），矢量图标清晰不模糊。
-		if (topPanel != null) {
-			ViewGroup.LayoutParams lp = topPanel.getLayoutParams();
-			lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-			topPanel.setLayoutParams(lp);
-			topPanel.setVisibility(View.VISIBLE);
+		View bottomPanel = findViewById(R.id.bottomPanel);
+		if (bottomPanel != null) {
+			bottomPanel.setVisibility(View.VISIBLE);
 		}
 	}
 
@@ -277,120 +253,28 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	}
 
 	/**
-	 * 缩放某个碎片的根视图（240dp × 262dp 的设计内容）并锚定到中间容器。
-	 * 内容统一从左上角等比放大铺满整宽（240dp × scale = 屏幕宽）。
-	 * 垂直位置（顶部对齐 / 居中）必须在布局完成后，用容器真实高度减去缩放后的
-	 * 内容高度来定，否则重力会基于"未缩放的小盒子"居中，导致内容下移、顶部留空、
-	 * 底部被裁切——因为 setScaleX/Y 不改变布局边界，不能依赖 gravity。
+	 * 响应式原生渲染：确保 1:1 原生物理像素绘制，无 GPU 缩放插值模糊。
 	 *
 	 * @param content  碎片根视图（其父必须是中间容器 midPanel）
-	 * @param topAlign true=贴容器顶部（桌面待机屏）；false=垂直居中（菜单/百宝箱）
+	 * @param topAlign true=贴容器顶部；false=垂直居中
 	 */
 	protected void scaleMidContent(View content, boolean topAlign) {
-		DisplayMetrics dm = getResources().getDisplayMetrics();
-		float density = dm.density;
-		float widthDp = dm.widthPixels / density;
-		float heightDp = dm.heightPixels / density;
-		float scale = computeScale(widthDp, heightDp);
-		Log.i("NokiaScale", "scaleMidContent density=" + density
-				+ " widthDp=" + widthDp + " heightDp=" + heightDp + " scale=" + scale);
-
-		content.setPivotX(0);
-		content.setPivotY(0);
-		// scale≈1（240x320 基准屏 scale=1）时跳过 setScaleX/Y：避免硬件变换层
-		// 对像素做二次双线性过滤导致整体发虚；仅在确需缩放时才应用变换。
-		if (Math.abs(scale - 1f) >= 0.001f) {
-			content.setScaleX(scale);
-			content.setScaleY(scale);
+		if (content == null) return;
+		content.setScaleX(1f);
+		content.setScaleY(1f);
+		content.setTranslationX(0f);
+		content.setTranslationY(0f);
+		ViewParent parent = content.getParent();
+		if (parent instanceof View) {
+			((View) parent).setVisibility(View.VISIBLE);
 		}
-
-		final float fScale = scale;
-		final float fDensity = density;
-		content.post(new Runnable() {
-			@Override
-			public void run() {
-				ViewParent parent = content.getParent();
-				if (!(parent instanceof View)) {
-					return;
-				}
-				View panel = (View) parent;
-				panel.setVisibility(View.VISIBLE);
-				int panelH = panel.getHeight();
-				// 顶栏已改为 wrap_content 优先完整显示，中间容器高度可能小于 MID_H*scale。
-				// 若内容高度 match_parent（与 panelH 接近），说明内容自行填充了容器，
-				// 跳过二次缩小分支（避免点线/分隔线被采样掉，桌面弹性布局依赖此行为）。
-				int contentH = content.getHeight();
-				float finalScale = fScale;
-				int visualH;
-				if (contentH > 0 && panelH > 0) {
-					visualH = (int) (contentH * fScale);
-					// 内容高度与面板高度接近（±2px 容差，match_parent 场景），跳过二次缩小
-					boolean contentFillsPanel = Math.abs(contentH - panelH) <= 2;
-					if (!contentFillsPanel && visualH > panelH) {
-						finalScale = (float) panelH / contentH;
-						visualH = panelH;
-						Log.i("NokiaScale", "scaleMidContent shrink: contentH=" + contentH
-								+ " panelH=" + panelH + " oldScale=" + fScale
-								+ " finalScale=" + finalScale);
-					}
-				} else {
-					visualH = (int) (MID_H * fDensity * fScale);
-				}
-			if (Math.abs(finalScale - 1f) >= 0.001f) {
-				content.setScaleX(finalScale);
-				content.setScaleY(finalScale);
-			} else {
-				// finalScale≈1 时必须显式重置为 1：本方法可能被多次调用，
-				// 若上次缩小（finalScale<1）后本次不再缩小，残留的 scale 会让
-				// 内容宽度继续变小、右侧露出缝隙（如 240x320 mdpi 设备按键绑定界面）。
-				content.setScaleX(1f);
-				content.setScaleY(1f);
-			}
-			int offset = topAlign ? 0 : Math.max(0, (panelH - visualH) / 2);
-				Log.i("NokiaScale", "scaleMidContent layout: panelH=" + panelH
-						+ " contentH=" + contentH + " visualH=" + visualH
-						+ " finalScale=" + finalScale + " offset=" + offset
-						+ " topAlign=" + topAlign);
-				content.setY(offset);
-			}
-		});
 	}
 
 	/**
-	 * 修复「match_parent 根布局 + topAlign=true 的二次缩放陷阱」。
-	 * 在调用了 {@link #scaleMidContent(View, boolean)} 之后必须调用本方法：
-	 * 延迟到布局完成后把根视图高度动态调整为 panelH / scale，
-	 * 使内容视觉高度恰好填满中间容器：
-	 * - 视觉高 &lt; panelH：高度拉高，内部 ScrollView 吸收多余空间（避免底部留白）；
-	 * - 视觉高 &gt; panelH：若保持 wrap_content 的矮内容高度，scaleMidContent 的
-	 *   二次缩小分支（finalScale = panelH / contentH）会让宽度随比例同步缩小、
-	 *   右侧露出缝隙。改为目标高度后 visualH == panelH，不触发缩小，宽度保持铺满。
-	 * 参考已修复的 NokiaKeyBindFragment（布局根 match_parent + 本方法）。
-	 *
-	 * @param content  碎片根视图（与 scaleMidContent 同一个 view）
-	 * @param topAlign 与 scaleMidContent 传值保持一致
+	 * 在响应式原生 DP 模式下为安全空实现，保留以兼容现有调用。
 	 */
 	public void fixMidContentHeight(final View content, final boolean topAlign) {
-		content.post(() -> {
-			View panel = (View) content.getParent();
-			if (panel == null || panel.getHeight() <= 0 || content.getHeight() <= 0) {
-				return;
-			}
-			// 统一使用 getScale() 获取缩放比（与基类算法一致）
-			float scale = getScale();
-			int panelH = panel.getHeight();
-			int targetH = Math.round(panelH / scale);
-			ViewGroup.LayoutParams lp = content.getLayoutParams();
-			if (lp.height != targetH) {
-				lp.height = targetH;
-				content.setLayoutParams(lp);
-				NokiaLog.i("NokiaScale", "fixMidContentHeight: 根视图高度=" + targetH
-						+ "px 使视觉高=panelH=" + panelH + "px scale=" + scale);
-				// 高度变化触发重新布局后，重新执行等比缩放（此时 visualH == panelH，
-				// 不触发缩小分支，宽度保持铺满）
-				content.post(() -> scaleMidContent(content, topAlign));
-			}
-		});
+		// 响应式原生 DP 模式下，根视图 match_parent 自适应容器高度，无需二次强改
 	}
 
 	/** 获取系统状态栏高度；如无法取得则返回 0。 */
@@ -400,9 +284,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	}
 
 	/**
-	 * 缩放面板内第一个子视图（即 240dp 宽的设计内容）。
-	 * centerPivot=true 时以内容中心为支点（用于需垂直居中的中间区域）；
-	 * 否则以左上角为支点。setHeight=true 时还会把面板高度设为按比例放大的像素值（用于顶/底栏）。
+	 * 响应式原生渲染：不再对面板内容进行 GPU setScaleX/Y，保证矢量清晰度。
 	 */
 	private void scalePanelContent(View panel, float scale, float baseH, float density,
 								   boolean centerPivot, boolean setHeight) {
@@ -411,25 +293,8 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		}
 		if (panel instanceof ViewGroup && ((ViewGroup) panel).getChildCount() > 0) {
 			View content = ((ViewGroup) panel).getChildAt(0);
-			if (centerPivot) {
-				// 内容固定为 240dp x baseH，支点取其中心。
-				content.setPivotX(120f * density);
-				content.setPivotY(baseH * density / 2f);
-			} else {
-				content.setPivotX(0);
-				content.setPivotY(0);
-			}
-			// scale≈1（240x320 基准屏 scale=1）时跳过变换层，避免顶/底栏像素被二次过滤发虚。
-			if (Math.abs(scale - 1f) >= 0.001f) {
-				content.setScaleX(scale);
-				content.setScaleY(scale);
-			}
-		}
-		if (setHeight) {
-			// 顶/底栏高度按 scale 放大，宽度由 match_parent 铺满。
-			ViewGroup.LayoutParams lp = panel.getLayoutParams();
-			lp.height = Math.round(baseH * density * scale);
-			panel.setLayoutParams(lp);
+			content.setScaleX(1f);
+			content.setScaleY(1f);
 		}
 		panel.setVisibility(View.VISIBLE);
 	}

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 高级设置：顶部提示 + 纵向列表（mini_shizuku / 电源键拦截） -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent">
 

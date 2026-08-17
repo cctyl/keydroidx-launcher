@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 桌面设置二级分组页：顶部标题 + 纵向列表（外观/按键/内容/系统 等分类下的细项） -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent">
 

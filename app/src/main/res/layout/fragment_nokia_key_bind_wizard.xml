@@ -2,7 +2,7 @@
 <!-- 首次启动按键绑定向导（碎片）：240dp 宽，高度 match_parent 自适应中间容器。
      与桌面弹性化一致，避免写死高度触发 scaleMidContent 二次缩小导致右侧缝隙。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/bg_nokia_menu">

@@ -3,7 +3,7 @@
      命令行由代码动态填充（脚本随 APK 分发，进入本页时释放到 getExternalFilesDir()，
      路径随包名变化，故命令必须动态拼接）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/bg_nokia_menu">

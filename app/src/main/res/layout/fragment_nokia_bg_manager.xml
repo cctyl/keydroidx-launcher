@@ -2,7 +2,7 @@
 <!-- 后台管理窗口：页签（运行/受保护）+ 摘要 + 后台任务列表，行由代码动态构建。
      左软键 = 全部保护/全部解除，右软键 = 清除，中间标题 = 后台管理。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@android:color/transparent">

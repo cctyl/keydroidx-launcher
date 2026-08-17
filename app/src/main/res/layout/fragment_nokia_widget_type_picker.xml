@@ -2,7 +2,7 @@
 <!-- 桌面组件设置 → 添加组件 → 组件类型选择页（S6）。
      标题 + 7 种类型的列表，行由代码动态构建。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@android:color/transparent">

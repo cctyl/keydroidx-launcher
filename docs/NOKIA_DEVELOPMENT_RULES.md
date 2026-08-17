@@ -151,18 +151,14 @@
 | **主适配** | 320×480 | tcpip 设备（density 136→160） | 同上，且顶栏/中间区比例可接受 |
 | **次要适配（兜底）** | 16:9 长屏 | jz5dauzlu8euw4e6 | 不崩、不变形、不裁切、可正常操作即可 |
 
-### 适配架构（理解后才能改）
+### 适配架构（响应式原生 DP 模式）
 
-项目采用 **「240×320 dp 设计基准 + 运行时整体缩放」** 方案，中枢在 `NokiaBaseActivity.java`：
+项目已全面升级为 **「响应式原生 DP 渲染」** 体系（弃用旧版 `setScaleX/Y` 整体放大架构，避免 GPU 二次插值模糊与纵向拔高）：
 
-- **设计常量**：`BASE_W=240`、`TOP_H=36`、`BOT_H=22`、`MID_H=262`
-- **缩放计算**：`scale = 屏宽dp / 240`（高度不足退化为 `屏高dp / 320` 的 contain 模式）
-- **中间面板**：`scaleMidContent()` 对 midPanel 内容 `setScaleX/Y` 整体放大，接近整数时（±0.04）吸附到整数 scale；内容高 = panelH（match_parent）时跳过二次缩小分支
-- **底栏**：`scalePanelContent()` 缩放内层内容，栏高设为 `22*scale`
-- **顶栏**：**不参与缩放**（原生 dp 渲染保图标清晰）
-- **density 修正**：`attachBaseContext()` 把 <160 DPI 强制吸附到 160（mdpi），非标准值吸附到最近标准值
-
-**关键约束：不改动「240 基准 + 整体缩放」架构，不引入资源限定符目录（如 values-sw320dp、layout-hdpi 等），避免与代码缩放双轨冲突。**
+- **无损渲染**：顶栏、中间内容区、底栏均采用原生物理分辨率逐像素直接光栅化绘制，`getScale()` 恒返回 `1.0f`。
+- **根宽规范**：所有 Fragment 根布局宽度统一使用 `android:layout_width="match_parent"`，由系统自然填满屏幕宽度。
+- **正比例守卫**：图标保持 1:1 正方形标准比例（如快捷栏 36×34dp、开关栏 36×32dp、网格图标 48×48dp），多余高度由壁纸与可滚动区域自然吸收。
+- **响应式均分**：功能表与百宝箱 3 列网格采用 `weight=1` 响应式均分宽度，在 240dp / 320dp / 480dp 等各种屏幕上均呈现精致规整的排布。
 
 ### 页面 Fragment 必须继承 NokiaPageFragment（强制，防漏缩放）
 
@@ -345,15 +341,14 @@ public void fixMidContentHeight(final View content, final boolean topAlign) {
 - [ ] 尺寸换算走 `NokiaDimens.dp()`，无裸 `(int)(v*density)`
 - [ ] 布局无 px 写死值（LayoutParams 高度/宽度、padding、margin 等）
 - [ ] Fragment 根布局高度为 `match_parent`（非 262dp）
-- [ ] Fragment 根布局**宽度固定 `240dp`**（非 `match_parent`，否则 scale>1 设备横向溢出）
+- [ ] Fragment 根布局**宽度为 `match_parent`**（响应式原生 DP 铺满）
 - [ ] 弹窗关键尺寸引用 `dimens.xml`（非硬编码 28dp/14sp/12sp）
 - [ ] 点线分隔线用 `NokiaDashedLineDrawable(getResources(), ...)`（非 XML shape dash）
 - [ ] 网格页面行数走实测 panelH 反推（`getMidPanelHeight()`），非估算公式
 - [ ] 网格行高均分拉伸，非写死固定 dp
-- [ ] scale 走 `getScale()` 单一来源，不自算
-- [ ] `match_parent` 根布局 + `topAlign=true` 的 Fragment 需补 `view.post` 动态高度调整
+- [ ] scale 走 `getScale()`（响应式模式下恒为 1.0f）
 - [ ] 在 **240×320（4a24ecf）** 和 **320×480（tcpip）** 两台真机上截图验证
-- [ ] 验证重点：点线清晰、无右侧缝隙、列表最后一项不被底栏遮挡、弹窗比例合适、网格行不裁切也不留白
+- [ ] 验证重点：原生矢量清晰无模糊、无横向溢出与右侧缝隙、图标保持 1:1 正比例、列表最后一项不被底栏遮挡、弹窗比例合适、网格行不裁切也不留白
 
 
 ## 设备说明

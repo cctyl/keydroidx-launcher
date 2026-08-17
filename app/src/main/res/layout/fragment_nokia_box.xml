@@ -4,7 +4,7 @@
      内部为 LinearLayout 容器，由 Java 代码动态添加网格行。 -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/appScroll"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:scrollbars="none"
     android:fadingEdge="none"

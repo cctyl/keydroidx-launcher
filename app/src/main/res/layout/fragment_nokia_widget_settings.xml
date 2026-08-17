@@ -3,7 +3,7 @@
      顶部副标题（已选 X/15 / 删除模式 / 排序模式）+ 组件列表。
      选项菜单（S2）与删除子菜单（S3）为底部弹出的 DialogFragment（样式与 JAR 选项菜单一致）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="240dp"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@android:color/transparent">
