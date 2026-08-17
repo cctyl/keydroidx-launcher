@@ -916,6 +916,8 @@ public class MicroActivity extends AppCompatActivity {
 			binding.toolbar.setVisibility(View.GONE);
 			layoutParams.height = 0;
 			binding.toolbar.setLayoutParams(layoutParams);
+			// 全屏沉浸式：隐藏状态栏和导航栏，MIDlet 内容铺满整屏
+			hideSystemUI();
 			binding.overlayView.setLocation(0, 0);
 			invalidateOptionsMenu();
 			if (next != null) {
