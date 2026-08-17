@@ -18,7 +18,6 @@ package javax.microedition.lcdui.commands;
 
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.PopupWindow;
 
@@ -31,22 +30,26 @@ import ru.playsoftware.j2meloader.databinding.SoftButtonBarBinding;
 
 public class ScreenSoftBar extends AbstractSoftKeysBar {
 	private static final Object TAG_CLEAR = new Object();
+	private static final Object TAG_SELECT_MENU_ITEM = new Object();
+	private static final Object TAG_CLOSE_MENU = new Object();
+
 	private final SoftButtonBarBinding binding;
 
 	public ScreenSoftBar(Screen target, SoftButtonBarBinding binding) {
 		super(target, true);
-		// todo высвобождать глобальный binding после использования
 		this.binding = binding;
 		this.binding.leftButton.setOnClickListener(this::onClick);
 		this.binding.middleButton.setOnClickListener(this::onClick);
 		this.binding.rightButton.setOnClickListener(this::onClick);
-		// 诺基亚按键机：底部软键不需要 D-Pad 光标焦点（由左/右软键直接触发）
+
+		// 规范：底部软键栏按钮不获得 D-Pad 光标焦点，由硬件软键直接触发
 		this.binding.leftButton.setFocusable(false);
 		this.binding.middleButton.setFocusable(false);
 		this.binding.rightButton.setFocusable(false);
 		this.binding.leftButton.setFocusableInTouchMode(false);
 		this.binding.middleButton.setFocusableInTouchMode(false);
 		this.binding.rightButton.setFocusableInTouchMode(false);
+
 		notifyChanged();
 	}
 
@@ -62,19 +65,41 @@ public class ScreenSoftBar extends AbstractSoftKeysBar {
 		return binding.rightButton;
 	}
 
+	@Override
+	protected void onMenuShown() {
+		// 菜单弹出态：左「选择」，中「空」（INVISIBLE），右「返回」
+		binding.leftButton.setText(R.string.cmd_select);
+		binding.leftButton.setVisibility(View.VISIBLE);
+		binding.leftButton.setTag(TAG_SELECT_MENU_ITEM);
+
+		binding.middleButton.setVisibility(View.INVISIBLE);
+		binding.middleButton.setTag(null);
+
+		binding.rightButton.setText(R.string.cmd_back);
+		binding.rightButton.setVisibility(View.VISIBLE);
+		binding.rightButton.setTag(TAG_CLOSE_MENU);
+	}
+
+	@Override
+	protected void onMenuDismissed() {
+		notifyChanged();
+	}
+
 	private void onClick(View button) {
 		Object tag = button.getTag();
 		if (tag == TAG_CLEAR) {
 			if (target instanceof TextBox) {
 				((TextBox) target).deletePreviousChar();
 			}
+		} else if (tag == TAG_SELECT_MENU_ITEM) {
+			performCurrentMenuSelection();
+		} else if (tag == TAG_CLOSE_MENU) {
+			closeMenu();
 		} else if (tag == null) {
 			PopupWindow popup = prepareMenu(menuStartIndex);
-			int y = binding.rightButton.getHeight();
-			View rootView = binding.rightButton.getRootView();
-			popup.setWidth(Math.min(rootView.getWidth(), rootView.getHeight()) / 2);
-			popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
-			popup.showAtLocation(rootView, Gravity.LEFT | Gravity.BOTTOM, 0, y);
+			int y = binding.rootLayout.getHeight();
+			View rootView = binding.rootLayout.getRootView();
+			popup.showAtLocation(rootView, Gravity.START | Gravity.BOTTOM, 0, y);
 		} else {
 			target.fireCommandAction((Command) tag);
 		}
@@ -82,6 +107,10 @@ public class ScreenSoftBar extends AbstractSoftKeysBar {
 
 	@Override
 	protected void onCommandsChanged() {
+		if (isMenuShowing()) {
+			return;
+		}
+
 		binding.leftButton.setTag(null);
 		binding.middleButton.setTag(null);
 		binding.rightButton.setTag(null);
@@ -108,40 +137,42 @@ public class ScreenSoftBar extends AbstractSoftKeysBar {
 			binding.rightButton.setText(R.string.cmd_clear);
 			binding.rightButton.setTag(TAG_CLEAR);
 
+			// 中间确认键：直达主命令（例如「发送」）
 			if (middle != null) {
 				setCommand(binding.middleButton, middle);
 			}
 
-			if (size - menuStartIndex > 0 || right != null) {
+			// 左软键：显示「菜单」呼出选项列表
+			if (size - menuStartIndex > 0 || right != null || middle != null) {
 				binding.leftButton.setVisibility(View.VISIBLE);
 				binding.leftButton.setText(R.string.cmd_menu);
 				binding.leftButton.setTag(null);
 			}
 		} else {
+			// 无字状态
 			if (size - menuStartIndex > 1) {
 				binding.leftButton.setVisibility(View.VISIBLE);
 				binding.leftButton.setText(R.string.cmd_menu);
+				binding.leftButton.setTag(null);
 			} else if (menuStartIndex < size) {
 				Command left = commands.get(menuStartIndex);
 				setCommand(binding.leftButton, left);
 			}
+
+			if (middle != null) {
+				setCommand(binding.middleButton, middle);
+			}
+
 			if (right != null) {
 				setCommand(binding.rightButton, right);
-				if (middle != null) {
-					setCommand(binding.middleButton, middle);
-				}
-			} else {
-				if (middle != null) {
-					setCommand(binding.rightButton, middle);
-				}
 			}
 		}
 		binding.rootLayout.setVisibility(View.VISIBLE);
 	}
 
-	private void setCommand(Button binding, Command c) {
-		binding.setVisibility(View.VISIBLE);
-		binding.setText(c.getAndroidLabel());
-		binding.setTag(c);
+	private void setCommand(Button btn, Command c) {
+		btn.setVisibility(View.VISIBLE);
+		btn.setText(c.getAndroidLabel());
+		btn.setTag(c);
 	}
 }

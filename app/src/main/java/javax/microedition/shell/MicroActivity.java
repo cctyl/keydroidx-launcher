@@ -613,6 +613,10 @@ public class MicroActivity extends AppCompatActivity {
 			}
 			switch (act) {
 				case NokiaKeyBinding.ACTION_SOFT_LEFT: {
+					if (softBar.isMenuShowing()) {
+						softBar.performCurrentMenuSelection();
+						return true;
+					}
 					if (softBar instanceof ScreenSoftBar) {
 						Button leftBtn = ((ScreenSoftBar) softBar).getLeftButton();
 						if (leftBtn.getVisibility() == View.VISIBLE) {
@@ -637,7 +641,8 @@ public class MicroActivity extends AppCompatActivity {
 				}
 				case NokiaKeyBinding.ACTION_SELECT: {
 					if (softBar.isMenuShowing()) {
-						return super.dispatchKeyEvent(event);
+						softBar.performCurrentMenuSelection();
+						return true;
 					}
 					if (softBar instanceof ScreenSoftBar) {
 						Button midBtn = ((ScreenSoftBar) softBar).getMiddleButton();

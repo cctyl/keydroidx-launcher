@@ -175,6 +175,8 @@
     <string name="opt_save_screen_params">save screen params</string>
     <string name="cmd_menu">Menu</string>
     <string name="cmd_clear">Clear</string>
+    <string name="cmd_select">Select</string>
+    <string name="cmd_back">Back</string>
     <string name="dismiss">Dismiss</string>
     <string name="show">Show</string>
 
