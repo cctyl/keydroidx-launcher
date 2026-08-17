@@ -76,6 +76,7 @@ import javax.microedition.lcdui.Displayable;
 import javax.microedition.lcdui.Form;
 import javax.microedition.lcdui.List;
 import javax.microedition.lcdui.Screen;
+import javax.microedition.lcdui.TextBox;
 import javax.microedition.lcdui.ViewHandler;
 import javax.microedition.lcdui.commands.AbstractSoftKeysBar;
 import javax.microedition.lcdui.commands.ScreenSoftBar;
@@ -922,6 +923,14 @@ public class MicroActivity extends AppCompatActivity {
 			invalidateOptionsMenu();
 			if (next != null) {
 				binding.displayableContainer.addView(next.getDisplayableView());
+				if (next instanceof TextBox) {
+					// 进入编辑界面后，焦点自动落到输入框（而非底部软键/菜单）
+					binding.displayableContainer.post(() -> {
+						if (next instanceof TextBox) {
+							((TextBox) next).requestTextFocus();
+						}
+					});
+				}
 			}
 		}
 	}

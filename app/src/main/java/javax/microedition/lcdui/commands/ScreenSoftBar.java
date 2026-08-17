@@ -40,6 +40,13 @@ public class ScreenSoftBar extends AbstractSoftKeysBar {
 		this.binding.leftButton.setOnClickListener(this::onClick);
 		this.binding.middleButton.setOnClickListener(this::onClick);
 		this.binding.rightButton.setOnClickListener(this::onClick);
+		// 诺基亚按键机：底部软键不需要 D-Pad 光标焦点（由左/右软键直接触发）
+		this.binding.leftButton.setFocusable(false);
+		this.binding.middleButton.setFocusable(false);
+		this.binding.rightButton.setFocusable(false);
+		this.binding.leftButton.setFocusableInTouchMode(false);
+		this.binding.middleButton.setFocusableInTouchMode(false);
+		this.binding.rightButton.setFocusableInTouchMode(false);
 		notifyChanged();
 	}
 
