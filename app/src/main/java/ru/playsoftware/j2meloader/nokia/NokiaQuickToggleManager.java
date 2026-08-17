@@ -10,6 +10,8 @@ import android.media.AudioManager;
 import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.Toast;
@@ -112,13 +114,27 @@ public class NokiaQuickToggleManager {
 	public static boolean isWifiOn(Context context) {
 		try {
 			WifiManager wm = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-			return wm != null && wm.isWifiEnabled();
+			if (wm == null) return false;
+			int state = wm.getWifiState();
+			return state == WifiManager.WIFI_STATE_ENABLED || state == WifiManager.WIFI_STATE_ENABLING;
 		} catch (Exception e) {
 			return false;
 		}
 	}
 
 	public static void toggleWifi(final Context context, final boolean targetOn) {
+		if (Build.VERSION.SDK_INT < 29) {
+			try {
+				WifiManager wm = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+				if (wm != null) {
+					boolean ret = wm.setWifiEnabled(targetOn);
+					if (ret) return;
+				}
+			} catch (Exception e) {
+				NokiaLog.w(TAG, "wifi setWifiEnabled failed: " + e.getMessage());
+			}
+		}
+
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -126,18 +142,15 @@ public class NokiaQuickToggleManager {
 					String cmd = "svc wifi " + (targetOn ? "enable" : "disable");
 					boolean res = Shizuku.exec(cmd);
 					NokiaLog.i(TAG, "Shizuku wifi toggle: " + res);
-					return;
+					if (res) return;
 				}
 
 				try {
 					WifiManager wm = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-					if (wm != null) {
-						boolean ret = wm.setWifiEnabled(targetOn);
-						if (ret) return;
+					if (wm != null && wm.setWifiEnabled(targetOn)) {
+						return;
 					}
-				} catch (Exception e) {
-					NokiaLog.w(TAG, "wifi setWifiEnabled failed: " + e.getMessage());
-				}
+				} catch (Exception ignored) {}
 
 				openSettings(context, Settings.ACTION_WIFI_SETTINGS);
 			}
@@ -192,13 +205,27 @@ public class NokiaQuickToggleManager {
 	public static boolean isBluetoothOn() {
 		try {
 			BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-			return adapter != null && adapter.isEnabled();
+			if (adapter == null) return false;
+			int state = adapter.getState();
+			return state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_TURNING_ON;
 		} catch (Exception e) {
 			return false;
 		}
 	}
 
 	public static void toggleBluetooth(final Context context, final boolean targetOn) {
+		if (Build.VERSION.SDK_INT < 33) {
+			try {
+				BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+				if (adapter != null) {
+					boolean ret = targetOn ? adapter.enable() : adapter.disable();
+					if (ret) return;
+				}
+			} catch (Exception e) {
+				NokiaLog.w(TAG, "bluetooth enable/disable failed: " + e.getMessage());
+			}
+		}
+
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -207,7 +234,7 @@ public class NokiaQuickToggleManager {
 							+ " ; cmd bluetooth_manager " + (targetOn ? "enable" : "disable");
 					boolean res = Shizuku.exec(cmd);
 					NokiaLog.i(TAG, "Shizuku bluetooth toggle: " + res);
-					return;
+					if (res) return;
 				}
 
 				try {
@@ -216,9 +243,7 @@ public class NokiaQuickToggleManager {
 						boolean ret = targetOn ? adapter.enable() : adapter.disable();
 						if (ret) return;
 					}
-				} catch (Exception e) {
-					NokiaLog.w(TAG, "bluetooth enable/disable failed: " + e.getMessage());
-				}
+				} catch (Exception ignored) {}
 
 				openSettings(context, Settings.ACTION_BLUETOOTH_SETTINGS);
 			}
@@ -248,7 +273,7 @@ public class NokiaQuickToggleManager {
 							+ " ; am broadcast -a android.intent.action.AIRPLANE_MODE --ez state " + targetOn;
 					boolean res = Shizuku.exec(cmd);
 					NokiaLog.i(TAG, "Shizuku airplane toggle: " + res);
-					return;
+					if (res) return;
 				}
 
 				try {
@@ -260,6 +285,15 @@ public class NokiaQuickToggleManager {
 				} catch (Exception e) {
 					NokiaLog.w(TAG, "write airplane_mode_on failed: " + e.getMessage());
 				}
+
+				// 尝试 root 切换（针对 4.4 等已 root 设备）
+				try {
+					String suCmd = "settings put global airplane_mode_on " + (targetOn ? "1" : "0")
+							+ " ; am broadcast -a android.intent.action.AIRPLANE_MODE --ez state " + targetOn;
+					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
+					p.waitFor();
+					if (p.exitValue() == 0) return;
+				} catch (Exception ignored) {}
 
 				openSettings(context, Settings.ACTION_AIRPLANE_MODE_SETTINGS);
 			}
@@ -472,11 +506,24 @@ public class NokiaQuickToggleManager {
 					int mode = targetOn ? Settings.Secure.LOCATION_MODE_HIGH_ACCURACY : Settings.Secure.LOCATION_MODE_OFF;
 					String providers = targetOn ? "+gps,+network" : "-gps,-network";
 					String cmd = "settings put secure location_mode " + mode
-							+ " ; settings put secure location_providers_allowed " + providers
-							+ " ; cmd location set-location-enabled " + (targetOn ? "true" : "false");
-					Shizuku.exec(cmd);
-					return;
+							+ " ; settings put secure location_providers_allowed " + providers;
+					if (Build.VERSION.SDK_INT >= 24) {
+						cmd += " ; cmd location set-location-enabled " + (targetOn ? "true" : "false");
+					}
+					boolean res = Shizuku.exec(cmd);
+					if (res) return;
 				}
+
+				// 尝试 root 切换（针对 4.4 等已 root 设备）
+				try {
+					int mode = targetOn ? Settings.Secure.LOCATION_MODE_HIGH_ACCURACY : Settings.Secure.LOCATION_MODE_OFF;
+					String providers = targetOn ? "+gps,+network" : "-gps,-network";
+					String suCmd = "settings put secure location_mode " + mode
+							+ " ; settings put secure location_providers_allowed " + providers;
+					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
+					p.waitFor();
+					if (p.exitValue() == 0) return;
+				} catch (Exception ignored) {}
 
 				openSettings(context, Settings.ACTION_LOCATION_SOURCE_SETTINGS);
 			}
@@ -594,9 +641,17 @@ public class NokiaQuickToggleManager {
 				if (Shizuku.isRunning()) {
 					String cmd = "cmd power set-mode " + (targetOn ? "1" : "0")
 							+ " ; settings put global low_power " + (targetOn ? "1" : "0");
-					Shizuku.exec(cmd);
-					return;
+					boolean res = Shizuku.exec(cmd);
+					if (res) return;
 				}
+
+				// 尝试 root 切换
+				try {
+					String suCmd = "settings put global low_power " + (targetOn ? "1" : "0");
+					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
+					p.waitFor();
+					if (p.exitValue() == 0) return;
+				} catch (Exception ignored) {}
 
 				openSettings(context, Settings.ACTION_BATTERY_SAVER_SETTINGS);
 			}
@@ -605,17 +660,23 @@ public class NokiaQuickToggleManager {
 
 	// ==================== 辅助方法 ====================
 
-	private static void openSettings(Context context, String action) {
-		try {
-			Intent intent = new Intent(action);
-			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			context.startActivity(intent);
-		} catch (Exception e) {
-			try {
-				Intent intent = new Intent(Settings.ACTION_SETTINGS);
-				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				context.startActivity(intent);
-			} catch (Exception ignored) {}
-		}
+	private static void openSettings(final Context context, final String action) {
+		if (context == null) return;
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					Intent intent = new Intent(action);
+					intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+					context.startActivity(intent);
+				} catch (Exception e) {
+					try {
+						Intent intent = new Intent(Settings.ACTION_SETTINGS);
+						intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+						context.startActivity(intent);
+					} catch (Exception ignored) {}
+				}
+			}
+		});
 	}
 }

@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.drawable.Drawable;
+import android.location.LocationManager;
 import android.media.AudioManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -471,6 +472,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
 		filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
 		filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
+		filter.addAction(LocationManager.PROVIDERS_CHANGED_ACTION);
+		filter.addAction("android.location.MODE_CHANGED");
 		requireContext().registerReceiver(toggleStateReceiver, filter);
 		receiverRegistered = true;
 		NokiaLog.i("Desktop", "已注册开关栏广播接收器");
