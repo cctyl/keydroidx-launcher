@@ -614,7 +614,6 @@ public class MicroActivity extends AppCompatActivity {
 			switch (act) {
 				case NokiaKeyBinding.ACTION_SOFT_LEFT: {
 					if (softBar.isMenuShowing()) {
-						softBar.performCurrentMenuSelection();
 						return true;
 					}
 					if (softBar instanceof ScreenSoftBar) {
@@ -641,7 +640,6 @@ public class MicroActivity extends AppCompatActivity {
 				}
 				case NokiaKeyBinding.ACTION_SELECT: {
 					if (softBar.isMenuShowing()) {
-						softBar.performCurrentMenuSelection();
 						return true;
 					}
 					if (softBar instanceof ScreenSoftBar) {

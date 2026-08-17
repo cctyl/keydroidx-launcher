@@ -269,8 +269,8 @@ class TextFieldImpl {
 			header.setOrientation(LinearLayout.HORIZONTAL);
 			header.setGravity(Gravity.CENTER_VERTICAL);
 			header.setBackgroundColor(0xFFD8DCE4);
-			int headerH = NokiaDimens.dp(res, 24);
-			int headerPadH = NokiaDimens.dp(res, 8);
+			int headerH = NokiaDimens.dp(res, 30);
+			int headerPadH = NokiaDimens.dp(res, 10);
 			header.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, headerH));
 			header.setPadding(headerPadH, 0, headerPadH, 0);
 
@@ -280,7 +280,7 @@ class TextFieldImpl {
 			titleTv.setEllipsize(TextUtils.TruncateAt.END);
 			titleTv.setTextColor(0xFF1F2937);
 			titleTv.setTypeface(Typeface.DEFAULT_BOLD);
-			NokiaDimens.textSize(titleTv, 12);
+			NokiaDimens.textSize(titleTv, 14);
 			if (title != null && !title.trim().isEmpty()) {
 				titleTv.setText(title);
 			}
@@ -288,8 +288,9 @@ class TextFieldImpl {
 
 			counterTextView = new TextView(context);
 			counterTextView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-			counterTextView.setTextColor(0xFF4B5563);
-			NokiaDimens.textSize(counterTextView, 11);
+			counterTextView.setTextColor(0xFF374151);
+			counterTextView.setTypeface(Typeface.DEFAULT_BOLD);
+			NokiaDimens.textSize(counterTextView, 13);
 			updateCounter();
 			header.addView(counterTextView);
 

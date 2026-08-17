@@ -269,11 +269,15 @@ public class NokiaOptionsDialog extends DialogFragment {
 	}
 
 	private void moveFocus(int step) {
-		int next = focusIndex + step;
-		while (next >= 0 && next < items.size() && !items.get(next).enabled) {
-			next += step;
+		if (items.isEmpty()) return;
+		int count = items.size();
+		int next = (focusIndex + step + count) % count;
+		int loopGuard = 0;
+		while (loopGuard < count && !items.get(next).enabled) {
+			next = (next + step + count) % count;
+			loopGuard++;
 		}
-		if (next >= 0 && next < items.size()) {
+		if (next >= 0 && next < count && items.get(next).enabled) {
 			setFocus(next);
 		}
 	}

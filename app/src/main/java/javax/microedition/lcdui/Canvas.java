@@ -1285,14 +1285,7 @@ public abstract class Canvas extends Displayable {
 		}
 
 		private void showPopup() {
-			OverlayView overlayView = overlayView();
-			if (overlayView == null) return;
-			PopupWindow popup = prepareMenu(fullscreen ? 0 : 1);
-			popup.setWidth(Math.min(displayWidth, displayHeight) / 2);
-			popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
-			int x = (int) (displayWidth - bounds.right);
-			int y = (int) (displayHeight - bounds.top);
-			popup.showAtLocation(overlayView, Gravity.RIGHT | Gravity.BOTTOM, x, y);
+			showOptionsMenu();
 		}
 
 		@Override
