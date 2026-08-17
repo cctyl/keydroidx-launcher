@@ -19,22 +19,34 @@
 package javax.microedition.lcdui;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
 import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.appcompat.widget.AppCompatEditText;
+
+import ru.playsoftware.j2meloader.nokia.NokiaDimens;
 
 import javax.microedition.lcdui.event.SimpleEvent;
 
 class TextFieldImpl {
 	private EditText textview;
+	private LinearLayout screenContainer;
+	private TextView counterTextView;
 	private TextBox ownerTextBox;
 
 	private String text;
@@ -206,25 +218,124 @@ class TextFieldImpl {
 				@Override
 				public void afterTextChanged(Editable s) {
 					text = s.toString();
+					updateCounter();
 					if (item != null) item.notifyStateChanged();
 					if (ownerTextBox != null) ownerTextBox.updateSoftBarText();
 				}
 			});
 
+			Resources res = context.getResources();
 			if (item != null) {
+				// Form 内部 TextField：卡片样式
+				GradientDrawable bg = new GradientDrawable();
+				bg.setColor(Color.WHITE);
+				bg.setStroke(NokiaDimens.dp(res, 1), 0xFFCCD2DB);
+				bg.setCornerRadius(NokiaDimens.dpF(res, 3));
+				textview.setBackground(bg);
+				int pad = NokiaDimens.dp(res, 6);
+				textview.setPadding(pad, pad, pad, pad);
+				textview.setTextColor(0xFF1F2937);
+				textview.setHintTextColor(0xFF8A95A5);
+				NokiaDimens.textSize(textview, 13);
 				textview.setOnFocusChangeListener((v, hasFocus) -> {
 					if (!hasFocus) item.notifyStateChanged();
 				});
 			} else {
-				textview.setLayoutParams(new LinearLayout.LayoutParams(
-						LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+				// 独立 TextBox 样式在 getScreenContainer 中统一装配
 				textview.setGravity(Gravity.TOP);
 			}
 		}
 		return textview;
 	}
 
+	private void updateCounter() {
+		if (counterTextView != null) {
+			int current = (text != null) ? text.length() : 0;
+			counterTextView.setText(current + "/" + maxSize);
+		}
+	}
+
+	/** 构造诺基亚 S40 纸质卡片编辑界面（供 TextBox 使用）。 */
+	View getScreenContainer(Context context) {
+		if (screenContainer == null) {
+			Resources res = context.getResources();
+			screenContainer = new LinearLayout(context);
+			screenContainer.setOrientation(LinearLayout.VERTICAL);
+			screenContainer.setBackgroundColor(0xFFEAEBED); // 经典冷灰蓝纸质底色
+
+			// 1. 顶部标题与字数栏
+			String title = (ownerTextBox != null) ? ownerTextBox.getTitle() : null;
+			LinearLayout header = new LinearLayout(context);
+			header.setOrientation(LinearLayout.HORIZONTAL);
+			header.setGravity(Gravity.CENTER_VERTICAL);
+			header.setBackgroundColor(0xFFD8DCE4);
+			int headerH = NokiaDimens.dp(res, 24);
+			int headerPadH = NokiaDimens.dp(res, 8);
+			header.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, headerH));
+			header.setPadding(headerPadH, 0, headerPadH, 0);
+
+			TextView titleTv = new TextView(context);
+			titleTv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+			titleTv.setSingleLine(true);
+			titleTv.setEllipsize(TextUtils.TruncateAt.END);
+			titleTv.setTextColor(0xFF1F2937);
+			titleTv.setTypeface(Typeface.DEFAULT_BOLD);
+			NokiaDimens.textSize(titleTv, 12);
+			if (title != null && !title.trim().isEmpty()) {
+				titleTv.setText(title);
+			}
+			header.addView(titleTv);
+
+			counterTextView = new TextView(context);
+			counterTextView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+			counterTextView.setTextColor(0xFF4B5563);
+			NokiaDimens.textSize(counterTextView, 11);
+			updateCounter();
+			header.addView(counterTextView);
+
+			screenContainer.addView(header);
+
+			// 顶部栏下方的微细分隔线
+			View divider = new View(context);
+			divider.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+			divider.setBackgroundColor(0xFFCAD0DB);
+			screenContainer.addView(divider);
+
+			// 2. 中间卡片输入区
+			EditText et = getView(context, null);
+			GradientDrawable cardBg = new GradientDrawable();
+			cardBg.setColor(Color.WHITE);
+			cardBg.setStroke(NokiaDimens.dp(res, 1), 0xFFCCD2DB);
+			cardBg.setCornerRadius(NokiaDimens.dpF(res, 3));
+			et.setBackground(cardBg);
+
+			int pad = NokiaDimens.dp(res, 8);
+			et.setPadding(pad, pad, pad, pad);
+			et.setTextColor(0xFF1F2937);
+			et.setHintTextColor(0xFF8A95A5);
+			NokiaDimens.textSize(et, 13);
+			et.setLineSpacing(NokiaDimens.dpF(res, 2), 1.0f);
+
+			LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f);
+			int margin = NokiaDimens.dp(res, 6);
+			etParams.setMargins(margin, margin, margin, margin);
+			et.setLayoutParams(etParams);
+
+			screenContainer.addView(et);
+		}
+		return screenContainer;
+	}
+
+	void requestTextFocus() {
+		if (textview != null) {
+			textview.requestFocus();
+		}
+	}
+
 	void clearScreenView() {
 		textview = null;
+		screenContainer = null;
+		counterTextView = null;
 	}
 }

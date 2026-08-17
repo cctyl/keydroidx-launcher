@@ -104,16 +104,13 @@ public class TextBox extends Screen {
 
 	/** 请求输入框获取 D-Pad 焦点（进入编辑界面时调用）。 */
 	public void requestTextFocus() {
-		View v = textField.getView(ContextHolder.getActivity(), null);
-		if (v != null) {
-			v.requestFocus();
-		}
+		textField.requestTextFocus();
 	}
 
 	@Override
 	public View getScreenView() {
 		Context context = ContextHolder.getActivity();
-		return textField.getView(context, null);
+		return textField.getScreenContainer(context);
 	}
 
 	@Override

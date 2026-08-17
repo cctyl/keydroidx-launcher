@@ -21,6 +21,7 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -72,8 +73,8 @@ public abstract class AbstractSoftKeysBar {
 
 	/** 供外部或软键触发当前菜单选中项的执行。 */
 	public void performCurrentMenuSelection() {
-		if (popup != null && popup.isShowing() && menuListView != null && adapter != null) {
-			int pos = menuListView.getSelectedItemPosition();
+		if (popup != null && popup.isShowing() && adapter != null) {
+			int pos = adapter.getSelectedPosition();
 			if (pos < 0 || pos >= adapter.getCount()) {
 				pos = 0;
 			}
@@ -123,17 +124,17 @@ public abstract class AbstractSoftKeysBar {
 			menuListView.setOnKeyListener((v, keyCode, event) -> {
 				if (event.getAction() == KeyEvent.ACTION_DOWN) {
 					int count = adapter.getCount();
-					int currentPos = menuListView.getSelectedItemPosition();
+					int currentPos = adapter.getSelectedPosition();
 					if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-						if (currentPos <= 0) {
-							menuListView.setSelection(count - 1);
-							return true;
-						}
+						int nextPos = (currentPos <= 0) ? (count - 1) : (currentPos - 1);
+						adapter.setSelectedPosition(nextPos);
+						menuListView.setSelection(nextPos);
+						return true;
 					} else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-						if (currentPos >= count - 1) {
-							menuListView.setSelection(0);
-							return true;
-						}
+						int nextPos = (currentPos >= count - 1) ? 0 : (currentPos + 1);
+						adapter.setSelectedPosition(nextPos);
+						menuListView.setSelection(nextPos);
+						return true;
 					} else if (keyCode == KeyEvent.KEYCODE_BACK) {
 						closeMenu();
 						return true;
@@ -143,6 +144,17 @@ public abstract class AbstractSoftKeysBar {
 					}
 				}
 				return false;
+			});
+
+			menuListView.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					adapter.setSelectedPosition(position);
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
+				}
 			});
 
 			popup.setContentView(menuListView);
@@ -171,6 +183,7 @@ public abstract class AbstractSoftKeysBar {
 		popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
 
 		// 默认高亮第一项
+		adapter.setSelectedPosition(0);
 		menuListView.post(() -> {
 			menuListView.requestFocus();
 			menuListView.setSelection(0);
@@ -284,23 +297,24 @@ public abstract class AbstractSoftKeysBar {
 
 	/** 诺基亚经典单行紧凑菜单 Adapter */
 	private static class NokiaMenuAdapter extends ArrayAdapter<Command> {
-		private final ColorStateList textColors;
+		private int selectedPosition = 0;
+		private final GradientDrawable focusedBg;
 
 		public NokiaMenuAdapter(Context context) {
 			super(context, 0, new ArrayList<>());
-			int[][] states = new int[][]{
-					new int[]{android.R.attr.state_focused},
-					new int[]{android.R.attr.state_selected},
-					new int[]{android.R.attr.state_pressed},
-					new int[]{}
-			};
-			int[] colors = new int[]{
-					0xFFFFFFFF, // 高亮白字
-					0xFFFFFFFF,
-					0xFFFFFFFF,
-					0xFF1F2937  // 常态深黑灰字
-			};
-			textColors = new ColorStateList(states, colors);
+			Resources res = context.getResources();
+			focusedBg = new GradientDrawable();
+			focusedBg.setColor(0xFF0055AA);
+			focusedBg.setCornerRadius(NokiaDimens.dpF(res, 2));
+		}
+
+		public void setSelectedPosition(int position) {
+			this.selectedPosition = position;
+			notifyDataSetChanged();
+		}
+
+		public int getSelectedPosition() {
+			return selectedPosition;
 		}
 
 		@Override
@@ -319,8 +333,17 @@ public abstract class AbstractSoftKeysBar {
 				tv.setSingleLine(true);
 				tv.setEllipsize(TextUtils.TruncateAt.END);
 				NokiaDimens.textSize(tv, 13);
-				tv.setTextColor(textColors);
-				tv.setDuplicateParentStateEnabled(true);
+			}
+
+			boolean isSelected = (position == selectedPosition);
+			if (isSelected) {
+				tv.setBackground(focusedBg);
+				tv.setTextColor(0xFFFFFFFF); // 选中的条目：蓝底白字
+				tv.setTypeface(Typeface.DEFAULT_BOLD);
+			} else {
+				tv.setBackgroundColor(0x00000000);
+				tv.setTextColor(0xFF1F2937); // 未选中的条目：深黑灰字，极其清晰！
+				tv.setTypeface(Typeface.DEFAULT);
 			}
 
 			Command cmd = getItem(position);
