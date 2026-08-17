@@ -360,13 +360,18 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			toggleStates = new boolean[count];
 		}
 
-		int cellWidth = NokiaDimens.dp(getResources(), 36);
 		int cellHeight = NokiaDimens.dp(getResources(), 32);
+		boolean useWeight = count <= 4;
+		int fixedCellWidth = NokiaDimens.dp(getResources(), 48);
 
 		for (int i = 0; i < count; i++) {
 			NokiaQuickToggleItem item = activeToggles.get(i);
 			LinearLayout cell = new LinearLayout(requireContext());
-			cell.setLayoutParams(new LinearLayout.LayoutParams(cellWidth, cellHeight));
+			if (useWeight) {
+				cell.setLayoutParams(new LinearLayout.LayoutParams(0, cellHeight, 1f));
+			} else {
+				cell.setLayoutParams(new LinearLayout.LayoutParams(fixedCellWidth, cellHeight));
+			}
 			cell.setOrientation(LinearLayout.VERTICAL);
 			cell.setGravity(Gravity.CENTER);
 			cell.setFocusable(true);
