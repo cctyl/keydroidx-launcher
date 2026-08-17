@@ -27,6 +27,7 @@ public class TextBox extends Screen {
 
 	public TextBox(String title, String text, int maxSize, int constraints) {
 		textField = new TextFieldImpl();
+		textField.setOwnerTextBox(this);
 		setTitle(title);
 		setMaxSize(maxSize);
 		setConstraints(constraints);
@@ -86,6 +87,19 @@ public class TextBox extends Screen {
 
 	public void delete(int offset, int length) {
 		textField.delete(offset, length);
+	}
+
+	public void updateSoftBarText() {
+		if (softBar != null) {
+			softBar.notifyChanged();
+		}
+	}
+
+	public void deletePreviousChar() {
+		int caret = textField.getCaretPosition();
+		if (caret > 0) {
+			textField.delete(caret - 1, 1);
+		}
 	}
 
 	@Override

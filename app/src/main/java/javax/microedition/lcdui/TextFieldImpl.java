@@ -35,6 +35,7 @@ import javax.microedition.lcdui.event.SimpleEvent;
 
 class TextFieldImpl {
 	private EditText textview;
+	private TextBox ownerTextBox;
 
 	private String text;
 	private int maxSize;
@@ -159,6 +160,10 @@ class TextFieldImpl {
 		return text.length();
 	}
 
+	void setOwnerTextBox(TextBox ownerTextBox) {
+		this.ownerTextBox = ownerTextBox;
+	}
+
 	int getCaretPosition() {
 		if (textview != null) {
 			return textview.getSelectionEnd();
@@ -168,8 +173,17 @@ class TextFieldImpl {
 	}
 
 	void delete(int offset, int length) {
+		if (text == null || offset < 0 || offset + length > text.length()) return;
 		String tmp = new StringBuilder(text).delete(offset, offset + length).toString();
-		setString(tmp);
+		this.text = tmp;
+		if (textview != null) {
+			textview.setText(tmp);
+			int newPos = Math.max(0, Math.min(offset, tmp.length()));
+			textview.setSelection(newPos);
+		}
+		if (ownerTextBox != null) {
+			ownerTextBox.updateSoftBarText();
+		}
 	}
 
 	EditText getView(Context context, Item item) {
@@ -193,6 +207,7 @@ class TextFieldImpl {
 				public void afterTextChanged(Editable s) {
 					text = s.toString();
 					if (item != null) item.notifyStateChanged();
+					if (ownerTextBox != null) ownerTextBox.updateSoftBarText();
 				}
 			});
 

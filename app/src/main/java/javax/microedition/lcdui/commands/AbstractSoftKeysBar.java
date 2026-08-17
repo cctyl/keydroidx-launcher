@@ -31,6 +31,7 @@ import java.util.List;
 
 import javax.microedition.lcdui.Command;
 import javax.microedition.lcdui.Displayable;
+import javax.microedition.lcdui.TextBox;
 import javax.microedition.lcdui.ViewHandler;
 import javax.microedition.util.ContextHolder;
 
@@ -70,7 +71,11 @@ public abstract class AbstractSoftKeysBar {
 			lv.setOnItemClickListener(this::onMenuItemClick);
 			popup.setOnDismissListener(() -> adapter.clear());
 		}
-		adapter.addAll(skip == 0 ? commands : commands.subList(skip, commands.size()));
+		List<Command> sub = skip == 0 ? new ArrayList<>(commands) : new ArrayList<>(commands.subList(skip, commands.size()));
+		if (target instanceof TextBox && ((TextBox) target).size() > 0 && right != null && !sub.contains(right)) {
+			sub.add(right);
+		}
+		adapter.addAll(sub);
 		return popup;
 	}
 
@@ -111,6 +116,10 @@ public abstract class AbstractSoftKeysBar {
 			i++;
 		}
 		menuStartIndex = i;
+	}
+
+	public boolean isMenuShowing() {
+		return popup != null && popup.isShowing();
 	}
 
 	public void closeMenu() {

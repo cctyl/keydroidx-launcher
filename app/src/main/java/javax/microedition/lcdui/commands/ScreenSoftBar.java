@@ -24,11 +24,13 @@ import android.widget.PopupWindow;
 
 import javax.microedition.lcdui.Command;
 import javax.microedition.lcdui.Screen;
+import javax.microedition.lcdui.TextBox;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.databinding.SoftButtonBarBinding;
 
 public class ScreenSoftBar extends AbstractSoftKeysBar {
+	private static final Object TAG_CLEAR = new Object();
 	private final SoftButtonBarBinding binding;
 
 	public ScreenSoftBar(Screen target, SoftButtonBarBinding binding) {
@@ -41,9 +43,25 @@ public class ScreenSoftBar extends AbstractSoftKeysBar {
 		notifyChanged();
 	}
 
+	public Button getLeftButton() {
+		return binding.leftButton;
+	}
+
+	public Button getMiddleButton() {
+		return binding.middleButton;
+	}
+
+	public Button getRightButton() {
+		return binding.rightButton;
+	}
+
 	private void onClick(View button) {
 		Object tag = button.getTag();
-		if (tag == null) {
+		if (tag == TAG_CLEAR) {
+			if (target instanceof TextBox) {
+				((TextBox) target).deletePreviousChar();
+			}
+		} else if (tag == null) {
 			PopupWindow popup = prepareMenu(menuStartIndex);
 			int y = binding.rightButton.getHeight();
 			View rootView = binding.rightButton.getRootView();
@@ -69,25 +87,46 @@ public class ScreenSoftBar extends AbstractSoftKeysBar {
 
 		super.onCommandsChanged();
 		int size = commands.size();
-		if (size == 0) {
+
+		boolean isTextBoxWithText = (target instanceof TextBox && ((TextBox) target).size() > 0);
+
+		if (size == 0 && !isTextBoxWithText) {
 			binding.rootLayout.setVisibility(View.GONE);
 			return;
 		}
-		if (size - menuStartIndex > 1) {
-			binding.leftButton.setVisibility(View.VISIBLE);
-			binding.leftButton.setText(R.string.cmd_menu);
-		} else if (menuStartIndex < size) {
-			Command left = commands.get(menuStartIndex);
-			setCommand(binding.leftButton, left);
-		}
-		if (right != null) {
-			setCommand(binding.rightButton, right);
+
+		if (isTextBoxWithText) {
+			// 诺基亚 S40 规范：有字时右软键动态显示为「清除」，点击删字
+			binding.rightButton.setVisibility(View.VISIBLE);
+			binding.rightButton.setText(R.string.cmd_clear);
+			binding.rightButton.setTag(TAG_CLEAR);
+
 			if (middle != null) {
 				setCommand(binding.middleButton, middle);
 			}
+
+			if (size - menuStartIndex > 0 || right != null) {
+				binding.leftButton.setVisibility(View.VISIBLE);
+				binding.leftButton.setText(R.string.cmd_menu);
+				binding.leftButton.setTag(null);
+			}
 		} else {
-			if (middle != null) {
-				setCommand(binding.rightButton, middle);
+			if (size - menuStartIndex > 1) {
+				binding.leftButton.setVisibility(View.VISIBLE);
+				binding.leftButton.setText(R.string.cmd_menu);
+			} else if (menuStartIndex < size) {
+				Command left = commands.get(menuStartIndex);
+				setCommand(binding.leftButton, left);
+			}
+			if (right != null) {
+				setCommand(binding.rightButton, right);
+				if (middle != null) {
+					setCommand(binding.middleButton, middle);
+				}
+			} else {
+				if (middle != null) {
+					setCommand(binding.rightButton, middle);
+				}
 			}
 		}
 		binding.rootLayout.setVisibility(View.VISIBLE);

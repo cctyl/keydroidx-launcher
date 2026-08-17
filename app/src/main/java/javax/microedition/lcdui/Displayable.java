@@ -47,6 +47,10 @@ public abstract class Displayable {
 	CommandListener listener;
 	AbstractSoftKeysBar softBar;
 
+	public AbstractSoftKeysBar getSoftBar() {
+		return softBar;
+	}
+
 	private final ArrayList<Command> commands = new ArrayList<>();
 
 	private String title;

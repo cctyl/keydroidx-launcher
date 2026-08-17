@@ -47,6 +47,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView.AdapterContextMenuInfo;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -74,7 +75,10 @@ import javax.microedition.lcdui.Canvas;
 import javax.microedition.lcdui.Displayable;
 import javax.microedition.lcdui.Form;
 import javax.microedition.lcdui.List;
+import javax.microedition.lcdui.Screen;
 import javax.microedition.lcdui.ViewHandler;
+import javax.microedition.lcdui.commands.AbstractSoftKeysBar;
+import javax.microedition.lcdui.commands.ScreenSoftBar;
 import javax.microedition.lcdui.event.SimpleEvent;
 import javax.microedition.lcdui.keyboard.VirtualKeyboard;
 import javax.microedition.location.LocationProviderImpl;
@@ -125,9 +129,13 @@ public class MicroActivity extends AppCompatActivity {
 		View view = binding.getRoot();
 		setContentView(view);
 		setSupportActionBar(binding.toolbar);
+		if (getSupportActionBar() != null) {
+			getSupportActionBar().hide();
+		}
+		binding.toolbar.setVisibility(View.GONE);
 
 		SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-		actionBarEnabled = sp.getBoolean(PREF_TOOLBAR, false);
+		actionBarEnabled = false;
 		statusBarEnabled = sp.getBoolean(PREF_STATUSBAR, false);
 		if (sp.getBoolean(PREF_ADD_CUTOUT_AREA, false) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 			getWindow().getAttributes().layoutInDisplayCutoutMode =
@@ -532,8 +540,7 @@ public class MicroActivity extends AppCompatActivity {
 
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
-		// 挂机菜单键（绿键）拦截：仅 jar 内生效，未绑定则透传给 MIDlet/系统。
-		// 位于 onKeyUp 之前，即使绿键被绑成 BACK/MENU 也天然优先，无冲突。
+		// 1. 挂机菜单键（绿键）拦截
 		int hangupKey = nokiaKeyCodes == null ? KeyEvent.KEYCODE_UNKNOWN
 				: nokiaKeyCodes[NokiaKeyBinding.ACTION_HANGUP];
 		if (hangupKey != KeyEvent.KEYCODE_UNKNOWN && event.getKeyCode() == hangupKey) {
@@ -542,64 +549,111 @@ public class MicroActivity extends AppCompatActivity {
 					&& !isFinishing()) {
 				showHangupMenu();
 			}
-			// DOWN/REPEAT/CANCELED UP 一律消费，不转发 MIDlet（防长按重复弹窗）
 			return true;
 		}
-		if (event.getKeyCode() == KeyEvent.KEYCODE_MENU)
+
+		// 2. Screen 模式（TextBox、Form、List、Alert）：通过诺基亚键码表路由到底部软键栏
+		if (current instanceof Screen) {
+			return dispatchScreenKey(event);
+		}
+
+		// 3. Canvas 模式：KEYCODE_MENU 透传给 MIDlet，其余走系统
+		if (event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
 			if (current instanceof Canvas && binding.displayableContainer.dispatchKeyEvent(event)) {
 				return true;
-			} else if (event.getAction() == KeyEvent.ACTION_DOWN) {
-				if (event.getRepeatCount() == 0) {
-					event.startTracking();
-					return true;
-				} else if (event.isLongPress()) {
-					return onKeyLongPress(event.getKeyCode(), event);
-				}
-			} else if (event.getAction() == KeyEvent.ACTION_UP) {
-				return onKeyUp(event.getKeyCode(), event);
 			}
+		}
+		return super.dispatchKeyEvent(event);
+	}
+
+	/**
+	 * 在 Screen（TextBox/Form/List/Alert）中，将诺基亚按键映射到底部软键栏操作。
+	 * 左软键 → 打开「操作/菜单」；右软键 → 清除/返回；方向键/确认键 → 菜单导航。
+	 */
+	private boolean dispatchScreenKey(KeyEvent event) {
+		Screen screen = (Screen) current;
+		AbstractSoftKeysBar softBar = screen.getSoftBar();
+		if (softBar == null) return super.dispatchKeyEvent(event);
+
+		int keyCode = event.getKeyCode();
+		int action = NokiaKeyBinding.resolveAction(nokiaKeyCodes, event);
+
+		if (action == NokiaKeyBinding.ACTION_SOFT_LEFT || keyCode == KeyEvent.KEYCODE_MENU || keyCode == menuKey) {
+			if (event.getAction() == KeyEvent.ACTION_UP && softBar instanceof ScreenSoftBar) {
+				Button leftBtn = ((ScreenSoftBar) softBar).getLeftButton();
+				if (leftBtn.getVisibility() == View.VISIBLE) {
+					leftBtn.performClick();
+					return true;
+				}
+			}
+			return true;
+		}
+
+		if (action == NokiaKeyBinding.ACTION_SOFT_RIGHT || keyCode == KeyEvent.KEYCODE_BACK) {
+			if (event.getAction() == KeyEvent.ACTION_UP) {
+				if (softBar.isMenuShowing()) {
+					softBar.closeMenu();
+					return true;
+				}
+				if (softBar instanceof ScreenSoftBar) {
+					Button rightBtn = ((ScreenSoftBar) softBar).getRightButton();
+					if (rightBtn.getVisibility() == View.VISIBLE) {
+						rightBtn.performClick();
+						return true;
+					}
+				}
+			}
+			return true;
+		}
+
+		if (action == NokiaKeyBinding.ACTION_SELECT || keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+			if (softBar.isMenuShowing()) {
+				return super.dispatchKeyEvent(event);
+			}
+			if (softBar instanceof ScreenSoftBar) {
+				Button midBtn = ((ScreenSoftBar) softBar).getMiddleButton();
+				if (midBtn.getVisibility() == View.VISIBLE) {
+					if (event.getAction() == KeyEvent.ACTION_UP) {
+						midBtn.performClick();
+					}
+					return true;
+				}
+			}
+		}
+
+		if (action == NokiaKeyBinding.ACTION_UP || action == NokiaKeyBinding.ACTION_DOWN) {
+			if (softBar.isMenuShowing()) {
+				return super.dispatchKeyEvent(event);
+			}
+		}
+
 		return super.dispatchKeyEvent(event);
 	}
 
 	@Override
-	public void openOptionsMenu() {
-		if (!actionBarEnabled &&
-				Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && current instanceof Canvas) {
-			showSystemUI();
-		}
-		super.openOptionsMenu();
-	}
-
-	@Override
-	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
-		if (keyCode == menuKey || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU) {
-			showExitConfirmation();
-			return true;
-		}
-		return super.onKeyLongPress(keyCode, event);
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		return super.onKeyUp(keyCode, event);
 	}
 
 	@Override
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
-		if (keyCode == KeyEvent.KEYCODE_MENU) {
-			return false;
-		}
 		return super.onKeyDown(keyCode, event);
 	}
 
 	@Override
-	public boolean onKeyUp(int keyCode, KeyEvent event) {
-		if ((keyCode == menuKey || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_MENU)
-				&& (event.getFlags() & (KeyEvent.FLAG_LONG_PRESS | KeyEvent.FLAG_CANCELED)) == 0) {
-			openOptionsMenu();
-			return true;
-		}
-		return super.onKeyUp(keyCode, event);
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+		return super.onKeyLongPress(keyCode, event);
 	}
 
 	@Override
 	public void onBackPressed() {
 		// Intentionally overridden by empty due to support for back-key remapping.
+	}
+
+	@Override
+	public void openOptionsMenu() {
+		// 诺基亚风格下，ActionBar 已隐藏，openOptionsMenu 被禁用
+		// 所有菜单操作由底部软键栏（ScreenSoftBar）处理
 	}
 
 	@Override
@@ -857,27 +911,12 @@ public class MicroActivity extends AppCompatActivity {
 			binding.displayableContainer.removeAllViews();
 			ActionBar actionBar = Objects.requireNonNull(getSupportActionBar());
 			LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) binding.toolbar.getLayoutParams();
-			int toolbarHeight = 0;
-			if (next instanceof Canvas) {
-				hideSystemUI();
-				if (!actionBarEnabled) {
-					actionBar.hide();
-				} else {
-					final String title = next.getTitle();
-					actionBar.setTitle(title == null ? appName : title);
-					toolbarHeight = (int) (getToolBarHeight() / 1.5);
-					layoutParams.height = toolbarHeight;
-				}
-			} else {
-				showSystemUI();
-				actionBar.show();
-				final String title = next != null ? next.getTitle() : null;
-				actionBar.setTitle(title == null ? appName : title);
-				toolbarHeight = getToolBarHeight();
-				layoutParams.height = toolbarHeight;
-			}
-			binding.overlayView.setLocation(0, toolbarHeight);
+			// 诺基亚风格：始终隐藏顶部 ActionBar，toolbarHeight=0
+			actionBar.hide();
+			binding.toolbar.setVisibility(View.GONE);
+			layoutParams.height = 0;
 			binding.toolbar.setLayoutParams(layoutParams);
+			binding.overlayView.setLocation(0, 0);
 			invalidateOptionsMenu();
 			if (next != null) {
 				binding.displayableContainer.addView(next.getDisplayableView());
