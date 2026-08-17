@@ -567,9 +567,16 @@ public class MicroActivity extends AppCompatActivity {
 		return super.dispatchKeyEvent(event);
 	}
 
+	/** 最近一次在 Screen 内按下的诺基亚动作（DOWN 时记录，UP 时消费执行）。 */
+	private int pendingScreenAction = -1;
+
 	/**
 	 * 在 Screen（TextBox/Form/List/Alert）中，将诺基亚按键映射到底部软键栏操作。
 	 * 左软键 → 打开「操作/菜单」；右软键 → 清除/返回；方向键/确认键 → 菜单导航。
+	 * <p>
+	 * 采用 DOWN/UP 配对：DOWN 时用 {@link NokiaKeyBinding#resolveAction(int[], KeyEvent)}
+	 * 解析动作并记录，UP 时按记录执行。绝不依赖 menuKey/keyCode 做 UP 期二次判断，
+	 * 避免 menuKey 默认值（KEYCODE_BACK）与右软键冲突导致误触发左软键。
 	 */
 	private boolean dispatchScreenKey(KeyEvent event) {
 		Screen screen = (Screen) current;
@@ -577,58 +584,77 @@ public class MicroActivity extends AppCompatActivity {
 		if (softBar == null) return super.dispatchKeyEvent(event);
 
 		int keyCode = event.getKeyCode();
-		int action = NokiaKeyBinding.resolveAction(nokiaKeyCodes, event);
 
-		if (action == NokiaKeyBinding.ACTION_SOFT_LEFT || keyCode == KeyEvent.KEYCODE_MENU || keyCode == menuKey) {
-			if (event.getAction() == KeyEvent.ACTION_UP && softBar instanceof ScreenSoftBar) {
-				Button leftBtn = ((ScreenSoftBar) softBar).getLeftButton();
-				if (leftBtn.getVisibility() == View.VISIBLE) {
-					leftBtn.performClick();
-					return true;
-				}
+		if (event.getAction() == KeyEvent.ACTION_DOWN) {
+			// DOWN：用键码表解析动作（此时 resolveAction 才有效）
+			int action = NokiaKeyBinding.resolveAction(nokiaKeyCodes, event);
+			if (action >= 0) {
+				pendingScreenAction = action;
+				return true;
 			}
-			return true;
+			// 键码表未命中（如默认方案未绑定的键）：用标准兜底
+			if (keyCode == KeyEvent.KEYCODE_BACK) {
+				pendingScreenAction = NokiaKeyBinding.ACTION_SOFT_RIGHT;
+				return true;
+			}
+			if (keyCode == KeyEvent.KEYCODE_MENU) {
+				pendingScreenAction = NokiaKeyBinding.ACTION_SOFT_LEFT;
+				return true;
+			}
+			// 方向键/数字键等交给系统（编辑框光标、输入、菜单 ListView 导航）
+			return super.dispatchKeyEvent(event);
 		}
 
-		if (action == NokiaKeyBinding.ACTION_SOFT_RIGHT || keyCode == KeyEvent.KEYCODE_BACK) {
-			if (event.getAction() == KeyEvent.ACTION_UP) {
-				if (softBar.isMenuShowing()) {
-					softBar.closeMenu();
+		if (event.getAction() == KeyEvent.ACTION_UP) {
+			int act = pendingScreenAction;
+			pendingScreenAction = -1;
+			if ((event.getFlags() & KeyEvent.FLAG_CANCELED) != 0) {
+				return act >= 0;
+			}
+			switch (act) {
+				case NokiaKeyBinding.ACTION_SOFT_LEFT: {
+					if (softBar instanceof ScreenSoftBar) {
+						Button leftBtn = ((ScreenSoftBar) softBar).getLeftButton();
+						if (leftBtn.getVisibility() == View.VISIBLE) {
+							leftBtn.performClick();
+						}
+					}
 					return true;
 				}
-				if (softBar instanceof ScreenSoftBar) {
-					Button rightBtn = ((ScreenSoftBar) softBar).getRightButton();
-					if (rightBtn.getVisibility() == View.VISIBLE) {
-						rightBtn.performClick();
+				case NokiaKeyBinding.ACTION_SOFT_RIGHT: {
+					if (softBar.isMenuShowing()) {
+						softBar.closeMenu();
 						return true;
 					}
-				}
-			}
-			return true;
-		}
-
-		if (action == NokiaKeyBinding.ACTION_SELECT || keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-			if (softBar.isMenuShowing()) {
-				return super.dispatchKeyEvent(event);
-			}
-			if (softBar instanceof ScreenSoftBar) {
-				Button midBtn = ((ScreenSoftBar) softBar).getMiddleButton();
-				if (midBtn.getVisibility() == View.VISIBLE) {
-					if (event.getAction() == KeyEvent.ACTION_UP) {
-						midBtn.performClick();
+					if (softBar instanceof ScreenSoftBar) {
+						Button rightBtn = ((ScreenSoftBar) softBar).getRightButton();
+						if (rightBtn.getVisibility() == View.VISIBLE) {
+							rightBtn.performClick();
+							return true;
+						}
 					}
 					return true;
 				}
+				case NokiaKeyBinding.ACTION_SELECT: {
+					if (softBar.isMenuShowing()) {
+						return super.dispatchKeyEvent(event);
+					}
+					if (softBar instanceof ScreenSoftBar) {
+						Button midBtn = ((ScreenSoftBar) softBar).getMiddleButton();
+						if (midBtn.getVisibility() == View.VISIBLE) {
+							midBtn.performClick();
+							return true;
+						}
+					}
+					return super.dispatchKeyEvent(event);
+				}
+				default:
+					return super.dispatchKeyEvent(event);
 			}
 		}
 
-		if (action == NokiaKeyBinding.ACTION_UP || action == NokiaKeyBinding.ACTION_DOWN) {
-			if (softBar.isMenuShowing()) {
-				return super.dispatchKeyEvent(event);
-			}
-		}
-
-		return super.dispatchKeyEvent(event);
+		// ACTION_REPEAT 等：已由 DOWN 消费，直接吞掉
+		return true;
 	}
 
 	@Override
