@@ -1072,28 +1072,23 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private boolean moveUp() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
-			if (focusIndex == SHORTCUT_FIRST) {
-				// 循环到最底下：开关栏 → 组件区末项 → 快捷栏末项
-				if (toggleCount() > 0) newIdx = toggleLast() - 1;
-				else if (widgetCount > 0) newIdx = widgetLast() - 1;
-				else newIdx = shortcutLast() - 1;
-			} else {
-				newIdx = SHORTCUT_FIRST;
-			}
+			// 在顶部快捷栏按 UP：循环跳到底部区域（开关栏或组件区最末项）
+			if (toggleCount() > 0) newIdx = toggleFirst();
+			else if (widgetCount > 0) newIdx = widgetLast() - 1;
 		} else if (isInWidgets()) {
+			// 在组件区按 UP：上一行组件，若已是第一行则跳入顶部快捷栏
 			if (focusIndex > widgetFirst()) {
 				newIdx = focusIndex - 1;
 			} else {
-				if (shortcutCount > 0) newIdx = shortcutLast() - 1;
-				else if (toggleCount() > 0) newIdx = toggleLast() - 1;
+				if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
+				else if (toggleCount() > 0) newIdx = toggleFirst();
 			}
 		} else if (isInToggles()) {
-			if (focusIndex > toggleFirst()) {
-				newIdx = focusIndex - 1;
-			} else {
-				if (widgetCount > 0) newIdx = widgetLast() - 1;
-				else if (shortcutCount > 0) newIdx = shortcutLast() - 1;
-				else newIdx = toggleLast() - 1;
+			// 在开关栏按 UP：直接向上离开开关栏，跳入组件区末项或顶部快捷栏
+			if (widgetCount > 0) {
+				newIdx = widgetLast() - 1;
+			} else if (shortcutCount > 0) {
+				newIdx = SHORTCUT_FIRST;
 			}
 		}
 		return applyFocus(newIdx);
@@ -1102,26 +1097,27 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private boolean moveDown() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
+			// 在顶部快捷栏按 DOWN：直接向下离开快捷栏，跳入组件区第一项或开关栏
 			if (widgetCount > 0) {
 				newIdx = widgetFirst();
 			} else if (toggleCount() > 0) {
 				newIdx = toggleFirst();
-			} else {
-				newIdx = SHORTCUT_FIRST;
 			}
 		} else if (isInWidgets()) {
+			// 在组件区按 DOWN：下一行组件，若已是最后一行则跳入开关栏（或循环回顶部）
 			if (focusIndex < widgetLast() - 1) {
 				newIdx = focusIndex + 1;
 			} else if (toggleCount() > 0) {
 				newIdx = toggleFirst();
-			} else {
-				if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
+			} else if (shortcutCount > 0) {
+				newIdx = SHORTCUT_FIRST;
 			}
 		} else if (isInToggles()) {
-			if (focusIndex < toggleLast() - 1) {
-				newIdx = focusIndex + 1;
-			} else {
+			// 在开关栏按 DOWN：直接向下离开开关栏，循环回到顶部快捷栏或组件区第一项
+			if (shortcutCount > 0) {
 				newIdx = SHORTCUT_FIRST;
+			} else if (widgetCount > 0) {
+				newIdx = widgetFirst();
 			}
 		}
 		return applyFocus(newIdx);
@@ -1130,18 +1126,20 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private boolean moveLeft() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
+			// 快捷栏横向循环向左
 			if (focusIndex > SHORTCUT_FIRST) {
 				newIdx = focusIndex - 1;
 			} else if (shortcutCount > 1) {
 				newIdx = shortcutLast() - 1;
 			}
 		} else if (isInWidgets()) {
-			if (shortcutCount > 0) newIdx = shortcutLast() - 1;
-			else if (toggleCount() > 0) newIdx = toggleLast() - 1;
+			// 组件区为纵向单列，按 LEFT 保持聚焦，不横向乱跳
+			return false;
 		} else if (isInToggles()) {
+			// 开关栏横向循环向左
 			if (focusIndex > toggleFirst()) {
 				newIdx = focusIndex - 1;
-			} else {
+			} else if (toggleCount() > 1) {
 				newIdx = toggleLast() - 1;
 			}
 		}
@@ -1151,18 +1149,20 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private boolean moveRight() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
+			// 快捷栏横向循环向右
 			if (focusIndex < shortcutLast() - 1) {
 				newIdx = focusIndex + 1;
 			} else if (shortcutCount > 1) {
 				newIdx = SHORTCUT_FIRST;
 			}
 		} else if (isInWidgets()) {
-			if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
-			else if (toggleCount() > 0) newIdx = toggleFirst();
+			// 组件区为纵向单列，按 RIGHT 保持聚焦，不横向乱跳
+			return false;
 		} else if (isInToggles()) {
+			// 开关栏横向循环向右
 			if (focusIndex < toggleLast() - 1) {
 				newIdx = focusIndex + 1;
-			} else {
+			} else if (toggleCount() > 1) {
 				newIdx = toggleFirst();
 			}
 		}
