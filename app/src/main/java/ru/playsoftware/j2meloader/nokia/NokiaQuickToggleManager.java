@@ -479,20 +479,31 @@ public class NokiaQuickToggleManager {
 	public static boolean isLocationOn(Context context) {
 		if (context == null) return false;
 		// 1. Android 4.4+ (API 19+) 官方推荐首选：查询 Secure.LOCATION_MODE
+		if (Build.VERSION.SDK_INT >= 19) {
+			try {
+				int mode = Settings.Secure.getInt(context.getContentResolver(), Settings.Secure.LOCATION_MODE);
+				return mode != Settings.Secure.LOCATION_MODE_OFF;
+			} catch (Exception ignored) {}
+		}
+
+		// 2. 读取 LOCATION_PROVIDERS_ALLOWED
 		try {
-			int mode = Settings.Secure.getInt(context.getContentResolver(),
-					Settings.Secure.LOCATION_MODE, Settings.Secure.LOCATION_MODE_OFF);
-			if (mode != Settings.Secure.LOCATION_MODE_OFF) {
-				return true;
+			String allowed = Settings.Secure.getString(context.getContentResolver(),
+					Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
+			if (allowed != null) {
+				allowed = allowed.trim();
+				if (allowed.isEmpty()) return false;
+				boolean hasGps = allowed.contains("gps") && !allowed.contains("-gps");
+				boolean hasNetwork = allowed.contains("network") && !allowed.contains("-network");
+				return hasGps || hasNetwork;
 			}
 		} catch (Exception ignored) {}
 
-		// 2. 降级：检查 GPS 或 Network Provider
+		// 3. 降级：仅检查 GPS_PROVIDER
 		try {
 			LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
 			if (lm != null) {
-				return lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
-						|| lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+				return lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
 			}
 		} catch (Exception ignored) {}
 		return false;
@@ -502,11 +513,12 @@ public class NokiaQuickToggleManager {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
+				int mode = targetOn ? Settings.Secure.LOCATION_MODE_HIGH_ACCURACY : Settings.Secure.LOCATION_MODE_OFF;
+				String providers = targetOn ? "gps,network" : "";
+
 				if (Shizuku.isRunning()) {
-					int mode = targetOn ? Settings.Secure.LOCATION_MODE_HIGH_ACCURACY : Settings.Secure.LOCATION_MODE_OFF;
-					String providers = targetOn ? "+gps,+network" : "-gps,-network";
 					String cmd = "settings put secure location_mode " + mode
-							+ " ; settings put secure location_providers_allowed " + providers;
+							+ " ; settings put secure location_providers_allowed \"" + providers + "\"";
 					if (Build.VERSION.SDK_INT >= 24) {
 						cmd += " ; cmd location set-location-enabled " + (targetOn ? "true" : "false");
 					}
@@ -516,10 +528,8 @@ public class NokiaQuickToggleManager {
 
 				// 尝试 root 切换（针对 4.4 等已 root 设备）
 				try {
-					int mode = targetOn ? Settings.Secure.LOCATION_MODE_HIGH_ACCURACY : Settings.Secure.LOCATION_MODE_OFF;
-					String providers = targetOn ? "+gps,+network" : "-gps,-network";
 					String suCmd = "settings put secure location_mode " + mode
-							+ " ; settings put secure location_providers_allowed " + providers;
+							+ " ; settings put secure location_providers_allowed '" + providers + "'";
 					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
 					p.waitFor();
 					if (p.exitValue() == 0) return;
