@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 自动旋转屏幕 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16.48 2.52c3.27 1.55 5.61 4.72 5.97 8.48h1.5c-0.47-4.82-3.66-8.73-8-10.23V0l-4 3.5 4 3.5V4.2c-4.42 0-8 3.58-8 8 0 1.57 0.46 3.03 1.24 4.26L7.7 15.01C7.26 14.12 7 13.09 7 12c0-3.31 2.69-6 6-6v2.5l4-3.5-4-3.5v1.52zM7.52 21.48C4.25 19.93 1.91 16.76 1.55 13H0.05c0.47 4.82 3.66 8.73 8 10.23V24l4-3.5-4-3.5v2.8c4.42 0 8-3.58 8-8 0-1.57-0.46-3.03-1.24-4.26l-1.49 1.45c0.44 0.89 0.7 1.92 0.7 3.01 0 3.31-2.69 6-6 6v-2.5l-4 3.5 4 3.5v-1.52z" />
+</vector>

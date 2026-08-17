@@ -1,11 +1,17 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.app.ActivityManager;
+import android.bluetooth.BluetoothAdapter;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.drawable.Drawable;
+import android.media.AudioManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
@@ -15,9 +21,11 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.StatFs;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -39,6 +47,7 @@ import java.util.List;
 import java.util.Locale;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.mini_shizuku.Shizuku;
 
 
 /**
@@ -72,6 +81,17 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	/** 快捷栏第一个焦点索引 */
 	private static final int SHORTCUT_FIRST = 0;
 
+	// ---- 便捷开关栏 ----
+
+	private HorizontalScrollView quickToggleScroll;
+	private LinearLayout quickToggleBar;
+	private View quickToggleDivider;
+	private final List<NokiaQuickToggleItem> activeToggles = new ArrayList<>();
+	private final List<View> toggleCells = new ArrayList<>();
+	private boolean[] toggleStates = new boolean[0];
+	private BroadcastReceiver toggleStateReceiver;
+	private boolean receiverRegistered = false;
+
 	@Override
 	protected int getLayoutRes() {
 		return R.layout.fragment_nokia_desktop;
@@ -91,11 +111,15 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 点线分割线
 		View dividerTop = view.findViewById(R.id.shortcutDividerTop);
 		View dividerBottom = view.findViewById(R.id.shortcutDivider);
+		View toggleDivider = view.findViewById(R.id.quickToggleDivider);
 		if (dividerTop != null) {
 			dividerTop.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
 		}
 		if (dividerBottom != null) {
 			dividerBottom.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
+		}
+		if (toggleDivider != null) {
+			toggleDivider.setBackground(new NokiaDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
 		}
 
 		settingsStorage = new NokiaSettingsStorage(requireContext());
@@ -109,6 +133,25 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 		loadShortcutBarAsync(view);
 		rebuildWidgetArea(view);
+
+		// 便捷开关栏
+		quickToggleScroll = view.findViewById(R.id.quickToggleScroll);
+		quickToggleBar = view.findViewById(R.id.quickToggleBar);
+		quickToggleDivider = view.findViewById(R.id.quickToggleDivider);
+		if (quickToggleBar != null) {
+			buildToggleBar();
+			syncToggleStatesFromSystem();
+			// rebuildWidgetArea 已在 buildToggleBar 前调用（当时 toggleCells 为空），
+			// 这里手动把开关单元格补进焦点列表；之后快捷栏异步加载完成会整体重建
+			for (View cell : toggleCells) {
+				if (cell != null) {
+					focusTargets.add(cell);
+				}
+			}
+		}
+
+		// 注册广播接收器监听系统开关状态变化
+		registerToggleReceiver();
 
 		NokiaLog.i("Desktop", "桌面待机屏初始化完成：快捷栏 " + shortcutCount
 				+ " 项，组件区 " + widgetCount + " 项");
@@ -126,7 +169,17 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		}
 		// 异步刷新后台管理组件计数（countBackgroundProcesses 含 shizuku TCP，不能在主线程）
 		refreshBgCountAsync();
+		// 更新开关栏状态
+		if (quickToggleBar != null) {
+			syncToggleStatesFromSystem();
+		}
 		NokiaLog.d("Desktop", "桌面 onResume，已刷新组件区");
+	}
+
+	@Override
+	public void onPause() {
+		super.onPause();
+		unregisterToggleReceiver();
 	}
 
 	/** 后台线程计算后台进程数并回主线程刷新组件区（避免主线程 TCP 卡顿）。 */
@@ -201,6 +254,13 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 收集组件区焦点（排在快捷项之后）
 		collectWidgetTargets(view);
 
+		// 追加便捷开关栏的所有单元格到焦点列表
+		for (View cell : toggleCells) {
+			if (cell != null) {
+				focusTargets.add(cell);
+			}
+		}
+
 		long buildElapsed = System.currentTimeMillis() - buildStart;
 		NokiaLog.i("Desktop", "快捷栏已构建：" + apps.size() + " 项，共 " + focusTargets.size()
 				+ " 个焦点，耗时 " + buildElapsed + "ms");
@@ -261,9 +321,170 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 重新收集
 		collectWidgetTargets(view);
 
+		// 追加便捷开关栏的所有单元格到焦点列表
+		for (View cell : toggleCells) {
+			if (cell != null) {
+				focusTargets.add(cell);
+			}
+		}
+
 		// 如果当前焦点索引超出范围，复位
 		if (focusIndex >= focusTargets.size()) {
 			setFocusIndex(Math.max(0, focusTargets.size() - 1));
+		}
+	}
+
+	// ---- 便捷开关栏 ----
+
+	/** 构建开关单元格（根据 NokiaQuickToggleStorage 中启用的开关动态创建）。 */
+	private void buildToggleBar() {
+		if (quickToggleBar == null) return;
+		quickToggleBar.removeAllViews();
+		toggleCells.clear();
+
+		activeToggles.clear();
+		activeToggles.addAll(NokiaQuickToggleStorage.getEnabledToggles(requireContext()));
+		int count = activeToggles.size();
+
+		if (count == 0) {
+			if (quickToggleScroll != null) quickToggleScroll.setVisibility(View.GONE);
+			if (quickToggleDivider != null) quickToggleDivider.setVisibility(View.GONE);
+			toggleStates = new boolean[0];
+			return;
+		}
+
+		if (quickToggleScroll != null) quickToggleScroll.setVisibility(View.VISIBLE);
+		if (quickToggleDivider != null) quickToggleDivider.setVisibility(View.VISIBLE);
+
+		if (toggleStates.length != count) {
+			toggleStates = new boolean[count];
+		}
+
+		boolean useWeight = count <= 4;
+		int cellWidth = NokiaDimens.dp(getResources(), 52);
+		int cellHeight = NokiaDimens.dp(getResources(), 32);
+
+		for (int i = 0; i < count; i++) {
+			NokiaQuickToggleItem item = activeToggles.get(i);
+			LinearLayout cell = new LinearLayout(requireContext());
+			if (useWeight) {
+				cell.setLayoutParams(new LinearLayout.LayoutParams(
+						0, cellHeight, 1f));
+			} else {
+				cell.setLayoutParams(new LinearLayout.LayoutParams(
+						cellWidth, cellHeight));
+			}
+			cell.setOrientation(LinearLayout.VERTICAL);
+			cell.setGravity(Gravity.CENTER);
+			cell.setFocusable(true);
+			cell.setClickable(true);
+
+			// 图标
+			ImageView iv = new ImageView(requireContext());
+			iv.setLayoutParams(new LinearLayout.LayoutParams(
+					NokiaDimens.dp(getResources(), 18), NokiaDimens.dp(getResources(), 18)));
+			iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+			iv.setImageResource(item.iconRes);
+			iv.setTag("icon");
+			cell.addView(iv);
+
+			// 状态指示小圆点
+			View dot = new View(requireContext());
+			LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(
+					NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4));
+			dotLp.setMargins(0, NokiaDimens.dp(getResources(), 1), 0, 0);
+			dot.setLayoutParams(dotLp);
+			dot.setTag("dot");
+			cell.addView(dot);
+
+			final int index = i;
+			cell.setOnClickListener(v -> {
+				toggleItem(index);
+			});
+
+			quickToggleBar.addView(cell);
+			toggleCells.add(cell);
+		}
+	}
+
+	/** 从系统同步所有已启用开关的真实状态并刷新视图。 */
+	private void syncToggleStatesFromSystem() {
+		if (activeToggles.isEmpty()) return;
+		Context ctx = requireContext().getApplicationContext();
+		if (toggleStates.length != activeToggles.size()) {
+			toggleStates = new boolean[activeToggles.size()];
+		}
+		for (int i = 0; i < activeToggles.size(); i++) {
+			toggleStates[i] = NokiaQuickToggleManager.isToggleOn(ctx, activeToggles.get(i).type);
+		}
+		renderToggleViews();
+	}
+
+	/** 纯视图渲染：根据当前内存中的 toggleStates[] 刷新单元格图标和指示灯（0 延迟）。 */
+	private void renderToggleViews() {
+		for (int i = 0; i < toggleCells.size(); i++) {
+			View cell = toggleCells.get(i);
+			if (cell == null) continue;
+			boolean on = (i < toggleStates.length) && toggleStates[i];
+
+			ImageView iv = cell.findViewWithTag("icon");
+			if (iv != null) {
+				iv.setAlpha(on ? 1.0f : 0.35f);
+			}
+			View dot = cell.findViewWithTag("dot");
+			if (dot != null) {
+				android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+				gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+				gd.setColor(on ? 0xFF4FC3F7 : 0xFF445566);
+				dot.setBackground(gd);
+			}
+		}
+	}
+
+	/** 切换指定索引的开关状态（0 毫秒乐观更新图标 + 执行）。 */
+	private void toggleItem(int index) {
+		if (index < 0 || index >= activeToggles.size() || index >= toggleStates.length) return;
+		final Context ctx = requireContext();
+		final NokiaQuickToggleItem item = activeToggles.get(index);
+		final boolean targetOn = !toggleStates[index];
+
+		// 1. 立即乐观更新内存状态并刷新 UI，消除点击延迟感
+		toggleStates[index] = targetOn;
+		renderToggleViews();
+
+		// 2. 异步执行切换链路
+		NokiaQuickToggleManager.toggle(ctx, item.type, targetOn);
+	}
+
+	// ---- 广播接收器 ----
+
+	private void registerToggleReceiver() {
+		if (receiverRegistered) return;
+		toggleStateReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				if (!isAdded() || quickToggleBar == null) return;
+				syncToggleStatesFromSystem();
+			}
+		};
+		IntentFilter filter = new IntentFilter();
+		filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+		filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+		filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+		filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+		filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
+		requireContext().registerReceiver(toggleStateReceiver, filter);
+		receiverRegistered = true;
+		NokiaLog.i("Desktop", "已注册开关栏广播接收器");
+	}
+
+	private void unregisterToggleReceiver() {
+		if (toggleStateReceiver != null && receiverRegistered) {
+			try {
+				requireContext().unregisterReceiver(toggleStateReceiver);
+			} catch (Exception ignored) {}
+			receiverRegistered = false;
+			NokiaLog.i("Desktop", "已注销开关栏广播接收器");
 		}
 	}
 
@@ -847,19 +1068,39 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private int shortcutLast() { return shortcutCount; }
 	private int widgetFirst() { return shortcutCount; }
 	private int widgetLast() { return shortcutCount + widgetCount; }
+	private int toggleCount() { return toggleCells.size(); }
+	private int toggleFirst() { return shortcutCount + widgetCount; }
+	private int toggleLast() { return toggleFirst() + toggleCount(); }
 
 	private boolean isInShortcuts() { return focusIndex >= SHORTCUT_FIRST && focusIndex < shortcutLast(); }
 	private boolean isInWidgets() { return focusIndex >= widgetFirst() && focusIndex < widgetLast(); }
+	private boolean isInToggles() { return focusIndex >= toggleFirst() && focusIndex < toggleLast(); }
 
 	private boolean moveUp() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
-			if (focusIndex != SHORTCUT_FIRST) newIdx = SHORTCUT_FIRST;
+			if (focusIndex == SHORTCUT_FIRST) {
+				// 循环到最底下：开关栏 → 组件区末项 → 快捷栏末项
+				if (toggleCount() > 0) newIdx = toggleLast() - 1;
+				else if (widgetCount > 0) newIdx = widgetLast() - 1;
+				else newIdx = shortcutLast() - 1;
+			} else {
+				newIdx = SHORTCUT_FIRST;
+			}
 		} else if (isInWidgets()) {
 			if (focusIndex > widgetFirst()) {
 				newIdx = focusIndex - 1;
 			} else {
 				if (shortcutCount > 0) newIdx = shortcutLast() - 1;
+				else if (toggleCount() > 0) newIdx = toggleLast() - 1;
+			}
+		} else if (isInToggles()) {
+			if (focusIndex > toggleFirst()) {
+				newIdx = focusIndex - 1;
+			} else {
+				if (widgetCount > 0) newIdx = widgetLast() - 1;
+				else if (shortcutCount > 0) newIdx = shortcutLast() - 1;
+				else newIdx = toggleLast() - 1;
 			}
 		}
 		return applyFocus(newIdx);
@@ -870,12 +1111,24 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		if (isInShortcuts()) {
 			if (widgetCount > 0) {
 				newIdx = widgetFirst();
+			} else if (toggleCount() > 0) {
+				newIdx = toggleFirst();
+			} else {
+				newIdx = SHORTCUT_FIRST;
 			}
 		} else if (isInWidgets()) {
 			if (focusIndex < widgetLast() - 1) {
 				newIdx = focusIndex + 1;
+			} else if (toggleCount() > 0) {
+				newIdx = toggleFirst();
 			} else {
 				if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
+			}
+		} else if (isInToggles()) {
+			if (focusIndex < toggleLast() - 1) {
+				newIdx = focusIndex + 1;
+			} else {
+				newIdx = SHORTCUT_FIRST;
 			}
 		}
 		return applyFocus(newIdx);
@@ -891,6 +1144,13 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			}
 		} else if (isInWidgets()) {
 			if (shortcutCount > 0) newIdx = shortcutLast() - 1;
+			else if (toggleCount() > 0) newIdx = toggleLast() - 1;
+		} else if (isInToggles()) {
+			if (focusIndex > toggleFirst()) {
+				newIdx = focusIndex - 1;
+			} else {
+				newIdx = toggleLast() - 1;
+			}
 		}
 		return applyFocus(newIdx);
 	}
@@ -905,6 +1165,13 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			}
 		} else if (isInWidgets()) {
 			if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
+			else if (toggleCount() > 0) newIdx = toggleFirst();
+		} else if (isInToggles()) {
+			if (focusIndex < toggleLast() - 1) {
+				newIdx = focusIndex + 1;
+			} else {
+				newIdx = toggleFirst();
+			}
 		}
 		return applyFocus(newIdx);
 	}
@@ -920,20 +1187,26 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	}
 
 	private void scrollToVisible(int index) {
-		if (!isInShortcuts()) return;
 		if (index < 0 || index >= focusTargets.size()) return;
 		View target = focusTargets.get(index);
 		if (target == null) return;
 
-		ViewParent parent = target.getParent();
-		while (parent instanceof View) {
-			View pv = (View) parent;
-			if (pv.getId() == R.id.shortcutBar) {
-				int scrollX = target.getLeft() - pv.getPaddingLeft();
-				pv.scrollTo(Math.max(0, scrollX - NokiaDimens.dp(getResources(), 12)), 0);
-				return;
+		if (isInShortcuts()) {
+			ViewParent parent = target.getParent();
+			while (parent instanceof View) {
+				View pv = (View) parent;
+				if (pv.getId() == R.id.shortcutBar) {
+					int scrollX = target.getLeft() - pv.getPaddingLeft();
+					pv.scrollTo(Math.max(0, scrollX - NokiaDimens.dp(getResources(), 12)), 0);
+					return;
+				}
+				parent = pv.getParent();
 			}
-			parent = pv.getParent();
+		} else if (isInToggles()) {
+			if (quickToggleScroll != null) {
+				int scrollX = target.getLeft() - quickToggleScroll.getPaddingLeft();
+				quickToggleScroll.smoothScrollTo(Math.max(0, scrollX - NokiaDimens.dp(getResources(), 16)), 0);
+			}
 		}
 	}
 
@@ -993,9 +1266,15 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	@Override
 	public void onDestroyView() {
 		super.onDestroyView();
+		unregisterToggleReceiver();
 		if (bubbleHandler != null) bubbleHandler.removeCallbacks(bubbleHideRunnable);
 		bubbleHandler = null;
 		shortcutNameBubble = null;
 		shortcutBar = null;
+		quickToggleScroll = null;
+		quickToggleBar = null;
+		quickToggleDivider = null;
+		toggleCells.clear();
+		activeToggles.clear();
 	}
 }

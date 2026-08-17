@@ -65,6 +65,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 				return new int[]{
 						R.drawable.ic_nokia_settings, // 顶部快捷栏设置
 						R.drawable.s60_settings_alt,  // 桌面组件设置
+						R.drawable.ic_nokia_settings, // 快捷开关
 				};
 			case GROUP_SYSTEM:
 				return new int[]{
@@ -83,7 +84,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			case GROUP_KEYS:
 				return new String[]{"按键绑定", "应用向导"};
 			case GROUP_CONTENT:
-				return new String[]{"顶部快捷栏设置", "桌面组件设置"};
+				return new String[]{"顶部快捷栏设置", "桌面组件设置", "快捷开关"};
 			case GROUP_SYSTEM:
 				return new String[]{"日志记录", "默认桌面设置"};
 			default:
@@ -275,6 +276,10 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			case 1:
 				NokiaLog.i("SettingsGroup", "进入桌面组件设置");
 				host.openFragment(new NokiaWidgetSettingsFragment());
+				return true;
+			case 2:
+				NokiaLog.i("SettingsGroup", "进入快捷开关设置");
+				host.openFragment(new NokiaQuickToggleSettingsFragment());
 				return true;
 			default:
 				return false;
