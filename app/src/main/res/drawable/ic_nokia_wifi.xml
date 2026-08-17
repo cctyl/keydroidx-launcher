@@ -1,29 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- WiFi 图标（矢量描边，缩放不模糊），白色 -->
+<!-- 诺基亚快捷开关 WiFi 图标：与顶部状态栏经典饱满宽扁扇形严格保持一致风格 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- 外弧 -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.2"
+        android:strokeWidth="2.8"
         android:strokeLineCap="round"
-        android:pathData="M2.5 7.5 C6 4.5 9 3 12 3 S18 4.5 21.5 7.5" />
+        android:pathData="M2.5 9 C6 6 9 4.5 12 4.5 S18 6 21.5 9" />
+    <!-- 中弧 -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.2"
+        android:strokeWidth="2.8"
         android:strokeLineCap="round"
-        android:pathData="M5.5 11 C8 9 9.8 8 12 8 S16 9 18.5 11" />
+        android:pathData="M5.5 12 C8 10 9.8 9 12 9 S16 10 18.5 12" />
+    <!-- 内弧 -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.2"
+        android:strokeWidth="2.8"
         android:strokeLineCap="round"
-        android:pathData="M8.5 14.5 C10 13.5 11 13 12 13 S14 13.5 15.5 14.5" />
+        android:pathData="M8.5 15 C10 14 11 13.5 12 13.5 S14 14 15.5 15" />
+    <!-- 底部圆点 -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M12 19 m-1.8 0 a1.8 1.8 0 1 0 3.6 0 a1.8 1.8 0 1 0 -3.6 0" />
+        android:pathData="M12 17.5 m-1.6 0 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0" />
 </vector>
