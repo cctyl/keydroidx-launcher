@@ -50,6 +50,7 @@ public class StatusBarController {
 
 	private final NokiaBaseActivity activity;
 	private ImageView ivSignal1, ivSignal2, ivWifi, ivBluetooth, ivAirplane, ivBattery;
+	private NokiaBatteryDrawable batteryDrawable;
 	private LinearLayout sim1Container, sim2Container;
 	private TextView tvCarrier1, tvCarrier2;
 	private View simCarrierContainer;
@@ -504,7 +505,7 @@ public class StatusBarController {
 		}
 	}
 
-	/** 从 BATTERY_CHANGED 广播中读取电量百分比并更新图标。 */
+	/** 从 BATTERY_CHANGED 广播中读取电量百分比及充电状态并更新图标。 */
 	@SuppressLint("MissingPermission")
 	private void updateBatteryFromIntent(Intent intent) {
 		if (ivBattery == null || intent == null) return;
@@ -512,8 +513,16 @@ public class StatusBarController {
 		int scale = intent.getIntExtra("scale", 100);
 		if (level < 0 || scale <= 0) return;
 		int pct = level * 100 / scale;
-		int resId = batteryLevelToDrawable(pct);
-		ivBattery.setImageResource(resId);
+
+		int status = intent.getIntExtra("status", -1);
+		boolean isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+				|| status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+
+		if (batteryDrawable == null) {
+			batteryDrawable = new NokiaBatteryDrawable(ivBattery.getContext());
+			ivBattery.setImageDrawable(batteryDrawable);
+		}
+		batteryDrawable.setBatteryState(pct, isCharging);
 	}
 
 	@SuppressLint("MissingPermission")
