@@ -140,6 +140,29 @@ public class NokiaWidgetItem {
 		return Objects.hash(type, label, value);
 	}
 
+	/** 获取当前小组件实例对应的 Material Icons 字符。 */
+	public String getTypeIconUnicode() {
+		return getTypeIconUnicode(this.type);
+	}
+
+	/** 类型对应的 Material Icons 矢量字体 Unicode（单色矢量光栅化）。 */
+	public static String getTypeIconUnicode(int type) {
+		switch (type) {
+			case TYPE_APP: return NokiaIcons.ICON_APP;
+			case TYPE_URL: return NokiaIcons.ICON_URL;
+			case TYPE_CALENDAR: return NokiaIcons.ICON_CALENDAR;
+			case TYPE_ACTIVITY: return NokiaIcons.ICON_ACTIVITY;
+			case TYPE_MEMORY: return NokiaIcons.ICON_MEMORY;
+			case TYPE_STORAGE: return NokiaIcons.ICON_STORAGE;
+			case TYPE_USAGE: return NokiaIcons.ICON_USAGE;
+			case TYPE_LOCK_SCREEN: return NokiaIcons.ICON_LOCK;
+			case TYPE_BG_MANAGER: return NokiaIcons.ICON_BG_MANAGER;
+			case TYPE_IP: return NokiaIcons.ICON_IP;
+			case TYPE_QS_TILE: return NokiaIcons.ICON_QS_TILE;
+			default: return NokiaIcons.ICON_APP;
+		}
+	}
+
 	/** 类型对应的图标资源 ID（S1 行图标 / S6 类型图标）。 */
 	public static int getTypeIcon(int type) {
 		switch (type) {

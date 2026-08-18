@@ -148,15 +148,12 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 				row.setClickable(true);
 			}
 
-			// 图标
+			// 图标（统一使用 Material Icons 矢量字体）
 			ImageView iv = new ImageView(requireContext());
 			iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
-			try {
-				iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-						NokiaWidgetItem.getTypeIcon(type)));
-			} catch (Exception ignored) {
-				NokiaLog.w(TAG, "加载类型图标失败 type=" + type);
-			}
+			String unicode = NokiaWidgetItem.getTypeIconUnicode(type);
+			int iconColor = enabled ? 0xFFFFFFFF : 0xFF888888;
+			iv.setImageDrawable(NokiaIcons.get(requireContext(), unicode, iconColor, 20));
 			if (!enabled) {
 				iv.setAlpha(0.5f);
 			}

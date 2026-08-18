@@ -160,13 +160,13 @@ public class NokiaQuickToggleSettingsFragment extends NokiaPageFragment {
 			}
 			row.addView(checkTv);
 
-			// 2. 开关图标
+			// 2. 开关图标（Material Icons 矢量字体）
 			ImageView iv = new ImageView(getContext());
 			LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(iconSize, iconSize);
 			ivLp.rightMargin = iconMargin;
 			iv.setLayoutParams(ivLp);
-			iv.setImageResource(item.iconRes);
-			iv.setColorFilter(item.enabled || mode == MODE_SORT ? 0xFFFFFFFF : 0xFF666666);
+			int iconColor = (item.enabled || mode == MODE_SORT) ? 0xFFFFFFFF : 0xFF666666;
+			iv.setImageDrawable(NokiaIcons.get(getContext(), item.getIconUnicode(), iconColor, 18));
 			row.addView(iv);
 
 			// 3. 开关名称

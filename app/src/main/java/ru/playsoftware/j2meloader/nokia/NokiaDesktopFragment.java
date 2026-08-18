@@ -382,12 +382,12 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			cell.setFocusable(true);
 			cell.setClickable(true);
 
-			// 图标
+			// 图标（Material Icons 矢量字体）
 			ImageView iv = new ImageView(requireContext());
 			iv.setLayoutParams(new LinearLayout.LayoutParams(
 					NokiaDimens.dp(getResources(), 18), NokiaDimens.dp(getResources(), 18)));
 			iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-			iv.setImageResource(item.iconRes);
+			iv.setImageDrawable(NokiaIcons.get(requireContext(), item.getIconUnicode(), 0xFFFFFFFF, 18));
 			iv.setTag("icon");
 			cell.addView(iv);
 
@@ -596,13 +596,15 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		row.setFocusable(true);
 		row.setClickable(true);
 
-		// 图标
-		int iconRes = NokiaWidgetItem.getTypeIcon(item.type);
+		// 图标（内置类型统一使用 Material Icons 矢量字体）
 		ImageView iv = new ImageView(ctx);
 		iv.setLayoutParams(new LinearLayout.LayoutParams(
 				NokiaDimens.dp(getResources(), 16), NokiaDimens.dp(getResources(), 16)));
 		iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-		try { iv.setImageResource(iconRes); } catch (Exception ignored) {}
+		String unicode = item.getTypeIconUnicode();
+		if (!TextUtils.isEmpty(unicode)) {
+			iv.setImageDrawable(NokiaIcons.get(ctx, unicode, 0xFFFFFFFF, 16));
+		}
 		if (item.type == NokiaWidgetItem.TYPE_QS_TILE && !TextUtils.isEmpty(item.value)) {
 			try {
 				String[] parts = item.value.split("/");

@@ -32,6 +32,24 @@ public class NokiaQuickToggleItem {
 		this.enabled = enabled;
 	}
 
+	public String getIconUnicode() {
+		switch (type) {
+			case TYPE_WIFI: return NokiaIcons.TOGGLE_WIFI;
+			case TYPE_DATA: return NokiaIcons.TOGGLE_DATA;
+			case TYPE_BLUETOOTH: return NokiaIcons.TOGGLE_BLUETOOTH;
+			case TYPE_AIRPLANE: return NokiaIcons.TOGGLE_AIRPLANE;
+			case TYPE_TORCH: return NokiaIcons.TOGGLE_TORCH;
+			case TYPE_SOUND: return NokiaIcons.TOGGLE_SOUND;
+			case TYPE_ROTATE: return NokiaIcons.TOGGLE_ROTATE;
+			case TYPE_LOCK: return NokiaIcons.TOGGLE_LOCK;
+			case TYPE_BRIGHTNESS: return NokiaIcons.TOGGLE_BRIGHTNESS;
+			case TYPE_LOCATION: return NokiaIcons.TOGGLE_LOCATION;
+			case TYPE_HOTSPOT: return NokiaIcons.TOGGLE_HOTSPOT;
+			case TYPE_SAVER: return NokiaIcons.TOGGLE_SAVER;
+			default: return NokiaIcons.ICON_SETTINGS;
+		}
+	}
+
 	public static NokiaQuickToggleItem createDefault(int type) {
 		switch (type) {
 			case TYPE_WIFI:
