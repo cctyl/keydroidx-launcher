@@ -58,6 +58,9 @@ class TextFieldImpl {
 		@Override
 		public void process() {
 			textview.setText(text);
+			if (text != null) {
+				textview.setSelection(text.length());
+			}
 		}
 	};
 
@@ -206,6 +209,9 @@ class TextFieldImpl {
 			setMaxSize(maxSize);
 			setConstraints(constraints);
 			setString(text);
+			if (text != null) {
+				textview.setSelection(text.length());
+			}
 
 			textview.addTextChangedListener(new TextWatcher() {
 				@Override

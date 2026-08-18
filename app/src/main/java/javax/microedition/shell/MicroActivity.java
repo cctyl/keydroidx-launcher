@@ -599,7 +599,12 @@ public class MicroActivity extends AppCompatActivity {
 		if (event.getAction() == KeyEvent.ACTION_DOWN) {
 			// DOWN：用键码表解析动作（此时 resolveAction 才有效）
 			int action = NokiaKeyBinding.resolveAction(nokiaKeyCodes, event);
-			if (action >= 0) {
+			// 注意：方向键（上/下/左/右）在 Screen（特别是编辑框 TextBox）内不能作为页面软键动作拦截，
+			// 必须放行给 EditText 移动光标和多行滚动！
+			if (action >= 0 && action != NokiaKeyBinding.ACTION_LEFT
+					&& action != NokiaKeyBinding.ACTION_RIGHT
+					&& action != NokiaKeyBinding.ACTION_UP
+					&& action != NokiaKeyBinding.ACTION_DOWN) {
 				pendingScreenAction = action;
 				return true;
 			}

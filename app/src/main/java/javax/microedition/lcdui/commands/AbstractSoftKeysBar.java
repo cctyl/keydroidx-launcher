@@ -31,6 +31,7 @@ import java.util.List;
 
 import javax.microedition.lcdui.Command;
 import javax.microedition.lcdui.Displayable;
+import javax.microedition.lcdui.TextBox;
 import javax.microedition.lcdui.ViewHandler;
 import javax.microedition.util.ContextHolder;
 
@@ -79,6 +80,17 @@ public abstract class AbstractSoftKeysBar {
 					true,
 					false,
 					() -> target.fireCommandAction(cmd)
+			));
+		}
+
+		// 保底措施：如果是 TextBox 且有输入内容，在左菜单加入「清空输入」选项
+		if (target instanceof TextBox && ((TextBox) target).size() > 0) {
+			items.add(new NokiaOptionsDialog.OptionItem(
+					0,
+					"清空输入",
+					true,
+					false,
+					() -> ((TextBox) target).setString("")
 			));
 		}
 
