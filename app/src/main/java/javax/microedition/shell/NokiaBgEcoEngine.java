@@ -21,14 +21,14 @@ public class NokiaBgEcoEngine {
 	/** 是否处于后台挂机保活模式 */
 	private static volatile boolean sBackgroundMode = false;
 
-	/** Doze 周期总时长：1000ms (1秒一个周期) */
-	private static final long DOZE_CYCLE_MS = 1000L;
+	/** Doze 周期总时长：10000ms (10秒一个大周期) */
+	private static final long DOZE_CYCLE_MS = 10000L;
 
-	/** Doze 维护/活动窗口时长：200ms (在此期间全速处理网络与消息) */
-	private static final long DOZE_MAINTENANCE_WINDOW_MS = 200L;
+	/** Doze 维护/活动窗口时长：1000ms (1秒集中全速处理网络与消息收发) */
+	private static final long DOZE_MAINTENANCE_WINDOW_MS = 1000L;
 
-	/** 深度休眠期的单次节流休眠时长 (ms) */
-	private static final long DEEP_SLEEP_THROTTLE_MS = 80L;
+	/** 深度休眠期的单次节流休眠时长 (ms) (设为 2000ms 深度打盹休眠，彻底消除后台空转) */
+	private static final long DEEP_SLEEP_THROTTLE_MS = 2000L;
 
 	/** 音频播放活跃锁：当正在播放提示音/音效时，临时禁用节流，保证音频流畅不卡顿 */
 	private static volatile int sActiveAudioPlayingCount = 0;
