@@ -398,3 +398,19 @@ public void fixMidContentHeight(final View content, final boolean topAlign) {
 - 通过usb链接的，adb查看名为jz5dauzlu8euw4e6 的设备，是小米设备，是 现代 16:9 及以上比例的长条形屏幕，不支持直接通过adb安装应用，你推送到 `adb -s jz5dauzlu8euw4e6 push "d:/project/nokia_desktop/app/build/outputs/apk/open/debug/J2ME_Loader-1.8.2-open-debug.apk" /sdcard/Download/J2ME_Loader-open-debug.apk` 设备文件中即可。我会来安装。这个设备当然也支持adb 查看日志等操作，只是不支持直接安装。
 
 - 设备名为 4a24ecf 的是 240*320分辨率的设备，安卓4.4.
+
+### 11. 全局主题配色与规范约束（NokiaTheme）
+
+为了确保全系统（桌面、功能表、设置、二级页面、弹窗）在切换主题（如曜石黑、翡翠绿、酒红、琥珀金等）时 100% 视觉联动，必须遵守以下硬性规范：
+
+1. **禁止在 Fragment XML 根布局设置不透明背景**：
+   - 根布局一律设置 `android:background="@android:color/transparent"`（或不设）；
+   - 基类 `NokiaPageFragment.onViewCreated` 会自动执行 `view.setBackgroundResource(0)` 强力保底，确保底层 `NokiaTheme` 主题背景壁纸完美透出。
+2. **禁止在布局中写死特定主题色彩（如蓝色 `#2a4a7a`、`#64b5f6`）**：
+   - 分隔线使用半透明中性白（如 `#20FFFFFF`）或点线 `NokiaDashedLineDrawable`，确保在任何深色/彩色主题下均自然融合；
+   - 文本小标题与说明使用 `#E0FFFFFF`（主文字）或 `#88FFFFFF`（次级文字）。
+3. **焦点选中高亮统一来源**：
+   - **禁止** 引用任何硬编码的静态选中 Drawable；
+   - **必须** 统一调用 `NokiaTheme.createSelectionDrawable(context, radiusDp)` 获取动态半透明焦点色。
+4. **弹窗界面一律使用统一组件 `NokiaOptionsDialog`**：
+   - 选项菜单禁止重复造弹窗，必须使用 `NokiaOptionsDialog`，其标题、列表底色、高亮色和软键底栏会自动 100% 联动当前主题。

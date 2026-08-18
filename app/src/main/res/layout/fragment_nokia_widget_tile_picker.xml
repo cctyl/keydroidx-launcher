@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/bg_nokia_menu"
+    android:background="@android:color/transparent"
     android:padding="8dp">
 
     <!-- 列表区域 -->

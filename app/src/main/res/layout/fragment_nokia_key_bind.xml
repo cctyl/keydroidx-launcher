@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/bg_nokia_menu">
+    android:background="@android:color/transparent">
 
     <!-- 提示栏（动态切换内容：平常→操作提示 / 冲突→触摸提示） -->
     <LinearLayout
@@ -31,7 +31,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#2a4a7a" />
+        android:background="#20FFFFFF" />
 
     <!-- 可滚动的绑定列表 -->
     <ScrollView

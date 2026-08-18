@@ -65,6 +65,9 @@ public abstract class NokiaPageFragment extends Fragment implements NokiaPage {
 	@Override
 	public final void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		super.onViewCreated(view, savedInstanceState);
+		// 强制根视图透明，避免子页面 XML 误设不透明背景遮挡全局主题壁纸
+		view.setBackgroundResource(0);
+
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		boolean topAlign = isTopAlign();
 		host.scaleMidContent(view, topAlign);
