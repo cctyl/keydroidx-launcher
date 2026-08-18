@@ -29,7 +29,7 @@ public final class NokiaIcons {
 	// ---- 常用图标 Unicode 编码常量 ----
 
 	// 桌面小组件
-	public static final String ICON_MEMORY = "\ue322";        // memory (RAM/芯片)
+	public static final String ICON_MEMORY = "\ue30d";        // developer_board (高辨识度芯片/主板/RAM)
 	public static final String ICON_STORAGE = "\ue1db";       // sd_storage (存储卡)
 	public static final String ICON_USAGE = "\ue8b5";         // schedule (时钟/使用时长)
 	public static final String ICON_LOCK = "\ue897";          // lock (锁屏)

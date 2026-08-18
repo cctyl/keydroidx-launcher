@@ -2,6 +2,48 @@
 
 > 本文件是 `CODEBUDDY.md` 的扩展：收录诺基亚桌面的详细开发规范。这些是**反复踩坑总结的硬性规则**，新增 / 修改任何诺基亚界面、弹窗、按键逻辑前，务必对照本文件自查。主文件概览见 `CODEBUDDY.md`。
 
+## 图标与矢量字体规范（Material Icons）（重要）
+
+**项目中除「第三方应用/J2ME应用真实图标」外，所有系统小组件、快捷开关、设置菜单列表项、通用弹窗选项的图标一律统一使用内置的 Google Material Icons 矢量字体（`NokiaIcons`），禁止新增零散的 PNG / XML 图标。**
+
+背景与原因：
+1. 传统 XML 矢量图和 PNG 图片在不同屏幕分辨率（如 240×320、320×480）和 Android 4.4 旧版本上容易出现失真、模糊、留白比例不一的问题。
+2. 阿里 Iconfont 等零散下载方案难以维护，且每次新增组件或开关都需要手动检索、下载、切图并重新打包。
+3. 项目内置了 Google 官方 **Material Icons** 字体库（`app/src/main/assets/fonts/MaterialIcons-Regular.ttf`），包含 2500+ 个系统级、硬件级与操作类矢量图标，体积仅约 350KB。
+4. `NokiaIcons` 工具类在运行时根据目标尺寸（DP）和颜色直接将字体 Glyph 1:1 光栅化为高质量 BitmapDrawable，自带像素级居中与 LRU 缓存，在任何分辨率下边缘均极其锐利。
+
+### 标准调用方式
+
+#### 1. 小组件 / 列表 / 控件中直接使用
+```java
+// 获取指定 Unicode 字符、指定颜色、指定 dp 尺寸的 Drawable：
+Drawable icon = NokiaIcons.get(context, NokiaIcons.ICON_MEMORY, 0xFFFFFFFF, 20);
+imageView.setImageDrawable(icon);
+```
+
+#### 2. 通用选项弹窗（`NokiaOptionsDialog`）中使用
+`OptionItem` 支持直接传入 Material Icons Unicode 字符串（优先）或资源 ID：
+```java
+// 传入字体图标编码
+items.add(new NokiaOptionsDialog.OptionItem(
+    NokiaIcons.ICON_EDIT,  // Material Icons Unicode
+    "更换应用",
+    true,
+    false,
+    () -> doEdit()
+));
+```
+
+#### 3. 常用尺寸规范
+- **桌面单行小组件图标**：统一标准为 **`20dp`**（白色 `0xFFFFFFFF`），留白间距 `6dp`；
+- **顶部快捷开关栏图标**：统一标准为 **`18dp`**；
+- **设置菜单 / 二级子页列表行图标**：统一标准为 **`22dp`**；
+- **通用弹窗选项列表图标**：统一标准为 **`18dp`**。
+
+#### 4. 图标命名与扩充
+所有图标 Unicode 常量集中定义在 `ru.playsoftware.j2meloader.nokia.NokiaIcons` 中。如需新增图标，只需查阅 Material Icons 官方编码表，向 `NokiaIcons.java` 添加一行常量即可，无需修改资源文件。
+
+
 ## 重要事项
 
 在应该加日志的地方，都要加上日志输出，尽可能多的加日志。方便排查问题。

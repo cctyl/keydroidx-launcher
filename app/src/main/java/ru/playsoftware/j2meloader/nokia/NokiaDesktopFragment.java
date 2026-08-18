@@ -518,14 +518,16 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		row.setFocusable(true);
 		row.setClickable(true);
 
-		// 图标 14dp
-		int iconRes = NokiaWidgetItem.getTypeIcon(item.type);
+		// 图标（统一使用 Material Icons 矢量字体）
 		ImageView iv = new ImageView(ctx);
-		iv.setLayoutParams(new LinearLayout.LayoutParams(
-				NokiaDimens.dp(getResources(), 14), NokiaDimens.dp(getResources(), 14)));
+		int iconSize = NokiaDimens.dp(getResources(), 20);
+		iv.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
 		iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-		try { iv.setImageResource(iconRes); } catch (Exception ignored) {}
-		iv.setPadding(0, 0, NokiaDimens.dp(getResources(), 5), 0);
+		String unicode = item.getTypeIconUnicode();
+		if (!TextUtils.isEmpty(unicode)) {
+			iv.setImageDrawable(NokiaIcons.get(ctx, unicode, 0xFFFFFFFF, 20));
+		}
+		iv.setPadding(0, 0, NokiaDimens.dp(getResources(), 4), 0);
 		row.addView(iv);
 
 		// 标签文字，弹性占满剩余空间
