@@ -210,7 +210,6 @@ public class EventQueue implements Runnable {
 		}
 
 		synchronized (callbackLock) {
-			javax.microedition.shell.NokiaBgEcoEngine.throttleIfNeeded();
 			paintEvent.process();
 		}
 	}

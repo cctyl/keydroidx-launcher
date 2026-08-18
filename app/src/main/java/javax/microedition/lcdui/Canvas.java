@@ -606,6 +606,7 @@ public abstract class Canvas extends Displayable {
 	}
 
 	public final void repaint(int x, int y, int width, int height) {
+		javax.microedition.shell.NokiaBgEcoEngine.throttleIfNeeded();
 		limitFps();
 		boolean post;
 		synchronized (paintEvent) {
@@ -901,7 +902,6 @@ public abstract class Canvas extends Displayable {
 		@Override
 		public void process() {
 			if (!visible) {
-				javax.microedition.shell.NokiaBgEcoEngine.throttleIfNeeded();
 				return;
 			}
 			int l, t, r, b;

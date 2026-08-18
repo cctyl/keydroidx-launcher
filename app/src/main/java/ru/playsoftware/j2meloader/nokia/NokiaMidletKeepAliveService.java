@@ -8,8 +8,10 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -37,9 +39,13 @@ public class NokiaMidletKeepAliveService extends Service {
 	private static final String CHANNEL_ID = "midlet_keepalive";
 	private static final int NOTIFICATION_ID = 1;
 
+	private PowerManager.WakeLock wakeLock;
+	private WifiManager.WifiLock wifiLock;
+
 	@Override
 	public void onCreate() {
 		super.onCreate();
+		acquireLocks();
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 			NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
 					"JAR 后台运行", NotificationManager.IMPORTANCE_LOW);
@@ -138,8 +144,61 @@ public class NokiaMidletKeepAliveService extends Service {
 
 	@Override
 	public void onDestroy() {
+		releaseLocks();
 		stopForeground(true);
 		super.onDestroy();
+	}
+
+	private void acquireLocks() {
+		try {
+			PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+			if (pm != null && wakeLock == null) {
+				wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "nokia:midlet_keepalive");
+				wakeLock.setReferenceCounted(false);
+				wakeLock.acquire();
+				NokiaLog.i(TAG, "已获取 PartialWakeLock，防止 CPU 在挂机时休眠断网");
+			}
+		} catch (Throwable t) {
+			NokiaLog.w(TAG, "获取 WakeLock 失败: " + t);
+		}
+
+		try {
+			WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+			if (wm != null && wifiLock == null) {
+				int lockType = WifiManager.WIFI_MODE_FULL;
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1) {
+					lockType = WifiManager.WIFI_MODE_FULL_HIGH_PERF;
+				}
+				wifiLock = wm.createWifiLock(lockType, "nokia:midlet_wifi_keepalive");
+				wifiLock.setReferenceCounted(false);
+				wifiLock.acquire();
+				NokiaLog.i(TAG, "已获取 WifiLock，防止系统灭屏休眠 WiFi 芯片导致 QQ 掉线");
+			}
+		} catch (Throwable t) {
+			NokiaLog.w(TAG, "获取 WifiLock 失败: " + t);
+		}
+	}
+
+	private void releaseLocks() {
+		try {
+			if (wakeLock != null && wakeLock.isHeld()) {
+				wakeLock.release();
+				wakeLock = null;
+				NokiaLog.i(TAG, "已释放 PartialWakeLock");
+			}
+		} catch (Throwable t) {
+			NokiaLog.w(TAG, "释放 WakeLock 失败: " + t);
+		}
+
+		try {
+			if (wifiLock != null && wifiLock.isHeld()) {
+				wifiLock.release();
+				wifiLock = null;
+				NokiaLog.i(TAG, "已释放 WifiLock");
+			}
+		} catch (Throwable t) {
+			NokiaLog.w(TAG, "释放 WifiLock 失败: " + t);
+		}
 	}
 
 	@Nullable

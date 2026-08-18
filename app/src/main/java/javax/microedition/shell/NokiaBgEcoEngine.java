@@ -5,65 +5,86 @@ import android.os.SystemClock;
 import android.util.Log;
 
 /**
- * 诺基亚 J2ME 挂机后台智能节能引擎 (Doze-Cycle Eco Engine)
- *
- * 设计原理：
- * 仿照 Android Doze（打盹）周期轮询模型：
- * 1. 深度休眠窗口 (Deep Eco Sleep): 大部分时间（如 800ms）主循环休眠，抑制 CPU 空转与发热；
- * 2. 维护/轮询活动窗口 (Doze Maintenance Window): 周期性开启短时间（如 200ms）高速运行窗口，
- *    让 MIDlet 集中处理网络 IO、定时器、消息收发与业务逻辑；
- * 3. 声音智能放行 (Smart Sound Allowance): 消息提示音、Tone、Notification 音频完全允许发声。
+ * 诺基亚桌面 J2ME 挂机后台智能节能引擎（NokiaBgEcoEngine）
+ * <p>
+ * 核心机制：
+ * 1. 阶梯退避式 Doze 周期（Ladder Doze Cycle）：
+ *    - 刚进入后台 (0 ~ 2 分钟)：5 秒小周期 (1s 维护窗口 + 4s 节流打盹)；
+ *    - 中期挂机 (2 ~ 10 分钟)：15 秒中周期 (1.5s 维护窗口 + 13.5s 节流打盹)；
+ *    - 长期挂机 (> 10 分钟)：45 秒大周期 (2s 维护窗口 + 43s 节流打盹)；
+ * 2. 线程安全性与解耦：
+ *    - 节流休眠仅作用于游戏主循环（repaint / serviceRepaints），且全部在锁外执行，绝不阻塞 EventQueue 与网络回调；
+ * 3. 声音即时唤醒：
+ *    - 播放提示音或消息音时，0 毫秒全速放行，确保声音清脆连贯。
  */
 public class NokiaBgEcoEngine {
 
 	private static final String TAG = "NokiaBgEcoEngine";
 
-	/** 是否处于后台挂机保活模式 */
+	/** 是否处于后台挂机模式 */
 	private static volatile boolean sBackgroundMode = false;
 
-	/** Doze 周期总时长：10000ms (10秒一个大周期) */
-	private static final long DOZE_CYCLE_MS = 10000L;
+	/** 进入后台的时间戳 (ms) */
+	private static volatile long sBackgroundStartTime = 0L;
 
-	/** Doze 维护/活动窗口时长：1000ms (1秒集中全速处理网络与消息收发) */
-	private static final long DOZE_MAINTENANCE_WINDOW_MS = 1000L;
-
-	/** 深度休眠期的单次节流休眠时长 (ms) (设为 2000ms 深度打盹休眠，彻底消除后台空转) */
-	private static final long DEEP_SLEEP_THROTTLE_MS = 2000L;
-
-	/** 音频播放活跃锁：当正在播放提示音/音效时，临时禁用节流，保证音频流畅不卡顿 */
+	/** 当前活动中的音频播放器数量（>0 表示有声音正在播放） */
 	private static volatile int sActiveAudioPlayingCount = 0;
 
+	/** 阶段 1：前 2 分钟 (0 ~ 120,000ms) */
+	private static final long STAGE_1_DURATION_MS = 2 * 60 * 1000L;
+	private static final long STAGE_1_CYCLE_MS = 5000L;
+	private static final long STAGE_1_WINDOW_MS = 1000L;
+	private static final long STAGE_1_SLEEP_STEP_MS = 1000L;
+
+	/** 阶段 2：2 ~ 10 分钟 (120,000 ~ 600,000ms) */
+	private static final long STAGE_2_DURATION_MS = 10 * 60 * 1000L;
+	private static final long STAGE_2_CYCLE_MS = 15000L;
+	private static final long STAGE_2_WINDOW_MS = 1500L;
+	private static final long STAGE_2_SLEEP_STEP_MS = 2000L;
+
+	/** 阶段 3：10 分钟以上 (长期挂机) */
+	private static final long STAGE_3_CYCLE_MS = 45000L;
+	private static final long STAGE_3_WINDOW_MS = 2000L;
+	private static final long STAGE_3_SLEEP_STEP_MS = 3000L;
+
+	/**
+	 * 当 MIDlet 挂机退入后台时调用
+	 */
 	public static void onBackgroundStarted() {
 		sBackgroundMode = true;
+		sBackgroundStartTime = SystemClock.uptimeMillis();
+		Log.i(TAG, "J2ME 进入后台挂机：启动阶梯退避节能引擎 (5s -> 15s -> 45s)");
+
 		try {
 			Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
 		} catch (Throwable t) {
-			Log.w(TAG, "降级线程优先级失败", t);
+			Log.w(TAG, "降低后台主线程优先级失败", t);
 		}
-		Log.i(TAG, "J2ME 进入后台 Doze 节能模式 (周期轮询收发消息 + 音频放行)");
 	}
 
+	/**
+	 * 当 MIDlet 恢复前台时调用
+	 */
 	public static void onForegroundResumed() {
 		sBackgroundMode = false;
+		sBackgroundStartTime = 0L;
+		Log.i(TAG, "J2ME 恢复前台运行：恢复全速渲染");
+
 		try {
 			Process.setThreadPriority(Process.THREAD_PRIORITY_DEFAULT);
 		} catch (Throwable t) {
-			Log.w(TAG, "恢复线程优先级失败", t);
+			Log.w(TAG, "恢复前台主线程优先级失败", t);
 		}
-		Log.i(TAG, "J2ME 恢复前台全速模式");
 	}
 
-	public static boolean isBackgroundMode() {
-		return sBackgroundMode;
-	}
-
-	/** 当开始播放音频时调用（保证提示音、QQ消息音、音效完整响亮不被节流卡顿） */
-	public static void onAudioStarted() {
+	/**
+	 * 音频播放状态通知
+	 */
+	public static synchronized void onAudioStarted() {
 		sActiveAudioPlayingCount++;
 	}
 
-	/** 音频播放结束或停止时调用 */
-	public static void onAudioStopped() {
+	public static synchronized void onAudioStopped() {
 		if (sActiveAudioPlayingCount > 0) {
 			sActiveAudioPlayingCount--;
 		}
@@ -83,16 +104,39 @@ public class NokiaBgEcoEngine {
 		}
 
 		long now = SystemClock.uptimeMillis();
-		long phase = now % DOZE_CYCLE_MS;
+		long elapsedInBg = now - sBackgroundStartTime;
 
-		// 处于 200ms 的 Doze 维护/消息轮询窗口内：全速执行，不休眠
-		if (phase < DOZE_MAINTENANCE_WINDOW_MS) {
+		long cycleMs;
+		long windowMs;
+		long sleepStepMs;
+
+		if (elapsedInBg < STAGE_1_DURATION_MS) {
+			// 阶段 1：刚进后台 2 分钟内
+			cycleMs = STAGE_1_CYCLE_MS;
+			windowMs = STAGE_1_WINDOW_MS;
+			sleepStepMs = STAGE_1_SLEEP_STEP_MS;
+		} else if (elapsedInBg < STAGE_2_DURATION_MS) {
+			// 阶段 2：挂机 2 ~ 10 分钟
+			cycleMs = STAGE_2_CYCLE_MS;
+			windowMs = STAGE_2_WINDOW_MS;
+			sleepStepMs = STAGE_2_SLEEP_STEP_MS;
+		} else {
+			// 阶段 3：长期挂机 > 10 分钟
+			cycleMs = STAGE_3_CYCLE_MS;
+			windowMs = STAGE_3_WINDOW_MS;
+			sleepStepMs = STAGE_3_SLEEP_STEP_MS;
+		}
+
+		long phase = now % cycleMs;
+
+		// 处于维护/消息轮询窗口内：全速执行，不休眠
+		if (phase < windowMs) {
 			return;
 		}
 
-		// 处于深度节能打盹窗口内：休眠降低 CPU 负载
+		// 处于深度节能打盹窗口内：分步休眠降低 CPU 负载
 		try {
-			Thread.sleep(DEEP_SLEEP_THROTTLE_MS);
+			Thread.sleep(sleepStepMs);
 		} catch (InterruptedException ignored) {
 		}
 	}
