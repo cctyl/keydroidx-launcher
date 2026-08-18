@@ -907,18 +907,57 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		}
 	}
 
-	/** 触发第三方 QS Tile 快捷开关。 */
+	/** 触发第三方 QS Tile 快捷开关（支持 Shizuku、Root 与广播多级降级）。 */
 	private void triggerQsTile(NokiaWidgetItem item) {
 		if (item == null || TextUtils.isEmpty(item.value)) return;
-		Toast.makeText(requireContext(), "已触发: " + item.label, Toast.LENGTH_SHORT).show();
-		NokiaLog.i("Desktop", "触发快捷开关: " + item.label + " target=" + item.value);
+		final Context ctx = requireContext();
+		final String target = item.value.trim();
+		final String label = item.label;
+		NokiaLog.i("Desktop", "触发快捷开关: " + label + " target=" + target);
 
 		new Thread(() -> {
-			try {
-				Process p = Runtime.getRuntime().exec("cmd statusbar click-tile " + item.value);
-				p.waitFor();
-			} catch (Exception e) {
-				NokiaLog.e("Desktop", "执行 click-tile 失败: " + item.value, e);
+			boolean executed = false;
+
+			// 1. 优先使用 mini_shizuku 服务以 Shell 身份执行
+			if (Shizuku.isRunning()) {
+				executed = Shizuku.exec("cmd statusbar click-tile " + target);
+				NokiaLog.i("Desktop", "Shizuku 执行 click-tile 结果: " + executed);
+			}
+
+			// 2. 若 Shizuku 未运行，尝试 root su 执行
+			if (!executed) {
+				try {
+					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "cmd statusbar click-tile " + target});
+					int exitCode = p.waitFor();
+					if (exitCode == 0) {
+						executed = true;
+						NokiaLog.i("Desktop", "Root 执行 click-tile 成功");
+					}
+				} catch (Exception ignored) {
+				}
+			}
+
+			// 3. 特殊应用免权限广播/动作兜底（如小黑屋）
+			if (target.startsWith("web1n.stopapp")) {
+				try {
+					Intent freezeIntent = new Intent("web1n.stopapp.action.FREEZE");
+					freezeIntent.setPackage("web1n.stopapp");
+					ctx.sendBroadcast(freezeIntent);
+					NokiaLog.i("Desktop", "已发送小黑屋一键冻结广播");
+				} catch (Exception ignored) {
+				}
+			}
+
+			final boolean success = executed;
+			if (getActivity() != null) {
+				getActivity().runOnUiThread(() -> {
+					if (success) {
+						Toast.makeText(ctx, "已触发: " + label, Toast.LENGTH_SHORT).show();
+					} else {
+						// 提示需要激活 mini_shizuku
+						Toast.makeText(ctx, "快捷开关需在高级设置中激活 mini_shizuku 服务", Toast.LENGTH_LONG).show();
+					}
+				});
 			}
 		}).start();
 	}
