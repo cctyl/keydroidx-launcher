@@ -156,7 +156,7 @@ public class NokiaThemeSettingsFragment extends NokiaListPageFragment {
 			if (item.id.equals(currentThemeId)) {
 				ImageView ivCheck = new ImageView(requireContext());
 				ivCheck.setLayoutParams(new LinearLayout.LayoutParams(previewSize, previewSize));
-				ivCheck.setImageDrawable(NokiaIcons.get(requireContext(), NokiaIcons.ICON_CHECK, item.primaryColor, 18));
+				ivCheck.setImageDrawable(NokiaIcons.get(requireContext(), NokiaIcons.ICON_CHECK, item.accentColor, 18));
 				row.addView(ivCheck);
 			}
 

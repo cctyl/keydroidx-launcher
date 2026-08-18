@@ -1,34 +1,37 @@
 package ru.playsoftware.j2meloader.nokia;
 
-import android.graphics.Color;
+import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 诺基亚全套主题配色系统。
- * 管理桌面壁纸背景、功能表背景、软键栏底色、高亮选中态、文字主色等。
- */
 public class NokiaTheme {
+
+	public static final String THEME_CLASSIC_BLUE = "classic_blue";
+	public static final String THEME_OBSIDIAN_BLACK = "obsidian_black";
+	public static final String THEME_CYAN_SEA = "cyan_sea";
+	public static final String THEME_EMERALD_GREEN = "emerald_green";
+	public static final String THEME_WINE_PURPLE = "wine_purple";
+	public static final String THEME_AMBER_GOLD = "amber_gold";
 
 	public static class ThemeDef {
 		public final String id;
 		public final String name;
-		public final int primaryColor;       // 主题主色（如高亮、焦点色 #2196F3）
-		public final int softKeyStartColor;  // 软键栏渐变顶色
-		public final int softKeyEndColor;    // 软键栏渐变底色
-		public final int bgStartColor;       // 页面壁纸渐变顶色
-		public final int bgCenterColor;      // 页面壁纸渐变中心色
-		public final int bgEndColor;         // 页面壁纸渐变底色
-		public final int focusColor;         // 列表选中态高亮半透明色
+		public final int accentColor;
+		public final int softKeyStartColor;
+		public final int softKeyEndColor;
+		public final int bgStartColor;
+		public final int bgCenterColor;
+		public final int bgEndColor;
+		public final int focusColor;
 
-		public ThemeDef(String id, String name, int primaryColor,
-		                int softKeyStartColor, int softKeyEndColor,
-		                int bgStartColor, int bgCenterColor, int bgEndColor,
-		                int focusColor) {
+		public ThemeDef(String id, String name, int accentColor,
+						int softKeyStartColor, int softKeyEndColor,
+						int bgStartColor, int bgCenterColor, int bgEndColor,
+						int focusColor) {
 			this.id = id;
 			this.name = name;
-			this.primaryColor = primaryColor;
+			this.accentColor = accentColor;
 			this.softKeyStartColor = softKeyStartColor;
 			this.softKeyEndColor = softKeyEndColor;
 			this.bgStartColor = bgStartColor;
@@ -37,13 +40,6 @@ public class NokiaTheme {
 			this.focusColor = focusColor;
 		}
 	}
-
-	public static final String THEME_CLASSIC_BLUE = "classic_blue";
-	public static final String THEME_OBSIDIAN_BLACK = "obsidian_black";
-	public static final String THEME_CYAN_SEA = "cyan_sea";
-	public static final String THEME_EMERALD_GREEN = "emerald_green";
-	public static final String THEME_WINE_PURPLE = "wine_purple";
-	public static final String THEME_AMBER_GOLD = "amber_gold";
 
 	private static final List<ThemeDef> THEMES = new ArrayList<>();
 
@@ -109,6 +105,12 @@ public class NokiaTheme {
 		return THEMES.get(0);
 	}
 
+	/** 获取当前系统选择的主题定义 */
+	public static ThemeDef getSelectedTheme(Context context) {
+		NokiaSettingsStorage storage = new NokiaSettingsStorage(context);
+		return storage.getTheme();
+	}
+
 	/** 创建当前主题背景壁纸 Drawable */
 	public static GradientDrawable createBackgroundDrawable(ThemeDef theme) {
 		GradientDrawable gd = new GradientDrawable(
@@ -135,6 +137,17 @@ public class NokiaTheme {
 		gd.setShape(GradientDrawable.RECTANGLE);
 		gd.setColor(theme.focusColor);
 		gd.setCornerRadius(cornerRadiusPx);
+		return gd;
+	}
+
+	/** 创建带有当前主题选中色的圆角 Drawable（替代静态 bg_nokia_selected_dark） */
+	public static GradientDrawable createSelectionDrawable(Context context, float radiusDp) {
+		ThemeDef theme = getSelectedTheme(context);
+		GradientDrawable gd = new GradientDrawable();
+		gd.setShape(GradientDrawable.RECTANGLE);
+		gd.setColor(theme.focusColor);
+		int px = NokiaDimens.dp(context.getResources(), (int) radiusDp);
+		gd.setCornerRadius(px);
 		return gd;
 	}
 }

@@ -147,10 +147,23 @@ public class NokiaOptionsDialog extends DialogFragment {
 			dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 		}
 
+
 		TextView titleView = dialog.findViewById(R.id.widgetOptionsTitle);
 		if (titleView != null) {
 			titleView.setText(title);
 		}
+
+		// 应用当前主题配色到选项弹窗的标题栏与底栏
+		android.view.View titleBar = dialog.findViewById(R.id.widgetOptionsTitleBar);
+		android.view.View bottomBar = dialog.findViewById(R.id.widgetOptionsBottomBar);
+		NokiaTheme.ThemeDef currentTheme = NokiaTheme.getSelectedTheme(requireContext());
+		if (titleBar != null) {
+			titleBar.setBackground(NokiaTheme.createSoftKeyDrawable(currentTheme));
+		}
+		if (bottomBar != null) {
+			bottomBar.setBackground(NokiaTheme.createSoftKeyDrawable(currentTheme));
+		}
+
 
 		listContainer = dialog.findViewById(R.id.widgetOptionsList);
 		rebuildList();
@@ -318,8 +331,11 @@ public class NokiaOptionsDialog extends DialogFragment {
 		for (int i = 0; i < optionRows.length; i++) {
 			if (optionRows[i] == null) continue;
 			boolean selected = (i == index) && items.get(i).enabled;
-			optionRows[i].setBackgroundResource(
-					selected ? R.drawable.bg_nokia_selected_dark : 0);
+			if (selected) {
+				optionRows[i].setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
+			} else {
+				optionRows[i].setBackground(null);
+			}
 		}
 	}
 

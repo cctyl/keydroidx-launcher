@@ -9,6 +9,7 @@
 
     <!-- ========== 标题栏 ========== -->
     <LinearLayout
+        android:id="@+id/widgetOptionsTitleBar"
         android:layout_width="match_parent"
         android:layout_height="@dimen/nokia_dialog_title_bar_height"
         android:background="@drawable/bg_nokia_softkey"
@@ -36,6 +37,7 @@
     <!-- ========== 底部软键栏 ========== -->
     <!-- 规范：软键栏只显示文字标签，无高亮/焦点逻辑 -->
     <LinearLayout
+        android:id="@+id/widgetOptionsBottomBar"
         android:layout_width="match_parent"
         android:layout_height="@dimen/nokia_dialog_title_bar_height"
         android:background="@drawable/bg_nokia_softkey"

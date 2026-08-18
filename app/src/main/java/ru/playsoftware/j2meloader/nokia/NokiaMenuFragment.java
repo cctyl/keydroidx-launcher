@@ -887,7 +887,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		if (focusPos >= 0 && focusPos < cellViews.length) {
 			View v = cellViews[focusPos];
 			if (v != null) {
-				v.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+				v.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 				selectedView = v;
 				return;
 			}
