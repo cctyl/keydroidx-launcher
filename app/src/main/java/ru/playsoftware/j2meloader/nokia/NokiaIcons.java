@@ -42,6 +42,25 @@ public final class NokiaIcons {
 	public static final String ICON_FREEZE = "\ueb3b";        // ac_unit (雪花/一键冻结)
 	public static final String ICON_APP = "\ue5c3";           // apps (应用网格)
 
+	// 桌面设置分类与菜单项
+	public static final String ICON_DISPLAY = "\ue3a5";       // brightness_medium / tv (外观与显示)
+	public static final String ICON_KEYPAD = "\ue312";        // keyboard / keypad (按键与操作)
+	public static final String ICON_DESKTOP = "\ue871";       // dashboard / widgets (桌面内容)
+	public static final String ICON_SYSTEM = "\ue8b8";        // settings / system (系统与权限)
+	public static final String ICON_ADVANCED = "\ue869";      // build / tune (高级设置)
+	public static final String ICON_FONT = "\ue165";          // format_size (字体大小)
+	public static final String ICON_WALLPAPER = "\ue3f4";     // image / wallpaper (壁纸设置)
+	public static final String ICON_SHORTCUTS = "\ue8f9";     // view_headline (顶部快捷栏设置)
+	public static final String ICON_WIDGETS = "\ue871";       // widgets (桌面组件设置)
+	public static final String ICON_TOGGLES = "\uea3b";       // bolt / toggle (快捷开关)
+	public static final String ICON_LOG = "\ue873";           // description / log (日志记录)
+	public static final String ICON_HOME = "\ue88a";          // home (默认桌面设置)
+	public static final String ICON_POWER = "\ue8ac";         // power_settings_new (电源键)
+	public static final String ICON_TERMINAL = "\ue869";      // terminal / code (mini_shizuku)
+	public static final String ICON_PLAY = "\ue037";          // play_arrow (启动/运行)
+	public static final String ICON_SORT = "\ue8d2";          // swap_vert / sort (排序)
+	public static final String ICON_SHIELD = "\ue8e8";        // verified_user / shield (保护)
+
 	// 快捷开关栏 (Quick Toggles)
 	public static final String TOGGLE_WIFI = "\ue63e";        // wifi
 	public static final String TOGGLE_BLUETOOTH = "\ue1a7";   // bluetooth
@@ -67,6 +86,14 @@ public final class NokiaIcons {
 	public static final String ICON_EDIT = "\ue3c9";          // edit (铅笔)
 	public static final String ICON_ADD = "\ue145";           // add (加号)
 	public static final String ICON_INFO = "\ue88e";          // info (信息)
+	public static final String ICON_SHIZUKU = "\ue869";       // terminal / code (mini_shizuku)
+	public static final String ICON_CLEAR_ALL = "\ue0b8";     // clear_all (清除全部)
+	public static final String ICON_LOCK_OPEN = "\ue898";     // lock_open (解锁)
+	public static final String ICON_POWER_OFF = "\ue8ac";     // power_settings_new (关闭/电源)
+	public static final String ICON_POWER_ON = "\ue8ac";      // power_settings_new (开启/电源)
+	public static final String ICON_CHECK_BOX = "\ue834";      // check_box (已选复选框)
+	public static final String ICON_CHECK_BOX_OUTLINE_BLANK = "\ue835"; // check_box_outline_blank (未选复选框)
+	public static final String ICON_RESTORE = "\ue8b3";        // restore / settings_backup_restore (恢复默认)
 
 	private NokiaIcons() {}
 

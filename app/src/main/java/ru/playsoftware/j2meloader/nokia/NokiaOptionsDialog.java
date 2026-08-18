@@ -46,6 +46,8 @@ public class NokiaOptionsDialog extends DialogFragment {
 	public static class OptionItem {
 		/** 图标资源 id，0 表示无图标。 */
 		public final int icon;
+		/** Material Icons 矢量图标 Unicode 编码，null 表示无。 */
+		public final String iconUnicode;
 		/** 文案（{@link #setItems(List)} 后可整体替换刷新）。 */
 		public final String label;
 		/** false=灰色不可选，方向键自动跳过。 */
@@ -56,7 +58,16 @@ public class NokiaOptionsDialog extends DialogFragment {
 		public final Runnable action;
 
 		public OptionItem(int icon, String label, boolean enabled, boolean keepOpen, Runnable action) {
+			this(icon, null, label, enabled, keepOpen, action);
+		}
+
+		public OptionItem(String iconUnicode, String label, boolean enabled, boolean keepOpen, Runnable action) {
+			this(0, iconUnicode, label, enabled, keepOpen, action);
+		}
+
+		public OptionItem(int icon, String iconUnicode, String label, boolean enabled, boolean keepOpen, Runnable action) {
 			this.icon = icon;
+			this.iconUnicode = iconUnicode;
 			this.label = label;
 			this.enabled = enabled;
 			this.keepOpen = keepOpen;
@@ -204,9 +215,16 @@ public class NokiaOptionsDialog extends DialogFragment {
 					ViewGroup.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 40)));
 			row.setPadding(NokiaDimens.dp(getResources(), 14), 0, NokiaDimens.dp(getResources(), 14), 0);
 
-			if (item.icon != 0) {
+			boolean hasIcon = false;
+			if (item.iconUnicode != null && !item.iconUnicode.isEmpty()) {
 				ImageView iv = new ImageView(requireContext());
-				iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 24), NokiaDimens.dp(getResources(), 24)));
+				iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
+				iv.setImageDrawable(NokiaIcons.get(requireContext(), item.iconUnicode, item.enabled ? 0xFFFFFFFF : 0xFF666666, 22));
+				row.addView(iv);
+				hasIcon = true;
+			} else if (item.icon != 0) {
+				ImageView iv = new ImageView(requireContext());
+				iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
 				try {
 					iv.setImageResource(item.icon);
 				} catch (Exception ignored) {}
@@ -214,12 +232,13 @@ public class NokiaOptionsDialog extends DialogFragment {
 					iv.setAlpha(0.5f);
 				}
 				row.addView(iv);
+				hasIcon = true;
 			}
 
 			TextView tv = new TextView(requireContext());
 			tv.setLayoutParams(new LinearLayout.LayoutParams(
 					ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-			if (item.icon != 0) {
+			if (hasIcon) {
 				tv.setPadding(NokiaDimens.dp(getResources(), 10), 0, 0, 0);
 			}
 			tv.setText(item.label);

@@ -49,31 +49,31 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 		}
 	}
 
-	private static int[] iconsOf(int group) {
+	private static String[] iconsOf(int group) {
 		switch (group) {
 			case GROUP_APPEARANCE:
-				return new int[]{
-						R.drawable.s60_settings,      // 字体大小
-						R.drawable.s60_gallery,       // 壁纸设置
+				return new String[]{
+						NokiaIcons.ICON_FONT,         // 字体大小
+						NokiaIcons.ICON_WALLPAPER,    // 壁纸设置
 				};
 			case GROUP_KEYS:
-				return new int[]{
-						R.drawable.s60_settings,      // 按键绑定
-						R.drawable.s60_settings,      // 应用向导
+				return new String[]{
+						NokiaIcons.ICON_KEYPAD,       // 按键绑定
+						NokiaIcons.ICON_ACTIVITY,     // 应用向导
 				};
 			case GROUP_CONTENT:
-				return new int[]{
-						R.drawable.ic_nokia_settings, // 顶部快捷栏设置
-						R.drawable.s60_settings_alt,  // 桌面组件设置
-						R.drawable.ic_nokia_settings, // 快捷开关
+				return new String[]{
+						NokiaIcons.ICON_SHORTCUTS,    // 顶部快捷栏设置
+						NokiaIcons.ICON_WIDGETS,      // 桌面组件设置
+						NokiaIcons.ICON_TOGGLES,      // 快捷开关
 				};
 			case GROUP_SYSTEM:
-				return new int[]{
-						R.drawable.s60_settings,      // 日志记录
-						R.drawable.ic_nokia_home,     // 默认桌面设置
+				return new String[]{
+						NokiaIcons.ICON_LOG,          // 日志记录
+						NokiaIcons.ICON_HOME,         // 默认桌面设置
 				};
 			default:
-				return new int[0];
+				return new String[0];
 		}
 	}
 
@@ -97,7 +97,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 	private static final String[] FONT_LABELS = {"较小", "标准", "较大", "最大"};
 
 	private int group;
-	private int[] itemIcons;
+	private String[] itemIcons;
 	private String[] itemNames;
 	private TextView[] tvNames;
 
@@ -145,13 +145,11 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 					NokiaDimens.dp(getResources(), 10), NokiaDimens.dp(getResources(), 4));
 			row.setClickable(true);
 
-			// 图标
+			// 图标（Material Icons 矢量字符）
 			ImageView ivIcon = new ImageView(requireContext());
 			ivIcon.setLayoutParams(new LinearLayout.LayoutParams(
-					NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
-			try {
-				ivIcon.setImageDrawable(ContextCompat.getDrawable(requireContext(), itemIcons[i]));
-			} catch (Exception ignored) {}
+					NokiaDimens.dp(getResources(), 20), NokiaDimens.dp(getResources(), 20)));
+			ivIcon.setImageDrawable(NokiaIcons.get(requireContext(), itemIcons[i], 0xFFFFFFFF, 20));
 			row.addView(ivIcon);
 
 			// 间距

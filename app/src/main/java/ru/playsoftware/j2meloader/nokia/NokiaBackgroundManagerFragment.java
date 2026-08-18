@@ -340,17 +340,17 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
 		// Android 5.0+ 未激活 mini_shizuku 时，首要入口为「激活 mini_shizuku」
 		if (!NokiaBgManagerHelper.isBgManagerAvailable()) {
-			items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_widget_bg_manager,
+			items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_SHIZUKU,
 					"激活 mini_shizuku", true, false, this::requestShizukuActivation));
 			NokiaOptionsDialog.show(getParentFragmentManager(), "后台管理", items);
 			NokiaLog.i(TAG, "弹出选项菜单（仅激活入口）");
 			return;
 		}
-		items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_widget_bg_manager,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_CLEAR_ALL,
 				"清除全部", true, false, this::clearAll));
-		items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_protect,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_LOCK,
 				"全部保护", true, false, this::protectAll));
-		items.add(new NokiaOptionsDialog.OptionItem(0,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_LOCK_OPEN,
 				"全部解除", true, false, this::unprotectAll));
 		NokiaOptionsDialog.show(getParentFragmentManager(), "后台管理", items);
 		NokiaLog.i(TAG, "弹出选项菜单");

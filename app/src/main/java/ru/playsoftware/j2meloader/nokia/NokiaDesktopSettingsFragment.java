@@ -22,13 +22,13 @@ import ru.playsoftware.j2meloader.R;
  */
 public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 
-	/** 分类入口：图标 + 名称 + 分组 ID（-1 表示高级设置）。 */
-	private static final int[] ITEM_ICONS = {
-			R.drawable.s60_gallery,       // 外观与显示
-			R.drawable.s60_settings,      // 按键与操作
-			R.drawable.ic_nokia_settings, // 桌面内容
-			R.drawable.ic_nokia_home,     // 系统与权限
-			R.drawable.s60_settings_alt,  // 高级设置
+	/** 分类入口：图标（Material Icons 矢量字符） + 名称 + 分组 ID（-1 表示高级设置）。 */
+	private static final String[] ITEM_ICON_UNICODES = {
+			NokiaIcons.ICON_DISPLAY,       // 外观与显示
+			NokiaIcons.ICON_KEYPAD,        // 按键与操作
+			NokiaIcons.ICON_DESKTOP,       // 桌面内容
+			NokiaIcons.ICON_SYSTEM,        // 系统与权限
+			NokiaIcons.ICON_ADVANCED,      // 高级设置
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -73,13 +73,11 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 					NokiaDimens.dp(getResources(), 10), NokiaDimens.dp(getResources(), 4));
 			row.setClickable(true);
 
-			// 图标
+			// 图标（Material Icons 矢量图标）
 			ImageView ivIcon = new ImageView(requireContext());
 			ivIcon.setLayoutParams(new LinearLayout.LayoutParams(
-					NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
-			try {
-				ivIcon.setImageDrawable(ContextCompat.getDrawable(requireContext(), ITEM_ICONS[i]));
-			} catch (Exception ignored) {}
+					NokiaDimens.dp(getResources(), 20), NokiaDimens.dp(getResources(), 20)));
+			ivIcon.setImageDrawable(NokiaIcons.get(requireContext(), ITEM_ICON_UNICODES[i], 0xFFFFFFFF, 20));
 			row.addView(ivIcon);
 
 			// 间距

@@ -598,12 +598,12 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 		// 图标（内置类型统一使用 Material Icons 矢量字体）
 		ImageView iv = new ImageView(ctx);
-		iv.setLayoutParams(new LinearLayout.LayoutParams(
-				NokiaDimens.dp(getResources(), 16), NokiaDimens.dp(getResources(), 16)));
+		int iconSize = NokiaDimens.dp(getResources(), 20);
+		iv.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
 		iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
 		String unicode = item.getTypeIconUnicode();
 		if (!TextUtils.isEmpty(unicode)) {
-			iv.setImageDrawable(NokiaIcons.get(ctx, unicode, 0xFFFFFFFF, 16));
+			iv.setImageDrawable(NokiaIcons.get(ctx, unicode, 0xFFFFFFFF, 20));
 		}
 		if (item.type == NokiaWidgetItem.TYPE_QS_TILE && !TextUtils.isEmpty(item.value)) {
 			try {
@@ -618,7 +618,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				}
 			} catch (Exception ignored) {}
 		}
-		iv.setPadding(0, 0, NokiaDimens.dp(getResources(), 6), 0);
+		iv.setPadding(0, 0, NokiaDimens.dp(getResources(), 5), 0);
 		row.addView(iv);
 
 		// 标签文字

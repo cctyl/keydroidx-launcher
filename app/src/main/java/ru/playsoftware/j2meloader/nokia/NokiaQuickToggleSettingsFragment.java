@@ -377,7 +377,7 @@ public class NokiaQuickToggleSettingsFragment extends NokiaPageFragment {
 
 		// 1. 调整排序
 		items.add(new NokiaOptionsDialog.OptionItem(
-				android.R.drawable.ic_menu_sort_by_size,
+				NokiaIcons.ICON_SORT,
 				"调整排序",
 				true,
 				false,
@@ -392,7 +392,7 @@ public class NokiaQuickToggleSettingsFragment extends NokiaPageFragment {
 		// 2. 全选 / 取消全选
 		final boolean all = isAllEnabled();
 		items.add(new NokiaOptionsDialog.OptionItem(
-				0,
+				all ? NokiaIcons.ICON_CHECK_BOX_OUTLINE_BLANK : NokiaIcons.ICON_CHECK_BOX,
 				all ? "取消全选" : "全选",
 				true,
 				true,
@@ -409,7 +409,7 @@ public class NokiaQuickToggleSettingsFragment extends NokiaPageFragment {
 
 		// 3. 恢复默认
 		items.add(new NokiaOptionsDialog.OptionItem(
-				android.R.drawable.ic_menu_revert,
+				NokiaIcons.ICON_RESTORE,
 				"恢复默认",
 				true,
 				false,

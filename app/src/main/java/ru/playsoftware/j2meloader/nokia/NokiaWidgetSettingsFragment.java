@@ -284,11 +284,11 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 		boolean canDelete = !widgets.isEmpty();
 		boolean canSort = widgets.size() > 1;
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_add,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_ADD,
 				"添加组件", canAdd, false, this::openTypePicker));
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_DELETE,
 				"删除组件", canDelete, false, this::enterDeleteMode));
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_sort_by_size,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_SORT,
 				"组件排序", canSort, false, this::enterSortMode));
 		NokiaOptionsDialog.show(getParentFragmentManager(), "选项", items);
 		NokiaLog.i(TAG, "弹出选项菜单弹窗: canAdd=" + canAdd + " canDelete=" + canDelete + " canSort=" + canSort);
@@ -324,7 +324,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 		boolean all = allChecked();
 		int count = checkedCount();
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
-		items.add(new NokiaOptionsDialog.OptionItem(0,
+		items.add(new NokiaOptionsDialog.OptionItem(all ? NokiaIcons.ICON_CHECK_BOX_OUTLINE_BLANK : NokiaIcons.ICON_CHECK_BOX,
 				all ? "取消全选" : "全选",
 				true, true, () -> {
 			toggleSelectAll();
@@ -333,7 +333,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 				holder[0].setItems(buildDeleteDialogItems(holder));
 			}
 		}));
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_DELETE,
 				"删除已选(" + count + ")", count > 0, false, this::deleteSelected));
 		return items;
 	}
@@ -543,12 +543,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 			// 应用组件：加载真实应用图标（S60 → 系统图标 → 占位），未命中则后台异步刷新
 			loadAppIcon(item, iv);
 		} else {
-			try {
-				iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
-						NokiaWidgetItem.getTypeIcon(item.type)));
-			} catch (Exception ignored) {
-				NokiaLog.w(TAG, "加载组件图标失败 type=" + item.type);
-			}
+			iv.setImageDrawable(NokiaIcons.get(requireContext(), item.getTypeIconUnicode(), 0xFFFFFFFF, 20));
 		}
 		row.addView(iv);
 

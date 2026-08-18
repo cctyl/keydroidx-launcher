@@ -488,17 +488,17 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 	private void showAppOptionsMenu(AppItem app) {
 		NokiaLog.i("Box", "弹出选项菜单: " + app.getTitle());
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_media_play,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_PLAY,
 				"启动", true, false, () -> {
 			NokiaLog.i("Box", "选项菜单-启动: " + app.getTitle());
 			NokiaJarLauncher.launch(requireActivity(), app.getTitle(), app.getPathExt());
 		}));
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_manage,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_SETTINGS,
 				"设置", true, false, () -> {
 			NokiaLog.i("Box", "选项菜单-设置: " + app.getTitle());
 			Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), true);
 		}));
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_DELETE,
 				"卸载", true, false, () -> {
 			NokiaLog.i("Box", "选项菜单-卸载: " + app.getTitle());
 			showUninstallDialog(app);

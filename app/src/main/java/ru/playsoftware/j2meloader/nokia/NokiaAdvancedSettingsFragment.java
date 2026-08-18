@@ -33,9 +33,9 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  */
 public class NokiaAdvancedSettingsFragment extends NokiaListPageFragment {
 
-	private static final int[] ITEM_ICONS = {
-			R.drawable.ic_nokia_settings,  // mini_shizuku
-			R.drawable.ic_nokia_lock,      // 电源键拦截设置
+	private static final String[] ITEM_ICON_UNICODES = {
+			NokiaIcons.ICON_TERMINAL,  // mini_shizuku
+			NokiaIcons.ICON_POWER,     // 电源键拦截设置
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -77,13 +77,11 @@ public class NokiaAdvancedSettingsFragment extends NokiaListPageFragment {
 					NokiaDimens.dp(getResources(), 10), NokiaDimens.dp(getResources(), 4));
 			row.setClickable(true);
 
-			// 图标
+			// 图标（Material Icons 矢量图标）
 			ImageView ivIcon = new ImageView(requireContext());
 			ivIcon.setLayoutParams(new LinearLayout.LayoutParams(
-					NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
-			try {
-				ivIcon.setImageDrawable(ContextCompat.getDrawable(requireContext(), ITEM_ICONS[i]));
-			} catch (Exception ignored) {}
+					NokiaDimens.dp(getResources(), 20), NokiaDimens.dp(getResources(), 20)));
+			ivIcon.setImageDrawable(NokiaIcons.get(requireContext(), ITEM_ICON_UNICODES[i], 0xFFFFFFFF, 20));
 			row.addView(ivIcon);
 
 			// 间距

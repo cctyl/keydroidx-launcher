@@ -34,12 +34,12 @@ public final class NokiaJarLauncher {
 		}
 		NokiaLog.i(TAG, "挂机中(" + running.appName + ")，启动新 jar 需确认: " + name);
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_media_play,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_PLAY,
 				"继续", true, false, () -> {
 					NokiaLog.i(TAG, "确认切换: " + running.appName + " -> " + name);
 					Config.startApp(act, name, path, false);
 				}));
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_close_clear_cancel,
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_CLOSE,
 				"取消", true, false, () -> NokiaLog.i(TAG, "取消切换，保持挂机: " + running.appName)));
 		NokiaOptionsDialog.show(act.getSupportFragmentManager(),
 				"后台运行的「" + running.appName + "」将被停止，是否继续？", items);
