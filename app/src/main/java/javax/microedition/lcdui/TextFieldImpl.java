@@ -353,6 +353,17 @@ class TextFieldImpl {
 	}
 
 	void clearScreenView() {
+		if (textview != null) {
+			try {
+				android.view.inputmethod.InputMethodManager imm =
+						(android.view.inputmethod.InputMethodManager) textview.getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+				if (imm != null) {
+					imm.hideSoftInputFromWindow(textview.getWindowToken(), 0);
+				}
+			} catch (Exception ignored) {
+			}
+			textview.clearFocus();
+		}
 		textview = null;
 		screenContainer = null;
 		counterTextView = null;

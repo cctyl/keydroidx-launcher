@@ -355,7 +355,15 @@ public class MicroActivity extends AppCompatActivity {
 	private void hideSoftInput() {
 		if (inputMethodManager != null) {
 			IBinder windowToken = binding.displayableContainer.getWindowToken();
-			inputMethodManager.hideSoftInputFromWindow(windowToken, 0);
+			if (windowToken != null) {
+				inputMethodManager.hideSoftInputFromWindow(windowToken, 0);
+			}
+			View currentFocus = getCurrentFocus();
+			if (currentFocus != null) {
+				inputMethodManager.hideSoftInputFromWindow(currentFocus.getWindowToken(), 0);
+				currentFocus.clearFocus();
+			}
+			binding.displayableContainer.requestFocus();
 		}
 	}
 
@@ -935,6 +943,7 @@ public class MicroActivity extends AppCompatActivity {
 		@Override
 		public void process() {
 			closeOptionsMenu();
+			hideSoftInput();
 			if (current != null) {
 				current.clearDisplayableView();
 			}
