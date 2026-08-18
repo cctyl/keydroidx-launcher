@@ -353,7 +353,7 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 		}
 		if (itemViews == null || focusIndex < 0 || focusIndex >= itemViews.length) return;
 		if (!enabledList.get(focusIndex)) return;
-		itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+		itemViews[focusIndex].setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 		selectedView = itemViews[focusIndex];
 	}
 

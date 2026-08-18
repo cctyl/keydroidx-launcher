@@ -188,12 +188,12 @@ public class NokiaWidgetActivityNameFragment extends NokiaPageFragment {
 		// 名称字段：焦点态蓝色高亮，非焦点态灰色边框
 		etName.setBackgroundResource(
 				(focusIndex == FOCUS_NAME && !editing) || editing
-						? R.drawable.bg_nokia_selected_dark : R.drawable.bg_nokia_searchbox);
+						? 0 : R.drawable.bg_nokia_searchbox);
 
 		// 保存按钮：焦点态蓝色高亮，非焦点态普通样式
 		if (focusIndex == FOCUS_SAVE) {
 			tvSaveButton.setTextColor(0xFF2196F3);
-			tvSaveButton.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+			tvSaveButton.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 		} else {
 			tvSaveButton.setTextColor(0xFF64B5F6);
 			tvSaveButton.setBackgroundResource(0);

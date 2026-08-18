@@ -304,7 +304,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		NokiaDimens.textSize(btn, 11);
 		btn.setClickable(true);
 		btn.setFocusable(true);
-		btn.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+		btn.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 		btn.setOnClickListener(listener);
 		LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -357,7 +357,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 				NokiaDimens.dp(getResources(), 8), NokiaDimens.dp(getResources(), 8)));
 		LinearLayout.LayoutParams dotLp = (LinearLayout.LayoutParams) dot.getLayoutParams();
 		dotLp.setMargins(0, 0, NokiaDimens.dp(getResources(), 6), 0);
-		dot.setBackgroundResource(R.drawable.bg_nokia_selected);
+		dot.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 		recordStatusBar.addView(dot);
 
 		// 录制状态文字
@@ -495,7 +495,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		focusIndex = index;
 		// 设置新焦点
 		if (itemViews[focusIndex] != null) {
-			itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+			itemViews[focusIndex].setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 			scrollToItem(focusIndex);
 		}
 	}

@@ -329,7 +329,7 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 	private void applyFocusGrid() {
 		if (focusIndex >= 0 && focusIndex < gridCellViews.length
 				&& gridCellViews[focusIndex] != null) {
-			gridCellViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+			gridCellViews[focusIndex].setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 			selectedView = gridCellViews[focusIndex];
 		}
 		updateSoftKeys();

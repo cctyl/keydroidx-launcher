@@ -1311,7 +1311,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		focusIndex = index;
 		View v = focusTargets.get(index);
 		if (v != null) {
-			v.setBackgroundResource(R.drawable.bg_nokia_selected);
+			v.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 			selectedView = v;
 		}
 		if (isInShortcuts() && v != null) {

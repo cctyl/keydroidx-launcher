@@ -222,7 +222,7 @@ public class NokiaQuickToggleSettingsFragment extends NokiaPageFragment {
 				row.setBackgroundResource(R.drawable.bg_nokia_lifted);
 			} else if (i == focusIndex) {
 				// 正常焦点高亮
-				row.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+				row.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 			} else {
 				row.setBackgroundColor(Color.TRANSPARENT);
 			}

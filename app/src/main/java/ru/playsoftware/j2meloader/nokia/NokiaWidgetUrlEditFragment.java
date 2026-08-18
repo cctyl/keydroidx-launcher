@@ -186,10 +186,10 @@ public class NokiaWidgetUrlEditFragment extends NokiaPageFragment {
 		if (etName == null || etUrl == null) return;
 		etName.setBackgroundResource(
 				(focusIndex == FOCUS_NAME && !editing) || editingField == FOCUS_NAME
-						? R.drawable.bg_nokia_selected_dark : R.drawable.bg_nokia_searchbox);
+						? 0 : R.drawable.bg_nokia_searchbox);
 		etUrl.setBackgroundResource(
 				(focusIndex == FOCUS_URL && !editing) || editingField == FOCUS_URL
-						? R.drawable.bg_nokia_selected_dark : R.drawable.bg_nokia_searchbox);
+						? 0 : R.drawable.bg_nokia_searchbox);
 	}
 
 	// ---- 导航 ----

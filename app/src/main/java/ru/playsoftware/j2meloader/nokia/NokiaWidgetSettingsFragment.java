@@ -751,7 +751,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 			selectedView = liftedRow;
 		} else if (focusIndex >= 0 && focusIndex < itemViews.length) {
 			View focusRow = itemViews[focusIndex];
-			focusRow.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+			focusRow.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 			LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) focusRow.getLayoutParams();
 			if (lp != null && lp.height != NokiaDimens.dp(getResources(), 34)) {
 				lp.height = NokiaDimens.dp(getResources(), 34);

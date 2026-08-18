@@ -103,8 +103,8 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 	}
 
 	private void updateIntroHighlight() {
-		introBind.setBackgroundResource(introChoice == 0 ? R.drawable.bg_nokia_selected_dark : 0);
-		introSkip.setBackgroundResource(introChoice == 1 ? R.drawable.bg_nokia_selected_dark : 0);
+		introBind.setBackground(introChoice == 0 ? NokiaTheme.createSelectionDrawable(requireContext(), 4) : null);
+		introSkip.setBackground(introChoice == 1 ? NokiaTheme.createSelectionDrawable(requireContext(), 4) : null);
 	}
 
 	private void startRecording() {

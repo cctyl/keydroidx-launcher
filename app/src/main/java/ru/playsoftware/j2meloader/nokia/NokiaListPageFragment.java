@@ -131,7 +131,7 @@ public abstract class NokiaListPageFragment extends NokiaPageFragment {
 
 	private void applyFocusBackground() {
 		if (focusIndex >= 0 && focusIndex < itemViews.length && itemViews[focusIndex] != null) {
-			itemViews[focusIndex].setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+			itemViews[focusIndex].setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 			selectedView = itemViews[focusIndex];
 		}
 	}

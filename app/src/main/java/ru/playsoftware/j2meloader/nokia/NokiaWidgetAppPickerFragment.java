@@ -594,7 +594,7 @@ public class NokiaWidgetAppPickerFragment extends NokiaPageFragment {
 	private void applyFocus() {
 		if (etSearch != null) {
 			etSearch.setBackgroundResource(
-					(focusPos == -1 || editing) ? R.drawable.bg_nokia_selected_dark : R.drawable.bg_nokia_searchbox);
+					(focusPos == -1 || editing) ? 0 : R.drawable.bg_nokia_searchbox);
 		}
 		if (cellViews == null) return;
 		for (int i = 0; i < cellViews.length; i++) {
@@ -613,7 +613,7 @@ public class NokiaWidgetAppPickerFragment extends NokiaPageFragment {
 		boolean current = pos < cellCurrent.length && cellCurrent[pos];
 
 		if (focused) {
-			cell.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+			cell.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 		} else if (current) {
 			cell.setBackgroundResource(R.drawable.bg_nokia_current);
 		} else if (added) {

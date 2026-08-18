@@ -490,7 +490,7 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 		}
 		if (listLayout == null || focusIndex < 0 || focusIndex >= listLayout.getChildCount()) return;
 		View v = listLayout.getChildAt(focusIndex);
-		v.setBackgroundResource(R.drawable.bg_nokia_selected_dark);
+		v.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
 		selectedView = v;
 	}
 
