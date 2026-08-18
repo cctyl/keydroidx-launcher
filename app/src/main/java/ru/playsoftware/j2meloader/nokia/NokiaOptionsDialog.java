@@ -151,6 +151,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 		TextView titleView = dialog.findViewById(R.id.widgetOptionsTitle);
 		if (titleView != null) {
 			titleView.setText(title);
+			NokiaDimens.textSize(titleView, 14);
 		}
 
 		// 应用当前主题配色到选项弹窗的标题栏与底栏
