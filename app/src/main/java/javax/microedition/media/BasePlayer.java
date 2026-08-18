@@ -51,7 +51,6 @@ public class BasePlayer implements Player, VolumeControl, PanControl {
 		controls.put(PanControl.class.getName(), this);
 		controls.put(EqualizerControl.class.getName(), equalizer);
 
-		javax.microedition.shell.NokiaBgEcoEngine.registerPlayer(this);
 	}
 
 	public void addControl(String name, Control control) {
@@ -152,6 +151,7 @@ public class BasePlayer implements Player, VolumeControl, PanControl {
 		prefetch();
 
 		if (state == PREFETCHED) {
+			javax.microedition.shell.NokiaBgEcoEngine.onAudioStarted();
 			doStart();
 
 			state = STARTED;
@@ -163,6 +163,7 @@ public class BasePlayer implements Player, VolumeControl, PanControl {
 	public synchronized void stop() {
 		checkClosed();
 		if (state == STARTED) {
+			javax.microedition.shell.NokiaBgEcoEngine.onAudioStopped();
 			doStop();
 
 			state = PREFETCHED;
@@ -189,7 +190,6 @@ public class BasePlayer implements Player, VolumeControl, PanControl {
 	@Override
 	public synchronized void close() {
 		if (state != CLOSED) {
-			javax.microedition.shell.NokiaBgEcoEngine.unregisterPlayer(this);
 			deallocate();
 			doClose();
 
