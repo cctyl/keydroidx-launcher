@@ -5,9 +5,12 @@ import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.graphics.drawable.Drawable;
 import android.location.LocationManager;
 import android.media.AudioManager;
@@ -23,6 +26,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.StatFs;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -599,6 +603,19 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				NokiaDimens.dp(getResources(), 16), NokiaDimens.dp(getResources(), 16)));
 		iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
 		try { iv.setImageResource(iconRes); } catch (Exception ignored) {}
+		if (item.type == NokiaWidgetItem.TYPE_QS_TILE && !TextUtils.isEmpty(item.value)) {
+			try {
+				String[] parts = item.value.split("/");
+				if (parts.length == 2) {
+					ComponentName cn = new ComponentName(parts[0], parts[1]);
+					PackageManager pm = ctx.getPackageManager();
+					ServiceInfo si = pm.getServiceInfo(cn, 0);
+					Drawable d = si.loadIcon(pm);
+					if (d == null && si.applicationInfo != null) d = si.applicationInfo.loadIcon(pm);
+					if (d != null) iv.setImageDrawable(d);
+				}
+			} catch (Exception ignored) {}
+		}
 		iv.setPadding(0, 0, NokiaDimens.dp(getResources(), 6), 0);
 		row.addView(iv);
 
@@ -658,6 +675,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				return cachedBgCount + " 个后台";
 			case NokiaWidgetItem.TYPE_IP:
 				return getWifiIpAddress();
+			case NokiaWidgetItem.TYPE_QS_TILE:
+				return "[快捷]";
 			default:
 				return item.getTypeTag();
 		}
@@ -876,10 +895,32 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					rebuildWidgetArea(getView());
 				});
 				break;
+			case NokiaWidgetItem.TYPE_QS_TILE:
+				// 快捷开关组件：触发已绑定的第三方 QS Tile
+				row.setOnClickListener(v -> {
+					triggerQsTile(item);
+				});
+				break;
 			default:
 				// 内存、存储、使用时长等不可编辑类型无点击行为
 				break;
 		}
+	}
+
+	/** 触发第三方 QS Tile 快捷开关。 */
+	private void triggerQsTile(NokiaWidgetItem item) {
+		if (item == null || TextUtils.isEmpty(item.value)) return;
+		Toast.makeText(requireContext(), "已触发: " + item.label, Toast.LENGTH_SHORT).show();
+		NokiaLog.i("Desktop", "触发快捷开关: " + item.label + " target=" + item.value);
+
+		new Thread(() -> {
+			try {
+				Process p = Runtime.getRuntime().exec("cmd statusbar click-tile " + item.value);
+				p.waitFor();
+			} catch (Exception e) {
+				NokiaLog.e("Desktop", "执行 click-tile 失败: " + item.value, e);
+			}
+		}).start();
 	}
 
 	// ---- 快捷栏 ----

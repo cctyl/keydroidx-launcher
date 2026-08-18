@@ -45,7 +45,8 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 			NokiaWidgetItem.TYPE_USAGE,
 			NokiaWidgetItem.TYPE_LOCK_SCREEN,
 			NokiaWidgetItem.TYPE_BG_MANAGER,
-		NokiaWidgetItem.TYPE_IP,
+			NokiaWidgetItem.TYPE_IP,
+			NokiaWidgetItem.TYPE_QS_TILE,
 	};
 
 	private LinearLayout listLayout;
@@ -104,6 +105,10 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 		return Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
 	}
 
+	private boolean qsTileAvailable() {
+		return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N;
+	}
+
 	private void buildTypeList() {
 		if (listLayout == null) return;
 		listLayout.removeAllViews();
@@ -112,12 +117,19 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 
 		for (int i = 0; i < TYPE_IDS.length; i++) {
 			int type = TYPE_IDS[i];
-			boolean enabled = !(type == NokiaWidgetItem.TYPE_USAGE && !usageStatsAvailable());
+			boolean enabled = true;
+			if (type == NokiaWidgetItem.TYPE_USAGE && !usageStatsAvailable()) {
+				enabled = false;
+			} else if (type == NokiaWidgetItem.TYPE_QS_TILE && !qsTileAvailable()) {
+				enabled = false;
+			}
 			enabledList.add(enabled);
 
 			String label = NokiaWidgetItem.getTypeName(type);
-			if (!enabled) {
+			if (type == NokiaWidgetItem.TYPE_USAGE && !enabled) {
 				label += " (需Android 5.0+)";
+			} else if (type == NokiaWidgetItem.TYPE_QS_TILE && !enabled) {
+				label += " (需Android 7.0+)";
 			}
 			// 后台管理组件：Android 5.0+ 需 mini_shizuku 才能准确枚举/清理；
 			// 未激活时仍可选可添加（B 方案），但标注提示，加完在桌面显示“未激活”
@@ -273,6 +285,11 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 				// Activity 快捷：进入步骤1（选择应用），详见 docs/6-Activity快捷组件添加编辑界面设计.md
 				((NokiaDesktopActivity) requireActivity())
 						.openFragment(NokiaWidgetAppPickerFragment.newActivityAddMode());
+				break;
+			case NokiaWidgetItem.TYPE_QS_TILE:
+				// 快捷开关：选择已安装的第三方/系统 QS Tile
+				((NokiaDesktopActivity) requireActivity())
+						.openFragment(new NokiaWidgetTilePickerFragment());
 				break;
 			default:
 				// 日历/内存/存储/使用时长：直接添加并返回 S1
