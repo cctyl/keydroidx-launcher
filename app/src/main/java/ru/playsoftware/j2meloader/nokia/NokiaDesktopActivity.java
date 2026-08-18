@@ -13,6 +13,7 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.View;
+import android.widget.TextView;
 
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
@@ -283,7 +284,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		}
 	}
 
-	/** 全局应用当前主题配色（更新背景壁纸与软键栏渐变） */
+	/** 全局应用当前主题配色（更新背景壁纸、软键栏渐变及左右软键文字主题色） */
 	public void applyCurrentTheme() {
 		NokiaSettingsStorage storage = new NokiaSettingsStorage(this);
 		NokiaTheme.ThemeDef theme = storage.getTheme();
@@ -294,6 +295,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		View bottomBar = findViewById(R.id.bottomPanel);
 		if (bottomBar != null) {
 			bottomBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
+		}
+		TextView bottomLeft = findViewById(R.id.bottomLeft);
+		if (bottomLeft != null) {
+			bottomLeft.setTextColor(theme.accentColor);
+		}
+		TextView bottomRight = findViewById(R.id.bottomRight);
+		if (bottomRight != null) {
+			bottomRight.setTextColor(theme.accentColor);
 		}
 	}
 
