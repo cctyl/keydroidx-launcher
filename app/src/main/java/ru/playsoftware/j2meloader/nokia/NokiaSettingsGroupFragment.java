@@ -239,8 +239,8 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 				showFontScaleDialog();
 				return true;
 			case 1:
-				NokiaLog.i("SettingsGroup", "壁纸设置（待实现）");
-				// TODO: 壁纸设置
+				NokiaLog.i("SettingsGroup", "进入壁纸设置");
+				host.openFragment(new NokiaWallpaperSettingsFragment());
 				return true;
 			default:
 				return false;

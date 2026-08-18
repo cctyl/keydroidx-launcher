@@ -1,5 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import ru.playsoftware.j2meloader.R;
+
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -306,13 +308,38 @@ public class NokiaSettingsStorage {
 
 	// ── 壁纸 ──
 
+	public static final String WALLPAPER_DEFAULT = "default";           // 经典诺基亚蓝
+	public static final String WALLPAPER_OBSIDIAN_BLACK = "obsidian_black"; // 曜石黑
+	public static final String WALLPAPER_CYAN_SEA = "cyan_sea";         // 青翠碧海
+	public static final String WALLPAPER_EMERALD_GREEN = "emerald_green"; // 翡翠深绿
+	public static final String WALLPAPER_WINE_PURPLE = "wine_purple";   // 典雅酒红/紫
+	public static final String WALLPAPER_AMBER_GOLD = "amber_gold";     // 琥珀暖金
+	public static final String WALLPAPER_CUSTOM = "custom";             // 自定义图片壁纸
+
 	public String getWallpaper() {
-		return prefs.getString(KEY_WALLPAPER, "default");
+		return prefs.getString(KEY_WALLPAPER, WALLPAPER_DEFAULT);
 	}
 
 	public void setWallpaper(String wallpaperId) {
 		prefs.edit().putString(KEY_WALLPAPER, wallpaperId).apply();
 		NokiaLog.i("SettingsStorage", "setWallpaper: " + wallpaperId);
+	}
+
+	/** 获取当前壁纸对应的内置 Drawable Resource ID（如果为 custom 则返回 0） */
+	public int getWallpaperDrawableRes() {
+		String wp = getWallpaper();
+		if (WALLPAPER_OBSIDIAN_BLACK.equals(wp)) {
+			return R.drawable.bg_nokia_obsidian_black;
+		} else if (WALLPAPER_CYAN_SEA.equals(wp)) {
+			return R.drawable.bg_nokia_cyan_sea;
+		} else if (WALLPAPER_EMERALD_GREEN.equals(wp)) {
+			return R.drawable.bg_nokia_emerald_green;
+		} else if (WALLPAPER_WINE_PURPLE.equals(wp)) {
+			return R.drawable.bg_nokia_wine_purple;
+		} else if (WALLPAPER_AMBER_GOLD.equals(wp)) {
+			return R.drawable.bg_nokia_amber_gold;
+		}
+		return R.drawable.bg_nokia_desktop;
 	}
 
 	// ── 左右软键 ──
