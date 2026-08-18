@@ -312,6 +312,7 @@ public class MicroActivity extends AppCompatActivity {
 	public void onResume() {
 		super.onResume();
 		visible = true;
+		NokiaBgEcoEngine.onForegroundResumed();
 		MidletThread.resumeApp();
 		NokiaMidletKeepAliveService.stop(this);
 		reportMidletForeground();
@@ -331,6 +332,7 @@ public class MicroActivity extends AppCompatActivity {
 		// 挂机保活：Activity 不可见且 MIDlet 仍在运行（覆盖绿键/红键/Home 全部离开路径；
 		// 绿键「后台运行」路径已在动作内先行启动，此处幂等）
 		if (MidletThread.hasInstance() && MidletThread.getRunningAppPath() != null) {
+			NokiaBgEcoEngine.onBackgroundStarted();
 			NokiaMidletKeepAliveService.start(this, appName,
 					MidletThread.getRunningAppPath(), nokiaKeyCodes);
 		}
@@ -520,6 +522,7 @@ public class MicroActivity extends AppCompatActivity {
 		hideSoftInput();
 		// 挂机动作发生时 Activity 仍前台：立即起保活通知（规避 Android 12+ 后台 FGS 限制）
 		if (MidletThread.hasInstance() && MidletThread.getRunningAppPath() != null) {
+			NokiaBgEcoEngine.onBackgroundStarted();
 			NokiaMidletKeepAliveService.start(this, appName,
 					MidletThread.getRunningAppPath(), nokiaKeyCodes);
 		}

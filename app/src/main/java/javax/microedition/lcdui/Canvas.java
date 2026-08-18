@@ -696,6 +696,7 @@ public abstract class Canvas extends Displayable {
 	 * and the calling thread is blocked until it is completed.
 	 */
 	public final void serviceRepaints() {
+		javax.microedition.shell.NokiaBgEcoEngine.throttleIfNeeded();
 		Display.getEventQueue().serviceRepaints(paintEvent);
 	}
 
@@ -900,6 +901,7 @@ public abstract class Canvas extends Displayable {
 		@Override
 		public void process() {
 			if (!visible) {
+				javax.microedition.shell.NokiaBgEcoEngine.throttleIfNeeded();
 				return;
 			}
 			int l, t, r, b;
