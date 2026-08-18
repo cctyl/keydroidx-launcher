@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诺基亚 S40/S60 沉浸式文本编辑界面设计提案</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1a1a24;
+            color: #e2e8f0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+
+        p.desc {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 24px;
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .phone-container {
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .preview-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .preview-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #cbd5e1;
+        }
+
+        /* 模拟 240x320 物理机屏幕比例 */
+        .nokia-screen {
+            width: 260px;
+            height: 380px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 0 4px #2d3748;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* ================= 方案 A：诺基亚纯正水晶质感（半透毛玻璃微光） ================= */
+        .theme-blue {
+            background: linear-gradient(180deg, #0d1b3e 0%, #1a3a6b 40%, #0d1b3e 100%);
+        }
+
+        .theme-green {
+            background: linear-gradient(180deg, #0a1f11 0%, #144324 40%, #0a1f11 100%);
+        }
+
+        .theme-black {
+            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 40%, #050505 100%);
+        }
+
+        .theme-wine {
+            background: linear-gradient(180deg, #21081a 0%, #4a153b 40%, #21081a 100%);
+        }
+
+        /* 顶部状态栏占位 */
+        .status-bar {
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 8px;
+            font-size: 10px;
+            color: #cbd5e1;
+        }
+
+        /* 顶部标题与字数栏 */
+        .editor-header {
+            height: 32px;
+            background: rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .editor-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+
+        .editor-counter {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .counter-blue { color: #93c5fd; }
+        .counter-green { color: #86efac; }
+        .counter-black { color: #e2e8f0; }
+        .counter-wine { color: #f472b6; }
+
+        /* 内容编辑卡片区 */
+        .editor-body {
+            flex: 1;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 方案 A：半透水晶内凹输入框（与主题底色浑然一体，透出主题微光） */
+        .input-card-glass {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #ffffff;
+            border: 1px solid;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+            position: relative;
+            outline: none;
+        }
+
+        .border-blue { border-color: rgba(96, 165, 250, 0.35); }
+        .border-green { border-color: rgba(74, 222, 128, 0.35); }
+        .border-black { border-color: rgba(255, 255, 255, 0.2); }
+        .border-wine { border-color: rgba(244, 114, 182, 0.35); }
+
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 16px;
+            background-color: currentColor;
+            vertical-align: middle;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 方案 B：高对比复古羊皮纸/白卡（如果喜欢经典白底黑字） */
+        .input-card-paper {
+            flex: 1;
+            background: #ffffff;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #1e293b;
+            border: 2px solid;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .border-paper-blue { border-color: #3b82f6; }
+
+        /* 底部软键栏（严格跟随主题渐变与强调色） */
+        .soft-bar {
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .bar-blue {
+            background: linear-gradient(180deg, #1a3a6b 0%, #0d1b3e 100%);
+            color: #64b5f6;
+        }
+
+        .bar-green {
+            background: linear-gradient(180deg, #144324 0%, #0a1f11 100%);
+            color: #81c784;
+        }
+
+        .bar-black {
+            background: linear-gradient(180deg, #222222 0%, #0a0a0a 100%);
+            color: #e0e0e0;
+        }
+
+        .bar-wine {
+            background: linear-gradient(180deg, #4a153b 0%, #21081a 100%);
+            color: #f48fb1;
+        }
+
+        .soft-btn {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .soft-center {
+            font-size: 13px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .feature-tag {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📱 诺基亚全屏文本编辑界面（TextBox）升级设计</h1>
+    <p class="desc">彻底告别突兀惨白的「生硬大白卡片」，采用<b>原汁原味的诺基亚 S40/S60 深色水晶半透质感</b>，全要素（顶栏、内凹输入区、光标、边框、底栏、字数指示器）100% 深度联动全局主题配色！</p>
+
+    <div class="phone-container">
+
+        <!-- 经典深蓝主题 -->
+        <div class="preview-card">
+            <div class="preview-title">1. 经典深蓝（主推 · 水晶半透）</div>
+            <div class="nokia-screen theme-blue">
+                <div class="status-bar">
+                    <span>中国移动</span>
+                    <span>14:35</span>
+                </div>
+                <div class="editor-header">
+                    <span class="editor-title">输入网址</span>
+                    <span class="editor-counter counter-blue">7 / 255</span>
+                </div>
+                <div class="editor-body">
+                    <div class="input-card-glass border-blue">
+                        http://<span class="cursor" style="color: #60a5fa;"></span>
+                    </div>
+                </div>
+                <div class="soft-bar bar-blue">
+                    <span class="soft-btn">菜单</span>
+                    <span class="soft-center">打开</span>
+                    <span class="soft-btn">清除</span>
+                </div>
+            </div>
+            <div class="feature-tag">✔ 纯正深海蓝微光沉浸感</div>
+        </div>
+
+        <!-- 翡翠幽绿主题 -->
+        <div class="preview-card">
+            <div class="preview-title">2. 翡翠幽绿（主题联动）</div>
+            <div class="nokia-screen theme-green">
+                <div class="status-bar">
+                    <span>中国移动</span>
+                    <span>14:35</span>
+                </div>
+                <div class="editor-header">
+                    <span class="editor-title">撰写信息</span>
+                    <span class="editor-counter counter-green">18 / 70</span>
+                </div>
+                <div class="editor-body">
+                    <div class="input-card-glass border-green">
+                        今晚一起去吃火锅吗？<span class="cursor" style="color: #4ade80;"></span>
+                    </div>
+                </div>
+                <div class="soft-bar bar-green">
+                    <span class="soft-btn">选项</span>
+                    <span class="soft-center">发送</span>
+                    <span class="soft-btn">清除</span>
+                </div>
+            </div>
+            <div class="feature-tag">✔ 墨绿底色 + 翠绿强调色</div>
+        </div>
+
+        <!-- 曜石纯黑主题 -->
+        <div class="preview-card">
+            <div class="preview-title">3. 曜石纯黑（极简微光）</div>
+            <div class="nokia-screen theme-black">
+                <div class="status-bar">
+                    <span>中国联通</span>
+                    <span>14:35</span>
+                </div>
+                <div class="editor-header">
+                    <span class="editor-title">便签备忘</span>
+                    <span class="editor-counter counter-black">5 / 100</span>
+                </div>
+                <div class="editor-body">
+                    <div class="input-card-glass border-black">
+                        买牛奶<span class="cursor" style="color: #e2e8f0;"></span>
+                    </div>
+                </div>
+                <div class="soft-bar bar-black">
+                    <span class="soft-btn">菜单</span>
+                    <span class="soft-center">保存</span>
+                    <span class="soft-btn">返回</span>
+                </div>
+            </div>
+            <div class="feature-tag">✔ OLED 极致省电深黑</div>
+        </div>
+
+        <!-- 典雅酒红主题 -->
+        <div class="preview-card">
+            <div class="preview-title">4. 典雅酒红（主题联动）</div>
+            <div class="nokia-screen theme-wine">
+                <div class="status-bar">
+                    <span>中国电信</span>
+                    <span>14:35</span>
+                </div>
+                <div class="editor-header">
+                    <span class="editor-title">修改昵称</span>
+                    <span class="editor-counter counter-wine">4 / 12</span>
+                </div>
+                <div class="editor-body">
+                    <div class="input-card-glass border-wine">
+                        Nokia<span class="cursor" style="color: #f472b6;"></span>
+                    </div>
+                </div>
+                <div class="soft-bar bar-wine">
+                    <span class="soft-btn">选项</span>
+                    <span class="soft-center">确定</span>
+                    <span class="soft-btn">清除</span>
+                </div>
+            </div>
+            <div class="feature-tag">✔ 浆果紫红 + 玫瑰粉软键</div>
+        </div>
+
+    </div>
+
+</body>
+</html>
