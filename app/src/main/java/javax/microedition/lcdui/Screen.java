@@ -35,7 +35,8 @@ public abstract class Screen extends Displayable {
 	public View getDisplayableView() {
 		if (layout == null) {
 			layout = (LinearLayout) super.getDisplayableView();
-			layout.setBackgroundResource(ru.playsoftware.j2meloader.R.drawable.bg_nokia_desktop);
+			ru.playsoftware.j2meloader.nokia.NokiaTheme.ThemeDef theme = ru.playsoftware.j2meloader.nokia.NokiaTheme.getSelectedTheme(layout.getContext());
+			layout.setBackground(ru.playsoftware.j2meloader.nokia.NokiaTheme.createBackgroundDrawable(theme));
 
 			View screenView = getScreenView();
 			screenView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));

@@ -34,6 +34,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -261,18 +262,18 @@ class TextFieldImpl {
 			Resources res = context.getResources();
 			screenContainer = new LinearLayout(context);
 			screenContainer.setOrientation(LinearLayout.VERTICAL);
-			screenContainer.setBackgroundColor(0x00000000); // 透明底色，直接透出桌面深海蓝壁纸
+			screenContainer.setBackgroundColor(0x00000000); // 100% 透明，完全透出底下 Screen 的主题壁纸
 
-			// 1. 顶部标题与字数栏 (32dp 高度)
 			String title = (ownerTextBox != null) ? ownerTextBox.getTitle() : null;
 			ru.playsoftware.j2meloader.nokia.NokiaTheme.ThemeDef currentTheme = ru.playsoftware.j2meloader.nokia.NokiaTheme.getSelectedTheme(context);
 
+			// 1. 顶部标题与字数栏 (32dp 高度，半透明暗色底，与 HTML .editor-header 一致)
 			LinearLayout header = new LinearLayout(context);
 			header.setOrientation(LinearLayout.HORIZONTAL);
 			header.setGravity(Gravity.CENTER_VERTICAL);
-			header.setBackgroundColor(0x800D1B3E); // 半透明深蓝黑顶栏
+			header.setBackgroundColor(0x40000000); // 25% 半透明暗黑中性底，不含任何死板杂色
 			int headerH = NokiaDimens.dp(res, 32);
-			int headerPadH = NokiaDimens.dp(res, 10);
+			int headerPadH = NokiaDimens.dp(res, 12);
 			header.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, headerH));
 			header.setPadding(headerPadH, 0, headerPadH, 0);
 
@@ -280,22 +281,21 @@ class TextFieldImpl {
 			titleTv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 			titleTv.setSingleLine(true);
 			titleTv.setEllipsize(TextUtils.TruncateAt.END);
-			titleTv.setTextColor(0xFFFFFFFF); // 纯白高对比度标题
+			titleTv.setTextColor(0xFFFFFFFF);
 			titleTv.setTypeface(Typeface.DEFAULT_BOLD);
-			NokiaDimens.textSize(titleTv, 14);
+			NokiaDimens.textSize(titleTv, 13);
 			if (title != null && !title.trim().isEmpty()) {
 				titleTv.setText(title);
 			}
 			header.addView(titleTv);
 
-			// 字数统计胶囊 (带圆角半透明微背景与主题 accentColor)
+			// 字数胶囊 (HTML .editor-counter 一致：圆角微光胶囊 + 主题强调色)
 			counterTextView = new TextView(context);
 			GradientDrawable counterBg = new GradientDrawable();
-			counterBg.setColor(0x33000000);
-			counterBg.setCornerRadius(NokiaDimens.dpF(res, 10));
-			counterBg.setStroke(NokiaDimens.dp(res, 1), (currentTheme.accentColor & 0x00FFFFFF) | 0x40000000);
+			counterBg.setColor(0x2EFFFFFF); // 18% 半透明白底
+			counterBg.setCornerRadius(NokiaDimens.dpF(res, 8));
 			counterTextView.setBackground(counterBg);
-			int cPadH = NokiaDimens.dp(res, 6);
+			int cPadH = NokiaDimens.dp(res, 8);
 			int cPadV = NokiaDimens.dp(res, 2);
 			counterTextView.setPadding(cPadH, cPadV, cPadH, cPadV);
 			counterTextView.setTextColor(currentTheme.accentColor);
@@ -306,34 +306,42 @@ class TextFieldImpl {
 
 			screenContainer.addView(header);
 
-			// 顶部栏下方的微细半透明分隔线
+			// 分隔线 (HTML border-bottom 一致)
 			View divider = new View(context);
 			divider.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
-			divider.setBackgroundColor(0x25FFFFFF);
+			divider.setBackgroundColor(0x1FFFFFFF);
 			screenContainer.addView(divider);
 
-			// 2. 中间水晶质感半透明暗黑卡片输入区
+			// 2. 中间卡片容器与水晶输入框 (严格按照 HTML .editor-body 与 .input-card-glass)
+			FrameLayout bodyContainer = new FrameLayout(context);
+			LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f);
+			bodyContainer.setLayoutParams(bodyLp);
+			int padH = NokiaDimens.dp(res, 12);
+			int padV = NokiaDimens.dp(res, 10);
+			bodyContainer.setPadding(padH, padV, padH, padV);
+
 			EditText et = getView(context, null);
 			GradientDrawable cardBg = new GradientDrawable();
-			cardBg.setColor(0x55000000); // 35% 半透明暗黑水晶底，完美透出背景壁纸
-			cardBg.setStroke(NokiaDimens.dp(res, 1), (currentTheme.accentColor & 0x00FFFFFF) | 0x66000000); // 主题色微光边框
-			cardBg.setCornerRadius(NokiaDimens.dpF(res, 5));
+			cardBg.setColor(0x59000000); // 35% 半透明暗黑水晶底，完美透出背景壁纸
+			cardBg.setCornerRadius(NokiaDimens.dpF(res, 8)); // 8dp 水晶圆角
+			cardBg.setStroke(NokiaDimens.dp(res, 1), (currentTheme.accentColor & 0x00FFFFFF) | 0x66000000); // 主题专属微光描边
 			et.setBackground(cardBg);
 
-			int pad = NokiaDimens.dp(res, 10);
-			et.setPadding(pad, pad, pad, pad);
-			et.setTextColor(0xFFFFFFFF); // 纯白清晰文字
-			et.setHintTextColor(0xFF94A3B8); // 柔和灰文字提示
+			int innerPad = NokiaDimens.dp(res, 12);
+			et.setPadding(innerPad, innerPad, innerPad, innerPad);
+			et.setGravity(Gravity.TOP | Gravity.START);
+			et.setTextColor(0xFFFFFFFF);
+			et.setHintTextColor(0xFF94A3B8);
 			NokiaDimens.textSize(et, 14);
-			et.setLineSpacing(NokiaDimens.dpF(res, 3), 1.0f);
+			et.setLineSpacing(NokiaDimens.dpF(res, 4), 1.0f);
 
-			LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
-					ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f);
-			int margin = NokiaDimens.dp(res, 8);
-			etParams.setMargins(margin, margin, margin, margin);
+			FrameLayout.LayoutParams etParams = new FrameLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 			et.setLayoutParams(etParams);
 
-			screenContainer.addView(et);
+			bodyContainer.addView(et);
+			screenContainer.addView(bodyContainer);
 		}
 		return screenContainer;
 	}

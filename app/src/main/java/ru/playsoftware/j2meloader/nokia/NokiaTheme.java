@@ -89,7 +89,7 @@ public class NokiaTheme {
 				THEME_AMBER_GOLD, "琥珀暖金",
 				0xFFFFB74D,
 				0xFF4A2D14, 0xFF241408,
-				0xFF241408, 0xFF4A2D14, 0xFF241408,
+				0xFF3E2704, 0xFF6D4708, 0xFF2A1A02,
 				0x66FF9800
 		));
 	}
