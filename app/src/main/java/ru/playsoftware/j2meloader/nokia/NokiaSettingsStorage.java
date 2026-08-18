@@ -399,9 +399,36 @@ public class NokiaSettingsStorage {
 		NokiaLog.i("SettingsStorage", "setProtectedPackages: 保存 " + arr.length() + " 个包");
 	}
 
-	// ── 字体大小 ──
+	// ── 字体大小与字体样式 ──
 
 	private static final String KEY_FONT_SCALE = "font_scale";
+	private static final String KEY_FONT_ID = "font_id";
+
+	/**
+	 * 读取当前选用的字体 ID，默认方舟像素体 12px (ark_12px)。
+	 */
+	public String getFontId() {
+		return getFontId(context);
+	}
+
+	public void setFontId(String fontId) {
+		setFontId(context, fontId);
+	}
+
+	public static String getFontId(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getString(KEY_FONT_ID, NokiaFontManager.FONT_ID_ARK_12PX);
+	}
+
+	/**
+	 * 保存当前选用的字体 ID。
+	 */
+	public static void setFontId(Context ctx, String fontId) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putString(KEY_FONT_ID, fontId).apply();
+		NokiaFontManager.invalidate();
+		NokiaLog.i("SettingsStorage", "setFontId: " + fontId);
+	}
 
 	/**
 	 * 读取用户字体缩放系数（桌面设置 → 字体大小），默认 1.0。

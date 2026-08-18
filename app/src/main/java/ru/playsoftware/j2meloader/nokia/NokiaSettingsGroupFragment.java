@@ -54,6 +54,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			case GROUP_APPEARANCE:
 				return new String[]{
 						NokiaIcons.ICON_FONT,         // 字体大小
+						NokiaIcons.ICON_FONT,         // 界面字体（像素字体/自定义字体）
 						NokiaIcons.ICON_PALETTE,    // 主题设置
 				};
 			case GROUP_KEYS:
@@ -80,7 +81,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 	private static String[] namesOf(int group) {
 		switch (group) {
 			case GROUP_APPEARANCE:
-				return new String[]{"字体大小", "主题设置"};
+				return new String[]{"字体大小", "字体选择", "主题设置"};
 			case GROUP_KEYS:
 				return new String[]{"按键绑定", "应用向导"};
 			case GROUP_CONTENT:
@@ -239,6 +240,10 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 				showFontScaleDialog();
 				return true;
 			case 1:
+				NokiaLog.i("SettingsGroup", "进入字体选择");
+				host.openFragment(new NokiaFontSettingsFragment());
+				return true;
+			case 2:
 				NokiaLog.i("SettingsGroup", "进入主题设置");
 				host.openFragment(new NokiaThemeSettingsFragment());
 				return true;

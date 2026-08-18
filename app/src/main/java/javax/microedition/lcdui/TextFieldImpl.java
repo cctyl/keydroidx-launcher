@@ -348,6 +348,9 @@ class TextFieldImpl {
 
 			bodyContainer.addView(et);
 			screenContainer.addView(bodyContainer);
+
+			// 全局像素字体适配
+			ru.playsoftware.j2meloader.nokia.NokiaFontManager.applyFontToViewHierarchy(screenContainer);
 		}
 		return screenContainer;
 	}

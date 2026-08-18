@@ -76,15 +76,21 @@ public class Font {
 		this.size = size;
 
 		Typeface family;
-		switch (face) {
-			case FACE_MONOSPACE:
-				family = Typeface.MONOSPACE;
-				break;
-			case FACE_PROPORTIONAL:
-				family = Typeface.SANS_SERIF;
-				break;
-			default:
-				family = Typeface.DEFAULT;
+		android.content.Context ctx = ContextHolder.getAppContext();
+		Typeface globalPixelTf = (ctx != null) ? ru.playsoftware.j2meloader.nokia.NokiaFontManager.getGlobalTypeface(ctx) : null;
+		if (globalPixelTf != null) {
+			family = globalPixelTf;
+		} else {
+			switch (face) {
+				case FACE_MONOSPACE:
+					family = Typeface.MONOSPACE;
+					break;
+				case FACE_PROPORTIONAL:
+					family = Typeface.SANS_SERIF;
+					break;
+				default:
+					family = Typeface.DEFAULT;
+			}
 		}
 
 		paint.setColor(Color.BLACK);

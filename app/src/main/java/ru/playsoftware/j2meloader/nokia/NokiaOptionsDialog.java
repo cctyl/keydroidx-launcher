@@ -212,6 +212,11 @@ public class NokiaOptionsDialog extends DialogFragment {
 		// 默认焦点在第一个可用选项
 		setFocus(firstEnabledIndex());
 
+		// 统一应用全局字体
+		if (dialog.getWindow() != null && dialog.getWindow().getDecorView() != null) {
+			NokiaFontManager.applyFontToViewHierarchy(dialog.getWindow().getDecorView());
+		}
+
 		// Android 12+：Dialog 窗口首个导航键会被触摸模式吞掉，show 后强制退出该状态
 		dialog.setOnShowListener(d -> NokiaDialogFocus.forceNonTouchMode(dialog));
 

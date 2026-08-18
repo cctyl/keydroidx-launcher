@@ -75,6 +75,8 @@ public abstract class NokiaPageFragment extends Fragment implements NokiaPage {
 		host.applyCurrentTheme();
 		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
 		host.refreshPageBar();
+		// 统一应用全局字体（如方舟像素字体）
+		NokiaFontManager.applyFontToViewHierarchy(view);
 		// 子类初始化钩子
 		onPageCreated(view, savedInstanceState);
 	}

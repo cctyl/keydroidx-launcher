@@ -145,6 +145,14 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	protected void setupNokiaUi() {
 		tvTime = findViewById(R.id.tvTime);
 		applyScale();
+		View topPanel = findViewById(R.id.topPanel);
+		if (topPanel != null) {
+			NokiaFontManager.applyFontToViewHierarchy(topPanel);
+		}
+		View bottomPanel = findViewById(R.id.bottomPanel);
+		if (bottomPanel != null) {
+			NokiaFontManager.applyFontToViewHierarchy(bottomPanel);
+		}
 	}
 
 	@Override
@@ -185,6 +193,10 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		applyBottomText(findViewById(R.id.bottomLeft), left, false);
 		applyBottomText(findViewById(R.id.bottomCenter), center, true);
 		applyBottomText(findViewById(R.id.bottomRight), right, false);
+		View bottomPanel = findViewById(R.id.bottomPanel);
+		if (bottomPanel != null) {
+			NokiaFontManager.applyFontToViewHierarchy(bottomPanel);
+		}
 	}
 
 	private void applyBottomText(TextView tv, String text, boolean isCenter) {
