@@ -6,6 +6,7 @@
 
     <!-- 标题栏（蓝渐变，复用诺基亚风格） -->
     <LinearLayout
+        android:id="@+id/uninstall_title_bar"
         android:layout_width="match_parent"
         android:layout_height="@dimen/nokia_dialog_title_bar_height"
         android:background="@drawable/bg_nokia_softkey"
@@ -25,6 +26,7 @@
 
     <!-- 内容区 -->
     <LinearLayout
+        android:id="@+id/uninstall_body"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#102040"
@@ -44,6 +46,7 @@
 
     <!-- 底部软键栏：左=卸载（确认），右=取消。两键宽度贴合文字，中间 spacer 撑开 -->
     <LinearLayout
+        android:id="@+id/uninstall_bottom_bar"
         android:layout_width="match_parent"
         android:layout_height="@dimen/nokia_dialog_title_bar_height"
         android:background="@drawable/bg_nokia_softkey"

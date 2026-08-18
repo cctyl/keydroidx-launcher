@@ -30,6 +30,7 @@ import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity;
 import ru.playsoftware.j2meloader.nokia.NokiaDialogFocus;
 import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.NokiaTheme;
 import ru.playsoftware.j2meloader.nokia.NokiaLog;
 
 /**
@@ -120,6 +121,14 @@ public class NokiaInstallerDialog extends DialogFragment {
 
 		initViews(dialog);
 		setupKeyListener(dialog);
+
+		NokiaTheme.ThemeDef theme = NokiaTheme.getSelectedTheme(requireContext());
+		View titleBar = dialog.findViewById(R.id.install_title_bar);
+		if (titleBar != null) titleBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
+		View body = dialog.findViewById(R.id.install_body);
+		if (body != null) body.setBackground(NokiaTheme.createDialogBodyDrawable(theme));
+		View bottomBar = dialog.findViewById(R.id.install_bottom_bar);
+		if (bottomBar != null) bottomBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
 
 		// Android 12+：Dialog 窗口首个导航键会被触摸模式吞掉，show 后强制退出该状态
 		dialog.setOnShowListener(d -> NokiaDialogFocus.forceNonTouchMode(dialog));

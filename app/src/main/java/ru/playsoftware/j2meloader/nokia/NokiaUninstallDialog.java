@@ -63,6 +63,14 @@ public class NokiaUninstallDialog extends DialogFragment {
 		TextView content = dialog.findViewById(R.id.uninstall_content);
 		softLeft = dialog.findViewById(R.id.softLeft);
 		softRight = dialog.findViewById(R.id.softRight);
+
+		NokiaTheme.ThemeDef theme = NokiaTheme.getSelectedTheme(requireContext());
+		View titleBar = dialog.findViewById(R.id.uninstall_title_bar);
+		if (titleBar != null) titleBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
+		View body = dialog.findViewById(R.id.uninstall_body);
+		if (body != null) body.setBackground(NokiaTheme.createDialogBodyDrawable(theme));
+		View bottomBar = dialog.findViewById(R.id.uninstall_bottom_bar);
+		if (bottomBar != null) bottomBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
 		if (content != null) {
 			content.setText("是否卸载「" + appName + "」？");
 		}
