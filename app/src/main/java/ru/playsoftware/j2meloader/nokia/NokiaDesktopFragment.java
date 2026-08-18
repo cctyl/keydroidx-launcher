@@ -907,7 +907,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		}
 	}
 
-	/** 触发第三方 QS Tile 快捷开关（支持 Shizuku、Root 与广播多级降级）。 */
+	/** 触发第三方 QS Tile 快捷开关（支持特化通道、Shizuku、Root 多级执行）。 */
 	private void triggerQsTile(NokiaWidgetItem item) {
 		if (item == null || TextUtils.isEmpty(item.value)) return;
 		final Context ctx = requireContext();
@@ -915,16 +915,32 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		final String label = item.label;
 		NokiaLog.i("Desktop", "触发快捷开关: " + label + " target=" + target);
 
+		// 1. 小黑屋特化官方一键冻结通道（免 root、免 Shizuku、直接调用官方公开的 StopappActivity）
+		if (target.contains("web1n.stopapp")) {
+			try {
+				Intent freezeIntent = new Intent();
+				freezeIntent.setComponent(new ComponentName("web1n.stopapp", "web1n.stopapp.activity.StopappActivity"));
+				freezeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				ctx.startActivity(freezeIntent);
+				Toast.makeText(ctx, "已触发: " + label, Toast.LENGTH_SHORT).show();
+				NokiaLog.i("Desktop", "已直接拉起小黑屋一键冻结 StopappActivity");
+				return;
+			} catch (Exception e) {
+				NokiaLog.e("Desktop", "拉起小黑屋 StopappActivity 失败，尝试通用 Shell 通道", e);
+			}
+		}
+
+		// 2. 通用 Shizuku / Root / Shell 通道
 		new Thread(() -> {
 			boolean executed = false;
 
-			// 1. 优先使用 mini_shizuku 服务以 Shell 身份执行
+			// 优先使用 mini_shizuku 服务以 Shell 身份执行
 			if (Shizuku.isRunning()) {
 				executed = Shizuku.exec("cmd statusbar click-tile " + target);
 				NokiaLog.i("Desktop", "Shizuku 执行 click-tile 结果: " + executed);
 			}
 
-			// 2. 若 Shizuku 未运行，尝试 root su 执行
+			// 若 Shizuku 未运行，尝试 root su 执行
 			if (!executed) {
 				try {
 					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "cmd statusbar click-tile " + target});
@@ -933,17 +949,6 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 						executed = true;
 						NokiaLog.i("Desktop", "Root 执行 click-tile 成功");
 					}
-				} catch (Exception ignored) {
-				}
-			}
-
-			// 3. 特殊应用免权限广播/动作兜底（如小黑屋）
-			if (target.startsWith("web1n.stopapp")) {
-				try {
-					Intent freezeIntent = new Intent("web1n.stopapp.action.FREEZE");
-					freezeIntent.setPackage("web1n.stopapp");
-					ctx.sendBroadcast(freezeIntent);
-					NokiaLog.i("Desktop", "已发送小黑屋一键冻结广播");
 				} catch (Exception ignored) {
 				}
 			}
