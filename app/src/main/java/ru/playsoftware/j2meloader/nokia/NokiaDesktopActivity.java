@@ -52,6 +52,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
+		applyCurrentTheme();
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_nokia);
 		setupNokiaUi();
@@ -282,7 +283,20 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		}
 	}
 
-	@Override
+	/** 全局应用当前主题配色（更新背景壁纸与软键栏渐变） */
+	public void applyCurrentTheme() {
+		NokiaSettingsStorage storage = new NokiaSettingsStorage(this);
+		NokiaTheme.ThemeDef theme = storage.getTheme();
+		View wall = findViewById(R.id.wallpaper);
+		if (wall != null) {
+			wall.setBackground(NokiaTheme.createBackgroundDrawable(theme));
+		}
+		View bottomBar = findViewById(R.id.bottomPanel);
+		if (bottomBar != null) {
+			bottomBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
+		}
+	}
+
 	protected void onDestroy() {
 		if (lockServer != null) {
 			lockServer.stop();

@@ -22,7 +22,7 @@ import ru.playsoftware.j2meloader.R;
 /**
  * 桌面设置二级分组页。同一套纵向列表结构，按传入的分组 ID 展示不同细项：
  * <ul>
- *     <li>{@link #GROUP_APPEARANCE} 外观与显示：字体大小、壁纸设置；</li>
+ *     <li>{@link #GROUP_APPEARANCE} 外观与显示：字体大小、主题设置；</li>
  *     <li>{@link #GROUP_KEYS} 按键与操作：按键绑定、应用向导；</li>
  *     <li>{@link #GROUP_CONTENT} 桌面内容：顶部快捷栏设置、桌面组件设置；</li>
  *     <li>{@link #GROUP_SYSTEM} 系统与权限：日志记录、默认桌面设置。</li>
@@ -54,7 +54,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			case GROUP_APPEARANCE:
 				return new String[]{
 						NokiaIcons.ICON_FONT,         // 字体大小
-						NokiaIcons.ICON_WALLPAPER,    // 壁纸设置
+						NokiaIcons.ICON_PALETTE,    // 主题设置
 				};
 			case GROUP_KEYS:
 				return new String[]{
@@ -80,7 +80,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 	private static String[] namesOf(int group) {
 		switch (group) {
 			case GROUP_APPEARANCE:
-				return new String[]{"字体大小", "壁纸设置"};
+				return new String[]{"字体大小", "主题设置"};
 			case GROUP_KEYS:
 				return new String[]{"按键绑定", "应用向导"};
 			case GROUP_CONTENT:
@@ -239,8 +239,8 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 				showFontScaleDialog();
 				return true;
 			case 1:
-				NokiaLog.i("SettingsGroup", "进入壁纸设置");
-				host.openFragment(new NokiaWallpaperSettingsFragment());
+				NokiaLog.i("SettingsGroup", "进入主题设置");
+				host.openFragment(new NokiaThemeSettingsFragment());
 				return true;
 			default:
 				return false;

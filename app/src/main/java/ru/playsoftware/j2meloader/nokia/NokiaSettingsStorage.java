@@ -488,4 +488,19 @@ public class NokiaSettingsStorage {
 			default: return "未知(" + mode + ")";
 		}
 	}
+
+	// ── 主题设置 ──
+
+	public String getThemeId() {
+		return prefs.getString(KEY_WALLPAPER, NokiaTheme.THEME_CLASSIC_BLUE);
+	}
+
+	public NokiaTheme.ThemeDef getTheme() {
+		return NokiaTheme.getTheme(getThemeId());
+	}
+
+	public void setThemeId(String themeId) {
+		prefs.edit().putString(KEY_WALLPAPER, themeId).apply();
+		NokiaLog.i("SettingsStorage", "setThemeId: " + themeId);
+	}
 }

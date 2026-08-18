@@ -49,6 +49,7 @@ public final class NokiaIcons {
 	public static final String ICON_SYSTEM = "\ue8b8";        // settings / system (系统与权限)
 	public static final String ICON_ADVANCED = "\ue869";      // build / tune (高级设置)
 	public static final String ICON_FONT = "\ue165";          // format_size (字体大小)
+	public static final String ICON_PALETTE = "\ue40a";       // palette (调色板/主题)
 	public static final String ICON_WALLPAPER = "\ue3f4";     // image / wallpaper (壁纸设置)
 	public static final String ICON_SHORTCUTS = "\ue8f9";     // view_headline (顶部快捷栏设置)
 	public static final String ICON_WIDGETS = "\ue871";       // widgets (桌面组件设置)

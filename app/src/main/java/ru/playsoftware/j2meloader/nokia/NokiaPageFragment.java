@@ -68,19 +68,8 @@ public abstract class NokiaPageFragment extends Fragment implements NokiaPage {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		boolean topAlign = isTopAlign();
 		host.scaleMidContent(view, topAlign);
-		// 壁纸 (优先读取设置中的自定义壁纸主题，若无则使用页面默认)
-		View wall = host.findViewById(R.id.wallpaper);
-		if (wall != null) {
-			int customWallRes = new NokiaSettingsStorage(requireContext()).getWallpaperDrawableRes();
-			if (customWallRes != 0) {
-				wall.setBackgroundResource(customWallRes);
-			} else {
-				int wallRes = getWallpaperRes();
-				if (wallRes != 0) {
-					wall.setBackgroundResource(wallRes);
-				}
-			}
-		}
+		// 应用当前全局主题（背景壁纸与软键栏渐变）
+		host.applyCurrentTheme();
 		// 底部菜单栏由 NokiaPage 声明 + host.refreshPageBar() 自动装配
 		host.refreshPageBar();
 		// 子类初始化钩子
