@@ -933,17 +933,19 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 2. 通用 Shizuku / Root / Shell 通道
 		new Thread(() -> {
 			boolean executed = false;
+			// 复合命令：先展开设置面板激活 Tile 交互通道，再触发 click-tile，支持带弹窗的第三方 App
+			String cmd = "cmd statusbar expand-settings && sleep 0.1 && cmd statusbar click-tile " + target;
 
 			// 优先使用 mini_shizuku 服务以 Shell 身份执行
 			if (Shizuku.isRunning()) {
-				executed = Shizuku.exec("cmd statusbar click-tile " + target);
+				executed = Shizuku.exec(cmd);
 				NokiaLog.i("Desktop", "Shizuku 执行 click-tile 结果: " + executed);
 			}
 
 			// 若 Shizuku 未运行，尝试 root su 执行
 			if (!executed) {
 				try {
-					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "cmd statusbar click-tile " + target});
+					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
 					int exitCode = p.waitFor();
 					if (exitCode == 0) {
 						executed = true;
