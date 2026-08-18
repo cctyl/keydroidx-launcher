@@ -1,5 +1,6 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import android.content.Context;
 import android.content.res.Resources;
 import android.util.TypedValue;
 import android.widget.TextView;
@@ -39,6 +40,20 @@ public final class NokiaDimens {
      * 所有动态创建文字的 setTextSize() 一律走此入口，禁止使用默认 sp 单位。
      */
     public static void textSize(TextView tv, float dpValue) {
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, dpValue * sUserFontScale);
+        if (tv == null) return;
+        float scale = sUserFontScale;
+        if (scale <= 0f || scale == 1f) {
+            try {
+                Context ctx = tv.getContext();
+                if (ctx != null) {
+                    float s = NokiaSettingsStorage.getFontScale(ctx);
+                    if (s > 0f) {
+                        scale = s;
+                        sUserFontScale = s;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, dpValue * (scale > 0f ? scale : 1f));
     }
 }
