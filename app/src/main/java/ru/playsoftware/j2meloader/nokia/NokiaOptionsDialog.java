@@ -166,6 +166,9 @@ public class NokiaOptionsDialog extends DialogFragment {
 
 
 		listContainer = dialog.findViewById(R.id.widgetOptionsList);
+		if (listContainer != null) {
+			listContainer.setBackground(NokiaTheme.createDialogBodyDrawable(currentTheme));
+		}
 		rebuildList();
 
 		// 接入用户自定义按键映射（禁止写死 keyCode）

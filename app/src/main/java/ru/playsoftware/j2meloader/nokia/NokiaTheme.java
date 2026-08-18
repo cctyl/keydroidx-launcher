@@ -122,6 +122,16 @@ public class NokiaTheme {
 	}
 
 	/** 创建当前主题软键栏背景 Drawable */
+		/** 为通用选项弹窗内容区创建当前主题专属的深色背景 */
+	public static GradientDrawable createDialogBodyDrawable(ThemeDef theme) {
+		GradientDrawable gd = new GradientDrawable(
+				GradientDrawable.Orientation.TOP_BOTTOM,
+				new int[]{theme.bgCenterColor, theme.bgEndColor}
+		);
+		gd.setGradientType(GradientDrawable.LINEAR_GRADIENT);
+		return gd;
+	}
+
 	public static GradientDrawable createSoftKeyDrawable(ThemeDef theme) {
 		GradientDrawable gd = new GradientDrawable(
 				GradientDrawable.Orientation.TOP_BOTTOM,
