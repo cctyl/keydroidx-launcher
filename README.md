@@ -93,6 +93,13 @@
 
 ---
 
-## 致谢
+## 致谢与开源许可
 
-本项目基于 [J2ME-Loader](https://github.com/nikita36078/J2ME-Loader) 开发，感谢原作者。
+本项目基于开源社区优秀项目与资源开发，特此致谢：
+
+- **J2ME 模拟核心**：基于 [J2ME-Loader](https://github.com/nikita36078/J2ME-Loader) 开发，感谢原作者 [nikita36078](https://github.com/nikita36078)。
+- **复古像素字体**：
+  - **方舟像素字体 (Ark Pixel Font)**：由 [TakWolf](https://github.com/TakWolf/ark-pixel-font) 开发设计的开源泛中日韩像素字体（SIL Open Font License 1.1），提供 1:1 精修的 S40 经典 12px 点阵质感。
+  - **缝合怪像素字体 (Fusion Pixel Font)**：由 [TakWolf](https://github.com/TakWolf/fusion-pixel-font) 整合开发的超全字符集像素字体（SIL Open Font License 1.1），提供 100% 汉字全覆盖与纯正复古液晶感。
+- **矢量图标体系**：
+  - **Google Material Icons**：由 Google 团队提供的开源矢量图标字库（Apache License 2.0）。
