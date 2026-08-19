@@ -95,7 +95,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="• J2ME-Loader (nikita36078)\n• 方舟像素字体 / Ark Pixel (TakWolf)\n• 缝合怪像素字体 / Fusion Pixel (TakWolf)\n• Google Material Icons"
+                android:text="• J2ME-Loader (nikita36078)\n• 方舟像素字体 / Ark Pixel (TakWolf)\n• 缝合怪像素字体 / Fusion Pixel (TakWolf)\n• Google Material Icons\n• S60 图标库 / s60-icon-pack (x1unix)"
                 android:textColor="#CCCCCC"
                 android:textSize="10sp"
                 android:lineSpacingMultiplier="1.2"

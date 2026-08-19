@@ -103,3 +103,4 @@
   - **缝合怪像素字体 (Fusion Pixel Font)**：由 [TakWolf](https://github.com/TakWolf/fusion-pixel-font) 整合开发的超全字符集像素字体（SIL Open Font License 1.1），提供 100% 汉字全覆盖与纯正复古液晶感。
 - **矢量图标体系**：
   - **Google Material Icons**：由 Google 团队提供的开源矢量图标字库（Apache License 2.0）。
+  - **S60 图标库 (s60-icon-pack)**：由 [x1unix](https://github.com/x1unix) 整理的塞班 S60 系统图标库（[s60-icon-pack](https://github.com/x1unix/s60-icon-pack)），用于还原诺基亚经典界面风格。
