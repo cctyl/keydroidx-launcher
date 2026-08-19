@@ -137,13 +137,20 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 		}
 		float density = getResources().getDisplayMetrics().density;
 		float scale = host.getScale();
+		float fontScale = NokiaSettingsStorage.getFontScale(requireContext());
+		if (fontScale <= 0f) fontScale = 1.0f;
+
+		// 随字体缩放动态扩充行高预算，字体越大行高预留越足
+		float dynamicRowHDp = ROW_H_DP + Math.max(0f, (fontScale - 1.0f) * 16f);
+
 		float availDesign = panelH / density / scale;
-		int rows = (int) ((availDesign - TITLE_H_DP) / ROW_H_DP);
-		rows = Math.max(3, Math.min(8, rows));
+		int rows = (int) ((availDesign - TITLE_H_DP) / dynamicRowHDp);
+		rows = Math.max(2, Math.min(8, rows));
 		rowsPerPage = rows;
 		perPage = COLS * rowsPerPage;
 		NokiaLog.i("Box", "computeRowsPerPage: rowsPerPage=" + rowsPerPage
 				+ " panelH=" + panelH + " scale=" + scale + " density=" + density
+				+ " fontScale=" + fontScale + " dynamicRowHDp=" + dynamicRowHDp
 				+ " availDesign=" + availDesign);
 	}
 
