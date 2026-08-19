@@ -55,5 +55,7 @@ public final class NokiaDimens {
             } catch (Exception ignored) {}
         }
         tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, dpValue * (scale > 0f ? scale : 1f));
+        // 同步应用全局像素字体（避免动态创建的 TextView 漏掉字体设置）
+        NokiaFontManager.applyFontToViewHierarchy(tv);
     }
 }

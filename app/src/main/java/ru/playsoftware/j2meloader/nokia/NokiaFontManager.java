@@ -21,7 +21,7 @@ import java.util.Map;
 
 /**
  * 诺基亚桌面字体中枢管理器。
- * 负责全局字体（内置方舟像素体、自定义外部导入字体、系统默认字体）的加载、缓存与分发。
+ * 负责全局字体（内置方舟/缝合怪像素体、自定义外部导入字体、系统默认字体）的加载、缓存与分发。
  */
 public class NokiaFontManager {
 
@@ -29,7 +29,7 @@ public class NokiaFontManager {
 
 	public static final String FONT_ID_SYSTEM = "system_default";
 	public static final String FONT_ID_ARK_12PX = "ark_pixel_12px";
-	public static final String FONT_ID_ARK_16PX = "ark_pixel_16px";
+	public static final String FONT_ID_FUSION_12PX = "fusion_pixel_12px";
 	public static final String FONT_ID_CUSTOM_PREFIX = "custom_";
 
 	private static final Map<String, Typeface> sTypefaceCache = new HashMap<>();
@@ -75,7 +75,7 @@ public class NokiaFontManager {
 	}
 
 	/**
-	 * 加载指定 ID 的字体。
+	 * 根据 fontId 加载 Typeface。
 	 */
 	public static Typeface loadTypeface(Context context, String fontId) {
 		if (fontId == null || FONT_ID_SYSTEM.equals(fontId)) {
@@ -90,8 +90,8 @@ public class NokiaFontManager {
 		try {
 			if (FONT_ID_ARK_12PX.equals(fontId)) {
 				tf = Typeface.createFromAsset(context.getAssets(), "fonts/ArkPixel-12px.ttf");
-			} else if (FONT_ID_ARK_16PX.equals(fontId)) {
-				tf = Typeface.createFromAsset(context.getAssets(), "fonts/ArkPixel-16px.ttf");
+			} else if (FONT_ID_FUSION_12PX.equals(fontId)) {
+				tf = Typeface.createFromAsset(context.getAssets(), "fonts/FusionPixel-12px.ttf");
 			} else if (fontId.startsWith(FONT_ID_CUSTOM_PREFIX)) {
 				File fontDir = new File(context.getFilesDir(), "fonts");
 				File fontFile = new File(fontDir, fontId.substring(FONT_ID_CUSTOM_PREFIX.length()));
@@ -114,8 +114,8 @@ public class NokiaFontManager {
 	 */
 	public static List<FontItem> getAvailableFonts(Context context) {
 		List<FontItem> list = new ArrayList<>();
-		list.add(new FontItem(FONT_ID_ARK_12PX, "方舟像素体 (12px 推荐)", "复刻诺基亚 S40 经典 12 点阵，紧凑精致", false));
-		list.add(new FontItem(FONT_ID_ARK_16PX, "方舟像素体 (16px 大字)", "适合中高分辨率或偏好更大字号的用户", false));
+		list.add(new FontItem(FONT_ID_ARK_12PX, "方舟像素体 (12px 经典)", "复刻诺基亚 S40 经典 12 点阵，紧凑精致", false));
+		list.add(new FontItem(FONT_ID_FUSION_12PX, "缝合怪像素体 (12px 全字符)", "CJK 全字符无死角覆盖，大字符集推荐", false));
 		list.add(new FontItem(FONT_ID_SYSTEM, "系统默认字体", "系统原生无衬线字体 (Roboto / 默认)", false));
 
 		// 扫描自定义字体目录
@@ -154,9 +154,8 @@ public class NokiaFontManager {
 					cursor.close();
 				}
 			}
-
-			if (fileName == null || (!fileName.toLowerCase().endsWith(".ttf") && !fileName.toLowerCase().endsWith(".otf"))) {
-				fileName = "imported_font_" + System.currentTimeMillis() + ".ttf";
+			if (fileName == null) {
+				fileName = "font_" + System.currentTimeMillis() + ".ttf";
 			}
 
 			File fontDir = new File(context.getFilesDir(), "fonts");
@@ -166,65 +165,75 @@ public class NokiaFontManager {
 
 			File destFile = new File(fontDir, fileName);
 			try (InputStream in = context.getContentResolver().openInputStream(uri);
-			     OutputStream out = new FileOutputStream(destFile)) {
-				if (in == null) return null;
+				 OutputStream out = new FileOutputStream(destFile)) {
 				byte[] buffer = new byte[8192];
 				int read;
 				while ((read = in.read(buffer)) != -1) {
 					out.write(buffer, 0, read);
 				}
-				out.flush();
 			}
 
-			// 尝试解析，测试字体是否有效
-			try {
-				Typeface tf = Typeface.createFromFile(destFile);
-				if (tf != null) {
-					String fontId = FONT_ID_CUSTOM_PREFIX + fileName;
-					sTypefaceCache.put(fontId, tf);
-					return fontId;
-				}
-			} catch (Exception ex) {
+			// 尝试解析验证
+			Typeface tf = Typeface.createFromFile(destFile);
+			if (tf == null) {
 				destFile.delete();
-				NokiaLog.e(TAG, "导入字体文件解析损坏", ex);
+				return null;
 			}
+
+			return FONT_ID_CUSTOM_PREFIX + fileName;
 		} catch (Throwable t) {
-			NokiaLog.e(TAG, "从 Uri 复制字体文件失败", t);
+			NokiaLog.e(TAG, "导入字体文件失败: " + uri, t);
+			return null;
 		}
-		return null;
 	}
 
 	/**
-	 * 递归遍历给整个 View 树应用全局像素字体。
-	 * 特别保护：如果 TextView 已经应用了 Material Icons 矢量图标库，则不覆盖图标！
+	 * 删除自定义字体。
 	 */
-	public static void applyFontToViewHierarchy(View view) {
-		if (view == null) return;
-		Typeface globalTf = getGlobalTypeface(view.getContext());
-		applyFontInternal(view, globalTf);
+	public static boolean deleteCustomFont(Context context, String fontId) {
+		if (context == null || fontId == null || !fontId.startsWith(FONT_ID_CUSTOM_PREFIX)) {
+			return false;
+		}
+		File fontDir = new File(context.getFilesDir(), "fonts");
+		File fontFile = new File(fontDir, fontId.substring(FONT_ID_CUSTOM_PREFIX.length()));
+		boolean ok = fontFile.delete();
+		if (ok) {
+			sTypefaceCache.remove(fontId);
+			if (fontId.equals(sCurrentFontId)) {
+				invalidate();
+			}
+		}
+		return ok;
 	}
 
-	private static void applyFontInternal(View view, Typeface globalTf) {
-		if (view instanceof TextView) {
-			TextView tv = (TextView) view;
-			Typeface currentTf = tv.getTypeface();
-			Typeface iconTf = NokiaIcons.getTypeface(view.getContext());
-			// 保护图标：绝不覆盖 Material Icons
-			if (currentTf != null && currentTf == iconTf) {
+	/**
+	 * 递归将全局字体应用到指定 View 树。
+	 * 特别保护：如果 TextView 使用的是 NokiaIcons (MaterialIcons)，则坚决跳过，不覆盖图标字体！
+	 */
+	public static void applyFontToViewHierarchy(View root) {
+		if (root == null) return;
+		Typeface tf = getGlobalTypeface(root.getContext());
+		applyFontToViewHierarchy(root, tf);
+	}
+
+	public static void applyFontToViewHierarchy(View root, Typeface tf) {
+		if (root == null) return;
+
+		if (root instanceof TextView) {
+			TextView tv = (TextView) root;
+			// 保护：如果 TextView 已经设置了 MaterialIcons 矢量图标字体，绝对不要覆盖！
+			Typeface curTf = tv.getTypeface();
+			if (curTf != null && curTf.equals(NokiaIcons.getTypeface(tv.getContext()))) {
 				return;
 			}
-			if (globalTf != null) {
-				tv.setTypeface(globalTf);
-				// 针对像素字体优化：关闭次像素与抗锯齿毛边，使点阵更加清晰硬朗
-				tv.setPaintFlags(tv.getPaintFlags() & ~Paint.SUBPIXEL_TEXT_FLAG);
-			} else {
-				tv.setTypeface(Typeface.DEFAULT);
-			}
-		} else if (view instanceof ViewGroup) {
-			ViewGroup vg = (ViewGroup) view;
-			int childCount = vg.getChildCount();
-			for (int i = 0; i < childCount; i++) {
-				applyFontInternal(vg.getChildAt(i), globalTf);
+			tv.setTypeface(tf != null ? tf : Typeface.DEFAULT);
+			return;
+		}
+
+		if (root instanceof ViewGroup) {
+			ViewGroup group = (ViewGroup) root;
+			for (int i = 0; i < group.getChildCount(); i++) {
+				applyFontToViewHierarchy(group.getChildAt(i), tf);
 			}
 		}
 	}
