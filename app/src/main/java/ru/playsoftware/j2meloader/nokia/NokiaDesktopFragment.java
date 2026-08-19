@@ -381,9 +381,16 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			toggleStates = new boolean[count];
 		}
 
-		int cellHeight = NokiaDimens.dp(getResources(), 32);
+		float fontScale = NokiaSettingsStorage.getFontScale(ctx);
+		float toggleScale = 1.0f + (fontScale - 1.0f) * 0.6f;
+		if (toggleScale < 0.8f) toggleScale = 0.8f;
+
+		int cellHeight = NokiaDimens.dp(getResources(), Math.round(32 * toggleScale));
 		boolean useWeight = count <= 4;
-		int fixedCellWidth = NokiaDimens.dp(getResources(), 48);
+		int fixedCellWidth = NokiaDimens.dp(getResources(), Math.round(48 * toggleScale));
+		int iconSize = Math.round(18 * toggleScale);
+		int dotSize = Math.max(3, Math.round(4 * toggleScale));
+		int dotMarginTop = Math.max(1, Math.round(1 * toggleScale));
 
 		for (int i = 0; i < count; i++) {
 			NokiaQuickToggleItem item = activeToggles.get(i);
@@ -401,17 +408,17 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			// 图标（Material Icons 矢量字体）
 			ImageView iv = new ImageView(ctx);
 			iv.setLayoutParams(new LinearLayout.LayoutParams(
-					NokiaDimens.dp(getResources(), 18), NokiaDimens.dp(getResources(), 18)));
+					NokiaDimens.dp(getResources(), iconSize), NokiaDimens.dp(getResources(), iconSize)));
 			iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-			iv.setImageDrawable(NokiaIcons.get(ctx, item.getIconUnicode(), 0xFFFFFFFF, 18));
+			iv.setImageDrawable(NokiaIcons.get(ctx, item.getIconUnicode(), 0xFFFFFFFF, iconSize));
 			iv.setTag("icon");
 			cell.addView(iv);
 
 			// 状态指示小圆点
 			View dot = new View(ctx);
 			LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(
-					NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4));
-			dotLp.setMargins(0, NokiaDimens.dp(getResources(), 1), 0, 0);
+					NokiaDimens.dp(getResources(), dotSize), NokiaDimens.dp(getResources(), dotSize));
+			dotLp.setMargins(0, NokiaDimens.dp(getResources(), dotMarginTop), 0, 0);
 			dot.setLayoutParams(dotLp);
 			dot.setTag("dot");
 			cell.addView(dot);
@@ -1018,16 +1025,30 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private LinearLayout createShortcutCell(ShortcutApp app, int index) {
 		Context ctx = getContext();
 		if (ctx == null) return null;
+		float fontScale = NokiaSettingsStorage.getFontScale(ctx);
+		// 图标缩放比字体小一号：进行适当弱化，避免视觉过大（如 1.3x 字体对应约 1.15x 图标）
+		float iconScale = 1.0f + (fontScale - 1.0f) * 0.6f;
+		if (iconScale < 0.8f) iconScale = 0.8f;
+
+		int iconBase = Math.round(22 * iconScale);
+		int cellW = Math.round(36 * iconScale);
+		int cellH = Math.round(34 * iconScale);
+		int padding = Math.max(1, Math.round(4 * iconScale));
+
 		LinearLayout cell = new LinearLayout(ctx);
-		cell.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 34)));
+		cell.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), cellW), NokiaDimens.dp(getResources(), cellH)));
 		cell.setOrientation(LinearLayout.VERTICAL);
 		cell.setGravity(Gravity.CENTER);
-		cell.setPadding(NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4));
+		cell.setPadding(
+				NokiaDimens.dp(getResources(), padding),
+				NokiaDimens.dp(getResources(), padding),
+				NokiaDimens.dp(getResources(), padding),
+				NokiaDimens.dp(getResources(), padding));
 		cell.setClickable(true);
 		cell.setTag(app);
 
 		ImageView iv = new ImageView(ctx);
-		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
+		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), iconBase), NokiaDimens.dp(getResources(), iconBase)));
 		Drawable icon = loadShortcutIconMemory(app);
 		if (icon != null) {
 			iv.setImageDrawable(icon);
