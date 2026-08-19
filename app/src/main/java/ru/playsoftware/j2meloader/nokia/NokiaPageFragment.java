@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import android.widget.ScrollView;
+
 import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -86,5 +88,36 @@ public abstract class NokiaPageFragment extends Fragment implements NokiaPage {
 	 * 子类在此 findViewById / 构建列表 / 设置焦点等（替代原先 onViewCreated 的剩余部分）。
 	 */
 	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	}
+
+	/**
+	 * 通用滚动跟随辅助方法：确保目标子视图 {@code target} 完全处于 {@code scroll} 的可视区内。
+	 * <p>
+	 * 支持单层列表与任意多层嵌套容器（例如网格 {@code ScrollView -> Container -> Row -> Cell}），
+	 * 会自动循环累加父级视图的 top 偏移量，计算出相对于 ScrollView 的真实垂直坐标。
+	 *
+	 * @param scroll 滚动容器
+	 * @param target 需要滚入可视区的子视图
+	 */
+	public void smoothScrollToVisible(@Nullable ScrollView scroll, @Nullable View target) {
+		if (scroll == null || target == null) return;
+		scroll.post(() -> {
+			if (scroll == null || !isAdded()) return;
+			int scrollY = scroll.getScrollY();
+			int itemTop = 0;
+			View current = target;
+			while (current != null && current != scroll && current.getParent() instanceof View) {
+				itemTop += current.getTop();
+				current = (View) current.getParent();
+			}
+			int itemBottom = itemTop + target.getHeight();
+			int svHeight = scroll.getHeight();
+			if (svHeight <= 0) return;
+			if (itemTop < scrollY) {
+				scroll.smoothScrollTo(0, itemTop);
+			} else if (itemBottom > scrollY + svHeight) {
+				scroll.smoothScrollTo(0, itemBottom - svHeight);
+			}
+		});
 	}
 }

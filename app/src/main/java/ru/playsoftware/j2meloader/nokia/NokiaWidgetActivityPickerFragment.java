@@ -384,20 +384,7 @@ public class NokiaWidgetActivityPickerFragment extends NokiaPageFragment {
 
 	private void scrollToVisible(int index) {
 		if (scroll == null || itemViews == null || index < 0 || index >= itemViews.length) return;
-		View item = itemViews[index];
-		if (item == null) return;
-		scroll.post(() -> {
-			int scrollY = scroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = scroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				scroll.smoothScrollTo(0, itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				scroll.smoothScrollTo(0, itemBottom - svHeight);
-			}
-		});
+		smoothScrollToVisible(scroll, itemViews[index]);
 	}
 
 	private void applyListHighlight() {

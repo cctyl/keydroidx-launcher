@@ -345,20 +345,7 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 	private void scrollToVisibleGrid(int index) {
 		if (appScroll == null || gridCellViews == null
 				|| index < 0 || index >= gridCellViews.length) return;
-		View item = gridCellViews[index];
-		if (item == null) return;
-		appScroll.post(() -> {
-			int scrollY = appScroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = appScroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				appScroll.smoothScrollTo(0, itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				appScroll.smoothScrollTo(0, itemBottom - svHeight);
-			}
-		});
+		smoothScrollToVisible(appScroll, gridCellViews[index]);
 	}
 
 	// ============================

@@ -249,6 +249,22 @@ items.add(new NokiaOptionsDialog.OptionItem(
 
 **不属于列表/文章基类的特殊页面（网格/分页/多模式）：** `NokiaMenuFragment`、`NokiaBoxFragment`、`NokiaWidgetAppPickerFragment`、`NokiaWidgetTypePickerFragment`、`NokiaWidgetActivityNameFragment`、`NokiaWidgetActivityPickerFragment`、`NokiaWidgetUrlEditFragment`、`NokiaKeyBindWizardFragment`、`NokiaKeyBindFragment`、`NokiaBackgroundManagerFragment`、`NokiaWidgetSettingsFragment`。这些直接继承 `NokiaPageFragment` 并自行管理各自的焦点与翻页/网格计算。
 
+#### ScrollView 内部嵌套 View 自动滚动规范（血泪教训）
+
+在网格类或自定义嵌套布局中（如 `ScrollView -> LinearLayout (Container) -> LinearLayout (Row) -> LinearLayout (Cell)`）：
+- **严禁直接使用 `cell.getTop()`/`cell.getBottom()` 计算滚动位置**。因为 `cell.getTop()` 获取到的是它在直接父容器（Row）内部的局部相对坐标（永远为 0），会导致 `itemBottom > scrollY + svHeight` 判断永远为 false，方向键移动焦点时滚动条完全不动，表现为“只能触屏滑动、按键无法滚到下方内容”。
+- **必须累加所有父级容器的偏移量**，计算相对于 `ScrollView` 的绝对 `top`：
+  ```java
+  int itemTop = 0;
+  View current = item;
+  while (current != null && current != scrollView && current.getParent() instanceof View) {
+      itemTop += current.getTop();
+      current = (View) current.getParent();
+  }
+  int itemBottom = itemTop + item.getHeight();
+  ```
+- 计算出正确的 `itemTop` 与 `itemBottom` 后，再与 `scrollView.getScrollY()` 及 `scrollView.getHeight()` 比较执行 `scrollView.smoothScrollTo(0, ...)`。
+
 ### 尺寸规范
 
 #### 统一尺寸工具类 NokiaDimens

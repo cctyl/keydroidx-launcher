@@ -145,20 +145,7 @@ public abstract class NokiaListPageFragment extends NokiaPageFragment {
 	private void scrollToVisible(int index) {
 		if (listScroll == null || itemViews == null
 				|| index < 0 || index >= itemViews.length) return;
-		final View item = itemViews[index];
-		if (item == null) return;
-		listScroll.post(() -> {
-			int scrollY = listScroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = listScroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				listScroll.smoothScrollTo(0, itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				listScroll.smoothScrollTo(0, itemBottom - svHeight);
-			}
-		});
+		smoothScrollToVisible(listScroll, itemViews[index]);
 	}
 
 	/**

@@ -718,22 +718,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 	 */
 	private void scrollToVisible(int index) {
 		if (scroll == null || itemViews == null || index < 0 || index >= itemViews.length) return;
-		View item = itemViews[index];
-		if (item == null) return;
-		scroll.post(() -> {
-			int scrollY = scroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = scroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				scroll.smoothScrollTo(0, itemTop);
-				NokiaLog.d(TAG, "↑ 滚动至 item " + index + " top=" + itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				scroll.smoothScrollTo(0, itemBottom - svHeight);
-				NokiaLog.d(TAG, "↓ 滚动至 item " + index + " bottom=" + itemBottom + " svH=" + svHeight);
-			}
-		});
+		smoothScrollToVisible(scroll, itemViews[index]);
 	}
 
 	private void applyListHighlight() {

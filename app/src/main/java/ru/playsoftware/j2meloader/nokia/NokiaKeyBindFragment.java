@@ -505,19 +505,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		if (bindListContainer == null) return;
 		View parent = (View) bindListContainer.getParent();
 		if (parent instanceof ScrollView && itemViews[index] != null) {
-			ScrollView sv = (ScrollView) parent;
-			View item = itemViews[index];
-			sv.post(() -> {
-				int scrollY = sv.getScrollY();
-				int itemTop = item.getTop();
-				int itemBottom = item.getBottom();
-				int svHeight = sv.getHeight();
-				if (itemTop < scrollY) {
-					sv.smoothScrollTo(0, itemTop);
-				} else if (itemBottom > scrollY + svHeight) {
-					sv.smoothScrollTo(0, itemBottom - svHeight);
-				}
-			});
+			smoothScrollToVisible((ScrollView) parent, itemViews[index]);
 		}
 	}
 }

@@ -496,20 +496,7 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 
 	private void scrollToVisible(int index) {
 		if (scroll == null || listLayout == null || index < 0 || index >= listLayout.getChildCount()) return;
-		View item = listLayout.getChildAt(index);
-		if (item == null) return;
-		scroll.post(() -> {
-			int scrollY = scroll.getScrollY();
-			int itemTop = item.getTop();
-			int itemBottom = item.getBottom();
-			int svHeight = scroll.getHeight();
-			if (svHeight <= 0) return;
-			if (itemTop < scrollY) {
-				scroll.smoothScrollTo(0, itemTop);
-			} else if (itemBottom > scrollY + svHeight) {
-				scroll.smoothScrollTo(0, itemBottom - svHeight);
-			}
-		});
+		smoothScrollToVisible(scroll, listLayout.getChildAt(index));
 	}
 
 	private void showToast(String msg) {
