@@ -94,8 +94,8 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 	}
 
 	/** 字体大小档位（分组页 → 字体大小），作用于全部应用内文字。 */
-	private static final float[] FONT_SCALES = {0.85f, 1.0f, 1.15f, 1.3f};
-	private static final String[] FONT_LABELS = {"较小", "标准", "较大", "最大"};
+	private static final float[] FONT_SCALES = {0.85f, 1.0f, 1.15f, 1.3f, 1.5f, 1.8f, 2.0f};
+	private static final String[] FONT_LABELS = {"较小 (0.85x)", "标准 (1.0x)", "较大 (1.15x)", "特大 (1.3x)", "超大 (1.5x)", "巨大 (1.8x)", "极巨 (2.0x)"};
 
 	private int group;
 	private String[] itemIcons;
@@ -194,12 +194,15 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 	private String getItemDisplayName(int index) {
 		if (group == GROUP_APPEARANCE && index == 0) {
 			float cur = NokiaSettingsStorage.getFontScale(requireContext());
-			String label = "标准";
+			String label = null;
 			for (int i = 0; i < FONT_SCALES.length; i++) {
 				if (Math.abs(FONT_SCALES[i] - cur) < 0.001f) {
 					label = FONT_LABELS[i];
 					break;
 				}
+			}
+			if (label == null) {
+				label = String.format(java.util.Locale.US, "自定义 (%.2fx)", cur);
 			}
 			return "字体大小：" + label;
 		}
@@ -334,6 +337,11 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 				((NokiaDesktopActivity) requireActivity()).recreate();
 			}));
 		}
+		// 增加自定义倍率选项（支持手动输入 0.5 ~ 3.5x）
+		items.add(new NokiaOptionsDialog.OptionItem(0, "自定义倍率...", true, false, () -> {
+			NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+			host.openFragment(new NokiaCustomFontScaleFragment());
+		}));
 		NokiaOptionsDialog.show(getParentFragmentManager(), "字体大小", items);
 	}
 
