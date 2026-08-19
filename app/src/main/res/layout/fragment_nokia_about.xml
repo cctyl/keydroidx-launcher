@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="12dp">
+
+            <!-- 开源项目链接卡片 -->
+            <LinearLayout
+                android:id="@+id/btnGithub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="开源地址 (GitHub)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="https://github.com/cctyl/nokia_launcher"
+                    android:textColor="#90CAF9"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- 演示视频卡片 -->
+            <LinearLayout
+                android:id="@+id/btnBilibili"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="演示视频 (Bilibili)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="https://www.bilibili.com/video/BV1WxMX6yEHX"
+                    android:textColor="#FF80AB"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- 作者信息 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="作者 ID: cctyl"
+                android:textColor="#FFEB3B"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <!-- 感谢清单 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="致谢清单："
+                android:textColor="#EEEEEE"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="• J2ME-Loader (nikita36078)\n• 方舟像素字体 / Ark Pixel (TakWolf)\n• 缝合怪像素字体 / Fusion Pixel (TakWolf)\n• Google Material Icons"
+                android:textColor="#CCCCCC"
+                android:textSize="10sp"
+                android:lineSpacingMultiplier="1.2"
+                android:layout_marginBottom="10dp" />
+
+            <!-- 说明 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="说明：\n目标是在安卓上还原诺基亚的体验，欢迎点赞收藏star，欢迎修改分发，只要保留原作者id即可。"
+                android:textColor="#EEEEEE"
+                android:textSize="10sp"
+                android:lineSpacingMultiplier="1.3" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

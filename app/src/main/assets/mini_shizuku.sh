@@ -51,3 +51,5 @@ app_process -Djava.class.path="$path" -Dapp.package="$PACKAGE" /system/bin \
     ru.playsoftware.mini_shizuku.server.AdbProcess \
     >> /data/local/tmp/minishizuku.log 2>&1 &
 echo "MiniShizuku started for $PACKAGE"
+echo "Author: cctyl"
+echo "GitHub: https://github.com/cctyl/nokia_launcher"

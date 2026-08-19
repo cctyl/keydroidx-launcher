@@ -81,9 +81,18 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:lineSpacingExtra="2dp"
-                android:text="提示：手机重启后服务会停止，重新执行第②步那条命令即可（脚本已留在手机上，不用再推）。详细说明见项目 README 的「老设备权限（mini_shizuku）」一节。"
+                android:text="提示：手机重启后服务会停止，重新执行第②步那条命令即可（脚本已留在手机上，不用再推）。详细说明见项目 README 的「mini_shizuku 权限服务」一节。"
                 android:textColor="#8a9ab5"
                 android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="2dp"
+                android:text="Author: cctyl\nGitHub: https://github.com/cctyl/nokia_launcher"
+                android:textColor="#5a7090"
+                android:textSize="9sp" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

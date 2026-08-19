@@ -22,13 +22,14 @@ import ru.playsoftware.j2meloader.R;
  */
 public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 
-	/** 分类入口：图标（Material Icons 矢量字符） + 名称 + 分组 ID（-1 表示高级设置）。 */
+	/** 分类入口：图标（Material Icons 矢量字符） + 名称 + 分组 ID（-1 表示高级设置，-2 表示关于）。 */
 	private static final String[] ITEM_ICON_UNICODES = {
 			NokiaIcons.ICON_DISPLAY,       // 外观与显示
 			NokiaIcons.ICON_KEYPAD,        // 按键与操作
 			NokiaIcons.ICON_DESKTOP,       // 桌面内容
 			NokiaIcons.ICON_SYSTEM,        // 系统与权限
 			NokiaIcons.ICON_ADVANCED,      // 高级设置
+			NokiaIcons.ICON_INFO,          // 关于
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -37,6 +38,7 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 			"桌面内容",
 			"系统与权限",
 			"高级设置",
+			"关于",
 	};
 
 	private static final int[] ITEM_GROUPS = {
@@ -45,6 +47,7 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 			NokiaSettingsGroupFragment.GROUP_CONTENT,
 			NokiaSettingsGroupFragment.GROUP_SYSTEM,
 			-1, // 高级设置（独立页面）
+			-2, // 关于（独立页面）
 	};
 
 
@@ -123,9 +126,12 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 		if (focusIndex < 0 || focusIndex >= ITEM_GROUPS.length) return false;
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		int group = ITEM_GROUPS[focusIndex];
-		if (group < 0) {
+		if (group == -1) {
 			NokiaLog.i("DesktopSettings", "进入高级设置");
 			host.openFragment(new NokiaAdvancedSettingsFragment());
+		} else if (group == -2) {
+			NokiaLog.i("DesktopSettings", "进入关于页面");
+			host.openFragment(new NokiaAboutFragment());
 		} else {
 			NokiaLog.i("DesktopSettings", "进入设置分组: " + ITEM_NAMES[focusIndex]);
 			host.openFragment(NokiaSettingsGroupFragment.newInstance(group));
