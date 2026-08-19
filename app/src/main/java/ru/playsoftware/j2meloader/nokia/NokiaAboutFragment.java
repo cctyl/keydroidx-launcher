@@ -15,11 +15,11 @@ import androidx.annotation.Nullable;
 
 import ru.playsoftware.j2meloader.R;
 
-public class NokiaAboutFragment extends NokiaPageFragment {
+public class NokiaAboutFragment extends NokiaScrollPageFragment {
 
 	private View btnGithub;
 	private View btnBilibili;
-	private int focusIndex = 0;
+	private int focusIndex = 0; // 0: btnGithub, 1: btnBilibili, 2: 底部纯文本浏览状态
 
 	@Override
 	protected int getLayoutRes() {
@@ -38,7 +38,7 @@ public class NokiaAboutFragment extends NokiaPageFragment {
 
 	@Override
 	public String getSoftLeftText() {
-		return "打开";
+		return focusIndex >= 0 && focusIndex <= 1 ? "打开" : "";
 	}
 
 	@Override
@@ -47,7 +47,7 @@ public class NokiaAboutFragment extends NokiaPageFragment {
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	protected void onScrollPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		btnGithub = view.findViewById(R.id.btnGithub);
 		btnBilibili = view.findViewById(R.id.btnBilibili);
 
@@ -86,18 +86,49 @@ public class NokiaAboutFragment extends NokiaPageFragment {
 				btnBilibili.setBackgroundColor(normalBg);
 			}
 		}
+		if (getActivity() instanceof NokiaDesktopActivity) {
+			((NokiaDesktopActivity) getActivity()).refreshPageBar();
+		}
 	}
 
 	@Override
 	public boolean onDirection(int action) {
-		if (action == NokiaKeyBinding.ACTION_UP) {
-			focusIndex = (focusIndex - 1 + 2) % 2;
-			updateFocus();
-			return true;
-		} else if (action == NokiaKeyBinding.ACTION_DOWN) {
-			focusIndex = (focusIndex + 1) % 2;
-			updateFocus();
-			return true;
+		if (action == NokiaKeyBinding.ACTION_DOWN) {
+			if (focusIndex == 0) {
+				focusIndex = 1;
+				updateFocus();
+				return true;
+			} else {
+				// focusIndex >= 1，向下滚动
+				if (focusIndex == 1) {
+					focusIndex = 2;
+					updateFocus();
+				}
+				scrollDown();
+				return true;
+			}
+		} else if (action == NokiaKeyBinding.ACTION_UP) {
+			if (focusIndex == 2) {
+				if (pageScrollView != null && pageScrollView.getScrollY() > 10) {
+					scrollUp();
+				} else {
+					focusIndex = 1;
+					updateFocus();
+				}
+				return true;
+			} else if (focusIndex == 1) {
+				focusIndex = 0;
+				updateFocus();
+				if (pageScrollView != null) {
+					pageScrollView.smoothScrollTo(0, 0);
+				}
+				return true;
+			} else if (focusIndex == 0) {
+				if (pageScrollView != null) {
+					pageScrollView.smoothScrollTo(0, 0);
+				}
+				return true;
+			}
 		}
 		return false;
 	}
@@ -106,8 +137,10 @@ public class NokiaAboutFragment extends NokiaPageFragment {
 	public boolean onSelect() {
 		if (focusIndex == 0) {
 			openUrl("https://github.com/cctyl/nokia_launcher");
+			return true;
 		} else if (focusIndex == 1) {
 			openUrl("https://www.bilibili.com/video/BV1WxMX6yEHX");
+			return true;
 		}
 		return true;
 	}
@@ -119,8 +152,11 @@ public class NokiaAboutFragment extends NokiaPageFragment {
 
 	@Override
 	public boolean onSoftRight() {
-		requireActivity().getSupportFragmentManager().popBackStack();
-		return true;
+		if (getActivity() instanceof NokiaDesktopActivity) {
+			((NokiaDesktopActivity) getActivity()).exitCurrent();
+			return true;
+		}
+		return false;
 	}
 
 	@Override

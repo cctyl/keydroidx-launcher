@@ -218,33 +218,36 @@ items.add(new NokiaOptionsDialog.OptionItem(
 >
 > 已迁移（2026-08）：`NokiaDesktopFragment`、`NokiaMenuFragment`、`NokiaBoxFragment`、`NokiaDesktopSettingsFragment`、`NokiaShortcutSettingsFragment`、`NokiaWidgetSettingsFragment`、`NokiaWidgetTypePickerFragment`、`NokiaWidgetActivityNameFragment`、`NokiaWidgetActivityPickerFragment`、`NokiaWidgetAppPickerFragment`、`NokiaWidgetUrlEditFragment`、`NokiaBackgroundManagerFragment`、`NokiaKeyBindFragment`、`NokiaKeyBindWizardFragment`、`ShizukuFragment`。
 
-### 纵向列表页继承 NokiaListPageFragment（循环导航，强制）
+### 纵向列表与文章滚动页基类（强制，防漏按键导航与滚动）
 
-**凡纵向单列菜单/列表页面，必须继承 `NokiaListPageFragment`（循环导航基类），禁止直接继承 `NokiaPageFragment` 再手抄焦点三件套。**
+项目提供了通用基类以规范方向键交互与滚动体验：
 
-`NokiaListPageFragment` 收编了各页面重复手抄的焦点管理方法（`setFocusIndex`、`clearFocusBackground`、`applyFocusBackground`、`scrollToVisible`、`constrainScrollHeight`），并把方向键导航固化为**循环导航**：
-- 列表顶部按「上」→ 跳转到列表末尾；
-- 列表底部按「下」→ 跳转到列表开头；
-- 左右方向键默认消费无效果，子类可通过 `onLeftRight(int)` 钩子实现左右切页签等逻辑；
-- 子类可通过 `isDirectionEnabled()` 钩子临时禁用方向键（如确认弹窗态）。
+1. **纵向单列菜单/选项列表页**：必须继承 **`NokiaListPageFragment`**（循环导航基类），禁止直接继承 `NokiaPageFragment` 再手抄焦点三件套。
+   - 收编了焦点管理与自动滚动（`setFocusIndex`、`clearFocusBackground`、`applyFocusBackground`、`scrollToVisible` 等）；
+   - 固化为**循环导航**（顶部按上跳到末尾，底部按下跳到开头）；
+   - 子类只需在 `onPageCreated` 中填充 `itemViews[]` 和 `listScroll`。
+   - 子类可通过覆写 `onLeftRight(int)` 处理左右切换页签。
 
-`onDirection` 声明为 `final`，子类**无法绕过**循环导航——和 `NokiaPageFragment` 的缩放四件套一样的防漏抄思路。
+   **已迁移：**
+   - `NokiaDesktopSettingsFragment` → 桌面设置主菜单
+   - `NokiaSettingsGroupFragment` → 设置二级分组页
+   - `NokiaAdvancedSettingsFragment` → 高级设置
+   - `NokiaPowerInterceptFragment` → 电源键拦截设置
+   - `NokiaShortcutSettingsFragment` → 快捷栏设置
+   - `ShizukuFragment` → mini_shizuku 页
+   - `ShizukuRootFragment` → root 激活页
 
-子类只需在 `onPageCreated` 中填充 `itemViews[]` 和 `listScroll`（ScrollView 引用），其余导航/焦点/滚动全部继承。
+2. **纯展示/说明/富文本类可滚动页面**：必须继承 **`NokiaScrollPageFragment`**（如 `ShizukuAdbFragment` 等）。
+   - 内部固化了统一的上下方向键平滑滚动（`smoothScrollBy`），步长按视口高度的 `45%` 动态计算（大步翻滚），触底或触顶自动拦截；
+   - **重写钩子规范（血泪教训）**：子类**严禁**直接重写 `onPageCreated`（否则会彻底截断父类的 `pageScrollView` 初始化导致其为 `null`，方向键完全失效），子类**必须**重写 `onScrollPageCreated(View view, Bundle savedInstanceState)` 钩子进行视图初始化；
+   - **禁止文本获取焦点**：展示型说明布局中的 `TextView` **严禁**添加 `android:textIsSelectable="true"`，否则原生 FocusFinder 会将方向键截获到文本框内部逐字移动光标，导致最外层的 `ScrollView` 完全无法接收到方向键滚动事件。
 
-**已迁移（2026-08）：**
-- `NokiaDesktopSettingsFragment` → 桌面设置主菜单
-- `NokiaSettingsGroupFragment` → 设置二级分组页
-- `NokiaAdvancedSettingsFragment` → 高级设置
-- `NokiaPowerInterceptFragment` → 电源键拦截设置
-- `NokiaShortcutSettingsFragment` → 快捷栏设置
-- `NokiaKeyBindFragment`（仅手动改循环，未迁移基类，因滚动机制不同）
-- `NokiaBackgroundManagerFragment`（仅手动改循环，未迁移基类，因动态列表/左右页签）
-- `NokiaWidgetSettingsFragment`（仅手动改循环 `onListDirection`，未迁移基类，因多模式导航）
-- `ShizukuFragment` → mini_shizuku 页
-- `ShizukuRootFragment` → root 激活页
+3. **图文带交互按钮混合页面**（如「关于」页面 `NokiaAboutFragment`）：
+   - 继承 `NokiaScrollPageFragment`，并重写 `onScrollPageCreated` 初始化控件；
+   - 支持高亮选中项并在方向键移动焦点时自动跟随滚动（`smoothScrollTo` 让目标视图完全进入可视区）；
+   - 当焦点已达底部交互项后，继续按「下」方向键无缝切换为文章浏览模式（清除按钮高亮），后续「下」方向键直接调用 `scrollDown()` 驱动 `ScrollView` 继续平滑滚动到底部阅读致谢和许可；按「上」方向键优先向上滚动页面，滚回顶部附近时恢复按钮高亮与焦点。
 
-**不属于本类的页面（网格/分页/特殊页面）：** `NokiaMenuFragment`、`NokiaBoxFragment`、`NokiaWidgetAppPickerFragment`、`NokiaWidgetTypePickerFragment`、`NokiaWidgetActivityNameFragment`、`NokiaWidgetActivityPickerFragment`、`NokiaWidgetUrlEditFragment`、`NokiaKeyBindWizardFragment`、`ShizukuAdbFragment`。这些继续直接继承 `NokiaPageFragment`。
+**不属于列表/文章基类的特殊页面（网格/分页/多模式）：** `NokiaMenuFragment`、`NokiaBoxFragment`、`NokiaWidgetAppPickerFragment`、`NokiaWidgetTypePickerFragment`、`NokiaWidgetActivityNameFragment`、`NokiaWidgetActivityPickerFragment`、`NokiaWidgetUrlEditFragment`、`NokiaKeyBindWizardFragment`、`NokiaKeyBindFragment`、`NokiaBackgroundManagerFragment`、`NokiaWidgetSettingsFragment`。这些直接继承 `NokiaPageFragment` 并自行管理各自的焦点与翻页/网格计算。
 
 ### 尺寸规范
 

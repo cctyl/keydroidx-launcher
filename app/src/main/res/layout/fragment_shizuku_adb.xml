@@ -72,7 +72,6 @@
                 android:textColor="#7ee787"
                 android:textSize="9sp"
                 android:typeface="monospace"
-                android:textIsSelectable="true"
                 android:lineSpacingExtra="1dp"
                 android:text="adb shell sh /sdcard/Android/data/..." />
 

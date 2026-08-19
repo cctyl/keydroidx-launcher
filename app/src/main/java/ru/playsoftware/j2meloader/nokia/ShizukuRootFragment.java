@@ -293,6 +293,7 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 
 	// ---- NokiaFocusHost ----
 
+
 	@Override
 	public boolean onSelect() {
 		if (focusIndex < 0 || focusIndex >= ACTION_NAMES.length) return false;

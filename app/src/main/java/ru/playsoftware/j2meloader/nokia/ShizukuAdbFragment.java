@@ -38,9 +38,9 @@ import ru.playsoftware.j2meloader.R;
  *       只需读权限，不依赖执行位；</li>
  *   <li>路径可预期（包名固定），命令可由 app 直接拼出供用户复制。</li>
  * </ul>
- * 页面不参与列表导航，方向键不消费；左软键「复制」把命令写入系统剪贴板；右软键「返回」。
+ * 继承 {@link NokiaScrollPageFragment}，支持方向键平滑滚动；左软键「复制」把命令写入系统剪贴板；右软键「返回」。
  */
-public class ShizukuAdbFragment extends NokiaPageFragment {
+public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 
 	/** assets 中的脚本文件名。 */
 	private static final String ASSET_SCRIPT = "mini_shizuku.sh";
@@ -55,7 +55,7 @@ public class ShizukuAdbFragment extends NokiaPageFragment {
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	protected void onScrollPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		tvCommand = view.findViewById(R.id.tvAdbCommand);
 		// 释放脚本并填充命令。释放涉及 IO，放后台线程避免阻塞 UI。
 		final Context ctx = requireContext().getApplicationContext();
@@ -161,32 +161,8 @@ public class ShizukuAdbFragment extends NokiaPageFragment {
 	// ---- NokiaFocusHost ----
 
 	@Override
-	public boolean onDirection(int direction) {
-		// 纯文本说明页，无列表导航，返回 false 不消费
-		return false;
-	}
-
-	@Override
-	public boolean onSelect() {
-		// 无列表项可确认，消费掉即可
-		return true;
-	}
-
-	@Override
 	public boolean onSoftLeft() {
 		copyCommand();
-		return true;
-	}
-
-	@Override
-	public boolean onSoftRight() {
-		((NokiaDesktopActivity) requireActivity()).exitCurrent();
-		return true;
-	}
-
-	@Override
-	public boolean onBack() {
-		((NokiaDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
 
