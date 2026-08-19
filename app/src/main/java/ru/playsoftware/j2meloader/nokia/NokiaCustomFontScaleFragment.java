@@ -142,11 +142,8 @@ public class NokiaCustomFontScaleFragment extends NokiaPageFragment {
 			NokiaSettingsStorage.setFontScale(requireContext(), scale);
 			hideIme();
 
-			NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-			host.applyCurrentTheme();
-			host.refreshPageBar();
 			Toast.makeText(requireContext(), "字体大小已设置为 " + String.format(Locale.US, "%.2f", scale) + "x", Toast.LENGTH_SHORT).show();
-			requireActivity().getSupportFragmentManager().popBackStack();
+			((NokiaDesktopActivity) requireActivity()).recreate();
 			return true;
 		} catch (Exception e) {
 			Toast.makeText(requireContext(), "格式不正确，请输入数字（如 1.5）", Toast.LENGTH_SHORT).show();
