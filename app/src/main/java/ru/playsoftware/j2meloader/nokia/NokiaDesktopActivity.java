@@ -626,10 +626,15 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	private void goHome() {
 		NokiaLog.i("Desktop", "goHome 清空返回栈并加载桌面");
 		FragmentManager fm = getSupportFragmentManager();
-		fm.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
-		fm.beginTransaction()
-				.replace(R.id.midPanel, new NokiaDesktopFragment())
-				.commit();
+		if (fm.getBackStackEntryCount() > 0) {
+			fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+		}
+		Fragment cur = fm.findFragmentById(R.id.midPanel);
+		if (!(cur instanceof NokiaDesktopFragment)) {
+			fm.beginTransaction()
+					.replace(R.id.midPanel, new NokiaDesktopFragment())
+					.commitAllowingStateLoss();
+		}
 		// jar 挂机/红键回桌面场景：native page_is_main 可能已被 MicroActivity 置 0，须强制重报
 		postReportPageState(true);
 	}

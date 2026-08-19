@@ -154,12 +154,16 @@
             android:excludeFromRecents="true"
             android:stateNotNeeded="true"
             android:screenOrientation="portrait">
+            <!-- 标准 Launcher 过滤器（包含 DEFAULT） -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- 抽屉应用列表展示入口 -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
         <activity

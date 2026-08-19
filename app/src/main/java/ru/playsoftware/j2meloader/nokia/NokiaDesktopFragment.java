@@ -189,7 +189,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	/** 后台线程计算后台进程数并回主线程刷新组件区（避免主线程 TCP 卡顿）。 */
 	private void refreshBgCountAsync() {
-		final Context appCtx = requireContext().getApplicationContext();
+		Context c = getContext();
+		if (c == null) return;
+		final Context appCtx = c.getApplicationContext();
 		new Thread(() -> {
 			NokiaBgManagerHelper.probeShizukuSync();
 			int count = NokiaBgManagerHelper.countBackgroundProcesses(appCtx);
@@ -205,8 +207,10 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	// ---- 构建快捷栏 ----
 
 	private void loadShortcutBarAsync(View view) {
+		Context c = getContext();
+		if (c == null) return;
 		long loadStart = System.currentTimeMillis();
-		NokiaS60IconMap.loadFromDisk(requireContext());
+		NokiaS60IconMap.loadFromDisk(c);
 		long loadElapsed = System.currentTimeMillis() - loadStart;
 		NokiaLog.i("Desktop", "S60 图标磁盘缓存加载耗时 " + loadElapsed + "ms");
 
@@ -238,14 +242,17 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		focusTargets.clear();
 
 		if (apps.isEmpty()) {
-			TextView hint = new TextView(requireContext());
-			hint.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.WRAP_CONTENT, NokiaDimens.dp(getResources(), 34)));
-			hint.setGravity(Gravity.CENTER);
-			hint.setText("（无快捷应用）");
-			hint.setTextColor(0xFF888888);
-			NokiaDimens.textSize(hint, 10);
-			container.addView(hint);
+			Context ctx = getContext();
+			if (ctx != null) {
+				TextView hint = new TextView(ctx);
+				hint.setLayoutParams(new LinearLayout.LayoutParams(
+						LinearLayout.LayoutParams.WRAP_CONTENT, NokiaDimens.dp(getResources(), 34)));
+				hint.setGravity(Gravity.CENTER);
+				hint.setText("（无快捷应用）");
+				hint.setTextColor(0xFF888888);
+				NokiaDimens.textSize(hint, 10);
+				container.addView(hint);
+			}
 		} else {
 			for (int i = 0; i < apps.size(); i++) {
 				LinearLayout cell = createShortcutCell(apps.get(i), i);
@@ -271,15 +278,19 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				+ " 个焦点，耗时 " + buildElapsed + "ms");
 
 		view.post(() -> {
+			if (!isAdded() || getContext() == null) return;
 			if (focusTargets.size() > 0) {
 				setFocusIndex(0);
 			}
 		});
 
-		NokiaS60IconMap.initAsync(requireContext(), () -> {
-			if (!isAdded() || getView() == null) return;
-			refreshShortcutIcons(container);
-		});
+		Context ctx = getContext();
+		if (ctx != null) {
+			NokiaS60IconMap.initAsync(ctx, () -> {
+				if (!isAdded() || getView() == null) return;
+				refreshShortcutIcons(container);
+			});
+		}
 	}
 
 	// ---- 组件区动态渲染 ----
@@ -296,8 +307,10 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		widgetCount = widgetItems.size();
 
 		if (widgetItems.isEmpty()) {
+			Context c = getContext();
+			if (c == null) return;
 			// 无组件时显示提示
-			TextView hint = new TextView(requireContext());
+			TextView hint = new TextView(c);
 			hint.setLayoutParams(new LinearLayout.LayoutParams(
 					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 			hint.setPadding(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 4),
@@ -347,8 +360,11 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		quickToggleBar.removeAllViews();
 		toggleCells.clear();
 
+		Context ctx = getContext();
+		if (ctx == null) return;
+
 		activeToggles.clear();
-		activeToggles.addAll(NokiaQuickToggleStorage.getEnabledToggles(requireContext()));
+		activeToggles.addAll(NokiaQuickToggleStorage.getEnabledToggles(ctx));
 		int count = activeToggles.size();
 
 		if (count == 0) {
@@ -371,7 +387,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 		for (int i = 0; i < count; i++) {
 			NokiaQuickToggleItem item = activeToggles.get(i);
-			LinearLayout cell = new LinearLayout(requireContext());
+			LinearLayout cell = new LinearLayout(ctx);
 			if (useWeight) {
 				cell.setLayoutParams(new LinearLayout.LayoutParams(0, cellHeight, 1f));
 			} else {
@@ -383,16 +399,16 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			cell.setClickable(true);
 
 			// 图标（Material Icons 矢量字体）
-			ImageView iv = new ImageView(requireContext());
+			ImageView iv = new ImageView(ctx);
 			iv.setLayoutParams(new LinearLayout.LayoutParams(
 					NokiaDimens.dp(getResources(), 18), NokiaDimens.dp(getResources(), 18)));
 			iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-			iv.setImageDrawable(NokiaIcons.get(requireContext(), item.getIconUnicode(), 0xFFFFFFFF, 18));
+			iv.setImageDrawable(NokiaIcons.get(ctx, item.getIconUnicode(), 0xFFFFFFFF, 18));
 			iv.setTag("icon");
 			cell.addView(iv);
 
 			// 状态指示小圆点
-			View dot = new View(requireContext());
+			View dot = new View(ctx);
 			LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(
 					NokiaDimens.dp(getResources(), 4), NokiaDimens.dp(getResources(), 4));
 			dotLp.setMargins(0, NokiaDimens.dp(getResources(), 1), 0, 0);
@@ -413,12 +429,14 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	/** 从系统同步所有已启用开关的真实状态并刷新视图。 */
 	private void syncToggleStatesFromSystem() {
 		if (activeToggles.isEmpty()) return;
-		Context ctx = requireContext().getApplicationContext();
+		Context ctx = getContext();
+		if (ctx == null) return;
+		Context appCtx = ctx.getApplicationContext();
 		if (toggleStates.length != activeToggles.size()) {
 			toggleStates = new boolean[activeToggles.size()];
 		}
 		for (int i = 0; i < activeToggles.size(); i++) {
-			toggleStates[i] = NokiaQuickToggleManager.isToggleOn(ctx, activeToggles.get(i).type);
+			toggleStates[i] = NokiaQuickToggleManager.isToggleOn(appCtx, activeToggles.get(i).type);
 		}
 		renderToggleViews();
 	}
@@ -447,7 +465,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	/** 切换指定索引的开关状态（0 毫秒乐观更新图标 + 执行）。 */
 	private void toggleItem(int index) {
 		if (index < 0 || index >= activeToggles.size() || index >= toggleStates.length) return;
-		final Context ctx = requireContext();
+		final Context ctx = getContext();
+		if (ctx == null) return;
 		final NokiaQuickToggleItem item = activeToggles.get(index);
 		final boolean targetOn = !toggleStates[index];
 
@@ -463,6 +482,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	private void registerToggleReceiver() {
 		if (receiverRegistered) return;
+		Context ctx = getContext();
+		if (ctx == null) return;
 		toggleStateReceiver = new BroadcastReceiver() {
 			@Override
 			public void onReceive(Context context, Intent intent) {
@@ -478,7 +499,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
 		filter.addAction(LocationManager.PROVIDERS_CHANGED_ACTION);
 		filter.addAction("android.location.MODE_CHANGED");
-		requireContext().registerReceiver(toggleStateReceiver, filter);
+		ctx.registerReceiver(toggleStateReceiver, filter);
 		receiverRegistered = true;
 		NokiaLog.i("Desktop", "已注册开关栏广播接收器");
 	}
@@ -486,7 +507,10 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private void unregisterToggleReceiver() {
 		if (toggleStateReceiver != null && receiverRegistered) {
 			try {
-				requireContext().unregisterReceiver(toggleStateReceiver);
+				Context ctx = getContext();
+				if (ctx != null) {
+					ctx.unregisterReceiver(toggleStateReceiver);
+				}
 			} catch (Exception ignored) {}
 			receiverRegistered = false;
 			NokiaLog.i("Desktop", "已注销开关栏广播接收器");
@@ -507,7 +531,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	/** 创建带进度条的组件行（内存/存储）。 */
 	private View createWidgetRowWithProgress(NokiaWidgetItem item, int fillColor, float usedRatio, String percentText) {
-		Context ctx = requireContext();
+		Context ctx = getContext();
+		if (ctx == null) return null;
 		LinearLayout row = new LinearLayout(ctx);
 		row.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -587,7 +612,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	/** 创建无进度条的普通组件行（日历/使用时长/可编辑类型）。 */
 	private View createWidgetRowSimple(NokiaWidgetItem item) {
-		Context ctx = requireContext();
+		Context ctx = getContext();
+		if (ctx == null) return null;
 		LinearLayout row = new LinearLayout(ctx);
 		row.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -689,7 +715,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	/** 获取 WiFi IPv4 地址；未连接 WiFi 或无 IP 时返回 "未连接"。 */
 	private String getWifiIpAddress() {
 		try {
-			WifiManager wifi = (WifiManager) requireContext().getApplicationContext()
+			Context ctx = getContext();
+			if (ctx == null) return "未连接";
+			WifiManager wifi = (WifiManager) ctx.getApplicationContext()
 					.getSystemService(Context.WIFI_SERVICE);
 			if (wifi == null) return "未连接";
 			WifiInfo info = wifi.getConnectionInfo();
@@ -709,7 +737,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	/** 返回已用比例 [0,1] 和百分比文字。 */
 	private float getMemoryUsedRatio() {
 		try {
-			ActivityManager am = (ActivityManager) requireContext()
+			Context ctx = getContext();
+			if (ctx == null) return 0;
+			ActivityManager am = (ActivityManager) ctx
 					.getSystemService(Context.ACTIVITY_SERVICE);
 			if (am == null) return 0;
 			ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
@@ -725,7 +755,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	private String getMemoryPercentText() {
 		try {
-			ActivityManager am = (ActivityManager) requireContext()
+			Context ctx = getContext();
+			if (ctx == null) return "";
+			ActivityManager am = (ActivityManager) ctx
 					.getSystemService(Context.ACTIVITY_SERVICE);
 			if (am == null) return "";
 			ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
@@ -870,29 +902,36 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				// 锁屏组件：点击执行一键锁屏（需设备管理员权限，未授权跳转系统激活页）
 				row.setOnClickListener(v -> {
 					NokiaLog.i("Desktop", "锁屏组件点击：执行锁屏");
-					NokiaLockScreen.lock(requireContext());
+					Context c = getContext();
+					if (c != null) {
+						NokiaLockScreen.lock(c);
+					}
 				});
 				break;
 			case NokiaWidgetItem.TYPE_BG_MANAGER:
 				// 后台管理组件：点击打开后台管理窗口（运行/受保护页签 + 清除）
 				row.setOnClickListener(v -> {
 					NokiaLog.i("Desktop", "后台管理组件点击：打开后台窗口");
-					((NokiaDesktopActivity) requireActivity())
-							.openFragment(new NokiaBackgroundManagerFragment());
+					if (getActivity() instanceof NokiaDesktopActivity) {
+						((NokiaDesktopActivity) getActivity())
+								.openFragment(new NokiaBackgroundManagerFragment());
+					}
 				});
 				break;
 			case NokiaWidgetItem.TYPE_IP:
 				// IP地址组件：点击刷新 IP 并复制到剪贴板
 				row.setOnClickListener(v -> {
+					Context c = getContext();
+					if (c == null) return;
 					String ip = getWifiIpAddress();
 					if (!"未连接".equals(ip)) {
-						ClipboardManager cm = (ClipboardManager) requireContext()
+						ClipboardManager cm = (ClipboardManager) c
 								.getSystemService(Context.CLIPBOARD_SERVICE);
 						if (cm != null) {
 							cm.setPrimaryClip(ClipData.newPlainText("IP", ip));
 						}
 					}
-					Toast.makeText(requireContext(),
+					Toast.makeText(c,
 							"未连接".equals(ip) ? "WiFi未连接" : "已复制: " + ip,
 							Toast.LENGTH_SHORT).show();
 					NokiaLog.i("Desktop", "IP组件点击: ip=" + ip);
@@ -914,7 +953,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	/** 触发第三方 QS Tile 快捷开关（支持特化通道、Shizuku、Root 多级执行）。 */
 	private void triggerQsTile(NokiaWidgetItem item) {
 		if (item == null || TextUtils.isEmpty(item.value)) return;
-		final Context ctx = requireContext();
+		final Context ctx = getContext();
+		if (ctx == null) return;
 		final String target = item.value.trim();
 		final String label = item.label;
 		NokiaLog.i("Desktop", "触发快捷开关: " + label + " target=" + target);
@@ -976,7 +1016,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	// ---- 快捷栏 ----
 
 	private LinearLayout createShortcutCell(ShortcutApp app, int index) {
-		Context ctx = requireContext();
+		Context ctx = getContext();
+		if (ctx == null) return null;
 		LinearLayout cell = new LinearLayout(ctx);
 		cell.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 34)));
 		cell.setOrientation(LinearLayout.VERTICAL);
@@ -1003,22 +1044,25 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	private Drawable loadShortcutIconMemory(ShortcutApp app) {
 		try {
-		if (app.type == ShortcutApp.TYPE_ANDROID) {
-			Intent intent = app.getLaunchIntent();
-			if (intent != null && intent.getComponent() != null) {
-				String pkg = intent.getComponent().getPackageName();
-				int s60Res = NokiaS60IconMap.getIcon(pkg, app.label);
-				if (s60Res != 0) {
-					try {
-						Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-						if (s60Icon != null) return s60Icon.mutate();
-					} catch (Exception ignored) {}
+			if (app.type == ShortcutApp.TYPE_ANDROID) {
+				Intent intent = app.getLaunchIntent();
+				if (intent != null && intent.getComponent() != null) {
+					String pkg = intent.getComponent().getPackageName();
+					int s60Res = NokiaS60IconMap.getIcon(pkg, app.label);
+					if (s60Res != 0) {
+						try {
+							Context ctx = getContext();
+							if (ctx != null) {
+								Drawable s60Icon = ContextCompat.getDrawable(ctx, s60Res);
+								if (s60Icon != null) return s60Icon.mutate();
+							}
+						} catch (Exception ignored) {}
+					}
 				}
 			}
+		} catch (Exception e) {
+			NokiaLog.w("Desktop", "加载快捷栏图标(内存)失败: " + app.label);
 		}
-	} catch (Exception e) {
-		NokiaLog.w("Desktop", "加载快捷栏图标(内存)失败: " + app.label);
-	}
 		return null;
 	}
 
@@ -1035,13 +1079,18 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					int s60Res = NokiaS60IconMap.getIcon(pkg, app.label);
 					if (s60Res != 0) {
 						try {
-							Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-							if (s60Icon != null) return s60Icon.mutate();
+							Context ctx = getContext();
+							if (ctx != null) {
+								Drawable s60Icon = ContextCompat.getDrawable(ctx, s60Res);
+								if (s60Icon != null) return s60Icon.mutate();
+							}
 						} catch (Exception ignored) {}
 					}
 					try {
-						return requireActivity().getPackageManager()
-								.getActivityIcon(intent.getComponent());
+						if (getActivity() != null) {
+							return getActivity().getPackageManager()
+									.getActivityIcon(intent.getComponent());
+						}
 					} catch (Exception ignored) {}
 				}
 			}
@@ -1311,7 +1360,10 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		focusIndex = index;
 		View v = focusTargets.get(index);
 		if (v != null) {
-			v.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
+			Context ctx = getContext();
+			if (ctx != null) {
+				v.setBackground(NokiaTheme.createSelectionDrawable(ctx, 4));
+			}
 			selectedView = v;
 		}
 		if (isInShortcuts() && v != null) {

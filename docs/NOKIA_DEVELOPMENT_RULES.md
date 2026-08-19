@@ -431,5 +431,49 @@ public void fixMidContentHeight(final View content, final boolean topAlign) {
 3. **焦点选中高亮统一来源**：
    - **禁止** 引用任何硬编码的静态选中 Drawable；
    - **必须** 统一调用 `NokiaTheme.createSelectionDrawable(context, radiusDp)` 获取动态半透明焦点色。
-4. **弹窗界面一律使用统一组件 `NokiaOptionsDialog`**：
-   - 选项菜单禁止重复造弹窗，必须使用 `NokiaOptionsDialog`，其标题、列表底色、高亮色和软键底栏会自动 100% 联动当前主题。
+### 12. Fragment 生命周期与异步/广播回调上下文安全规范（重要）
+
+**在 Fragment 的异步回调、广播接收器（BroadcastReceiver）、Handler / Runnable 以及动态 UI 构建逻辑中，禁止直接使用严格断言的 `requireContext()`，必须使用可空的 `getContext()` / `view.getContext()` 并做好生命周期守卫。**
+
+背景与原因（2026-08 实测 bug：切回桌面或按挂机键返回时应用抛出 `IllegalStateException` 崩溃）：
+
+1. 当用户按物理挂机键（或系统 Home 键）返回桌面，或者桌面 Activity 在 `goHome()` 中执行 Fragment 事务时，旧的 `NokiaDesktopFragment` 可能正处于销毁 / 分离（`detach` / `onDestroyView`）过渡期。
+2. 此时若快捷开关广播（如 `toggleStateReceiver`）收到系统状态变化（如 WiFi/蓝牙状态改变），或者异步任务（如扫描应用、快捷方式更新）完成返回主线程，并在回调中调用 `rebuildQuickToggleBar()` / `createQuickToggleCell()`：
+   - 若内部直接调用 `requireContext()`，Fragment 因已处于 detached 状态会立刻抛出 `java.lang.IllegalStateException: Fragment ... not attached to a context` 致命异常；
+   - Android 系统捕获该崩溃后，会认为当前 Launcher 异常退出，进而触发 Fallback 机制，强制唤出系统的 `ResolverActivity`（提示“选择主屏幕应用”），造成“按挂机键桌面黑屏/反复弹出选择桌面”的连锁故障。
+
+正确做法：
+
+- **异步 / 广播回调生命周期守卫**：
+  ```java
+  if (!isAdded() || getContext() == null || getView() == null) {
+      return;
+  }
+  ```
+- **动态创建 View 的上下文获取**：
+  优先使用传入的 `View` 自身 Context（如 `container.getContext()`），或者 `Context ctx = getContext(); if (ctx == null) return;`。
+- **Activity 返回桌面事务安全（`goHome`）**：
+  - 判断当前 midPanel 是否已是 `NokiaDesktopFragment` 实例，若是则复用，避免不必要的重复 `replace` 和多实例竞争；
+  - 必须使用 `commitAllowingStateLoss()` 和 `popBackStackImmediate()`。
+
+### 13. Launcher 桌面 Intent Filter 规范（重要）
+
+在 `AndroidManifest.xml` 中，桌面启动器的 Intent Filter 必须按照 Android 规范将 `category.HOME` 与 `category.LAUNCHER` 独立拆分声明：
+
+```xml
+<!-- 1. 标准 Launcher 默认桌面入口（包含 DEFAULT，供系统 HOME 调度） -->
+<intent-filter>
+    <action android:name="android.intent.action.MAIN" />
+    <category android:name="android.intent.category.HOME" />
+    <category android:name="android.intent.category.DEFAULT" />
+</intent-filter>
+
+<!-- 2. 应用列表/抽屉独立展示入口 -->
+<intent-filter>
+    <action android:name="android.intent.action.MAIN" />
+    <category android:name="android.intent.category.LAUNCHER" />
+</intent-filter>
+```
+
+**禁止** 将 `category.HOME`、`category.DEFAULT` 与 `category.LAUNCHER` 混合在同一个 `<intent-filter>` 标签内。混合声明会导致部分 Android 系统（特别是 Android 10+ 的 RoleManager / PreferredActivity 解析策略）产生匹配歧义，导致系统无法持久化保存默认桌面设置，从而在按 Home / 挂机键时反复弹出“选择主屏幕应用”。
+
