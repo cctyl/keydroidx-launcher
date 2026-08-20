@@ -21,7 +21,7 @@ import java.nio.charset.Charset;
  * 支持的指令：
  * <ul>
  *   <li>"LOCK" → {@link NokiaLockScreen#lock(Context)} 执行 Device Admin 锁屏</li>
- *   <li>"HOME" → startActivity 拉起诺基亚桌面到前台并触发 goHome() 回到待机屏</li>
+ *   <li>"HOME" → startActivity 拉起原键桌面到前台并触发 goHome() 回到待机屏</li>
  * </ul>
  * <p>
  * 生命周期：由 {@link NokiaDesktopActivity} 在 onCreate 启动、onDestroy 停止。
@@ -118,7 +118,7 @@ public class NokiaLockServer {
 	}
 
 	/**
-	 * 拉起诺基亚桌面到前台并回到待机屏。
+	 * 拉起原键桌面到前台并回到待机屏。
 	 * 用 HOME intent + 显式组件：触发 onNewIntent → goHome() → 清空返回栈 → 待机屏。
 	 * FLAG_ACTIVITY_NEW_TASK | CLEAR_TOP 确保已在栈顶时也触发 onNewIntent。
 	 */

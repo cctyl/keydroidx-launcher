@@ -55,7 +55,7 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 			btnGithub.setOnClickListener(v -> {
 				focusIndex = 0;
 				updateFocus();
-				openUrl("https://github.com/cctyl/nokia_launcher");
+				openUrl("https://github.com/keydroidx/keydroidx-launcher");
 			});
 		}
 
@@ -136,7 +136,7 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 	@Override
 	public boolean onSelect() {
 		if (focusIndex == 0) {
-			openUrl("https://github.com/cctyl/nokia_launcher");
+			openUrl("https://github.com/cctyl/keydroidx-launcher");
 			return true;
 		} else if (focusIndex == 1) {
 			openUrl("https://www.bilibili.com/video/BV1WxMX6yEHX");

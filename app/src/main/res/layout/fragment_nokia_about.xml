@@ -41,7 +41,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="https://github.com/cctyl/nokia_launcher"
+                    android:text="https://github.com/keydroidx/keydroidx-launcher"
                     android:textColor="#90CAF9"
                     android:textSize="10sp" />
             </LinearLayout>
@@ -105,7 +105,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="说明：\n目标是在安卓上还原诺基亚的体验，欢迎点赞收藏star，欢迎修改分发，只要保留原作者id即可。"
+                android:text="说明：\nKeydroidX（原键）致力于为现代智能按键机打造全套极致流畅的物理按键交互与极简生态体验。欢迎点赞收藏 Star，欢迎共建生态！"
                 android:textColor="#EEEEEE"
                 android:textSize="10sp"
                 android:lineSpacingMultiplier="1.3" />

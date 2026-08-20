@@ -1,7 +1,7 @@
 # JAR 应用挂机（后台运行）方案设计
 
 > 版本：v1.1　　日期：2026-08-15
-> 模块：`:midlet` 进程 / 诺基亚桌面 / native 拦截器
+> 模块：`:midlet` 进程 / 原键桌面 / native 拦截器
 > 关联 bug 清单条目：343（挂机 jar 显示到后台管理组件、可清除）、361（jar 内按挂机键不应锁屏应回桌面）、362（后期做成挂后台）、365（相机/拨号界面按挂机键误锁屏）
 >
 > **v1.1 变更**：真机首轮测试暴露 4 个问题，根因排查与修复见文末《附录 A：首轮实测问题修复记录》。核心教训：**debug 变体曾用 `tools:remove="android:process"` 移除 MicroActivity 的 `:midlet` 进程隔离**（上游遗留），使本方案的全部进程隔离前提失效；现已恢复隔离。
@@ -79,7 +79,7 @@ jar 应用（MIDlet）支持「挂机」：进入 jar 后按**挂机菜单键（
 
 ### 3.3 红键在 jar 内误锁屏的根因（bug 361）
 
-《挂机键行为定义.md》行为矩阵 A 态已定义：亮屏 + 非诺基亚应用 → 按红键 → **回诺基亚桌面**。
+《挂机键行为定义.md》行为矩阵 A 态已定义：亮屏 + 非诺基亚应用 → 按红键 → **回原键桌面**。
 但 jar 界面（`MicroActivity`）与桌面**同包名、不同 activity**，native 侧：
 
 - `interceptor.c` 的 `extract_front_package()` 只提取 `/` 之前的**包名**；
@@ -283,7 +283,7 @@ keyCode == keycodes[ACTION_HANGUP] 且 isBound（!= KEYCODE_UNKNOWN）：
     `.setClassName(this, NokiaDesktopActivity)` + `FLAG_ACTIVITY_NEW_TASK`（**不加 CLEAR_TOP**，
     保留本 Activity 实例 stopped → 下次走 R1 快速续跑）→ 桌面 `onNewIntent → goHome()` 回待机屏
     → 本 Activity `onPause → pauseApp()`（挂机）→ `onStop` 触发保活 Service（§6.4）。
-    显式组件保证即使本应用未被设为默认桌面，也回到诺基亚桌面。
+    显式组件保证即使本应用未被设为默认桌面，也回到原键桌面。
     注：native 红键路径（§6.9）带 CLEAR_TOP 会销毁实例 → 下次走 R2，两条路径均成立。
 
 **(6) onStop / onResume 与 Service 联动**：
@@ -403,7 +403,7 @@ jar 的三种「离开方式」全部殊途同归为挂机：
 
 ### 6.9 红键 jar 内行为修正（bug 361）
 
-目标：《挂机键行为定义.md》A 态语义落到 jar 场景——**jar 内按红键 = 回诺基亚桌面，jar 转挂机**。
+目标：《挂机键行为定义.md》A 态语义落到 jar 场景——**jar 内按红键 = 回原键桌面，jar 转挂机**。
 双保险实现（两层互补）：
 
 **(1) native 侧（主修正，语义正确）** —— `interceptor.c`：
@@ -411,7 +411,7 @@ jar 的三种「离开方式」全部殊途同归为挂机：
 - `update_front_window()` 增强：在 `Window{...}` 内提取 `/` 之后的 **activity 全名**
   （现有 `extract_front_package` 只取包名，格式
   `mCurrentFocus=Window{hash u0 pkg/javax.microedition.shell.MicroActivity}`，activity 名天然在输出中）；
-- 判定：activity 名以 `MicroActivity` 结尾 → **`front_is_nokia = 0`**（jar 界面不算诺基亚桌面）；
+- 判定：activity 名以 `MicroActivity` 结尾 → **`front_is_nokia = 0`**（jar 界面不算原键桌面）；
 - 效果：短按红键决策落到 else 分支 `inject_go_home`（A/B 态）→ 回桌面待机屏 →
   `NokiaDesktopActivity.onNewIntent → goHome()` → CLEAR_TOP 销毁 MicroActivity →
   `onPause → pauseApp()` 挂机、`onStop` 起保活通知、后台管理出现条目（全链路与本方案自动衔接）。

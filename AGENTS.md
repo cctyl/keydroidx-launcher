@@ -16,7 +16,7 @@
 7. **按键音**：按下物理按键时播放提示音。
 8. **可配置**：提供桌面设置入口 + 复用 J2ME-Loader 设置入口；快捷栏可编辑。
 
-**开发重心（重要）**：本仓库的主界面是**诺基亚桌面 `NokiaDesktopActivity`**（`ru.playsoftware.j2meloader.nokia.*`），**不是 J2ME-Loader 的 `MainActivity`**——切勿把 `MainActivity` 当作主界面。
+**开发重心（重要）**：本仓库的主界面是**原键桌面 `NokiaDesktopActivity`**（`ru.playsoftware.j2meloader.nokia.*`），**不是 J2ME-Loader 的 `MainActivity`**——切勿把 `MainActivity` 当作主界面。
 
 - 入口：`NokiaDesktopActivity` 在 `AndroidManifest.xml` 声明了 `LAUNCHER` + `HOME` + `DEFAULT`，应用图标和按 Home 键都进入它。
 - 旧 `MainActivity` 只是 J2ME-Loader 自带的启动器/文件选择器/应用列表界面，现在仅作为「百宝箱」启动 JAR、复用设置入口的底层壳，**不是主界面、不是开发重点**。
@@ -32,7 +32,7 @@ NokiaDesktopActivity， 就是按下HOME返回的界面，这里展示一些信�
 从桌面按下左键进入功能表，功能表里就是各种应用，和设置
 
 - 桌面设置
-从桌面按下右软键进入桌面设置，主要是 诺基亚桌面自身的一些设置。比如，按键绑定，顶部快捷栏设置，壁纸设置，桌面组件设置等。
+从桌面按下右软键进入桌面设置，主要是 原键桌面自身的一些设置。比如，按键绑定，顶部快捷栏设置，壁纸设置，桌面组件设置等。
 
 
 ## 操作说明
@@ -54,7 +54,7 @@ NokiaDesktopActivity， 就是按下HOME返回的界面，这里展示一些信�
 
 调试方面，使用adb截图理解，再使用adb 模拟点击来操作。常用调试命令（多设备一律加 `-s <serial>` 指定目标，避免误装到别的设备）：
 
-# 直接启动诺基亚桌面（跳过 HOME）
+# 直接启动原键桌面（跳过 HOME）
 adb shell am start -n io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity
 
 
@@ -120,9 +120,9 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
 
 **基于 NDK 的原生 3D。** `app/src/main/cpp` 通过 ndkBuild（`Android.mk`）构建两个共享库：`javam3g`（基于 OpenGL ES 1.1 的 Mascot Capsule 3D `m3g`，提供 `javax.microedition.m3g`）与 `micro3d`（Micro3D V3 引擎绑定）。正是这段原生代码使得工程固定使用较旧的 NDK 22.1.7171670，并且 Gradle 需要安装 NDK。
 
-**`ru.playsoftware.j2meloader` 中的应用外壳。** 安卓侧的 UI 与服务：`MainActivity`（遗留的 J2ME-Loader 启动器，已不再是主界面）、`NokiaDesktopActivity`（真正的 Home/桌面 —— 当前开发重点）、`ConfigActivity`、`SettingsActivity`、`KeyMapperActivity`、Room 数据库（按应用配置）、文件选择器以及 `storage.DocumentProvider`。诺基亚桌面代码位于 `ru.playsoftware.j2meloader.nokia.*` 之下。`com.*`/`mmpp.*` 持有诺基亚 UI 扩展（`com.nokia.mid.ui`）与 Mascot Capsule 辅助类。
+**`ru.playsoftware.j2meloader` 中的应用外壳。** 安卓侧的 UI 与服务：`MainActivity`（遗留的 J2ME-Loader 启动器，已不再是主界面）、`NokiaDesktopActivity`（真正的 Home/桌面 —— 当前开发重点）、`ConfigActivity`、`SettingsActivity`、`KeyMapperActivity`、Room 数据库（按应用配置）、文件选择器以及 `storage.DocumentProvider`。原键桌面代码位于 `ru.playsoftware.j2meloader.nokia.*` 之下。`com.*`/`mmpp.*` 持有诺基亚 UI 扩展（`com.nokia.mid.ui`）与 Mascot Capsule 辅助类。
 
-**诺基亚桌面内部（`ru.playsoftware.j2meloader.nokia.*`）—— 这是主要的开发面。** 在触碰任何 UI 之前需要理解的高层分层：
+**原键桌面内部（`ru.playsoftware.j2meloader.nokia.*`）—— 这是主要的开发面。** 在触碰任何 UI 之前需要理解的高层分层：
 
 - **Shell / 中枢层**：`NokiaBaseActivity`（240dp 设计基准 + `scaleMidContent`/`scalePanelContent` 整体缩放、density 修正、`applyBottomText` 动态字号）与 `NokiaDesktopActivity`（按键分发 `dispatchKeyEvent`、DOWN/UP 配对 `lastHandledDownKeyCode`、`refreshPageBar()` 页面装配、暴露 `getKeyBinding()`/`getScale()`/`getMidPanelHeight()`）。
 - **页面契约层**：`NokiaPage`（extends `NokiaFocusHost`）提供 `getPageTitle()`/`getSoftLeftText()`/`getSoftRightText()`，由 Activity 声明式装配底部三栏；各页面 Fragment（功能表、百宝箱、桌面设置、组件向导等）实现它并调用 `host.refreshPageBar()`。

@@ -10,7 +10,7 @@
 
 ### 1.1 背景
 
-当前诺基亚桌面的 JAR 安装入口（功能表 → 应用程序 → 安装）在调用文件选择器后，会直接弹出 J2ME-Loader 原有的 `InstallerDialog` 弹窗。该弹窗是标准的 Android `AlertDialog` 风格，与诺基亚 S40/S60 的视觉风格不一致。
+当前原键桌面的 JAR 安装入口（功能表 → 应用程序 → 安装）在调用文件选择器后，会直接弹出 J2ME-Loader 原有的 `InstallerDialog` 弹窗。该弹窗是标准的 Android `AlertDialog` 风格，与诺基亚 S40/S60 的视觉风格不一致。
 
 ### 1.2 目标
 
@@ -35,7 +35,7 @@
 |---|---|---|
 | `AppInstaller` | `ru.woesss.j2me.installer` | 安装核心逻辑：加载信息、下载、转换 DEX、写入文件系统 |
 | `InstallerDialog` | `ru.woesss.j2me.installer` | J2ME-Loader 原有安装弹窗：处理所有安装状态分支 |
-| `NokiaBoxFragment` | `ru.playsoftware.j2meloader.nokia` | 诺基亚桌面"应用程序"页面，包含"安装"入口 |
+| `NokiaBoxFragment` | `ru.playsoftware.j2meloader.nokia` | 原键桌面"应用程序"页面，包含"安装"入口 |
 
 ### 2.2 AppInstaller 状态码
 

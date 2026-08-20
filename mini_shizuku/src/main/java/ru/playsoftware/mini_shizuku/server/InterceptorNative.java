@@ -174,7 +174,7 @@ public class InterceptorNative {
      * 库已加载时直接调用 native 方法；未加载时缓存，待 {@link #applyCachedPageState()}
      * 在库加载后统一应用，避免 native 库未就绪时丢失状态。
      *
-     * @param isMain true=诺基亚桌面主界面（待机屏），false=子页面
+     * @param isMain true=原键桌面主界面（待机屏），false=子页面
      */
     public static void setPageState(boolean isMain) {
         int state = isMain ? 1 : 0;

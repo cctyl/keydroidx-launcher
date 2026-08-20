@@ -17,7 +17,7 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * 诺基亚桌面统一日志工具。
+ * 原键桌面统一日志工具。
  * <p>
  * 所有 nokia 包内的调试输出都走这里，统一 TAG 与格式（[子类] 消息），
  * 并可通过 {@link #setEnabled(boolean)} 全局开关控制 logcat 输出。

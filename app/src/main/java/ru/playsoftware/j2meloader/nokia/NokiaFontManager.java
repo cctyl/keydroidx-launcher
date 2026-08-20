@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 诺基亚桌面字体中枢管理器。
+ * 原键桌面字体中枢管理器。
  * 负责全局字体（内置方舟/缝合怪像素体、自定义外部导入字体、系统默认字体）的加载、缓存与分发。
  */
 public class NokiaFontManager {
@@ -114,7 +114,7 @@ public class NokiaFontManager {
 	 */
 	public static List<FontItem> getAvailableFonts(Context context) {
 		List<FontItem> list = new ArrayList<>();
-		list.add(new FontItem(FONT_ID_ARK_12PX, "方舟像素体 (12px 经典)", "复刻诺基亚 S40 经典 12 点阵，紧凑精致", false));
+		list.add(new FontItem(FONT_ID_ARK_12PX, "方舟像素体 (12px 经典)", "经典 12 点阵像素字体，紧凑精致", false));
 		list.add(new FontItem(FONT_ID_FUSION_12PX, "缝合怪像素体 (12px 全字符)", "CJK 全字符无死角覆盖，大字符集推荐", false));
 		list.add(new FontItem(FONT_ID_SYSTEM, "系统默认字体", "系统原生无衬线字体 (Roboto / 默认)", false));
 

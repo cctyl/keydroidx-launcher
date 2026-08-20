@@ -59,7 +59,7 @@
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginTop="12dp"
-        android:text="预览效果：诺基亚怀旧复古像素字体 Nokia Desktop"
+        android:text="预览效果：KeydroidX 原键复古像素字体"
         android:textColor="#FFFFFF"
         android:textSize="13sp" />
 

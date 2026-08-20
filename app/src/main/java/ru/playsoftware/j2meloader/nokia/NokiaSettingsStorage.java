@@ -27,7 +27,7 @@ import java.util.Set;
 import ru.playsoftware.j2meloader.BuildConfig;
 
 /**
- * 诺基亚桌面设置的 SharedPreferences 封装。
+ * 原键桌面设置的 SharedPreferences 封装。
  * 管理快捷栏应用列表、壁纸、软键映射等设置项的读写。
  */
 public class NokiaSettingsStorage {
@@ -308,7 +308,7 @@ public class NokiaSettingsStorage {
 
 	// ── 壁纸 ──
 
-	public static final String WALLPAPER_DEFAULT = "default";           // 经典诺基亚蓝
+	public static final String WALLPAPER_DEFAULT = "default";           // 经典深蓝
 	public static final String WALLPAPER_OBSIDIAN_BLACK = "obsidian_black"; // 曜石黑
 	public static final String WALLPAPER_CYAN_SEA = "cyan_sea";         // 青翠碧海
 	public static final String WALLPAPER_EMERALD_GREEN = "emerald_green"; // 翡翠深绿

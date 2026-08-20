@@ -15,7 +15,7 @@ android {
         targetSdk TARGET_SDK
         versionCode 102
         versionName "1.2"
-        resValue 'string', 'app_name', 'NokiaLauncher'
+        resValue 'string', 'app_name', 'KeydroidX'
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -56,10 +56,10 @@ android {
     lint {
         disable 'MissingTranslation', 'ExtraTranslation'
         // 以下为项目历史遗留/误报（完整 lint 会导致 release 构建失败）：
-        // J2ME 兼容层(javax.bluetooth/location)与诺基亚桌面刻意兼容 minSdk 14，
+        // J2ME 兼容层(javax.bluetooth/location)与原键桌面刻意兼容 minSdk 14，
         // 高版本 API 调用均带 SDK_INT 守卫，lint 静态分析无法识别。
         disable 'NewApi', 'InlinedApi', 'MissingPermission'
-        // 诺基亚桌面为固定 LTR 布局，不适用 RTL 适配检查。
+        // 原键桌面为固定 LTR 布局，不适用 RTL 适配检查。
         disable 'RtlCompat'
         // 字符串占位符历史遗留，与翻译文案不匹配，非运行错误。
         disable 'StringFormatMatches'
@@ -127,9 +127,9 @@ android {
 
     applicationVariants.all {
         if (buildType.name == 'debug' && flavorName != 'midlet') {
-            resValue 'string', 'app_name', 'NokiaLauncher Debug'
+            resValue 'string', 'app_name', 'KeydroidX Debug'
         }
-        def baseName = flavorName == 'midlet' ? "${midletArchivesBaseName}-" : "NokiaLauncher-"
+        def baseName = flavorName == 'midlet' ? "${midletArchivesBaseName}-" : "KeydroidX-"
         outputs.all {
             outputFileName = "${baseName}${versionName}-${dirName}-${buildType.name}.apk"
                     .replaceAll('--+', '-').replaceAll(' +', '_')

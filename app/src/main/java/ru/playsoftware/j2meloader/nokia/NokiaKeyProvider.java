@@ -11,7 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 /**
- * 诺基亚桌面按键配置对外 Provider。
+ * 原键桌面按键配置对外 Provider。
  * 供生态内的独立应用（如按键音乐播放器、浏览器等）只读获取用户在桌面上配置的物理按键映射。
  *
  * Authority: ${applicationId}.keyprovider (如 io.github.cctyl.nokia.keyprovider 或 io.github.cctyl.nokia.debug.keyprovider)

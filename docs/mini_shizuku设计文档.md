@@ -1,7 +1,7 @@
 
 ## 需求概述
 
-在诺基亚桌面 Launcher 项目中复刻 RFMouse 的 client-server 架构，实现一个**通用的 shell 命令通道**，使应用进程能够以 shell 身份执行系统命令。
+在原键桌面 Launcher 项目中复刻 RFMouse 的 client-server 架构，实现一个**通用的 shell 命令通道**，使应用进程能够以 shell 身份执行系统命令。
 
 ## 核心功能
 
@@ -9,7 +9,7 @@
 - **手动 adb 启动**：服务端由用户在开发机手动执行 `demon.sh` 启动，主 app 仅负责检测服务在线状态、展示并复制 adb 启动命令、测试连通。
 - **Android 版本分流**：mini_shizuku 仅用于 Android 7 以下（API < 24）；Android 7.0+（API >= 24）本次不集成官方 Shizuku，客户端门面做版本分流并预留将来扩展点。
 - **通用 shell 命令通道**：支持执行命令（静默执行 + 同步获取输出两种模式），供后续功能复用。
-- **桌面设置入口**：在「桌面设置」中新增"Shizuku 服务"设置项，展示服务状态、adb 启动指引、执行命令测试，遵循诺基亚桌面按键导航/240dp 布局规范。
+- **桌面设置入口**：在「桌面设置」中新增"Shizuku 服务"设置项，展示服务状态、adb 启动指引、执行命令测试，遵循原键桌面按键导航/240dp 布局规范。
 
 
 
@@ -19,7 +19,7 @@
 - **服务端**：现有 `mini_shizuku` 模块（app_process 以 shell/UID 2000 身份运行），复用 `AdbProcess → SocketService → MsgProcess → ShellUtil` 链路
 - **客户端**：扩展现有 `ShizukuClient`（TCP 127.0.0.1:10500），补充带输出回显的执行方法
 - **进程隔离**：保持 `:mini_shizuku` 作为独立 Gradle 库模块，服务端在独立 app_process 进程运行，崩溃不影响主 app
-- **UI**：诺基亚桌面现有 Fragment 模式（`NokiaPage` + `NokiaFocusHost`），复用 `NokiaOptionsDialog`、`NokiaSettingsStorage`、`NokiaDimens.dp()`
+- **UI**：原键桌面现有 Fragment 模式（`NokiaPage` + `NokiaFocusHost`），复用 `NokiaOptionsDialog`、`NokiaSettingsStorage`、`NokiaDimens.dp()`
 
 ## 实现方案
 
@@ -60,14 +60,14 @@ flowchart LR
 ## 实施注意（防止回归）
 
 - **版本守卫**：项目 `MIN_SDK=14`，新增代码严禁出现无守卫的高版本 API；版本判断一律 `Build.VERSION.SDK_INT >= 24` 形式。
-- **遵守诺基亚桌面规范**：新 Fragment 根布局宽固定 240dp、高度 match_parent；尺寸换算走 `NokiaDimens.dp()`；scale 走 `host.getScale()`；按键走 `NokiaKeyBinding` 语义动作（不能写死 keyCode）。
+- **遵守原键桌面规范**：新 Fragment 根布局宽固定 240dp、高度 match_parent；尺寸换算走 `NokiaDimens.dp()`；scale 走 `host.getScale()`；按键走 `NokiaKeyBinding` 语义动作（不能写死 keyCode）。
 - **lint 约束**：`app/build.gradle` 已 `disable 'NewApi'` 等，但 mini_shizuku 模块的 lint 配置需确认，新增代码保持与现有风格一致。
 - **不要改动 J2ME 兼容层**：本次改动仅在 `mini_shizuku` 模块和诺基亚包 `ru.playsoftware.j2meloader.nokia` 下，不影响 `javax.microedition.*`。
 - **启动脚本保持**：`app/src/debug/assets/demon.sh` 与 `app/src/release/assets/demon.sh` 已存在且正确，无需改动；设置页展示的命令从这两个脚本内容派生。
 
 ## 目录结构
 
-本次改动涉及 mini_shizuku 模块与诺基亚桌面设置页两部分。
+本次改动涉及 mini_shizuku 模块与原键桌面设置页两部分。
 
 ```
 mini_shizuku/src/main/java/ru/playsoftware/mini_shizuku/

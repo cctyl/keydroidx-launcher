@@ -26,7 +26,7 @@
 #define NBITS(x) ((((x)-1)/BITS_PER_LONG)+1)
 #define test_bit(bit, array) ((array[bit/BITS_PER_LONG] >> (bit%BITS_PER_LONG)) & 1)
 
-// 诺基亚桌面应用包名候选（release 无后缀 / debug 带 .debug）。
+// 原键桌面应用包名候选（release 无后缀 / debug 带 .debug）。
 // 回桌面注入时先探测已安装的包；前台判断也用它。
 #define PKG_NOKIA_RELEASE "io.github.cctyl.nokia"
 #define PKG_NOKIA_DEBUG   "io.github.cctyl.nokia.debug"
@@ -547,7 +547,7 @@ static int send_via_socket(const char* msg) {
     return 0;
 }
 
-// 注入：回诺基亚桌面主界面。
+// 注入：回原键桌面主界面。
 // 优先 socket 直连（~2ms，App 内 startActivity），失败时 fallback 到 am start（异步）。
 static void inject_go_home() {
     if (send_via_socket("HOME\n") == 0) {
@@ -655,7 +655,7 @@ static void handle_short_press() {
         inject_lock();
         last_inject_ms = now_ms();
     } else if (front_is_nokia && page_is_main) {
-        // C 亮屏·诺基亚桌面主界面 → Device Admin 锁屏（熄屏）。
+        // C 亮屏·原键桌面主界面 → Device Admin 锁屏（熄屏）。
         // 锁屏前即时复核前台（bug 365：相机/拨号浮层 + 2s 轮询陈旧会误判为 C 态），
         // 复核发现前台非本应用则降级 go_home。
         if (!verify_front_really_nokia()) {
@@ -668,8 +668,8 @@ static void handle_short_press() {
             last_inject_ms = now_ms();
         }
     } else {
-        // A 亮屏·非诺基亚应用 → 回诺基亚桌面主界面
-        // B 亮屏·诺基亚桌面其他界面 → 回诺基亚桌面主界面（不锁屏）
+        // A 亮屏·非诺基亚应用 → 回原键桌面主界面
+        // B 亮屏·原键桌面其他界面 → 回原键桌面主界面（不锁屏）
         LOGI("power: decision=go_home [A/B->C] (front=%s, nokia=%d, main=%d)",
              front_package, front_is_nokia, page_is_main);
         inject_go_home();
@@ -898,7 +898,7 @@ Java_ru_playsoftware_mini_1shizuku_server_InterceptorNative_setInterceptEnabled(
 }
 
 // 由 App 通过 TCP→服务端 JNI 调用，上报当前页面状态。
-// state: 1 = 诺基亚桌面主界面（待机屏），0 = 子页面（功能表/设置/百宝箱等）
+// state: 1 = 原键桌面主界面（待机屏），0 = 子页面（功能表/设置/百宝箱等）
 JNIEXPORT void JNICALL
 Java_ru_playsoftware_mini_1shizuku_server_InterceptorNative_nativeSetPageState(JNIEnv *env, jclass clazz, jint state) {
     int s = state ? 1 : 0;

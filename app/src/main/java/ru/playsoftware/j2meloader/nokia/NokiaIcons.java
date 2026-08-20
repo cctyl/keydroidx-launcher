@@ -16,7 +16,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 /**
- * 诺基亚桌面 Google Material Icons 字体图标库工具类。
+ * 原键桌面 Google Material Icons 字体图标库工具类。
  * <p>
  * 内置 2500+ 个矢量图标，单文件 .ttf 驱动，多分辨率 1:1 无损自适应，
  * 支持任意颜色、透明度与尺寸动态渲染。

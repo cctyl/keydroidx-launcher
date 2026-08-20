@@ -523,7 +523,7 @@ public class MicroActivity extends AppCompatActivity {
 	}
 
 	/**
-	 * 三菜单「后台运行」：显式回诺基亚桌面（不设默认桌面也能回到本桌面），
+	 * 三菜单「后台运行」：显式回原键桌面（不设默认桌面也能回到本桌面），
 	 * 本 Activity 保持 stopped（singleTask 不销毁），jar 转挂机，下次进入走 R1 快速续跑。
 	 */
 	private void runInBackground() {

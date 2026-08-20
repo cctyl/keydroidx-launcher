@@ -262,7 +262,7 @@ class TextFieldImpl {
 		}
 	}
 
-	/** 构造诺基亚桌面同款深色壁纸卡片编辑界面（供 TextBox 使用）。 */
+	/** 构造原键桌面同款深色壁纸卡片编辑界面（供 TextBox 使用）。 */
 	View getScreenContainer(Context context) {
 		if (screenContainer == null) {
 			Resources res = context.getResources();

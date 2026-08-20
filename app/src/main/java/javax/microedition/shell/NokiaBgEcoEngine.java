@@ -5,7 +5,7 @@ import android.os.SystemClock;
 import android.util.Log;
 
 /**
- * 诺基亚桌面 J2ME 挂机后台智能节能引擎（NokiaBgEcoEngine）
+ * 原键桌面 J2ME 挂机后台智能节能引擎（NokiaBgEcoEngine）
  * <p>
  * 核心机制：
  * 1. 阶梯退避式 Doze 周期（Ladder Doze Cycle）：

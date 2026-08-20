@@ -280,7 +280,7 @@ public class NokiaKeyBinding {
 	}
 
 	/**
-	 * 供诺基亚桌面各弹窗（Dialog / DialogFragment）复用：把一次按键事件按当前绑定解析，
+	 * 供原键桌面各弹窗（Dialog / DialogFragment）复用：把一次按键事件按当前绑定解析，
 	 * 并分发到左/右软键动作，避免各弹窗写死 keyCode。
 	 *
 	 * @param event            按键事件
