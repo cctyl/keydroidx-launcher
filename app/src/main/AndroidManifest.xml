@@ -247,6 +247,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- 诺基亚桌面按键配置对外 Provider（供生态独立 App 只读获取物理按键映射） -->
+        <provider
+            android:name=".nokia.NokiaKeyProvider"
+            android:authorities="${applicationId}.keyprovider"
+            android:exported="true" />
+
+
         <!-- 锁屏广播接收器：供 native 拦截器通过 am broadcast 触发 Device Admin 锁屏 -->
         <receiver
             android:name=".nokia.NokiaLockReceiver"

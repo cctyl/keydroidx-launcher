@@ -89,11 +89,13 @@ public class NokiaKeyBinding {
 		return keycode != KeyEvent.KEYCODE_UNKNOWN;
 	}
 
+	private final Context context;
 	private final SharedPreferences prefs;
 	private final int[] keycodes = new int[ACTION_COUNT];
 
 	public NokiaKeyBinding(Context context) {
-		prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+		this.context = context.getApplicationContext();
+		prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 		load();
 		NokiaLog.i("KeyBinding", "初始化完成，当前绑定：");
 		dumpBindings();
@@ -159,6 +161,20 @@ public class NokiaKeyBinding {
 		NokiaLog.i("KeyBinding",
 				"setKeyCode " + getActionName(action)
 						+ " : " + NokiaLog.keyName(old) + " -> " + NokiaLog.keyName(keycode));
+		notifyProviderChanged();
+	}
+
+	/** 通知 ContentProvider 订阅者按键映射已更新。 */
+	private void notifyProviderChanged() {
+		try {
+			if (context != null) {
+				android.net.Uri uri = android.net.Uri.parse("content://" + context.getPackageName() + ".keyprovider/keys");
+				context.getContentResolver().notifyChange(uri, null);
+				NokiaLog.d("KeyBinding", "已发送按键变更通知: " + uri);
+			}
+		} catch (Exception e) {
+			NokiaLog.w("KeyBinding", "notifyProviderChanged 失败: " + e.getMessage());
+		}
 	}
 
 	/** 获取指定动作的按键码。 */
