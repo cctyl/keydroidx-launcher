@@ -69,14 +69,6 @@
 
 ---
 
-## KeydroidX 生态项目矩阵
-
-- **[keydroidx-launcher](https://github.com/keydroidx/keydroidx-launcher)**：原键桌面（本仓库）
-- **[keydroidx-core](https://github.com/keydroidx/keydroidx-core)**：按键机生态通用 SDK（跨应用按键同步、统一向导、基类组件）
-- **keydroidx-music**（规划中）：原键复古音乐播放器
-- **keydroidx-browser**（规划中）：原键轻量按键浏览器
-
----
 
 ## 致谢与开源许可
 
