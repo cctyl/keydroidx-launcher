@@ -81,7 +81,7 @@
         tools:targetApi="r"
         tools:ignore="RtlEnabled">
         <activity
-            android:name=".MainActivity"
+            android:name=".J2meLoaderActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="true"
             android:launchMode="singleTask">

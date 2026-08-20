@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <application>
-        <activity android:name=".MainActivity" tools:node="remove" />
+        <activity android:name=".J2meLoaderActivity" tools:node="remove" />
         <activity android:name="javax.microedition.shell.MicroActivity"
             android:exported="true"
             tools:remove="android:process"

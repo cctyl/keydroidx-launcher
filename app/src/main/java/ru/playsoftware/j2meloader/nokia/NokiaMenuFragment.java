@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import ru.playsoftware.j2meloader.MainActivity;
+import ru.playsoftware.j2meloader.J2meLoaderActivity;
 import ru.playsoftware.j2meloader.R;
 
 /**
@@ -398,7 +398,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		Drawable mainIcon = safeDrawable(host, R.mipmap.ic_launcher);
 		if (mainIcon == null) mainIcon = boxIcon;
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_MAIN, "J2ME Loader", mainIcon, null));
-		NokiaLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入原始 MainActivity）");
+		NokiaLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入 J2meLoaderActivity）");
 		items.add(new NokiaAppItem(NokiaAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
 
 		// 将 pool 拆分为已匹配 S60 图标 和 未匹配，匹配的排在前面。
@@ -918,13 +918,13 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		}
 		if (item.type == NokiaAppItem.TYPE_MAIN) {
 			try {
-				Intent main = new Intent(requireActivity(), MainActivity.class);
+				Intent main = new Intent(requireActivity(), J2meLoaderActivity.class);
 				main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
 						| Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 				startActivity(main);
-				NokiaLog.i("Menu", "进入原始 J2ME-Loader 主界面 MainActivity");
+				NokiaLog.i("Menu", "进入原始 J2ME-Loader 主界面 J2meLoaderActivity");
 			} catch (Exception e) {
-				NokiaLog.e("Menu", "启动 MainActivity 失败", e);
+				NokiaLog.e("Menu", "启动 J2meLoaderActivity 失败", e);
 			}
 			return true;
 		}

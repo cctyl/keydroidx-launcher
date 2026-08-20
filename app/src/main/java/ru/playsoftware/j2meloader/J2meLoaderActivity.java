@@ -50,7 +50,14 @@ import static ru.playsoftware.j2meloader.util.Constants.PREF_EMULATOR_DIR;
 import static ru.playsoftware.j2meloader.util.Constants.PREF_STORAGE_WARNING_SHOWN;
 import static ru.playsoftware.j2meloader.util.Constants.PREF_TOOLBAR;
 
-public class MainActivity extends BaseActivity {
+/**
+ * J2ME-Loader 原始入口（应用列表/文件选择器/JAR 安装）。
+ * <p>
+ * 注意：本应用的主入口是 {@link ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity}（原键桌面），
+ * 本类只是 J2ME-Loader 的遗留壳，仅用于打开 JAR/JAD 文件与「J2ME Loader」菜单入口，
+ * 不是 Launcher 入口。命名为 J2meLoaderActivity 以避免与主入口混淆。
+ */
+public class J2meLoaderActivity extends BaseActivity {
 	private static final String[] STORAGE_PERMISSIONS = {Manifest.permission.WRITE_EXTERNAL_STORAGE};
 
 	private final ActivityResultLauncher<String[]> permissionsLauncher = registerForActivityResult(
