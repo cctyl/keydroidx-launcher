@@ -83,6 +83,11 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 		});
 		introSkip.setOnClickListener(v -> finishWizard(false));
 
+		View doneBtn = view.findViewById(R.id.doneBtn);
+		if (doneBtn != null) {
+			doneBtn.setOnClickListener(v -> exitToDesktop());
+		}
+
 		showIntro();
 	}
 
@@ -183,30 +188,33 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 		introCard.setVisibility(View.GONE);
 		recordingLayout.setVisibility(View.GONE);
 		doneLayout.setVisibility(View.VISIBLE);
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		host.refreshPageBar();
 		if (stepBadge != null) stepBadge.setText("");
 		// 标记向导已完成，下次启动不再弹出
 		keyBinding.markWizardDone();
 		// 让 Activity 的内存绑定立即生效
-		host.reloadKeyBindings();
-		NokiaLog.i("KeyWizard", "向导结束 bound=" + bound + "，标记完成并准备返回桌面");
+		if (getActivity() instanceof NokiaDesktopActivity) {
+			((NokiaDesktopActivity) getActivity()).reloadKeyBindings();
+			((NokiaDesktopActivity) getActivity()).refreshPageBar();
+		}
+		NokiaLog.i("KeyWizard", "向导结束 bound=" + bound + "，进入完成提示页");
+	}
 
-		// 短暂展示完成页后返回桌面待机屏
-		new Handler().postDelayed(() -> {
-			FragmentManager fm = requireActivity().getSupportFragmentManager();
-			fm.beginTransaction()
-					.replace(R.id.midPanel, new NokiaDesktopFragment())
-					.commit();
-			NokiaLog.i("KeyWizard", "返回桌面待机屏");
-			// 向导结束后：若尚未是默认桌面，则询问是否设为默认桌面
-			askSetDefaultLauncher();
-		}, 1200);
+	/** 退出向导并返回桌面待机屏 */
+	private void exitToDesktop() {
+		if (!isAdded() || getActivity() == null) return;
+		FragmentManager fm = requireActivity().getSupportFragmentManager();
+		fm.beginTransaction()
+				.replace(R.id.midPanel, new NokiaDesktopFragment())
+				.commitAllowingStateLoss();
+		NokiaLog.i("KeyWizard", "返回桌面待机屏");
+		// 向导结束后：若尚未是默认桌面，则询问是否设为默认桌面
+		askSetDefaultLauncher();
 	}
 
 	/** 向导完成后（返回桌面时）询问用户是否将本应用设为系统默认桌面。 */
 	private void askSetDefaultLauncher() {
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
+		if (!isAdded() || !(getActivity() instanceof NokiaDesktopActivity)) return;
+		NokiaDesktopActivity host = (NokiaDesktopActivity) getActivity();
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
 		items.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_home, "设置默认桌面", true, false,
 				() -> {
@@ -219,52 +227,82 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 		NokiaLog.i("KeyWizard", "弹出默认桌面询问窗");
 	}
 
-	// ---- NokiaFocusHost（仅 INTRO 状态使用）----
+	// ---- NokiaFocusHost（INTRO / DONE 状态使用）----
 
 	@Override
 	public boolean onDirection(int direction) {
-		if (state != STATE_INTRO) return true;
-		introChoice = (introChoice == 0) ? 1 : 0;
-		updateIntroHighlight();
-		NokiaLog.d("KeyWizard", "INTRO 切换选择 -> " + (introChoice == 0 ? "绑定" : "跳过"));
+		if (state == STATE_INTRO) {
+			introChoice = (introChoice == 0) ? 1 : 0;
+			updateIntroHighlight();
+			NokiaLog.d("KeyWizard", "INTRO 切换选择 -> " + (introChoice == 0 ? "绑定" : "跳过"));
+			return true;
+		}
 		return true;
 	}
 
 	@Override
 	public boolean onSelect() {
-		if (state != STATE_INTRO) return true;
-		if (introChoice == 0) {
-			NokiaLog.i("KeyWizard", "INTRO 选择 绑定");
-			startRecording();
-		} else {
-			NokiaLog.i("KeyWizard", "INTRO 选择 跳过");
-			finishWizard(false);
+		if (state == STATE_INTRO) {
+			if (introChoice == 0) {
+				NokiaLog.i("KeyWizard", "INTRO 选择 绑定");
+				startRecording();
+			} else {
+				NokiaLog.i("KeyWizard", "INTRO 选择 跳过");
+				finishWizard(false);
+			}
+			return true;
+		}
+		if (state == STATE_DONE) {
+			NokiaLog.i("KeyWizard", "DONE 确认 -> 进入桌面");
+			exitToDesktop();
+			return true;
 		}
 		return true;
 	}
 
 	@Override
 	public boolean onSoftLeft() {
-		if (state != STATE_INTRO) return true;
-		NokiaLog.i("KeyWizard", "左软键 -> 绑定");
-		startRecording();
+		if (state == STATE_INTRO) {
+			NokiaLog.i("KeyWizard", "左软键 -> 绑定");
+			startRecording();
+			return true;
+		}
+		if (state == STATE_DONE) {
+			NokiaLog.i("KeyWizard", "DONE 左软键 -> 完成/进入桌面");
+			exitToDesktop();
+			return true;
+		}
 		return true;
 	}
 
 	@Override
 	public boolean onSoftRight() {
-		if (state != STATE_INTRO) return true;
-		NokiaLog.i("KeyWizard", "右软键 -> 跳过");
-		finishWizard(false);
+		if (state == STATE_INTRO) {
+			NokiaLog.i("KeyWizard", "右软键 -> 跳过");
+			finishWizard(false);
+			return true;
+		}
+		if (state == STATE_DONE) {
+			NokiaLog.i("KeyWizard", "DONE 右软键 -> 完成/进入桌面");
+			exitToDesktop();
+			return true;
+		}
 		return true;
 	}
 
 	@Override
 	public boolean onBack() {
-		// 录制态的 BACK 由 onKeyRecorded 处理（将其绑定为当前动作）；此处仅 INTRO 生效
-		if (state != STATE_INTRO) return true;
-		NokiaLog.i("KeyWizard", "返回键 -> 跳过");
-		finishWizard(false);
+		// 录制态的 BACK 由 onKeyRecorded 处理（将其绑定为当前动作）；此处仅 INTRO / DONE 生效
+		if (state == STATE_INTRO) {
+			NokiaLog.i("KeyWizard", "返回键 -> 跳过");
+			finishWizard(false);
+			return true;
+		}
+		if (state == STATE_DONE) {
+			NokiaLog.i("KeyWizard", "DONE 返回键 -> 进入桌面");
+			exitToDesktop();
+			return true;
+		}
 		return true;
 	}
 
@@ -277,13 +315,14 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 
 	@Override
 	public String getSoftLeftText() {
-		// 仅 INTRO 显示"绑定"；录制/DONE 全部隐藏
-		return state == STATE_INTRO ? "绑定" : null;
+		if (state == STATE_INTRO) return "绑定";
+		if (state == STATE_DONE) return "完成";
+		return null;
 	}
 
 	@Override
 	public String getSoftRightText() {
-		// 仅 INTRO 显示"跳过"；录制/DONE 全部隐藏
-		return state == STATE_INTRO ? "跳过" : null;
+		if (state == STATE_INTRO) return "跳过";
+		return null;
 	}
 }
