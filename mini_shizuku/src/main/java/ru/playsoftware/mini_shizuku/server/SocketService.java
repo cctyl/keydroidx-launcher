@@ -5,7 +5,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -20,11 +20,13 @@ public class SocketService {
     public void start() throws IOException {
         Log.i(TAG, "Listening on 127.0.0.1:" + PORT);
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                1, 3, 5000L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(8));
+                4, 16, 60L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
+                new ThreadPoolExecutor.CallerRunsPolicy());
         ServerSocket server = new ServerSocket(PORT);
         while (!server.isClosed()) {
             try {
                 Socket socket = server.accept();
+                socket.setSoTimeout(10000); // 设置单次连接超时防挂死
                 executor.execute(new MsgProcess(socket));
             } catch (IOException e) {
                 Log.e(TAG, "accept failed", e);

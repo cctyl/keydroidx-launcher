@@ -119,7 +119,13 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 		PackageManager pm = requireActivity().getPackageManager();
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
-		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
+		int flags = 0;
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+			flags = PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS;
+		} else {
+			flags = PackageManager.GET_UNINSTALLED_PACKAGES | PackageManager.GET_DISABLED_COMPONENTS;
+		}
+		List<ResolveInfo> list = pm.queryIntentActivities(main, flags);
 		String selfPkg = requireActivity().getPackageName();
 		// 同包多 launcher 入口（如系统相机/短信注册了多个 Activity）按包名去重，只保留第一个，
 		// 避免同一个应用在快捷栏列表里出现多项、被重复加入快捷栏

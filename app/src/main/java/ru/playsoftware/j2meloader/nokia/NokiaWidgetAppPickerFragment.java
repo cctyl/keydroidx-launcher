@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
@@ -352,7 +353,13 @@ public class NokiaWidgetAppPickerFragment extends NokiaPageFragment {
 		PackageManager pm = requireActivity().getPackageManager();
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
-		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
+		int queryFlags = 0;
+		if (Build.VERSION.SDK_INT >= 24) {
+			queryFlags |= PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS;
+		} else {
+			queryFlags |= PackageManager.GET_UNINSTALLED_PACKAGES | PackageManager.GET_DISABLED_COMPONENTS;
+		}
+		List<ResolveInfo> list = pm.queryIntentActivities(main, queryFlags);
 		String selfPkg = requireActivity().getPackageName();
 
 		for (ResolveInfo ri : list) {

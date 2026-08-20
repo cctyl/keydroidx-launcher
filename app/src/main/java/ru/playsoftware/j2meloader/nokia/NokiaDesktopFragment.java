@@ -32,6 +32,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -170,6 +171,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 从桌面设置返回后刷新组件区（可能有增删改）
 		View view = getView();
 		if (view != null) {
+			loadShortcutBarAsync(view);
 			rebuildWidgetArea(view);
 		}
 		// 异步刷新后台管理组件计数（countBackgroundProcesses 含 shizuku TCP，不能在主线程）
@@ -506,6 +508,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
 		filter.addAction(LocationManager.PROVIDERS_CHANGED_ACTION);
 		filter.addAction("android.location.MODE_CHANGED");
+		filter.addAction(NokiaFreezeManager.ACTION_FREEZE_STATE_CHANGED);
 		ctx.registerReceiver(toggleStateReceiver, filter);
 		receiverRegistered = true;
 		NokiaLog.i("Desktop", "已注册开关栏广播接收器");
@@ -1047,8 +1050,13 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		cell.setClickable(true);
 		cell.setTag(app);
 
+		FrameLayout iconContainer = new FrameLayout(ctx);
+		iconContainer.setLayoutParams(new LinearLayout.LayoutParams(
+				NokiaDimens.dp(getResources(), iconBase), NokiaDimens.dp(getResources(), iconBase)));
+
 		ImageView iv = new ImageView(ctx);
-		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), iconBase), NokiaDimens.dp(getResources(), iconBase)));
+		iv.setLayoutParams(new FrameLayout.LayoutParams(
+				FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 		Drawable icon = loadShortcutIconMemory(app);
 		if (icon != null) {
 			iv.setImageDrawable(icon);
@@ -1057,7 +1065,28 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				iv.setImageDrawable(ContextCompat.getDrawable(ctx, R.mipmap.ic_launcher));
 			} catch (Exception ignored) {}
 		}
-		cell.addView(iv);
+		iconContainer.addView(iv);
+
+		// 判断快捷应用是否被冻结
+		String pkg = null;
+		if (app.type == ShortcutApp.TYPE_ANDROID) {
+			Intent intent = app.getLaunchIntent();
+			if (intent != null) {
+				if (intent.getComponent() != null) pkg = intent.getComponent().getPackageName();
+				else if (!TextUtils.isEmpty(intent.getPackage())) pkg = intent.getPackage();
+			}
+		}
+		if (pkg != null && NokiaFreezeManager.getInstance(ctx).isAppFrozen(pkg)) {
+			ImageView badgeIv = new ImageView(ctx);
+			int badgeSize = Math.max(NokiaDimens.dp(getResources(), 8), Math.round(NokiaDimens.dp(getResources(), 10) * iconScale));
+			FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(badgeSize, badgeSize);
+			badgeLp.gravity = Gravity.BOTTOM | Gravity.END;
+			badgeIv.setLayoutParams(badgeLp);
+			badgeIv.setImageResource(R.drawable.ic_nokia_ice_badge);
+			iconContainer.addView(badgeIv);
+		}
+
+		cell.addView(iconContainer);
 
 		cell.setOnClickListener(v -> launchShortcutApp(app));
 		return cell;
@@ -1134,9 +1163,14 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					if (index >= container.getChildCount()) return;
 					View child = container.getChildAt(index);
 					if (!(child instanceof LinearLayout)) return;
-					View iconView = ((LinearLayout) child).getChildAt(0);
-					if (iconView instanceof ImageView && icon != null) {
-						((ImageView) iconView).setImageDrawable(icon);
+					View firstChild = ((LinearLayout) child).getChildAt(0);
+					if (firstChild instanceof FrameLayout) {
+						View ivChild = ((FrameLayout) firstChild).getChildAt(0);
+						if (ivChild instanceof ImageView && icon != null) {
+							((ImageView) ivChild).setImageDrawable(icon);
+						}
+					} else if (firstChild instanceof ImageView && icon != null) {
+						((ImageView) firstChild).setImageDrawable(icon);
 					}
 				});
 			}, "shortcut-icon-" + index).start();
@@ -1144,11 +1178,28 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	}
 
 	private void launchShortcutApp(ShortcutApp app) {
+		Context ctx = getContext();
+		if (ctx == null) return;
 		NokiaLog.i("Desktop", "启动快捷栏应用: " + app.label);
 		try {
 			if (app.type == ShortcutApp.TYPE_ANDROID) {
+				String pkg = null;
 				Intent intent = app.getLaunchIntent();
-				if (intent != null) { startActivity(intent); return; }
+				if (intent != null) {
+					if (intent.getComponent() != null) pkg = intent.getComponent().getPackageName();
+					else if (!TextUtils.isEmpty(intent.getPackage())) pkg = intent.getPackage();
+				}
+
+				if (pkg != null && NokiaFreezeManager.getInstance(ctx).isAppFrozen(pkg)) {
+					NokiaFreezeManager.getInstance(ctx).unfreezeAndLaunch(app.getLaunchIntent(), pkg, app.label);
+					return;
+				}
+
+				if (intent != null) {
+					intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+					startActivity(intent);
+					return;
+				}
 			}
 			if (app.type == ShortcutApp.TYPE_J2ME) {
 				NokiaJarLauncher.launch(requireActivity(), app.label, app.appKey);

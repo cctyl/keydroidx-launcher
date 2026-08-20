@@ -10,15 +10,18 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -29,8 +32,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import ru.playsoftware.j2meloader.MainActivity;
 import ru.playsoftware.j2meloader.R;
@@ -165,7 +170,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 
 	@Override
 	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-		// 监听包安装/卸载/替换，实时刷新应用列表
+		// 监听包安装/卸载/替换与应用冻结状态变化，实时刷新应用列表
 		IntentFilter pkgFilter = new IntentFilter();
 		pkgFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
 		pkgFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
@@ -176,6 +181,14 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			NokiaLog.i("Menu", "已注册包变化广播接收器（ADDED/REMOVED/REPLACED）");
 		} catch (Exception e) {
 			NokiaLog.e("Menu", "注册包变化广播失败", e);
+		}
+
+		IntentFilter freezeFilter = new IntentFilter();
+		freezeFilter.addAction(NokiaFreezeManager.ACTION_FREEZE_STATE_CHANGED);
+		try {
+			requireContext().registerReceiver(packageReceiver, freezeFilter);
+		} catch (Exception e) {
+			NokiaLog.e("Menu", "注册冻结状态广播失败", e);
 		}
 
 		appGrid = view.findViewById(R.id.appGrid);
@@ -263,11 +276,18 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
-		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
-		NokiaLog.i("Menu", "queryIntentActivities 返回 " + list.size() + " 个可启动应用");
+		int queryFlags = 0;
+		if (Build.VERSION.SDK_INT >= 24) {
+			queryFlags |= PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS;
+		} else {
+			queryFlags |= PackageManager.GET_UNINSTALLED_PACKAGES | PackageManager.GET_DISABLED_COMPONENTS;
+		}
+		List<ResolveInfo> list = pm.queryIntentActivities(main, queryFlags);
+		NokiaLog.i("Menu", "queryIntentActivities (含已停用/冻结) 返回 " + list.size() + " 个可启动应用");
 
 		// 先全部放入临时池 pool，后续再按固定槽位提取
 		List<NokiaAppItem> pool = new ArrayList<>();
+		Set<String> seenPackages = new HashSet<>();
 		String selfPkg = host.getPackageName();
 		for (ResolveInfo ri : list) {
 			ActivityInfo ai = ri.activityInfo;
@@ -277,6 +297,11 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			}
 			if (ai.packageName.equals(selfPkg)) {
 				NokiaLog.d("Menu", "排除桌面自身: " + ai.packageName);
+				continue;
+			}
+			// 过滤同应用的多图标入口（如部分应用提供的多种样式启动别名）
+			if (!seenPackages.add(ai.packageName)) {
+				NokiaLog.d("Menu", "跳过重复包名入口: " + ai.packageName + "/" + ai.name);
 				continue;
 			}
 			// 应用名走进程内缓存，避免每次进入功能表重复 loadLabel IPC
@@ -535,8 +560,23 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 					NokiaAppItem item = items.get(start + pos);
 					pageItems[pos] = item;
 
+					String pkg = null;
+					if (item.launchIntent != null) {
+						if (item.launchIntent.getComponent() != null) {
+							pkg = item.launchIntent.getComponent().getPackageName();
+						} else if (!TextUtils.isEmpty(item.launchIntent.getPackage())) {
+							pkg = item.launchIntent.getPackage();
+						}
+					}
+					boolean isFrozen = (pkg != null && NokiaFreezeManager.getInstance(requireContext()).isAppFrozen(pkg));
+
+					FrameLayout iconContainer = new FrameLayout(requireContext());
+					iconContainer.setLayoutParams(new LinearLayout.LayoutParams(
+							NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 36)));
+
 					ImageView iv = new ImageView(requireContext());
-					iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 36)));
+					iv.setLayoutParams(new FrameLayout.LayoutParams(
+							FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 					if (item.icon != null) {
 						// 关闭缩放过滤：S60 图标为 nodpi 位图，最近邻缩放更锐利、契合复古风格，
 						// 避免 36dp 内降采样发虚（API 19 尤其明显）；真实应用图标密度感知，影响甚微。
@@ -547,11 +587,11 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 							&& item.launchIntent.getComponent() != null) {
 						// S60 未命中 → 先显示占位，后台线程加载真实系统图标（内存/磁盘缓存复用）
 						iv.setImageDrawable(getPlaceholderIcon());
-						final String pkg = item.launchIntent.getComponent().getPackageName();
+						final String asyncPkg = item.launchIntent.getComponent().getPackageName();
 						final ComponentName cn = item.launchIntent.getComponent();
 						final NokiaAppItem fItem = item;
-						iv.setTag(pkg);
-						NokiaAppIconCache.loadAsync(requireContext(), pkg, cn, (loadedPkg, d) -> {
+						iv.setTag(asyncPkg);
+						NokiaAppIconCache.loadAsync(requireContext(), asyncPkg, cn, (loadedPkg, d) -> {
 							// 校验：cell 仍属于该应用（翻页/重建后 tag 变化则跳过），
 							// 且该应用未被 S60 图标替换（S60 优先级高于系统图标）
 							if (d == null || iv.getTag() == null
@@ -562,6 +602,29 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 							fItem.icon = d;
 						});
 					}
+					iconContainer.addView(iv);
+
+					// 若已被系统级真实冻结，用冰块效果全包围覆盖图标；若仅在名单中未冻结，显示雪花角标
+					boolean isRealFrozen = NokiaFreezeManager.getInstance(requireContext()).isAppFrozen(pkg);
+					boolean isInList = NokiaFreezeManager.getInstance(requireContext()).isInFreezeList(pkg);
+					if (isRealFrozen) {
+						ImageView iceCover = new ImageView(requireContext());
+						FrameLayout.LayoutParams coverLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+						coverLp.gravity = Gravity.CENTER;
+						iceCover.setLayoutParams(coverLp);
+						iceCover.setScaleType(ImageView.ScaleType.FIT_CENTER);
+						iceCover.setImageResource(R.drawable.ic_nokia_ice_block_cover);
+						iconContainer.addView(iceCover);
+					} else if (isInList) {
+						ImageView badgeIv = new ImageView(requireContext());
+						int badgeSize = NokiaDimens.dp(getResources(), 14);
+						FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(badgeSize, badgeSize);
+						badgeLp.gravity = Gravity.BOTTOM | Gravity.END;
+						badgeIv.setLayoutParams(badgeLp);
+						badgeIv.setImageResource(R.drawable.ic_nokia_ice_badge);
+						iconContainer.addView(badgeIv);
+					}
+
 					TextView tv = new TextView(requireContext());
 					tv.setLayoutParams(new LinearLayout.LayoutParams(
 							LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -571,7 +634,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 					tv.setSingleLine(true);
 					tv.setEllipsize(TextUtils.TruncateAt.END);
 					tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
-					cell.addView(iv);
+					cell.addView(iconContainer);
 					cell.addView(tv);
 
 					final int fpos = pos;
@@ -774,7 +837,20 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			((NokiaDesktopActivity) requireActivity()).openDesktopSettings();
 			return true;
 		}
+		// 原生应用（带 launchIntent）
 		if (item.launchIntent != null) {
+			String pkg = null;
+			if (item.launchIntent.getComponent() != null) {
+				pkg = item.launchIntent.getComponent().getPackageName();
+			} else if (!TextUtils.isEmpty(item.launchIntent.getPackage())) {
+				pkg = item.launchIntent.getPackage();
+			}
+
+			if (pkg != null && NokiaFreezeManager.getInstance(requireContext()).isAppFrozen(pkg)) {
+				NokiaFreezeManager.getInstance(requireContext()).unfreezeAndLaunch(item.launchIntent, pkg, item.label);
+				return true;
+			}
+
 			try {
 				startActivity(item.launchIntent);
 				NokiaLog.i("Menu", "启动应用 " + item.label);
@@ -819,6 +895,46 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		final String pkg = resolvedPkg;
 		NokiaLog.i("Menu", "弹出选项菜单: " + item.label + " pkg=" + pkg);
 		List<NokiaOptionsDialog.OptionItem> options = new ArrayList<>();
+
+		// 冻结 / 移出冻结列表选项
+		boolean inFreezeList = NokiaFreezeManager.getInstance(requireContext()).isInFreezeList(pkg);
+		boolean isFrozen = NokiaFreezeManager.getInstance(requireContext()).isAppFrozen(pkg);
+		if (inFreezeList) {
+			if (isFrozen) {
+				options.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_freeze,
+						"解冻应用", true, false, () -> {
+					NokiaFreezeManager.getInstance(requireContext()).unfreezeApp(pkg, (success, msg) -> {
+						if (isAdded()) {
+							Toast.makeText(requireContext(), success ? ("已解冻: " + item.label) : ("解冻失败: " + msg), Toast.LENGTH_SHORT).show();
+							buildCurrentPage();
+						}
+					});
+				}));
+			} else {
+				options.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_freeze,
+						"立即冻结", true, false, () -> {
+					NokiaFreezeManager.getInstance(requireContext()).freezeApp(pkg, (success, msg) -> {
+						if (isAdded()) {
+							Toast.makeText(requireContext(), success ? ("已冻结: " + item.label) : ("冻结失败: " + msg), Toast.LENGTH_SHORT).show();
+							buildCurrentPage();
+						}
+					});
+				}));
+			}
+			options.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_close_clear_cancel,
+					"移出冻结列表", true, false, () -> {
+				NokiaFreezeManager.getInstance(requireContext()).removeFromFreezeList(pkg);
+				Toast.makeText(requireContext(), "已移出冻结列表", Toast.LENGTH_SHORT).show();
+				buildCurrentPage();
+			}));
+		} else {
+			options.add(new NokiaOptionsDialog.OptionItem(R.drawable.ic_nokia_freeze,
+					"加入冻结列表", true, false, () -> {
+				NokiaFreezeManager.getInstance(requireContext()).addToFreezeList(pkg);
+				Toast.makeText(requireContext(), "已加入冻结列表", Toast.LENGTH_SHORT).show();
+				buildCurrentPage();
+			}));
+		}
 		options.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
 				"卸载", true, false, () -> {
 			NokiaLog.i("Menu", "选项菜单-卸载: " + item.label + " pkg=" + pkg);

@@ -63,6 +63,9 @@ public class NokiaQuickToggleManager {
 				return isHotspotOn(context);
 			case NokiaQuickToggleItem.TYPE_SAVER:
 				return isSaverOn(context);
+			case NokiaQuickToggleItem.TYPE_FREEZE:
+			case NokiaQuickToggleItem.TYPE_UNFREEZE:
+				return false; // 一键冻结 / 一键解冻为瞬态动作
 			default:
 				return false;
 		}
@@ -105,6 +108,12 @@ public class NokiaQuickToggleManager {
 				break;
 			case NokiaQuickToggleItem.TYPE_SAVER:
 				toggleSaver(context, targetOn);
+				break;
+			case NokiaQuickToggleItem.TYPE_FREEZE:
+				toggleFreezeAll(context);
+				break;
+			case NokiaQuickToggleItem.TYPE_UNFREEZE:
+				toggleUnfreezeAll(context);
 				break;
 		}
 	}
@@ -666,6 +675,20 @@ public class NokiaQuickToggleManager {
 				openSettings(context, Settings.ACTION_BATTERY_SAVER_SETTINGS);
 			}
 		}).start();
+	}
+
+	// ==================== 13. 一键冻结 / 一键解冻 ====================
+
+	public static void toggleFreezeAll(final Context context) {
+		if (context == null) return;
+		final Context appCtx = context.getApplicationContext();
+		NokiaFreezeManager.getInstance(appCtx).freezeAll(null);
+	}
+
+	public static void toggleUnfreezeAll(final Context context) {
+		if (context == null) return;
+		final Context appCtx = context.getApplicationContext();
+		NokiaFreezeManager.getInstance(appCtx).unfreezeAll(null);
 	}
 
 	// ==================== 辅助方法 ====================

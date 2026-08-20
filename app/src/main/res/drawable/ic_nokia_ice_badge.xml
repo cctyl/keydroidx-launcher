@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="12dp"
+    android:height="12dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 浅蓝/冰蓝色半透明背景圆圈 -->
+    <path
+        android:fillColor="#E00288D1"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2z" />
+    <!-- 白色雪花主体 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,11h-3.34l2.59,-2.59l-1.41,-1.41L14.41,10.41l-1.41,-1.41V4h-2v5L8.41,6.41L7,7.83L9.59,10.41l-1.41,1.41H4v2h4.17l-1.41,1.41l1.41,1.41l2.83,-2.83l1.41,1.41V20h2v-5l2.59,2.59l1.41,-1.41l-2.59,-2.59l1.41,-1.41H20V11z" />
+</vector>

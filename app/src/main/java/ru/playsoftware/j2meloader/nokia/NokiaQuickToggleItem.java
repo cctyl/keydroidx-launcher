@@ -16,7 +16,9 @@ public class NokiaQuickToggleItem {
 	public static final int TYPE_LOCATION = 9;    // 位置信息 / GPS
 	public static final int TYPE_HOTSPOT = 10;    // 个人热点
 	public static final int TYPE_SAVER = 11;      // 省电模式
-	public static final int TYPE_COUNT = 12;
+	public static final int TYPE_FREEZE = 12;     // 一键冻结
+	public static final int TYPE_UNFREEZE = 13;   // 一键解冻
+	public static final int TYPE_COUNT = 14;
 
 	public final int type;
 	public final String id;
@@ -46,6 +48,8 @@ public class NokiaQuickToggleItem {
 			case TYPE_LOCATION: return NokiaIcons.TOGGLE_LOCATION;
 			case TYPE_HOTSPOT: return NokiaIcons.TOGGLE_HOTSPOT;
 			case TYPE_SAVER: return NokiaIcons.TOGGLE_SAVER;
+			case TYPE_FREEZE: return NokiaIcons.TOGGLE_FREEZE;
+			case TYPE_UNFREEZE: return NokiaIcons.TOGGLE_UNFREEZE;
 			default: return NokiaIcons.ICON_SETTINGS;
 		}
 	}
@@ -76,6 +80,10 @@ public class NokiaQuickToggleItem {
 				return new NokiaQuickToggleItem(TYPE_HOTSPOT, "hotspot", "个人热点", R.drawable.ic_nokia_hotspot, false);
 			case TYPE_SAVER:
 				return new NokiaQuickToggleItem(TYPE_SAVER, "saver", "省电模式", R.drawable.ic_nokia_saver, false);
+			case TYPE_FREEZE:
+				return new NokiaQuickToggleItem(TYPE_FREEZE, "freeze", "一键冻结", R.drawable.ic_nokia_freeze, true);
+			case TYPE_UNFREEZE:
+				return new NokiaQuickToggleItem(TYPE_UNFREEZE, "unfreeze", "一键解冻", R.drawable.ic_nokia_unfreeze, false);
 			default:
 				return new NokiaQuickToggleItem(type, "unknown_" + type, "未知开关", R.drawable.ic_nokia_settings, false);
 		}

@@ -61,13 +61,9 @@ public class MsgProcess implements Runnable {
                         handleInterceptorStop();
                     } else if (cmd.startsWith(CMD_PAGE_STATE)) {
                         handlePageState(cmd.substring(CMD_PAGE_STATE.length()));
-                    } else if (cmd.startsWith(PREFIX_SILENT)) {
-                        String real = cmd.substring(PREFIX_SILENT.length()).trim();
-                        Log.i(TAG, "exec(silent): " + real);
-                        ShellUtil.execute(real);
                     } else {
-                        // 兼容旧客户端：未加前缀的命令按静默处理
-                        Log.i(TAG, "exec(silent/legacy): " + cmd);
+                        // 普通 Shell 命令（静默执行）
+                        Log.i(TAG, "exec(silent): " + cmd);
                         ShellUtil.execute(cmd);
                     }
                 }
