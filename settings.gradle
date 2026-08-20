@@ -19,5 +19,5 @@ dependencyResolutionManagement {
         maven { url "https://jitpack.io" }
     }
 }
-rootProject.name = "J2ME Loader"
+rootProject.name = "KeydroidXLauncher"
 include ':app', ':dexlib', ':mini_shizuku'

@@ -41,7 +41,7 @@ for p in io.github.cctyl.nokia io.github.cctyl.nokia.debug; do
 done
 
 if [ -z "$PACKAGE" ]; then
-    echo "MiniShizuku: 未找到应用，请先安装 Nokia Launcher"
+    echo "MiniShizuku: 未找到应用，请先安装 KeydroidXLauncher"
     exit 1
 fi
 

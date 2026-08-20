@@ -64,13 +64,13 @@ adb shell am start -n io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nok
 ```
 .\gradlew.bat assembleOpenRelease -x lint
 ```
-需要 `-x lint` 参数，是因为本工程的 Lint 配置在出错时会中断构建。输出位置：`app/build/outputs/apk/open/release/J2ME_Loader-*-open-release.apk`。需要 `keystore.properties` + `app/test.jks`（已存在）以及 NDK 22.1.7171670。
+需要 `-x lint` 参数，是因为本工程的 Lint 配置在出错时会中断构建。输出位置：`app/build/outputs/apk/open/release/KeydroidXLauncher-*-open-release.apk`。需要 `keystore.properties` + `app/test.jks`（已存在）以及 NDK 22.1.7171670。
 
 构建 debug APK：
 ```
 .\gradlew.bat assembleOpenDebug
 ```
-Debug 变体会追加 `.debug` 到 applicationId 后缀，并以 `JL-Debug` 名义运行。使用 `installOpenDebug` 把产物推送到已连接的设备/模拟器。
+Debug 变体会追加 `.debug` 到 applicationId 后缀，并以 `KeydroidXLauncher Debug` 名义运行。使用 `installOpenDebug` 把产物推送到已连接的设备/模拟器。
 
 一键构建 + 安装 debug（快速开发循环；改动构建配置前请先阅读文档）：
 ```

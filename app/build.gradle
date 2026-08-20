@@ -15,7 +15,7 @@ android {
         targetSdk TARGET_SDK
         versionCode 102
         versionName "1.2"
-        resValue 'string', 'app_name', 'KeydroidX'
+        resValue 'string', 'app_name', 'KeydroidXLauncher'
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -127,9 +127,9 @@ android {
 
     applicationVariants.all {
         if (buildType.name == 'debug' && flavorName != 'midlet') {
-            resValue 'string', 'app_name', 'KeydroidX Debug'
+            resValue 'string', 'app_name', 'KeydroidXLauncher Debug'
         }
-        def baseName = flavorName == 'midlet' ? "${midletArchivesBaseName}-" : "KeydroidX-"
+        def baseName = flavorName == 'midlet' ? "${midletArchivesBaseName}-" : "KeydroidXLauncher-"
         outputs.all {
             outputFileName = "${baseName}${versionName}-${dirName}-${buildType.name}.apk"
                     .replaceAll('--+', '-').replaceAll(' +', '_')
