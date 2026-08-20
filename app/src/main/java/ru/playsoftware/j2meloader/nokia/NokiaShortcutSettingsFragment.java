@@ -119,13 +119,8 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 		PackageManager pm = requireActivity().getPackageManager();
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
-		int flags = 0;
-		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-			flags = PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS;
-		} else {
-			flags = PackageManager.GET_UNINSTALLED_PACKAGES | PackageManager.GET_DISABLED_COMPONENTS;
-		}
-		List<ResolveInfo> list = pm.queryIntentActivities(main, flags);
+		// flags=0：只枚举已安装且已启用的可启动组件，不混入停用组件/卸载残留包
+		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
 		String selfPkg = requireActivity().getPackageName();
 		// 同包多 launcher 入口（如系统相机/短信注册了多个 Activity）按包名去重，只保留第一个，
 		// 避免同一个应用在快捷栏列表里出现多项、被重复加入快捷栏
@@ -134,11 +129,20 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 		for (ResolveInfo ri : list) {
 			ActivityInfo ai = ri.activityInfo;
 			if (ai == null) continue;
+			boolean appEnabled = ai.applicationInfo == null || ai.applicationInfo.enabled;
+			boolean compEnabled = ai.enabled && appEnabled;
+			NokiaLog.d("ShortcutSettings", "枚举入口: " + ai.packageName + "/" + ai.name
+					+ " enabled=" + compEnabled
+					+ " (componentEnabled=" + ai.enabled
+					+ ", appEnabled=" + appEnabled + ")");
 			if (ai.packageName.equals(selfPkg)) continue;
 			if (!seenPkgs.add(ai.packageName)) {
-				NokiaLog.d("ShortcutSettings", "同包多入口去重: " + ai.packageName + "/" + ai.name);
+				NokiaLog.d("ShortcutSettings", "同包多入口去重: " + ai.packageName + "/" + ai.name
+						+ " (首个入口已选中)");
 				continue;
 			}
+			NokiaLog.d("ShortcutSettings", "选中入口: " + ai.packageName + "/" + ai.name
+					+ " enabled=" + compEnabled);
 
 			CharSequence labelCs = ri.loadLabel(pm);
 			String label = (labelCs != null && labelCs.length() > 0) ? labelCs.toString() : ai.name;

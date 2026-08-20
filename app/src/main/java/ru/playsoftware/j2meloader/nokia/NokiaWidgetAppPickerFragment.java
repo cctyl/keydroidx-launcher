@@ -353,19 +353,18 @@ public class NokiaWidgetAppPickerFragment extends NokiaPageFragment {
 		PackageManager pm = requireActivity().getPackageManager();
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
-		int queryFlags = 0;
-		if (Build.VERSION.SDK_INT >= 24) {
-			queryFlags |= PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS;
-		} else {
-			queryFlags |= PackageManager.GET_UNINSTALLED_PACKAGES | PackageManager.GET_DISABLED_COMPONENTS;
-		}
-		List<ResolveInfo> list = pm.queryIntentActivities(main, queryFlags);
+		// flags=0：只枚举已安装且已启用的可启动组件，不混入停用组件/卸载残留包
+		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
 		String selfPkg = requireActivity().getPackageName();
+		// 同包多 launcher 入口（如系统相机/短信、MT 的主题别名）按包名去重，
+		// 避免同一应用出现多个图标
+		Set<String> seenPkgs = new HashSet<>();
 
 		for (ResolveInfo ri : list) {
 			ActivityInfo ai = ri.activityInfo;
 			if (ai == null) continue;
 			if (ai.packageName.equals(selfPkg)) continue;
+			if (!seenPkgs.add(ai.packageName)) continue;
 			CharSequence labelCs = ri.loadLabel(pm);
 			String label = (labelCs != null && labelCs.length() > 0) ? labelCs.toString() : ai.name;
 			Drawable icon = ri.loadIcon(pm);

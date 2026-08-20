@@ -1197,7 +1197,25 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 				if (intent != null) {
 					intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-					startActivity(intent);
+					try {
+						startActivity(intent);
+					} catch (Exception e) {
+						// 兜底：缓存的组件可能因应用更新/停用而失效，
+						// 重新解析当前「启用」入口再试，成功则修正存储的 intentUri
+						if (pkg != null) {
+							Intent retry = ctx.getPackageManager().getLaunchIntentForPackage(pkg);
+							if (retry != null) {
+								retry.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+								startActivity(retry);
+								app.intentUri = retry.toUri(Intent.URI_INTENT_SCHEME);
+								settingsStorage.setShortcutApps(new ArrayList<>(shortcutApps));
+								NokiaLog.i("Desktop", "快捷栏应用兜底启动成功并修正缓存: "
+										+ app.label + " -> " + retry.getComponent());
+								return;
+							}
+						}
+						throw e;
+					}
 					return;
 				}
 			}

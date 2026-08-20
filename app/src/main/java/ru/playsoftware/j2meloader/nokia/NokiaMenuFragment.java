@@ -285,14 +285,12 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
-		int queryFlags = 0;
-		if (Build.VERSION.SDK_INT >= 24) {
-			queryFlags |= PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS;
-		} else {
-			queryFlags |= PackageManager.GET_UNINSTALLED_PACKAGES | PackageManager.GET_DISABLED_COMPONENTS;
-		}
-		List<ResolveInfo> list = pm.queryIntentActivities(main, queryFlags);
-		NokiaLog.i("Menu", "queryIntentActivities (含已停用/冻结) 返回 " + list.size() + " 个可启动应用");
+		// flags=0：只返回「已安装 + 已启用 + 可启动」的组件（与系统桌面一致）。
+		// 绝不混入 MATCH_DISABLED_COMPONENTS / MATCH_UNINSTALLED_PACKAGES——
+		// 那会把停用组件（主题别名、CarPlay 入口）与卸载残留包也枚举进来，
+		// 导致启动报 ActivityNotFoundException 或同包出现多个图标。
+		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
+		NokiaLog.i("Menu", "queryIntentActivities (仅启用应用) 返回 " + list.size() + " 个可启动应用");
 
 		// 先全部放入临时池 pool，后续再按固定槽位提取
 		List<NokiaAppItem> pool = new ArrayList<>();
@@ -304,15 +302,24 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 				NokiaLog.w("Menu", "跳过空 activityInfo");
 				continue;
 			}
+			boolean appEnabled = ai.applicationInfo == null || ai.applicationInfo.enabled;
+			boolean compEnabled = ai.enabled && appEnabled;
+			NokiaLog.d("Menu", "枚举入口: " + ai.packageName + "/" + ai.name
+					+ " enabled=" + compEnabled
+					+ " (componentEnabled=" + ai.enabled
+					+ ", appEnabled=" + appEnabled + ")");
 			if (ai.packageName.equals(selfPkg)) {
 				NokiaLog.d("Menu", "排除桌面自身: " + ai.packageName);
 				continue;
 			}
 			// 过滤同应用的多图标入口（如部分应用提供的多种样式启动别名）
 			if (!seenPackages.add(ai.packageName)) {
-				NokiaLog.d("Menu", "跳过重复包名入口: " + ai.packageName + "/" + ai.name);
+				NokiaLog.d("Menu", "跳过重复包名入口: " + ai.packageName + "/" + ai.name
+						+ " (首个入口已选中)");
 				continue;
 			}
+			NokiaLog.d("Menu", "选中入口: " + ai.packageName + "/" + ai.name
+					+ " enabled=" + compEnabled);
 			// 应用名走进程内缓存，避免每次进入功能表重复 loadLabel IPC
 			String labelKey = ai.packageName + "/" + ai.name;
 			String label = labelCache.get(labelKey);
@@ -374,6 +381,9 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 				NokiaLog.d("Menu", "固定槽位 " + (s + 1) + " 未命中，跳过（候选包均不存在）");
 			}
 		}
+
+		// 被冻结（包级停用）的应用单独枚举后追加，不混入正常应用枚举，保证列表确定性
+		addFrozenApps(pool, host, pm, selfPkg);
 
 		// 最终顺序：固定槽位 → 应用程序 → 按键绑定 → 桌面设置 → S60匹配应用（按名） → 未匹配应用（按名）
 		items.addAll(pinned);
@@ -494,6 +504,81 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * 单独枚举「被冻结」（包级停用）的应用并追加到 pool。
+	 * <p>
+	 * 正常应用枚举已用 flags=0（只含启用组件），冻结应用因包被停用而不会出现；
+	 * 此处用 MATCH_DISABLED_COMPONENTS 单独查，且只保留「包停用、但组件本身启用」的项——
+	 * 包被冻结但组件可用，解冻后即可正常启动。组件本身也停用的（如 STK 的 StkMain、
+	 * MT 的 NoBg/Dark 主题别名、抖音 CarPlay 入口）无法启动，一律跳过，绝不混入列表。
+	 */
+	private void addFrozenApps(List<NokiaAppItem> pool, NokiaDesktopActivity host,
+			PackageManager pm, String selfPkg) {
+		Intent main = new Intent(Intent.ACTION_MAIN, null);
+		main.addCategory(Intent.CATEGORY_LAUNCHER);
+		int flags = 0;
+		if (Build.VERSION.SDK_INT >= 24) {
+			flags |= PackageManager.MATCH_DISABLED_COMPONENTS;
+		} else {
+			flags |= PackageManager.GET_DISABLED_COMPONENTS;
+		}
+		List<ResolveInfo> list;
+		try {
+			list = pm.queryIntentActivities(main, flags);
+		} catch (Exception e) {
+			NokiaLog.e("Menu", "冻结应用枚举失败", e);
+			return;
+		}
+
+		int added = 0;
+		for (ResolveInfo ri : list) {
+			ActivityInfo ai = ri.activityInfo;
+			if (ai == null || ai.applicationInfo == null) continue;
+			// 只保留「包停用 + 组件启用」的项（解冻后可正常启动）；跳过自身
+			if (ai.applicationInfo.enabled) continue;
+			if (!ai.enabled) continue;
+			if (ai.packageName.equals(selfPkg)) continue;
+			if (poolContainsPackage(pool, ai.packageName)) continue;
+
+			String labelKey = ai.packageName + "/" + ai.name;
+			String label = labelCache.get(labelKey);
+			if (label == null) {
+				CharSequence labelCs = ri.loadLabel(pm);
+				label = (labelCs != null && labelCs.length() > 0) ? labelCs.toString() : ai.name;
+				labelCache.put(labelKey, label);
+			}
+			Intent launch = new Intent(Intent.ACTION_MAIN);
+			launch.addCategory(Intent.CATEGORY_LAUNCHER);
+			launch.setClassName(ai.packageName, ai.name);
+			launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+			NokiaAppItem item = new NokiaAppItem(NokiaAppItem.TYPE_APP, label, null, launch);
+			item.s60IconResId = NokiaS60IconMap.getIcon(ai.packageName, label);
+			if (item.s60IconResId != 0) {
+				Drawable s60Icon = safeDrawable(host, item.s60IconResId);
+				if (s60Icon != null) {
+					item.icon = s60Icon;
+				}
+			}
+			pool.add(item);
+			added++;
+			NokiaLog.d("Menu", "追加冻结应用: " + ai.packageName + "/" + ai.name);
+		}
+		if (added > 0) {
+			NokiaLog.i("Menu", "追加冻结应用 " + added + " 个");
+		}
+	}
+
+	/** pool 中是否已存在指定包名的应用项 */
+	private static boolean poolContainsPackage(List<NokiaAppItem> pool, String pkg) {
+		for (NokiaAppItem app : pool) {
+			if (app.launchIntent != null && app.launchIntent.getComponent() != null
+					&& pkg.equals(app.launchIntent.getComponent().getPackageName())) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private Drawable safeDrawable(NokiaDesktopActivity host, int resId) {
@@ -865,11 +950,30 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 				startActivity(item.launchIntent);
 				NokiaLog.i("Menu", "启动应用 " + item.label);
 			} catch (Exception e) {
+				// 兜底：组件可能因应用更新/状态变化而失效，重新解析当前启用入口再试一次
+				if (pkg != null && retryWithLaunchIntent(pkg, item.label)) {
+					return true;
+				}
 				NokiaLog.e("Menu", "启动失败 " + item.label, e);
 			}
 			return true;
 		}
 		return false;
+	}
+
+	/** 启动失败兜底：用 getLaunchIntentForPackage 重新解析启用入口并启动。 */
+	private boolean retryWithLaunchIntent(String pkg, String label) {
+		try {
+			Intent retry = requireActivity().getPackageManager().getLaunchIntentForPackage(pkg);
+			if (retry == null) return false;
+			retry.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+			startActivity(retry);
+			NokiaLog.i("Menu", "兜底启动成功 " + label + " -> " + retry.getComponent());
+			return true;
+		} catch (Exception e2) {
+			NokiaLog.e("Menu", "兜底启动也失败 " + label, e2);
+			return false;
+		}
 	}
 
 	@Override

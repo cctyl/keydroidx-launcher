@@ -194,15 +194,22 @@ public class NokiaFreezeManager {
 			mainHandler.post(() -> {
 				notifyStateChanged();
 				try {
-					Intent intent = launchIntent;
-					if (intent == null && targetPkg != null) {
-						PackageManager pm = appContext.getPackageManager();
+					Intent intent = null;
+					PackageManager pm = appContext.getPackageManager();
+					// 解冻后重新解析当前「启用」的启动入口，绝不复用传入的 intent——
+					// 传入组件可能指向停用的主题别名/失效入口（如 MT 的 MainNoBgIcon），
+					// 解冻包不会连带启用该组件，直接启动会抛 ActivityNotFoundException。
+					if (targetPkg != null) {
 						intent = pm.getLaunchIntentForPackage(targetPkg);
+					}
+					if (intent == null) {
+						intent = launchIntent;
 					}
 					if (intent != null) {
 						intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 						appContext.startActivity(intent);
-						NokiaLog.i(TAG, "成功解冻并启动: " + (label != null ? label : targetPkg));
+						NokiaLog.i(TAG, "成功解冻并启动: " + (label != null ? label : targetPkg)
+								+ " -> " + intent.getComponent());
 					} else {
 						Toast.makeText(appContext, "无法启动应用", Toast.LENGTH_SHORT).show();
 					}
