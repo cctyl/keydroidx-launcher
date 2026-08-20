@@ -227,9 +227,10 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 	// ---- 分辨率自适应：计算每页行数 ----
 
 	/**
-	 * 用实测 midPanel 像素高度反推行数空间预算，不再使用估算公式。
-	 * 公式：availDesign = panelH(px) / density / scale；rows = (availDesign - TITLE_H_DP) / ROW_H_DP
-	 * 行高在 buildCurrentPage() 中按 availDesign 均分拉伸。
+	 * 用实测 midPanel 像素高度反推行数空间预算，保证文字绝不被裁切。
+	 * 公式：availDesign = panelH(px) / density / scale；
+	 * 行数：先扣除标题与内边距预留，再按单元格真实物理最小需求（图标36 + 上下padding 8 + 文字高度 + 边框缓冲）
+	 * 计算能容纳的最大行数。若均分后单行高度不足以容纳文字，则自动减 1 行，确保剩余行均匀美观拉伸。
 	 */
 	private void computeRowsPerPage() {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
@@ -244,20 +245,28 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		float fontScale = NokiaSettingsStorage.getFontScale(requireContext());
 		if (fontScale <= 0f) fontScale = 1.0f;
 
-		// 字体变大时，每行应用名需要更多垂直空间与行间距，动态增加行高预算
-		// 基准行高 58dp，随 fontScale 动态扩展，例如 fontScale=1.5x 时 rowHDp ≈ 66dp，fontScale=2.0x 时 rowHDp ≈ 74dp
-		float dynamicRowHDp = ROW_H_DP + Math.max(0f, (fontScale - 1.0f) * 16f);
-
 		// 实测反推：可用设计高度 = panelH(px) / density / scale
 		float availDesign = panelH / density / scale;
-		int rows = (int) ((availDesign - TITLE_H_DP) / dynamicRowHDp);
+		// 标题栏(22dp) + appGrid上下padding(4dp)
+		float availForGrid = Math.max(0f, availDesign - TITLE_H_DP - 4f);
+
+		// 单行单元格所需的绝对最小安全设计高度：
+		// 36dp (图标) + 8dp (上下Cell padding 4+4) + 文字行高预算 (9sp * fontScale * 1.6f + 2dp) + 2dp (选中高亮边框余量)
+		float textHeightBudget = Math.max(16f, (9f * fontScale * 1.6f) + 2f);
+		float minSafeRowHDp = 36f + 8f + textHeightBudget + 2f;
+
+		int rows = (int) (availForGrid / minSafeRowHDp);
+		// 安全兜底校验：如果均分后的高度小于最小安全高度，减去一行
+		while (rows > 2 && (availForGrid / rows) < minSafeRowHDp) {
+			rows--;
+		}
 		rows = Math.max(2, Math.min(8, rows));
 		rowsPerPage = rows;
 		perPage = COLS * rowsPerPage;
 		NokiaLog.i("Menu", "computeRowsPerPage: rowsPerPage=" + rowsPerPage
 				+ " panelH=" + panelH + " scale=" + scale + " density=" + density
-				+ " fontScale=" + fontScale + " dynamicRowHDp=" + dynamicRowHDp
-				+ " availDesign=" + availDesign);
+				+ " fontScale=" + fontScale + " minSafeRowHDp=" + minSafeRowHDp
+				+ " availDesign=" + availDesign + " availForGrid=" + availForGrid);
 	}
 
 	// ---- 加载真实安卓应用 ----
@@ -526,13 +535,14 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			pageItems[i] = null;
 		}
 
-		// 行高均分拉伸：按实测可用空间计算每行实际 dp 高度，而非写死 58dp
+		// 行高均分拉伸：按实测可用空间计算每行实际 dp 高度
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		int panelH = host.getMidPanelHeight();
 		float density = getResources().getDisplayMetrics().density;
 		float scale = host.getScale();
 		float availDesign = panelH > 0 ? (panelH / density / scale) : 262f;
-		float rowActualDp = rowsPerPage > 0 ? (availDesign - TITLE_H_DP) / rowsPerPage : ROW_H_DP;
+		float availForGrid = Math.max(0f, availDesign - TITLE_H_DP - 4f);
+		float rowActualDp = rowsPerPage > 0 ? (availForGrid / rowsPerPage) : ROW_H_DP;
 		int rowH = NokiaDimens.dp(getResources(), Math.round(rowActualDp));
 
 		int start = pageIndex * perPage;
