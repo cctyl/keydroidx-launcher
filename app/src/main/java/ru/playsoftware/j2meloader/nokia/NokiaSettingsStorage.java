@@ -427,6 +427,7 @@ public class NokiaSettingsStorage {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putString(KEY_FONT_ID, fontId).apply();
 		NokiaFontManager.invalidate();
+		notifySettingsChanged(ctx);
 		NokiaLog.i("SettingsStorage", "setFontId: " + fontId);
 	}
 
@@ -443,6 +444,7 @@ public class NokiaSettingsStorage {
 	public static void setFontScale(Context ctx, float scale) {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putFloat(KEY_FONT_SCALE, scale).apply();
+		notifySettingsChanged(ctx);
 		NokiaLog.i("SettingsStorage", "setFontScale: " + scale);
 	}
 
@@ -528,6 +530,19 @@ public class NokiaSettingsStorage {
 
 	public void setThemeId(String themeId) {
 		prefs.edit().putString(KEY_WALLPAPER, themeId).apply();
+		notifySettingsChanged(context);
 		NokiaLog.i("SettingsStorage", "setThemeId: " + themeId);
+	}
+
+	private static void notifySettingsChanged(Context ctx) {
+		if (ctx == null) return;
+		try {
+			Uri uri = Uri.parse("content://" + ctx.getPackageName() + ".keyprovider/settings");
+			ctx.getContentResolver().notifyChange(uri, null);
+			Uri keysUri = Uri.parse("content://" + ctx.getPackageName() + ".keyprovider/keys");
+			ctx.getContentResolver().notifyChange(keysUri, null);
+		} catch (Exception e) {
+			NokiaLog.w("SettingsStorage", "notifySettingsChanged failed: " + e.getMessage());
+		}
 	}
 }
