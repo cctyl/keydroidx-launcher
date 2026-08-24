@@ -265,6 +265,39 @@ items.add(new NokiaOptionsDialog.OptionItem(
   ```
 - 计算出正确的 `itemTop` 与 `itemBottom` 后，再与 `scrollView.getScrollY()` 及 `scrollView.getHeight()` 比较执行 `scrollView.smoothScrollTo(0, ...)`。
 
+#### 焦点滚动：ScrollView 内焦点移动必须调用 requestFocus()（重要）
+
+**当焦点在 ScrollView 内移动时（如 `onAction(UP/DOWN)` 切换 focusIdx），`applyFocus()` 中必须调用 `layout.requestFocus()`，否则 ScrollView 不会自动滚动到焦点项。**
+
+背景与原因：
+
+1. `applyFocus()` 只改了背景色和文字颜色，没告诉 ScrollView "把这个 View 滚到可视区"，所以 ScrollView 根本不知道要滚动。
+2. 焦点移到下方不可见的条目时，用户按方向键只会看到 focusIdx 变化（高亮移动），但视图原地不动，表现为“按方向键没反应 / 无法滚到下方内容”。
+3. `requestFocus()` 会触发 ScrollView 的 `computeScrollDeltaToScrollChild` 逻辑，自动计算并平滑滚动到焦点项可见。
+
+正确做法：
+
+```kotlin
+// applyFocus() 中，对焦点项调用 requestFocus()
+private fun applyFocus() {
+    focusItems.forEachIndexed { i, layout ->
+        if (i == focusIdx) {
+            layout.setBackgroundResource(R.drawable.bg_focused_item)
+            setChildTextColors(layout, true)
+            layout.requestFocus()    // ← 必须加这一行
+        } else {
+            layout.setBackgroundColor(Color.TRANSPARENT)
+            setChildTextColors(layout, false)
+        }
+    }
+}
+```
+
+注意事项：
+- `requestFocus()` 要求目标 View **可聚焦**（`android:focusable="true"`），否则静默忽略。布局中每个条目根布局必须设置 `android:focusable="true"`。
+- 对于动态创建的条目（`LayoutInflater.inflate`），同样需要在条目布局根 View 上声明 `android:focusable="true"`。
+- 禁止用 `smoothScrollTo` 手动计算滚动位置代替 `requestFocus()`（`requestFocus()` 由 ScrollView 内部高度优化，代码更简洁）。
+
 ### 尺寸规范
 
 #### 统一尺寸工具类 NokiaDimens
