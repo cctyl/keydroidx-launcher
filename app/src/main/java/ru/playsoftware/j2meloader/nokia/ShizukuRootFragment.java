@@ -11,6 +11,11 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -180,6 +185,13 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 					}
 				}
 				final boolean ok = online;
+				// On failure, reuse the root shell to dump diagnostics into NokiaLog.
+				// app_process is backgrounded with &, so exit code 0 only means the root
+				// shell dispatched the command - not that the server actually came up.
+				// The real failure reason lives in minishizuku.log / logcat MiniShizuku.
+				if (!ok) {
+					collectActivationDiagnostics();
+				}
 				NokiaLog.i("ShizukuRoot", "root 激活结果: online=" + online + " execOk=true");
 				mainHandler.post(new Runnable() {
 					@Override
@@ -288,6 +300,81 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 		} catch (Exception e) {
 			NokiaLog.e("ShizukuRoot", "root 启动服务端异常", e);
 			return false;
+		}
+	}
+
+	/**
+	 * On activation failure, collect diagnostics via the already-acquired root shell and
+	 * write them into {@link NokiaLog}, so 'root command ran but server never came online'
+	 * cases are self-documenting (user just sends back the app log).
+	 *
+	 * <ul>
+	 *   <li>{@code getenforce} - SELinux mode;</li>
+	 *   <li>list {@code app_process} procs (is the server alive? as which uid?);</li>
+	 *   <li>{@code tail /data/local/tmp/minishizuku.log} - where the startup script
+	 *       redirects stdout/stderr; app_process crash stacks / SELinux denials land here;</li>
+	 *   <li>{@code logcat -s MiniShizuku} - server-side Log output (Java-level errors).</li>
+	 * </ul>
+	 * Silently records a single line if the root shell is unavailable; never throws.
+	 */
+	private void collectActivationDiagnostics() {
+		try {
+			Shell rootShell = ensureRootShell();
+			if (rootShell == null) {
+				NokiaLog.w("ShizukuRoot", "diagnostics skipped: no root shell");
+				return;
+			}
+			String diag = "echo '=== getenforce ==='; getenforce 2>&1; "
+					+ "echo '=== app_process procs ==='; "
+					+ "(ps -A 2>/dev/null || ps) | grep -i app_process; "
+					+ "echo '=== minishizuku.log (tail 80) ==='; "
+					+ "tail -n 80 /data/local/tmp/minishizuku.log 2>&1; "
+					+ "echo '=== logcat MiniShizuku (tail 60) ==='; "
+					+ "logcat -d -t 500 -s MiniShizuku:* 2>&1 | tail -n 60; "
+					+ "echo '=== END ==='";
+			Shell.Result r = rootShell.newJob().add(diag).exec();
+			StringBuilder sb = new StringBuilder();
+			for (String l : r.getOut()) {
+				sb.append(l).append('\n');
+			}
+			NokiaLog.e("ShizukuRoot", "root activation failure diagnostics (exit " + r.getCode() + "):\n" + sb.toString());
+			// 保险起见多一步：把整个 minishizuku.log 原样复制到 NokiaLog 日志目录，
+			// 保留完整原始文件（内联 tail 只截了 80 行），方便事后排查 / 寄回。
+			copyMinishizukuLog(rootShell);
+		} catch (Exception e) {
+			NokiaLog.e("ShizukuRoot", "collect diagnostics failed", e);
+		}
+	}
+
+	/**
+	 * 通过 root shell 把 {@code /data/local/tmp/minishizuku.log} 复制到 {@link NokiaLog}
+	 * 日志目录下，文件名带时间戳。app 自身 uid 无权读 /data/local/tmp，必须经 root；
+	 * 目标目录是 app 私有外存（/sdcard/Android/data/&lt;pkg&gt;/log），root 可写，
+	 * 复制后用户/我们可直接取走完整原始日志。
+	 */
+	private void copyMinishizukuLog(Shell rootShell) {
+		File logDir = NokiaLog.getLogDir();
+		if (logDir == null) {
+			NokiaLog.w("ShizukuRoot", "copy minishizuku.log skipped: NokiaLog dir not initialized");
+			return;
+		}
+		String name = "minishizuku_"
+				+ new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date())
+				+ ".log";
+		File target = new File(logDir, name);
+		String targetPath = target.getAbsolutePath().replace(" ", "\\ ");
+		String cmd = "cp -f /data/local/tmp/minishizuku.log " + targetPath + " 2>&1; "
+				+ "ls -l " + targetPath + " 2>&1";
+		try {
+			Shell.Result r = rootShell.newJob().add(cmd).exec();
+			StringBuilder sb = new StringBuilder();
+			for (String l : r.getOut()) {
+				sb.append(l).append('\n');
+			}
+			NokiaLog.i("ShizukuRoot", "copied minishizuku.log -> " + target.getAbsolutePath()
+					+ " (exit " + r.getCode() + ") " + sb.toString().trim());
+		} catch (Exception e) {
+			NokiaLog.e("ShizukuRoot", "copy minishizuku.log failed", e);
 		}
 	}
 
