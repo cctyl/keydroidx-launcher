@@ -47,6 +47,7 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 			NokiaWidgetItem.TYPE_BG_MANAGER,
 			NokiaWidgetItem.TYPE_IP,
 			NokiaWidgetItem.TYPE_QS_TILE,
+			NokiaWidgetItem.TYPE_MUSIC_PLAYER,
 	};
 
 	private LinearLayout listLayout;

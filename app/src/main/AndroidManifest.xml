@@ -57,6 +57,8 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- 音乐播放器：桌面组件跨进程读取播放态并打开播放页 -->
+        <package android:name="io.github.cctyl.keydroidx.music" />
     </queries>
 
     <uses-feature android:name="android.hardware.microphone" android:required="false" />

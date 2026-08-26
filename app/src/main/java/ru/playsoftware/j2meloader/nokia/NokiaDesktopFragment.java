@@ -11,6 +11,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.database.ContentObserver;
+import android.database.Cursor;
 import android.graphics.drawable.Drawable;
 import android.location.LocationManager;
 import android.media.AudioManager;
@@ -86,6 +88,23 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	/** 快捷栏第一个焦点索引 */
 	private static final int SHORTCUT_FIRST = 0;
+
+	/** 音乐播放器播放状态 ContentProvider URI（跨进程读取当前播放态） */
+	private static final Uri MUSIC_PLAYBACK_URI =
+			Uri.parse("content://io.github.cctyl.keydroidx.music.playback/state");
+	/** 音乐播放器包名 / 播放详情 Activity（组件确认键打开） */
+	private static final String MUSIC_PKG = "io.github.cctyl.keydroidx.music";
+	private static final String MUSIC_PLAYER_ACTIVITY = "io.github.cctyl.keydroidx.music.ui.MusicPlayerActivity";
+
+	/** 音乐组件刷新：ContentObserver 监听播放状态变化，仅重建音乐组件行 */
+	private final ContentObserver musicPlaybackObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
+		@Override
+		public void onChange(boolean selfChange, Uri uri) {
+			if (!isAdded() || getView() == null) return;
+			rebuildMusicWidgetRowOnly(getView());
+		}
+	};
+	private boolean musicObserverRegistered = false;
 
 	// ---- 便捷开关栏 ----
 
@@ -174,6 +193,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			loadShortcutBarAsync(view);
 			rebuildWidgetArea(view);
 		}
+		// 注册音乐播放状态 ContentObserver（监听播放态变化刷新组件行）
+		registerMusicPlaybackObserver();
 		// 异步刷新后台管理组件计数（countBackgroundProcesses 含 shizuku TCP，不能在主线程）
 		refreshBgCountAsync();
 		// 更新开关栏状态
@@ -187,6 +208,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	public void onPause() {
 		super.onPause();
 		unregisterToggleReceiver();
+		unregisterMusicPlaybackObserver();
 	}
 
 	/** 后台线程计算后台进程数并回主线程刷新组件区（避免主线程 TCP 卡顿）。 */
@@ -296,6 +318,52 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	}
 
 	// ---- 组件区动态渲染 ----
+
+	/** 注册音乐播放状态 ContentObserver（重复注册防抖）。 */
+	private void registerMusicPlaybackObserver() {
+		Context ctx = getContext();
+		if (ctx == null || musicObserverRegistered) return;
+		try {
+			ctx.getContentResolver().registerContentObserver(MUSIC_PLAYBACK_URI, false, musicPlaybackObserver);
+			musicObserverRegistered = true;
+			NokiaLog.i("Desktop", "已注册音乐播放状态 ContentObserver");
+		} catch (Exception e) {
+			NokiaLog.w("Desktop", "注册音乐播放 ContentObserver 失败: " + e.getMessage());
+		}
+	}
+
+	private void unregisterMusicPlaybackObserver() {
+		Context ctx = getContext();
+		if (ctx == null || !musicObserverRegistered) return;
+		try {
+			ctx.getContentResolver().unregisterContentObserver(musicPlaybackObserver);
+		} catch (Exception ignored) {}
+		musicObserverRegistered = false;
+	}
+
+	/** 仅重建音乐播放组件行（保持焦点不丢失、其余组件不动）。 */
+	private void rebuildMusicWidgetRowOnly(View view) {
+		LinearLayout notifArea = view.findViewById(R.id.notificationArea);
+		if (notifArea == null) return;
+		for (int i = 0; i < widgetItems.size(); i++) {
+			if (widgetItems.get(i).type == NokiaWidgetItem.TYPE_MUSIC_PLAYER) {
+				// 仅替换该行 View，并更新焦点列表对应项
+				View newRow = createWidgetRow(widgetItems.get(i));
+				if (newRow == null) continue;
+				View oldRow = notifArea.getChildAt(i);
+				if (oldRow != null) {
+					notifArea.removeViewAt(i);
+				}
+				notifArea.addView(newRow, i);
+				int focusIdx = shortcutCount + i;
+				if (focusIdx >= 0 && focusIdx < focusTargets.size()) {
+					focusTargets.set(focusIdx, newRow);
+				}
+				NokiaLog.i("Desktop", "音乐播放组件行已刷新");
+				break;
+			}
+		}
+	}
 
 	/** 重建桌面组件区：从 NokiaWidgetStorage 读取所有组件，动态创建行 View。 */
 	private void rebuildWidgetArea(View view) {
@@ -534,6 +602,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				return createWidgetRowWithProgress(item, 0xFF4FC3F7, getMemoryUsedRatio(), getMemoryPercentText());
 			case NokiaWidgetItem.TYPE_STORAGE:
 				return createWidgetRowWithProgress(item, 0xFF81C784, getStorageUsedRatio(), getStoragePercentText());
+			case NokiaWidgetItem.TYPE_MUSIC_PLAYER:
+				return createMusicPlayerWidgetRow(item);
 			default:
 				return createWidgetRowSimple(item);
 		}
@@ -618,6 +688,148 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 		setupWidgetRowClick(row, item);
 		return row;
+	}
+
+	/** 创建「正在播放」音乐组件行（图标 + 歌名/歌手 + 歌词 + 进度条）。 */
+	private View createMusicPlayerWidgetRow(NokiaWidgetItem item) {
+		Context ctx = getContext();
+		if (ctx == null) return null;
+		LinearLayout row = new LinearLayout(ctx);
+		row.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		row.setOrientation(LinearLayout.HORIZONTAL);
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.setPadding(NokiaDimens.dp(getResources(), 2), NokiaDimens.dp(getResources(), 3),
+				NokiaDimens.dp(getResources(), 2), NokiaDimens.dp(getResources(), 3));
+		row.setFocusable(true);
+		row.setClickable(true);
+
+		// 图标（Material Icons 音符）
+		ImageView iv = new ImageView(ctx);
+		int iconSize = NokiaDimens.dp(getResources(), 20);
+		iv.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
+		iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+		iv.setImageDrawable(NokiaIcons.get(ctx, NokiaIcons.ICON_MUSIC_NOTE, 0xFFFFFFFF, 20));
+		iv.setPadding(0, 0, NokiaDimens.dp(getResources(), 5), 0);
+		row.addView(iv);
+
+		// 右侧：两行文本（歌名/歌手 + 歌词）
+		LinearLayout textCol = new LinearLayout(ctx);
+		textCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+		textCol.setOrientation(LinearLayout.VERTICAL);
+
+		// 第一行：歌名 - 歌手 / 播放状态
+		TextView titleTv = new TextView(ctx);
+		titleTv.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		titleTv.setTextColor(0xFFFFFFFF);
+		NokiaDimens.textSize(titleTv, 11);
+		titleTv.setSingleLine(true);
+		titleTv.setEllipsize(TextUtils.TruncateAt.END);
+		titleTv.setText(getMusicWidgetTitle());
+		textCol.addView(titleTv);
+
+		// 第二行：当前歌词 / 占位
+		TextView lyricTv = new TextView(ctx);
+		lyricTv.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		lyricTv.setTextColor(0xFFAAAAAA);
+		NokiaDimens.textSize(lyricTv, 9);
+		lyricTv.setSingleLine(true);
+		lyricTv.setEllipsize(TextUtils.TruncateAt.END);
+		lyricTv.setText(getMusicWidgetLyric());
+		textCol.addView(lyricTv);
+
+		// 进度条（横条）
+		int barW = NokiaDimens.dp(getResources(), 40);
+		int barH = NokiaDimens.dp(getResources(), 3);
+		LinearLayout barTrack = new LinearLayout(ctx);
+		barTrack.setLayoutParams(new LinearLayout.LayoutParams(barW, barH));
+		barTrack.setOrientation(LinearLayout.HORIZONTAL);
+		android.graphics.drawable.GradientDrawable trackBg = new android.graphics.drawable.GradientDrawable();
+		trackBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+		trackBg.setCornerRadius(NokiaDimens.dp(getResources(), 1));
+		trackBg.setColor(0x26FFFFFF);
+		barTrack.setBackground(trackBg);
+
+		View barFill = new View(ctx);
+		int fillW = Math.max(0, (int) (getMusicWidgetProgressRatio() * barW));
+		barFill.setLayoutParams(new LinearLayout.LayoutParams(fillW, barH));
+		android.graphics.drawable.GradientDrawable fillBg = new android.graphics.drawable.GradientDrawable();
+		fillBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+		fillBg.setCornerRadius(NokiaDimens.dp(getResources(), 1));
+		fillBg.setColor(0xFF4FC3F7);
+		barFill.setBackground(fillBg);
+		barTrack.addView(barFill);
+
+		LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(barW, barH);
+		barLp.leftMargin = NokiaDimens.dp(getResources(), 5);
+		barTrack.setLayoutParams(barLp);
+		row.addView(textCol);
+		row.addView(barTrack);
+
+		setupWidgetRowClick(row, item);
+		return row;
+	}
+
+	/** 音乐组件：读取播放状态 Provider 的歌名/歌手标题。 */
+	private String getMusicWidgetTitle() {
+		Cursor c = null;
+		try {
+			c = getContext().getContentResolver().query(
+					MUSIC_PLAYBACK_URI, null, null, null, null);
+			if (c != null && c.moveToFirst()) {
+				String title = c.getString(c.getColumnIndexOrThrow("title"));
+				String artist = c.getString(c.getColumnIndexOrThrow("artist"));
+				boolean playing = c.getInt(c.getColumnIndexOrThrow("is_playing")) == 1;
+				if (title != null && !title.isEmpty()) {
+					String label = title + (artist != null && !artist.isEmpty() ? " - " + artist : "");
+					return playing ? label : label + "  [暂停]";
+				}
+			}
+		} catch (Exception e) {
+			NokiaLog.w("Desktop", "读取音乐播放状态失败: " + e.getMessage());
+		} finally {
+			if (c != null) c.close();
+		}
+		return "音乐播放器（未播放）";
+	}
+
+	/** 音乐组件：读取当前歌词行。 */
+	private String getMusicWidgetLyric() {
+		Cursor c = null;
+		try {
+			c = getContext().getContentResolver().query(
+					MUSIC_PLAYBACK_URI, null, null, null, null);
+			if (c != null && c.moveToFirst()) {
+				String lyric = c.getString(c.getColumnIndexOrThrow("lyric_text"));
+				if (lyric != null && !lyric.isEmpty()) return lyric;
+			}
+		} catch (Exception e) {
+			NokiaLog.w("Desktop", "读取音乐歌词失败: " + e.getMessage());
+		} finally {
+			if (c != null) c.close();
+		}
+		return "暂无歌词";
+	}
+
+	/** 音乐组件：读取播放进度比例 [0,1]。 */
+	private float getMusicWidgetProgressRatio() {
+		Cursor c = null;
+		try {
+			c = getContext().getContentResolver().query(
+					MUSIC_PLAYBACK_URI, null, null, null, null);
+			if (c != null && c.moveToFirst()) {
+				long pos = c.getLong(c.getColumnIndexOrThrow("position_ms"));
+				long dur = c.getLong(c.getColumnIndexOrThrow("duration_ms"));
+				if (dur > 0) return (float) pos / dur;
+			}
+		} catch (Exception e) {
+			NokiaLog.w("Desktop", "读取音乐进度失败: " + e.getMessage());
+		} finally {
+			if (c != null) c.close();
+		}
+		return 0f;
 	}
 
 	/** 创建无进度条的普通组件行（日历/使用时长/可编辑类型）。 */
@@ -954,9 +1166,31 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					triggerQsTile(item);
 				});
 				break;
+			case NokiaWidgetItem.TYPE_MUSIC_PLAYER:
+				// 正在播放组件：确认/点击进入音乐播放详情页
+				row.setOnClickListener(v -> {
+					launchMusicPlayer();
+				});
+				break;
 			default:
 				// 内存、存储、使用时长等不可编辑类型无点击行为
 				break;
+		}
+	}
+
+	/** 启动音乐播放器详情页（音乐播放器未安装时提示）。 */
+	private void launchMusicPlayer() {
+		Context ctx = getContext();
+		if (ctx == null) return;
+		NokiaLog.i("Desktop", "正在播放组件点击：打开音乐播放器");
+		try {
+			Intent intent = new Intent(Intent.ACTION_MAIN);
+			intent.setClassName(MUSIC_PKG, MUSIC_PLAYER_ACTIVITY);
+			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			startActivity(intent);
+		} catch (Exception e) {
+			NokiaLog.e("Desktop", "打开音乐播放器失败", e);
+			Toast.makeText(ctx, "未安装音乐播放器", Toast.LENGTH_SHORT).show();
 		}
 	}
 

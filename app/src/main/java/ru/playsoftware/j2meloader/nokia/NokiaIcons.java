@@ -59,6 +59,7 @@ public final class NokiaIcons {
 	public static final String ICON_POWER = "\ue8ac";         // power_settings_new (电源键)
 	public static final String ICON_TERMINAL = "\ue869";      // terminal / code (mini_shizuku)
 	public static final String ICON_PLAY = "\ue037";          // play_arrow (启动/运行)
+	public static final String ICON_MUSIC_NOTE = "\ue405";    // music_note (正在播放组件)
 	public static final String ICON_SORT = "\ue8d2";          // swap_vert / sort (排序)
 	public static final String ICON_SHIELD = "\ue8e8";        // verified_user / shield (保护)
 
