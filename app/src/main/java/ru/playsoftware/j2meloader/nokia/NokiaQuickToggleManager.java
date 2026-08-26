@@ -65,7 +65,8 @@ public class NokiaQuickToggleManager {
 				return isSaverOn(context);
 			case NokiaQuickToggleItem.TYPE_FREEZE:
 			case NokiaQuickToggleItem.TYPE_UNFREEZE:
-				return false; // 一键冻结 / 一键解冻为瞬态动作
+			case NokiaQuickToggleItem.TYPE_CLEAN_BG:
+				return false; // 一键冻结 / 一键解冻 / 清理后台为瞬态动作
 			default:
 				return false;
 		}
@@ -114,6 +115,9 @@ public class NokiaQuickToggleManager {
 				break;
 			case NokiaQuickToggleItem.TYPE_UNFREEZE:
 				toggleUnfreezeAll(context);
+				break;
+			case NokiaQuickToggleItem.TYPE_CLEAN_BG:
+				toggleCleanBg(context);
 				break;
 		}
 	}
@@ -689,6 +693,28 @@ public class NokiaQuickToggleManager {
 		if (context == null) return;
 		final Context appCtx = context.getApplicationContext();
 		NokiaFreezeManager.getInstance(appCtx).unfreezeAll(null);
+	}
+
+	// ==================== 14. 清理后台 ====================
+
+	public static void toggleCleanBg(final Context context) {
+		if (context == null) return;
+		final Context appCtx = context.getApplicationContext();
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				NokiaSettingsStorage storage = new NokiaSettingsStorage(appCtx);
+				java.util.Set<String> protectedSet = storage.getProtectedPackages();
+				final int clearedCount = NokiaBgManagerHelper.clearBackgroundTasks(appCtx, protectedSet);
+				new Handler(Looper.getMainLooper()).post(new Runnable() {
+					@Override
+					public void run() {
+						String msg = clearedCount > 0 ? ("已清理 " + clearedCount + " 个后台应用") : "后台已是最新，无须清理";
+						Toast.makeText(appCtx, msg, Toast.LENGTH_SHORT).show();
+					}
+				});
+			}
+		}).start();
 	}
 
 	// ==================== 辅助方法 ====================

@@ -18,7 +18,8 @@ public class NokiaQuickToggleItem {
 	public static final int TYPE_SAVER = 11;      // 省电模式
 	public static final int TYPE_FREEZE = 12;     // 一键冻结
 	public static final int TYPE_UNFREEZE = 13;   // 一键解冻
-	public static final int TYPE_COUNT = 14;
+	public static final int TYPE_CLEAN_BG = 14;   // 清理后台
+	public static final int TYPE_COUNT = 15;
 
 	public final int type;
 	public final String id;
@@ -50,6 +51,7 @@ public class NokiaQuickToggleItem {
 			case TYPE_SAVER: return NokiaIcons.TOGGLE_SAVER;
 			case TYPE_FREEZE: return NokiaIcons.TOGGLE_FREEZE;
 			case TYPE_UNFREEZE: return NokiaIcons.TOGGLE_UNFREEZE;
+			case TYPE_CLEAN_BG: return NokiaIcons.TOGGLE_CLEAN_BG;
 			default: return NokiaIcons.ICON_SETTINGS;
 		}
 	}
@@ -84,6 +86,8 @@ public class NokiaQuickToggleItem {
 				return new NokiaQuickToggleItem(TYPE_FREEZE, "freeze", "一键冻结", R.drawable.ic_nokia_freeze, true);
 			case TYPE_UNFREEZE:
 				return new NokiaQuickToggleItem(TYPE_UNFREEZE, "unfreeze", "一键解冻", R.drawable.ic_nokia_unfreeze, false);
+			case TYPE_CLEAN_BG:
+				return new NokiaQuickToggleItem(TYPE_CLEAN_BG, "clean_bg", "清理后台", R.drawable.ic_nokia_clean, true);
 			default:
 				return new NokiaQuickToggleItem(type, "unknown_" + type, "未知开关", R.drawable.ic_nokia_settings, false);
 		}

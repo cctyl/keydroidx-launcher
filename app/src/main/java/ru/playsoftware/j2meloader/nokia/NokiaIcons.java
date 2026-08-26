@@ -77,6 +77,7 @@ public final class NokiaIcons {
 	public static final String TOGGLE_LOCK = "\ue897";        // lock
 	public static final String TOGGLE_FREEZE = "\ueb3b";      // ac_unit (一键冻结)
 	public static final String TOGGLE_UNFREEZE = "\ue430";    // wb_sunny (太阳/解冻/融化)
+	public static final String TOGGLE_CLEAN_BG = "\ue0b8";    // clear_all (清理后台)
 
 	// 常用系统/交互图标
 	public static final String ICON_CHECK = "\ue5ca";         // check (对勾)
