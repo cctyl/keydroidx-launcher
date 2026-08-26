@@ -523,7 +523,7 @@ public class MicroActivity extends AppCompatActivity {
 	}
 
 	/**
-	 * 三菜单「后台运行」：显式回原键桌面（不设默认桌面也能回到本桌面），
+	 * 三菜单「后台运行」：回到原键桌面（默认桌面时走原生桌面动画，非默认桌面平滑切回），
 	 * 本 Activity 保持 stopped（singleTask 不销毁），jar 转挂机，下次进入走 R1 快速续跑。
 	 */
 	private void runInBackground() {
@@ -534,20 +534,7 @@ public class MicroActivity extends AppCompatActivity {
 			NokiaMidletKeepAliveService.start(this, appName,
 					MidletThread.getRunningAppPath(), nokiaKeyCodes);
 		}
-		Intent intent = new Intent(Intent.ACTION_MAIN);
-		intent.addCategory(Intent.CATEGORY_HOME);
-		intent.setClassName(this, NokiaDesktopActivity.class.getName());
-		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-		try {
-			startActivity(intent);
-		} catch (Exception e) {
-			// 极端场景（桌面不可用）：退回隐式 HOME
-			Log.e("MicroActivity", "runInBackground: 显式回桌面失败", e);
-			Intent fallback = new Intent(Intent.ACTION_MAIN);
-			fallback.addCategory(Intent.CATEGORY_HOME);
-			fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			startActivity(fallback);
-		}
+		ru.playsoftware.j2meloader.nokia.NokiaLauncherUtils.navigateToHome(this);
 	}
 
 	@Override

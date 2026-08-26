@@ -548,18 +548,15 @@ static int send_via_socket(const char* msg) {
 }
 
 // 注入：回原键桌面主界面。
-// 优先 socket 直连（~2ms，App 内 startActivity），失败时 fallback 到 am start（异步）。
+// 优先 socket 直连（~2ms，App 内处理，若为默认桌面发送隐式 HOME Intent），失败时 fallback 到隐式/显式 am start。
 static void inject_go_home() {
     if (send_via_socket("HOME\n") == 0) {
         LOGI("go home: sent via socket (fast path)");
     } else {
         LOGW("go home: socket failed, fallback to am start");
-        if (!ensure_nokia_package()) return;
         char cmd[400];
-        snprintf(cmd, sizeof(cmd),
-                 "am start -a android.intent.action.MAIN -c android.intent.category.HOME "
-                 "-n %s/%s -f 0x14000000",
-                 nokia_package, NOKIA_ACTIVITY);
+        // 隐式 HOME 回桌面，走系统原生转场动画
+        snprintf(cmd, sizeof(cmd), "am start -a android.intent.action.MAIN -c android.intent.category.HOME");
         inject_async(cmd);
     }
 }

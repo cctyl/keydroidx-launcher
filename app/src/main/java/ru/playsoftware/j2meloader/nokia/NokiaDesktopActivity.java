@@ -106,35 +106,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	 * 用于「桌面设置 → 默认桌面设置」文案状态展示与向导结束后的询问。
 	 */
 	public boolean isDefaultLauncher() {
-		try {
-			// API 29+：以 RoleManager 的 ROLE_HOME holder 为准，最准确。
-			// （部分系统用 resolveActivity 判断会把 HOME 解析到 android 包而非本应用，
-			//   导致“已设默认却误判为 false”的问题，这里优先走 RoleManager。）
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-				RoleManager roleManager = (RoleManager) getSystemService(ROLE_SERVICE);
-				if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
-					boolean isRole = roleManager.isRoleHeld(RoleManager.ROLE_HOME);
-					NokiaLog.i("Desktop", "isDefaultLauncher(RoleManager)=" + isRole);
-					return isRole;
-				}
-			}
-			// 旧版本：用 resolveActivity 解析默认 Home 包名与本包比较。
-			Intent homeIntent = new Intent(Intent.ACTION_MAIN);
-			homeIntent.addCategory(Intent.CATEGORY_HOME);
-			homeIntent.addCategory(Intent.CATEGORY_DEFAULT);
-			ResolveInfo resolve = getPackageManager().resolveActivity(homeIntent,
-					PackageManager.MATCH_DEFAULT_ONLY);
-			if (resolve == null || resolve.activityInfo == null) {
-				return false;
-			}
-			String curPkg = resolve.activityInfo.packageName;
-			boolean isDefault = getPackageName().equals(curPkg);
-			NokiaLog.i("Desktop", "isDefaultLauncher=" + isDefault + " resolvedPkg=" + curPkg);
-			return isDefault;
-		} catch (Exception e) {
-			NokiaLog.e("Desktop", "isDefaultLauncher 判断失败", e);
-			return false;
-		}
+		return NokiaLauncherUtils.isDefaultLauncher(this);
 	}
 
 	/**

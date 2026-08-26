@@ -109,29 +109,11 @@ public class NokiaLockServer {
 				NokiaLockScreen.lock(context);
 				break;
 			case "HOME":
-				goHome();
+				NokiaLauncherUtils.navigateToHome(context);
 				break;
 			default:
 				NokiaLog.w(TAG, "未知指令: " + cmd);
 				break;
-		}
-	}
-
-	/**
-	 * 拉起原键桌面到前台并回到待机屏。
-	 * 用 HOME intent + 显式组件：触发 onNewIntent → goHome() → 清空返回栈 → 待机屏。
-	 * FLAG_ACTIVITY_NEW_TASK | CLEAR_TOP 确保已在栈顶时也触发 onNewIntent。
-	 */
-	private void goHome() {
-		Intent intent = new Intent(Intent.ACTION_MAIN);
-		intent.addCategory(Intent.CATEGORY_HOME);
-		intent.setClassName(context, NOKIA_ACTIVITY);
-		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-		try {
-			context.startActivity(intent);
-			NokiaLog.i(TAG, "HOME: startActivity 已发送");
-		} catch (Exception e) {
-			NokiaLog.e(TAG, "HOME: startActivity 失败", e);
 		}
 	}
 }

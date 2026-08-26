@@ -148,12 +148,16 @@
         </activity>
         <activity
             android:name=".nokia.NokiaDesktopActivity"
-            android:exported="true"
-            android:theme="@style/AppTheme.NoActionBar"
-            android:launchMode="singleTask"
+            android:clearTaskOnLaunch="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:resumeWhilePausing="true"
+            android:screenOrientation="portrait"
             android:stateNotNeeded="true"
-            android:screenOrientation="portrait">
+            android:taskAffinity=""
+            android:theme="@style/Theme.NokiaDesktop">
             <!-- 标准 Launcher 过滤器（包含 DEFAULT） -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

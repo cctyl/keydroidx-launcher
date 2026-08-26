@@ -104,4 +104,28 @@
     <style name="TextViewVendor" parent="Widget.AppCompat.TextView" >
     </style>
 
+    <!-- 诺基亚桌面专用主题：屏蔽普通 Activity 的从右往左滑入/挤压动画，作为底层桌面自然显露 -->
+    <style name="Theme.NokiaDesktop" parent="AppTheme.NoActionBar">
+        <item name="android:windowAnimationStyle">@style/Animation.NokiaDesktop</item>
+    </style>
+
+    <style name="Animation.NokiaDesktop" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@null</item>
+        <item name="android:activityOpenExitAnimation">@null</item>
+        <item name="android:activityCloseEnterAnimation">@null</item>
+        <item name="android:activityCloseExitAnimation">@null</item>
+        <item name="android:taskOpenEnterAnimation">@null</item>
+        <item name="android:taskOpenExitAnimation">@null</item>
+        <item name="android:taskCloseEnterAnimation">@null</item>
+        <item name="android:taskCloseExitAnimation">@null</item>
+        <item name="android:taskToFrontEnterAnimation">@null</item>
+        <item name="android:taskToFrontExitAnimation">@null</item>
+        <item name="android:taskToBackEnterAnimation">@null</item>
+        <item name="android:taskToBackExitAnimation">@null</item>
+        <item name="android:wallpaperOpenEnterAnimation">@null</item>
+        <item name="android:wallpaperOpenExitAnimation">@null</item>
+        <item name="android:wallpaperCloseEnterAnimation">@null</item>
+        <item name="android:wallpaperCloseExitAnimation">@null</item>
+    </style>
+
 </resources>
