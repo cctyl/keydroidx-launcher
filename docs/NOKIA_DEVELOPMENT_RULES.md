@@ -93,6 +93,164 @@ items.add(new NokiaOptionsDialog.OptionItem(
 - 新增 / 修改任何按键分发、底部栏视觉反馈逻辑时，以「输入事件完整配对」为标准自查，而不是按某个机型打补丁。
 
 
+## 进入界面后首个方向键被吞规范（重要）
+
+**任何页面（纯按键驱动页、列表页、手写表单页等），进入界面或从桌面/子页面返回后，第一个方向键（UP / DOWN / LEFT / RIGHT / SELECT）必须 100% 立即生效；若出现「第一次按无效、第二次起才生效」的现象，根因是：窗口处于「无焦点视图（findFocus() == null）」状态，首个方向键被 Android 底层输入管道用于「退出触摸模式 + 寻找焦点目标」直接吞掉，根本无法传递到 `NokiaBaseActivity.dispatchKeyEvent → onAction`。**
+
+---
+
+### 一、Android 系统底层吞键机制深度剖析
+
+在 Android 系统的按键分发管道中（`ViewRootImpl.java` → `ViewPostImeInputStage.java`）：
+
+```java
+// ViewPostImeInputStage.processKeyEvent 核心管道逻辑
+if (mView.isInTouchMode()) {
+    if (isDirectional(keyCode) || isConfirm(keyCode)) {
+        boolean handled = ensureTouchMode(false); // 尝试退出触摸模式
+        if (handled) {
+            return FINISH_HANDLED; // 吞键！事件在此直接终结，不派发给 Activity
+        }
+    }
+}
+```
+
+当 `ensureTouchMode(false)` 执行 `leaveTouchMode()` 时：
+- **情况 A（已有 View 持有焦点）**：若 `mView.hasFocus() == true` 且当前持焦的 View 是 `isFocusable()` 的，`leaveTouchMode()` 会直接返回 **`false`** —— **按键绝不被吞，直接正常分发到 `Activity.dispatchKeyEvent`**。
+- **情况 B（没有任何 View 持有焦点，`findFocus() == null`）**：系统认为当前无持焦目标，触发 `restoreDefaultFocus()` 遍历整棵树寻找首个可聚焦 View，并返回 **`true`** —— **首个按键被系统当作“退出触摸模式并寻焦”的触发器直接拦截消耗**！直到第二次按下时，因系统已脱离 Touch Mode，事件才终于能到达 Activity。
+
+> **特征判断**：`*` / `#` / 左右软键不受影响（它们不是 Directional/Confirm 键，不触发 `ensureTouchMode` 吞键），**只有上下左右与确认键在第一次按下时无效，第二次才生效**。
+
+---
+
+### 二、历史演进与前三次修复方案复盘（保留与注释）
+
+在生态演进过程中，该问题经历了三次局部修补，虽然当时缓解了特定页面的症状，但因未从底层框架根治，导致在后续新页面中反复复现。
+
+#### 1. 历史方案一（2026-08 页面级补丁 · `MusicPlayerActivity`）
+```kotlin
+// 做法：在特定页面的根布局加属性并在 onInitViews 手动获焦
+val playerRoot = findViewById<View>(R.id.layout_player_root)
+playerRoot.requestFocus()
+playerRoot.post { playerRoot.requestFocus() }
+```
+```xml
+<LinearLayout android:id="@+id/layout_player_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:focusable="true"
+    android:focusableInTouchMode="true" ... >
+```
+> **【局限性注释】**：
+> 这是典型的业务页面局部修补。只保护了单个 Activity，新编写的 Activity（如设置页、反馈页）如果没有人肉照抄这套代码，问题必然在每一个新页面上重复爆发。
+
+#### 2. 历史方案二（2026-08 列表条目级补丁 · `MainActivity`「我的」Tab）
+```kotlin
+// 做法：在手写条目的 applyFocus() 里动态赋予 focusableInTouchMode
+private fun applyFocus() {
+    focusItems.forEachIndexed { i, layout ->
+        if (i == focusIdx) {
+            layout.setBackgroundResource(R.drawable.bg_focused_item)
+            setChildTextColors(layout, true)
+            layout.isFocusableInTouchMode = true  // 让 requestFocus 在 touch mode 下成功
+            layout.requestFocus()
+        } else { ... }
+    }
+}
+```
+> **【局限性注释】**：
+> 针对手写列表条目（非 `NokiaListPageFragment`）做了补丁，解决了 Tab 切换时的持焦问题。但由于仅在 `applyFocus()` 触发，对手写表单（如反馈页）或纯静态页面依旧无法自动覆盖。
+
+#### 3. 历史方案三（Commit `3d269a0` · 基类 DecorView 假修复）
+```java
+// NokiaBaseActivity.onCreate & onResume 当时的改动：
+View decor = getWindow() != null ? getWindow().getDecorView() : null;
+if (decor != null) {
+    decor.setFocusableInTouchMode(true);
+    decor.requestFocus();
+    decor.post(decor::requestFocus);
+}
+```
+> **【失效原因深度注释】**：
+> 1. **时序严重错位**：在 `onCreate` / `onResume` 执行时，View 树**尚未完成 Measure / Layout 测量布局**，Window 也**尚未获得系统窗口焦点（Window Focus）**，过早调用 `decor.requestFocus()` 无法建立真实持焦。
+> 2. **DecorView 是容器不是叶子**：`DecorView` 是 `FrameLayout`（ViewGroup）。在 Android 源码中，`ViewGroup.requestFocus()` 默认优先执行 `onRequestFocusInDescendants` 遍历子节点。如果子节点（如 5 行表单）均无 `focusableInTouchMode=true`，整棵树都拒收焦点；随后 Window Focus 建立时，DecorView 直接失焦，导致 `findFocus() == null` 再次出现。
+> 3. **ScrollView 中间容器干扰**：页面外层的 `ScrollView` 默认具有聚焦能力，在退出触摸模式时系统可能将焦点派发给 `ScrollView`，将方向键用于滚动，截断了向 Activity 的分发。
+
+---
+
+### 三、全新框架级根治方案（最终标准规范）
+
+为了彻底杜绝任何页面（无论是纯按键页、手写表单页、还是复杂交互页）再次出现首键被吞，实施**基类全局锚定 + 表单组件规范**的双重防御体系：
+
+#### 1. 基类层全局焦点锚定（`NokiaBaseActivity`）
+在所有页面的基类 `NokiaBaseActivity` 中内置持久焦点兜底机制，子类无需任何额外代码即可自动受益：
+
+- **`onWindowFocusChanged(boolean hasFocus)` 关键节点持焦**：
+  在 Activity 真正获得系统窗口焦点（`hasFocus == true`）的黄金时机执行检查：
+  ```java
+  @Override
+  public void onWindowFocusChanged(boolean hasFocus) {
+      super.onWindowFocusChanged(hasFocus);
+      if (hasFocus) {
+          ensureActiveFocus();
+      }
+  }
+  ```
+- **`ensureActiveFocus()` 自动唤醒**：
+  若当前 `getCurrentFocus() == null` 或持焦 View 无法在 Touch Mode 下持焦，基类自动激活 `contentContainer`（内容容器 `R.id.midPanel`），强制设置 `setFocusableInTouchMode(true)` 并立即 `requestFocus()` + `post` 队列兜底。
+  ```java
+  protected void ensureActiveFocus() {
+      View current = getCurrentFocus();
+      if (current == null || !current.isFocusableInTouchMode()) {
+          View target = contentContainer != null ? contentContainer : rootContainer;
+          if (target == null && getWindow() != null) {
+              target = getWindow().getDecorView();
+          }
+          if (target != null) {
+              target.setFocusable(true);
+              target.setFocusableInTouchMode(true);
+              target.requestFocus();
+              final View finalTarget = target;
+              target.post(() -> {
+                  if (getCurrentFocus() == null && finalTarget != null) {
+                      finalTarget.requestFocus();
+                  }
+              });
+          }
+      }
+  }
+  ```
+- **生命周期回退保证**：
+  在 `onResume()` 中统一调用 `ensureActiveFocus()`，确保无论从子页面返回、按 Home 键切回桌面再返回，均能瞬间恢复持焦。
+
+#### 2. 自定义表单 / 手写列表页面规范（以 `NokiaFeedbackActivity` 为标准范例）
+对于包含手写条目的页面：
+
+- **条目行声明原生持焦能力**：
+  每个可交互行在 XML 中必须显式声明：
+  ```xml
+  android:focusable="true"
+  android:focusableInTouchMode="true"
+  ```
+- **状态切换同步 View 焦点**：
+  在 `setFocusRow(row)` 或 `applyFocus()` 改变选中高亮背景色的同时，必须同步调用 `rows[row].requestFocus()`，使业务逻辑选中态与 Android 系统底层焦点树完全重合。
+- **滚动容器隔离**：
+  页面内非业务性 `ScrollView` 必须声明：
+  ```xml
+  android:focusable="false"
+  android:focusableInTouchMode="false"
+  ```
+  防止系统寻焦时将焦点误分配给 `ScrollView` 导致方向键被滚动事件消耗。
+
+---
+
+### 四、速查 Checklist 与关键认知
+
+- [ ] 新建任何 Activity 统一继承自 `NokiaBaseActivity`，自动享受基类 `onWindowFocusChanged` 全局焦点锚定保护。
+- [ ] 页面内若有外层包裹的 `ScrollView`，确保声明 `android:focusable="false"` + `android:focusableInTouchMode="false"`。
+- [ ] 手写表单/条目列表，条目根布局声明 `focusable="true"` + `focusableInTouchMode="true"`，并在切行时调用 `view.requestFocus()`。
+- [ ] 真机验证标准：冷启动进入页面、从子页面返回、切桌面再切回，**第 1 次按 `DPAD_UP/DOWN/SELECT` 必须立即在 Logcat 打印 `dispatchKeyEvent`**。
+
 ## 软键栏（底部左右菜单）禁止加高亮 / 焦点逻辑（重要）
 
 **底部软键栏的左右两个文字，就只是物理左 / 右软键的标签，禁止给它加任何"选中态高亮"或"焦点切换"机制。** 这是反复踩过的坑，务必遵守。
@@ -264,6 +422,37 @@ items.add(new NokiaOptionsDialog.OptionItem(
   int itemBottom = itemTop + item.getHeight();
   ```
 - 计算出正确的 `itemTop` 与 `itemBottom` 后，再与 `scrollView.getScrollY()` 及 `scrollView.getHeight()` 比较执行 `scrollView.smoothScrollTo(0, ...)`。
+
+#### 累加行高必须用 getTop()，禁止用 getHeight() 求和（血泪教训）
+
+**在 `ScrollView -> LinearLayout` 的逐行列表里计算「第 idx 行相对 ScrollView 内容顶部的 top」时，必须直接用 `childView.top`（`getTop()`，布局后真实位置），禁止用 `Σ getChildAt(i).height` 手动累加。**
+
+背景与原因（2026-08 实测 bug：正在播放页非全屏歌词滚动跟不上进度，定位永远在中间、手动滚到底会被下一个进度 tick 拉回中间）：
+
+1. `View.getHeight()` **不含 margin**。歌词行 `TextView` 普遍带 `topMargin` / `bottomMargin`（如各 3dp），用 `Σ getChildAt(i).height` 累加前 idx 行会**逐行漏算 margin**（idx=19 时漏算约 19×6dp ≈ 114px），末尾行算出的 top 比真实位置偏小一大截。
+2. 偏小的 top → `targetCenter = top + height/2` 偏小 → `scrollTarget = targetCenter - svH/2` 偏小 → `smoothScrollTo` 定位在**中间而非末尾**。表现就是「已播到末尾行、歌词还停在中间」。
+3. 因为下一行 `idx` 变化时 `onAction` 会重新 `smoothScrollTo` 到那个偏小的位置，**用户手动滚到底也会被下一个进度 tick 拉回中间**，看起来像「滚动被重置」。
+4. **全屏歌词页用的是 `tv.top`（正确），只有非全屏页用 `accumulateTop()` 求和（错误）**——同一套界面两种实现，错的那个踩坑，是典型的「半边对半边错」。
+
+正确做法：
+
+```kotlin
+sv.post {
+    // 直接取布局后的真实 top（含 marginTop + 容器 paddingTop），
+    // 不要手动累加 getHeight()
+    val targetTop = target.top
+    val targetCenter = targetTop + target.height / 2
+    val maxScroll = (container.height - sv.height).coerceAtLeast(0)
+    val scrollTarget = (targetCenter - sv.height / 2).coerceIn(0, maxScroll)
+    sv.smoothScrollTo(0, scrollTarget)
+}
+```
+
+要点：
+- **用 `view.top`（`getTop()`）**，它已经是 LinearLayout 布局后该子项相对父容器的真实坐标，自带 margin 与容器 padding；手写累加 `getHeight()` 既漏 margin 又易错。
+- **务必 clamp 上界**：`coerceIn(0, containerHeight - svHeight)`，末尾行 center 算出来可能超过 maxScroll，ScrollView 虽会自己 clamp，但显式 clamp 可让日志值与实际一致、便于排查。
+- 在 `sv.post { }` 里取 `view.top`：`post` 在下一轮 measure/layout 后执行，`getTop()` 已有效。
+- 已修复案例：`MusicPlayerActivity.updateLyricHighlight`（删掉 `accumulateTop()`，改用 `target.top` + `coerceIn`）。全屏 `updateFullscreenLyricHighlight` 本就用 `tv.top`，保持不变。
 
 #### 焦点滚动：ScrollView 内焦点移动必须调用 requestFocus()（重要）
 
@@ -441,6 +630,9 @@ public void fixMidContentHeight(final View content, final boolean topAlign) {
 - [ ] 网格页面行数走实测 panelH 反推（`getMidPanelHeight()`），非估算公式
 - [ ] 网格行高均分拉伸，非写死固定 dp
 - [ ] scale 走 `getScale()`（响应式模式下恒为 1.0f）
+- [ ] 纯按键驱动页（内容区无列表项）根视图已声明 `focusable` + `focusableInTouchMode` 并在初始化末尾 `requestFocus()`，页面内非业务 `ScrollView` 设为 `focusable="false"`（避免首个方向键被触摸模式吞掉，见「进入界面后首个方向键被吞规范」）
+- [ ] 手写焦点条目的列表页（非 `NokiaListPageFragment`）在 `applyFocus()` 里给当前焦点条目 `isFocusableInTouchMode = true` 再 `requestFocus()`（条目仅 `focusable="true"` 在 touch mode 下 `requestFocus()` 会失败）
+- [ ] 纯按键页与列表页都在 `onResume` 末尾重新 `requestFocus()`（或 `applyFocus()`）+ `post {}` 兑底；否则返回桌面再回来首键被吞
 - [ ] 在 **240×320（4a24ecf）** 和 **320×480（tcpip）** 两台真机上截图验证
 - [ ] 验证重点：原生矢量清晰无模糊、无横向溢出与右侧缝隙、图标保持 1:1 正比例、列表最后一项不被底栏遮挡、弹窗比例合适、网格行不裁切也不留白
 
