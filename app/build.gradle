@@ -187,6 +187,9 @@ dependencies {
     implementation 'androidx.preference:preference:1.2.0'
     implementation 'androidx.multidex:multidex:2.0.1'
 
+    // KeydroidX 生态基础库（联调期由 settings.gradle 的 includeBuild 以源码替换，见 docs/接入nokia-common实施计划.md）
+    implementation 'io.github.cctyl.nokia:nokia-common:1.0.0'
+
     // Networking && APIs
     implementation 'com.android.volley:volley:1.2.1'
     implementation 'com.google.code.gson:gson:2.9.0'

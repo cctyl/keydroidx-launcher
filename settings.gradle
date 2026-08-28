@@ -21,3 +21,8 @@ dependencyResolutionManagement {
 }
 rootProject.name = "KeydroidXLauncher"
 include ':app', ':dexlib', ':mini_shizuku'
+
+// 联调期：把 ../keydroidx-core 的 nokia-common 以源码形式替换同坐标依赖
+// （io.github.cctyl.nokia:nokia-common）。common 稳定后删除此行，回落 mavenLocal/远程坐标。
+// 详见 docs/接入nokia-common实施计划.md D2。
+includeBuild('../keydroidx-core')

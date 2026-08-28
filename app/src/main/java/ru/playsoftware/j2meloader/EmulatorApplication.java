@@ -42,6 +42,8 @@ import java.util.Arrays;
 
 import javax.microedition.util.ContextHolder;
 
+import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import ru.playsoftware.j2meloader.nokia.LauncherThemeProvider;
 import ru.playsoftware.j2meloader.nokia.NokiaLog;
 import ru.playsoftware.j2meloader.util.Constants;
 
@@ -67,6 +69,9 @@ public class EmulatorApplication extends Application {
 			MultiDex.install(this);
 		}
 		ContextHolder.setApplication(this);
+
+		// 向 common 注入桌面主题提供者（主进程与 :midlet 进程都需要，J2ME 层换用 common 主题后依赖此注入）
+		NokiaTheme.setThemeProvider(new LauncherThemeProvider());
 
 		// 主题与向量图设置必须早期同步完成（毫秒级，直接决定首帧主题），不能延迟
 		SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
