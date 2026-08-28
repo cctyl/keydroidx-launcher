@@ -3,9 +3,9 @@
     <dimen name="height_config_row">40dp</dimen>
 
     <!-- 诺基亚弹窗尺寸（集中管理，便于多分辨率统一调整） -->
-    <dimen name="nokia_dialog_title_bar_height">28dp</dimen>
-    <dimen name="nokia_dialog_title_text">14sp</dimen>
-    <dimen name="nokia_dialog_body_text">12sp</dimen>
+    <dimen name="nokia_dialog_title_bar_height">26dp</dimen>
+    <dimen name="nokia_dialog_title_text">11sp</dimen>
+    <dimen name="nokia_dialog_body_text">10sp</dimen>
     <dimen name="nokia_dialog_content_padding">10dp</dimen>
     <dimen name="nokia_dialog_icon_size">48dp</dimen>
 </resources>

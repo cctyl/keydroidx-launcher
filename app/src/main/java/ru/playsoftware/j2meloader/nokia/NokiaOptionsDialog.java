@@ -151,7 +151,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 		TextView titleView = dialog.findViewById(R.id.widgetOptionsTitle);
 		if (titleView != null) {
 			titleView.setText(title);
-			NokiaDimens.textSize(titleView, 14);
+			NokiaDimens.textSize(titleView, 11);
 		}
 
 		// 应用当前主题配色到选项弹窗的标题栏与底栏
@@ -234,19 +234,19 @@ public class NokiaOptionsDialog extends DialogFragment {
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					ViewGroup.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 40)));
-			row.setPadding(NokiaDimens.dp(getResources(), 14), 0, NokiaDimens.dp(getResources(), 14), 0);
+					ViewGroup.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 32)));
+			row.setPadding(NokiaDimens.dp(getResources(), 12), 0, NokiaDimens.dp(getResources(), 12), 0);
 
 			boolean hasIcon = false;
 			if (item.iconUnicode != null && !item.iconUnicode.isEmpty()) {
 				ImageView iv = new ImageView(requireContext());
-				iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
+				iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 18), NokiaDimens.dp(getResources(), 18)));
 				iv.setImageDrawable(NokiaIcons.get(requireContext(), item.iconUnicode, item.enabled ? 0xFFFFFFFF : 0xFF666666, 22));
 				row.addView(iv);
 				hasIcon = true;
 			} else if (item.icon != 0) {
 				ImageView iv = new ImageView(requireContext());
-				iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 22), NokiaDimens.dp(getResources(), 22)));
+				iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 18), NokiaDimens.dp(getResources(), 18)));
 				try {
 					iv.setImageResource(item.icon);
 				} catch (Exception ignored) {}
@@ -264,7 +264,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 				tv.setPadding(NokiaDimens.dp(getResources(), 10), 0, 0, 0);
 			}
 			tv.setText(item.label);
-			NokiaDimens.textSize(tv, 14);
+			NokiaDimens.textSize(tv, 10);
 			tv.setSingleLine(true);
 			tv.setTextColor(item.enabled ? 0xFFFFFFFF : 0xFF666666);
 			row.addView(tv);
