@@ -2,6 +2,7 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.app.Dialog;
 import android.os.Bundle;
+import io.github.cctyl.nokia.common.ui.focus.NokiaDialogFocus;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;

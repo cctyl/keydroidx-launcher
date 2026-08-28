@@ -28,7 +28,7 @@ import ru.playsoftware.j2meloader.applist.AppListModel;
 import ru.playsoftware.j2meloader.appsdb.AppRepository;
 import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity;
-import ru.playsoftware.j2meloader.nokia.NokiaDialogFocus;
+import io.github.cctyl.nokia.common.ui.focus.NokiaDialogFocus;
 import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 import ru.playsoftware.j2meloader.nokia.NokiaTheme;
 import ru.playsoftware.j2meloader.nokia.NokiaLog;
