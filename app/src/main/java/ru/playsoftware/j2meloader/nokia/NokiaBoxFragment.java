@@ -24,6 +24,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.PreferenceManager;
 
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.ui.focus.NokiaFocusHost;
 import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.io.File;
 import java.util.ArrayList;

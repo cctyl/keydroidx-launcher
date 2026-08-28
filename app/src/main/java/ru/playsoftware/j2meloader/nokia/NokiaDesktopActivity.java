@@ -15,10 +15,15 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
+import io.github.cctyl.nokia.common.model.KeyResolver;
+import io.github.cctyl.nokia.common.model.NokiaKeyAction;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.ui.focus.NokiaFocusHost;
+import io.github.cctyl.nokia.common.ui.page.NokiaPageHost;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 import io.github.cctyl.nokia.common.log.NokiaLog;
@@ -32,7 +37,8 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  * 每次从其他应用按 Home 键返回时都会触发 onNewIntent()，
  * 此时应清除返回栈并回到桌面待机屏。
  */
-public class NokiaDesktopActivity extends NokiaBaseActivity {
+public class NokiaDesktopActivity extends NokiaBaseActivity
+		implements NokiaPageHost, KeyResolver {
 
 	private static final String ACTION_HOME = Intent.ACTION_MAIN;
 	private static final String CATEGORY_HOME = Intent.CATEGORY_HOME;
@@ -166,6 +172,16 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 	}
 
 	/**
+	 * common {@link KeyResolver} 实现：把物理按键交给桌面按键绑定解析。
+	 * 动作取值与 {@link NokiaKeyBinding#ACTION_UP} 等常量一致（也即 common NokiaKeyAction 的取值）。
+	 */
+	@Override
+	public int resolveAction(@NonNull KeyEvent event) {
+		// 纯查询，不做 reload：dispatchKeyEvent 已在每次按键前 reload，避免按键热路径重复加载
+		return keyBinding == null ? NokiaKeyAction.UNKNOWN : keyBinding.resolveAction(event);
+	}
+
+	/**
 	 * 重新读取当前页面的 {@link NokiaPage} 声明并装配底部菜单栏。
 	 * <p>
 	 * 页面切到前台（onViewCreated / onResume）或内部状态变化（焦点、mode、覆盖模式、向导步骤）
@@ -175,12 +191,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 		Fragment f = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 		if (f instanceof NokiaPage) {
 			NokiaPage page = (NokiaPage) f;
-			String left = page.getSoftLeftText();
-			String center = page.getPageTitle();
-			String right = page.getSoftRightText();
+			CharSequence left = page.getSoftLeftText();
+			CharSequence center = page.getPageTitle();
+			CharSequence right = page.getSoftRightText();
 			NokiaLog.d("Desktop", "refreshPageBar 装配 " + f.getClass().getSimpleName()
 					+ " left=" + left + " center=" + center + " right=" + right);
-			setBottomBar(left, center, right);
+			setBottomBar(left == null ? null : left.toString(),
+					center == null ? null : center.toString(),
+					right == null ? null : right.toString());
 		} else {
 			NokiaLog.d("Desktop", "refreshPageBar: 当前 Fragment 未实现 NokiaPage（"
 					+ (f != null ? f.getClass().getSimpleName() : "null") + "），忽略");

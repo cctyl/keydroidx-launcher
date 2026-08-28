@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.model.KeyResolver;
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
 
 import android.app.Dialog;
@@ -309,11 +310,12 @@ public class NokiaOptionsDialog extends DialogFragment {
 			return NokiaKeyBinding.resolveAction(overrideKeyCodes, event);
 		}
 		androidx.fragment.app.FragmentActivity host = requireActivity();
-		if (host instanceof NokiaDesktopActivity) {
-			return ((NokiaDesktopActivity) host).getKeyBinding().resolveAction(event);
+		// 宿主实现 common KeyResolver（桌面已在 NokiaDesktopActivity 实现），优先走统一契约
+		if (host instanceof KeyResolver) {
+				return ((KeyResolver) host).resolveAction(event);
 		}
 		return -1;
-	}
+}
 
 	private void moveFocus(int step) {
 		if (items.isEmpty()) return;
