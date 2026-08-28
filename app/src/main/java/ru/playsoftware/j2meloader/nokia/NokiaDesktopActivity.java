@@ -208,7 +208,12 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 			io.github.cctyl.nokia.common.ui.page.NokiaPage page =
 					(io.github.cctyl.nokia.common.ui.page.NokiaPage) f;
 			CharSequence left = page.getSoftLeftText();
-			CharSequence center = page.getPageTitle();
+			// 中键：common 页面（如意见反馈页）会用中键承载「选择 / 提交」动作，优先显示它自己声明的文案；
+			// 桌面页面不声明中键（默认 null），沿用一贯的「中键显示页面名」。
+			CharSequence center = page.getSoftCenterText();
+			if (center == null || center.length() == 0) {
+				center = page.getPageTitle();
+			}
 			CharSequence right = page.getSoftRightText();
 			NokiaLog.d("Desktop", "refreshPageBar 装配 " + f.getClass().getSimpleName()
 					+ " left=" + left + " center=" + center + " right=" + right);
