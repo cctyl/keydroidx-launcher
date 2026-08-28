@@ -1,5 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.ui.NokiaIcons;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 

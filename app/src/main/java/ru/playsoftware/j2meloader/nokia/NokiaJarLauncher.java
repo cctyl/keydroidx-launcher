@@ -1,5 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.ui.NokiaIcons;
+
 import androidx.fragment.app.FragmentActivity;
 
 import java.util.ArrayList;

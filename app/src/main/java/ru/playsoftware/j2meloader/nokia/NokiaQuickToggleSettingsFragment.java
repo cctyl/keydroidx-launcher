@@ -1,5 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.ui.NokiaIcons;
+
 import android.graphics.Color;
 import android.os.Bundle;
 import io.github.cctyl.nokia.common.ui.drawable.NokiaDashedLineDrawable;

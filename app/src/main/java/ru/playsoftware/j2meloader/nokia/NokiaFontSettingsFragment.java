@@ -1,5 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.ui.NokiaIcons;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;

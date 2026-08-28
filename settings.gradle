@@ -24,5 +24,11 @@ include ':app', ':dexlib', ':mini_shizuku'
 
 // 联调期：把 ../keydroidx-core 的 nokia-common 以源码形式替换同坐标依赖
 // （io.github.cctyl.nokia:nokia-common）。common 稳定后删除此行，回落 mavenLocal/远程坐标。
+// 注意：必须显式声明 substitute 规则——core 仓库的项目未设置 project group，
+// 自动替换（按 group:name 匹配）会静默失效并回落到模块缓存的旧 artifact。
 // 详见 docs/接入nokia-common实施计划.md D2。
-includeBuild('../keydroidx-core')
+includeBuild('../keydroidx-core') {
+    dependencySubstitution {
+        substitute module('io.github.cctyl.nokia:nokia-common') using project(':nokia-common')
+    }
+}
