@@ -40,9 +40,10 @@ import android.widget.TextView;
 
 import androidx.appcompat.widget.AppCompatEditText;
 
-import ru.playsoftware.j2meloader.nokia.NokiaDimens;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 
 import javax.microedition.lcdui.event.SimpleEvent;
+import ru.playsoftware.j2meloader.nokia.NokiaFontManager;
 
 class TextFieldImpl {
 	private EditText textview;
@@ -243,7 +244,7 @@ class TextFieldImpl {
 				textview.setPadding(pad, pad, pad, pad);
 				textview.setTextColor(0xFF1F2937);
 				textview.setHintTextColor(0xFF8A95A5);
-				NokiaDimens.textSize(textview, 13);
+				NokiaFontManager.textSize(textview, 13);
 				textview.setOnFocusChangeListener((v, hasFocus) -> {
 					if (!hasFocus) item.notifyStateChanged();
 				});
@@ -289,7 +290,7 @@ class TextFieldImpl {
 			titleTv.setEllipsize(TextUtils.TruncateAt.END);
 			titleTv.setTextColor(0xFFFFFFFF);
 			titleTv.setTypeface(Typeface.DEFAULT_BOLD);
-			NokiaDimens.textSize(titleTv, 13);
+			NokiaFontManager.textSize(titleTv, 13);
 			if (title != null && !title.trim().isEmpty()) {
 				titleTv.setText(title);
 			}
@@ -306,7 +307,7 @@ class TextFieldImpl {
 			counterTextView.setPadding(cPadH, cPadV, cPadH, cPadV);
 			counterTextView.setTextColor(currentTheme.accentColor);
 			counterTextView.setTypeface(Typeface.DEFAULT_BOLD);
-			NokiaDimens.textSize(counterTextView, 11);
+			NokiaFontManager.textSize(counterTextView, 11);
 			updateCounter();
 			header.addView(counterTextView);
 
@@ -339,7 +340,7 @@ class TextFieldImpl {
 			et.setGravity(Gravity.TOP | Gravity.START);
 			et.setTextColor(0xFFFFFFFF);
 			et.setHintTextColor(0xFF94A3B8);
-			NokiaDimens.textSize(et, 14);
+			NokiaFontManager.textSize(et, 14);
 			et.setLineSpacing(NokiaDimens.dpF(res, 4), 1.0f);
 
 			FrameLayout.LayoutParams etParams = new FrameLayout.LayoutParams(

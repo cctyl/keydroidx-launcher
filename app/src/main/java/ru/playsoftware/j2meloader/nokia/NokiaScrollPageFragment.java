@@ -8,6 +8,7 @@ import android.widget.ScrollView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 
 /**
  * 诺基亚滚动页面 Fragment 抽象基类。

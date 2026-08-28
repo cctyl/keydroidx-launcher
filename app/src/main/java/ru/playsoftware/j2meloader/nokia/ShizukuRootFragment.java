@@ -12,6 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -85,13 +86,13 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tv.setText(ACTION_NAMES[i]);
 			tv.setTextColor(0xFFFFFFFF);
-			NokiaDimens.textSize(tv, 12);
+			NokiaFontManager.textSize(tv, 12);
 			row.addView(tv);
 
 			TextView arrow = new TextView(requireContext());
 			arrow.setText(">");
 			arrow.setTextColor(0xFFAAAAAA);
-			NokiaDimens.textSize(arrow, 14);
+			NokiaFontManager.textSize(arrow, 14);
 			row.addView(arrow);
 
 			final int idx = i;

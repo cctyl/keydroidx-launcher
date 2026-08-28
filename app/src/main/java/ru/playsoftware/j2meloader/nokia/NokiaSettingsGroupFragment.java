@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -165,7 +166,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tvName.setText(getItemDisplayName(i));
 			tvName.setTextColor(0xFFFFFFFF);
-			NokiaDimens.textSize(tvName, 12);
+			NokiaFontManager.textSize(tvName, 12);
 			tvNames[i] = tvName;
 			row.addView(tvName);
 
@@ -175,7 +176,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 			tvArrow.setText(">");
 			tvArrow.setTextColor(0xFFAAAAAA);
-			NokiaDimens.textSize(tvArrow, 14);
+			NokiaFontManager.textSize(tvArrow, 14);
 			row.addView(tvArrow);
 
 			final int index = i;

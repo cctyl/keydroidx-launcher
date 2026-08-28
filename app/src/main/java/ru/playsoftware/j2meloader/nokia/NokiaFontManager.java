@@ -9,6 +9,7 @@ import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.provider.OpenableColumns;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -38,6 +39,43 @@ public class NokiaFontManager {
 	private static final Map<String, Typeface> sTypefaceCache = new HashMap<>();
 	private static String sCurrentFontId = null;
 	private static Typeface sCurrentTypeface = null;
+
+	/**
+	 * 用户字体缩放系数缓存（桌面设置 → 字体大小），默认 1.0。
+	 * 由 NokiaBaseActivity 在 Activity 创建早期从设置读取并写入，避免每个 TextView 都读 SP。
+	 */
+	private static volatile float sUserFontScale = 1f;
+
+	/** 更新字体缩放缓存（NokiaBaseActivity 早期调用）。 */
+	public static void setUserFontScale(float scale) {
+		if (scale > 0f) sUserFontScale = scale;
+	}
+
+	/**
+	 * 以 dp 为单位设置 TextView 字号（含用户字体缩放），并同步应用全局字体。
+	 * 原 NokiaDimens.textSize；尺寸换算统一走 common NokiaDimens 后，字号入口收口到字体管理器。
+	 * 所有动态创建文字的 setTextSize() 一律走此入口，禁止使用默认 sp 单位。
+	 */
+	public static void textSize(TextView tv, float dpValue) {
+		if (tv == null) return;
+		float scale = sUserFontScale;
+		if (scale <= 0f || scale == 1f) {
+			try {
+				Context ctx = tv.getContext();
+				if (ctx != null) {
+					float s = NokiaSettingsStorage.getFontScale(ctx);
+					if (s > 0f) {
+						scale = s;
+						sUserFontScale = s;
+					}
+				}
+			} catch (Exception ignored) {
+			}
+		}
+		tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, dpValue * (scale > 0f ? scale : 1f));
+		// 同步应用全局像素字体（避免动态创建的 TextView 漏掉字体设置）
+		applyFontToViewHierarchy(tv);
+	}
 
 	public static class FontItem {
 		public final String id;

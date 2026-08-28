@@ -17,6 +17,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

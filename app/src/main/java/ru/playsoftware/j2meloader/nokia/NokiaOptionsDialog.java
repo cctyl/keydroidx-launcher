@@ -19,6 +19,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentManager;
 
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -156,7 +157,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 		TextView titleView = dialog.findViewById(R.id.widgetOptionsTitle);
 		if (titleView != null) {
 			titleView.setText(title);
-			NokiaDimens.textSize(titleView, 11);
+			NokiaFontManager.textSize(titleView, 11);
 		}
 
 		// 应用当前主题配色到选项弹窗的标题栏与底栏
@@ -269,7 +270,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 				tv.setPadding(NokiaDimens.dp(getResources(), 10), 0, 0, 0);
 			}
 			tv.setText(item.label);
-			NokiaDimens.textSize(tv, 10);
+			NokiaFontManager.textSize(tv, 10);
 			tv.setSingleLine(true);
 			tv.setTextColor(item.enabled ? 0xFFFFFFFF : 0xFF666666);
 			row.addView(tv);

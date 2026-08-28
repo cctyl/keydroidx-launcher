@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -172,7 +173,7 @@ public class NokiaWidgetTypePickerFragment extends NokiaPageFragment {
 			tv.setLayoutParams(new LinearLayout.LayoutParams(
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tv.setText(label);
-			NokiaDimens.textSize(tv, 12);
+			NokiaFontManager.textSize(tv, 12);
 			tv.setSingleLine(true);
 			tv.setEllipsize(TextUtils.TruncateAt.END);
 			tv.setTextColor(enabled ? 0xFFFFFFFF : 0xFF666666);

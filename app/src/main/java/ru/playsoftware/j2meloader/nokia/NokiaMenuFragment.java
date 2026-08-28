@@ -30,6 +30,7 @@ import androidx.fragment.app.Fragment;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -727,7 +728,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 							LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 					tv.setText(item.label);
 					tv.setTextColor(0xFFFFFFFF);
-					NokiaDimens.textSize(tv, 9);
+					NokiaFontManager.textSize(tv, 9);
 					tv.setSingleLine(true);
 					tv.setEllipsize(TextUtils.TruncateAt.END);
 					tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));

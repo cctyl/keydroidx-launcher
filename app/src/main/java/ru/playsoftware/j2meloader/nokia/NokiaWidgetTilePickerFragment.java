@@ -20,6 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -227,7 +228,7 @@ public class NokiaWidgetTilePickerFragment extends NokiaListPageFragment {
 			tvLabel.setLayoutParams(lpText);
 			tvLabel.setText(info.getDisplayTitle());
 			tvLabel.setTextColor(0xFFFFFFFF);
-			NokiaDimens.textSize(tvLabel, 13);
+			NokiaFontManager.textSize(tvLabel, 13);
 			tvLabel.setSingleLine(true);
 			tvLabel.setEllipsize(TextUtils.TruncateAt.END);
 			row.addView(tvLabel);

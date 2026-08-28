@@ -23,6 +23,7 @@ import androidx.sqlite.db.SupportSQLiteProgram;
 import androidx.sqlite.db.SupportSQLiteQuery;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -230,7 +231,7 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 			TextView empty = new TextView(requireContext());
 			empty.setText("未找到可添加的应用");
 			empty.setTextColor(0xFFAAAAAA);
-			NokiaDimens.textSize(empty, 12);
+			NokiaFontManager.textSize(empty, 12);
 			empty.setGravity(Gravity.CENTER);
 			empty.setPadding(0, NokiaDimens.dp(getResources(), 20), 0, 0);
 			appListLayout.addView(empty);
@@ -288,7 +289,7 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tv.setText(app.label);
 			tv.setTextColor(0xFFFFFFFF);
-			NokiaDimens.textSize(tv, 12);
+			NokiaFontManager.textSize(tv, 12);
 			tv.setSingleLine(true);
 			tv.setEllipsize(TextUtils.TruncateAt.END);
 			row.addView(tv);
@@ -300,7 +301,7 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 			tvCheck.setWidth(NokiaDimens.dp(getResources(), 24));
 			tvCheck.setHeight(NokiaDimens.dp(getResources(), 24));
 			tvCheck.setGravity(Gravity.CENTER);
-			NokiaDimens.textSize(tvCheck, 14);
+			NokiaFontManager.textSize(tvCheck, 14);
 			if (selectedMap.containsKey(key)) {
 				tvCheck.setText("[✓]");
 				tvCheck.setTextColor(0xFF4CAF50);

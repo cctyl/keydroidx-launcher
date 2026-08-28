@@ -149,16 +149,19 @@ common 版是后出的重构版、能力超集（v 级/分级持久化/installCr
 - 标签语义变化：桌面原 `[sub] msg` 统一由 logcat tag 承载，即原 sub 字符串成为 common 的 tag；日志文件不再含统一 `NokiaDesktop` tag。adb 过滤改为 `-s Desktop:* KeyBinding:*` 等组合。
 走查：日志落盘、7 天轮转、debug/release 默认级别、设置页日志开关、崩溃 CRASH 记录、:midlet 进程是否也记录（本阶段仍保持仅主进程）。
 
-**2.6 NokiaTheme**（24 文件，含 J2ME 层 4 处）
-前置：D3 调色板对齐（core 改 + 发 1.0.1，launcher 升版本）。
-全部 `getSelectedTheme(ctx)` → `getCurrentTheme(ctx)`；绘制方法签名逐对；`NokiaSettingsStorage.getTheme()` 返回 common ThemeDef。
-**最大风险点**：`:midlet` 进程 ThemeProvider 注入——midlet 进程初始化路径（EmulatorApplication midlet 分支或 MicroActivity）同样注入 LauncherThemeProvider，否则 J2ME 画面主题丢失。
-走查：6 套主题逐一：桌面壁纸/软键渐变/功能表/焦点高亮/弹窗底色/**J2ME 画面背景与软键栏**，全部截图对比。
+**2.6 NokiaTheme**（26 文件，含 J2ME 层 3 处）— 已完成
+前置：D3 调色板对齐（已在 core 完成：6 套主题 7 个桌面字段全部采用桌面值，主题名也用桌面命名）。
+全部 `getSelectedTheme(ctx)` → `getCurrentTheme(ctx)`；`NokiaSettingsStorage.getTheme()` 返回 common ThemeDef；删除桌面 `NokiaTheme.java`。
+common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDrawable` 改为纯色半透明 `focusColor`，`createDialogBodyDrawable` 渐变改为 `bgCenter -> bgEnd`；新增 `getThemes()` 主题清单。
+**风险点已验证**：`:midlet` 进程 ThemeProvider 注入有效（EmulatorApplication 在双进程均注入，实测 midlet 进程 `getCurrentTheme` 返回桌面所选主题）。
+走查：桌面背景渐变像素采样与调色板一致；列表高亮为 focusColor 叠加；**J2ME 画面/软键栏待真机目视确认**（待补）。
 
-**2.7 NokiaDimens + NokiaFontManager**（耦合对，一起换）
-EmulatorApplication 初始化 `NokiaFontManager.setFontScale/getFontScale`、`setCurrentFontId`；字体/缩放设置变更处双写（桌面 SP + common 静态）。
-按 D5 保留桌面薄封装 FontManager；`NokiaDimens.textSize` 语义逐调用点核对（28 文件，TextFieldImpl 18 处重点）。
-走查：3 套内置字体切换、自定义字体导入/删除、字体缩放、功能表/设置/弹窗字号、**J2ME 文字渲染（midlet 进程字体链路）**、桌面底栏动态字号。
+**2.7 NokiaDimens + NokiaFontManager** — 已完成（尺寸部分）
+- `NokiaDimens.dp/dpF` 全部改用 common `io.github.cctyl.nokia.common.util.NokiaDimens`（25 文件，含 J2ME TextFieldImpl），删除桌面 `NokiaDimens.java`。
+- `NokiaDimens.textSize(TextView, float)`（51 处）迁入桌面 `NokiaFontManager.textSize()`：它带桌面语义（用户字体缩放 + 应用全局/自定义字体），不适合放进 common；`sUserFontScale` 缓存同步改为 `NokiaFontManager.setUserFontScale()`。
+- 按 D5 桌面 `NokiaFontManager` 保留（自定义字体导入/删除/列举是桌面能力，未贡献回 common）。
+- **暂不做的部分**：common `NokiaFontManager` 的字体/缩放状态未在 EmulatorApplication 初始化、也未在设置变更处双写。原因：当前桌面没有任何代码消费 common 的字体状态，且 common 不认识 `custom_*` 字体 id（会退回内置字体），此时同步会埋下"自定义字体被静默替换"的隐患。**待阶段 3 引入 common 控件（或 D5 把自定义字体能力贡献回 common）时一并处理。**
+走查：字体缩放切换后文字尺寸按倍率变化（0.85x/1.0x/1.5x 实测状态栏文字高度 15/19/27px）；**3 套内置字体切换、自定义字体导入/删除、J2ME 文字渲染待真机目视确认**（待补）。
 
 **阶段 2 出口标准**：工具类全部单一来源到 common；真机全功能走查通过；单测全绿；`assembleOpenRelease -x lint` + proguard 装机验证一次。
 

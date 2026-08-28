@@ -33,6 +33,7 @@ import androidx.sqlite.db.SupportSQLiteQuery;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -555,7 +556,7 @@ public class NokiaWidgetAppPickerFragment extends NokiaPageFragment {
 							LinearLayout.LayoutParams.WRAP_CONTENT,
 							LinearLayout.LayoutParams.WRAP_CONTENT));
 					tv.setText(item.label);
-					NokiaDimens.textSize(tv, 9);
+					NokiaFontManager.textSize(tv, 9);
 					tv.setSingleLine(true);
 					tv.setEllipsize(TextUtils.TruncateAt.END);
 					tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
@@ -566,7 +567,7 @@ public class NokiaWidgetAppPickerFragment extends NokiaPageFragment {
 					// 右上角 📌 角标（仅当前编辑项）
 					TextView badge = new TextView(requireContext());
 					badge.setText("📌");
-					NokiaDimens.textSize(badge, 10);
+					NokiaFontManager.textSize(badge, 10);
 					badge.setTextColor(0xFFFFFFFF);
 					FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
 							FrameLayout.LayoutParams.WRAP_CONTENT,

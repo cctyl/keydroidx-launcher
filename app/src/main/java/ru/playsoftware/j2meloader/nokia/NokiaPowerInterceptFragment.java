@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
@@ -107,7 +108,7 @@ public class NokiaPowerInterceptFragment extends NokiaListPageFragment {
 			tvName.setLayoutParams(new LinearLayout.LayoutParams(
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tvName.setTextColor(0xFFFFFFFF);
-			NokiaDimens.textSize(tvName, 12);
+			NokiaFontManager.textSize(tvName, 12);
 			tvNames[i] = tvName;
 			row.addView(tvName);
 

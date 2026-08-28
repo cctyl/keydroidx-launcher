@@ -51,6 +51,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -279,7 +280,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				hint.setGravity(Gravity.CENTER);
 				hint.setText("（无快捷应用）");
 				hint.setTextColor(0xFF888888);
-				NokiaDimens.textSize(hint, 10);
+				NokiaFontManager.textSize(hint, 10);
 				container.addView(hint);
 			}
 		} else {
@@ -392,7 +393,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					0, 0);
 			hint.setText("无更多备忘");
 			hint.setTextColor(0xFF888888);
-			NokiaDimens.textSize(hint, 10);
+			NokiaFontManager.textSize(hint, 10);
 			notifArea.addView(hint);
 			NokiaLog.i("Desktop", "组件区为空");
 		} else {
@@ -647,7 +648,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		labelTv.setLayoutParams(labelLp);
 		labelTv.setText(item.label);
 		labelTv.setTextColor(0xFFFFFFFF);
-		NokiaDimens.textSize(labelTv, 11);
+		NokiaFontManager.textSize(labelTv, 11);
 		labelTv.setSingleLine(true);
 		row.addView(labelTv);
 
@@ -687,7 +688,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		percentTv.setLayoutParams(pctLp);
 		percentTv.setText(percentText);
 		percentTv.setTextColor(0x80FFFFFF);
-		NokiaDimens.textSize(percentTv, 9);
+		NokiaFontManager.textSize(percentTv, 9);
 		percentTv.setSingleLine(true);
 		row.addView(percentTv);
 
@@ -728,7 +729,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		titleTv.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		titleTv.setTextColor(0xFFFFFFFF);
-		NokiaDimens.textSize(titleTv, 11);
+		NokiaFontManager.textSize(titleTv, 11);
 		titleTv.setSingleLine(true);
 		titleTv.setEllipsize(TextUtils.TruncateAt.END);
 		titleTv.setText(getMusicWidgetTitle());
@@ -739,7 +740,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		lyricTv.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		lyricTv.setTextColor(0xFFAAAAAA);
-		NokiaDimens.textSize(lyricTv, 9);
+		NokiaFontManager.textSize(lyricTv, 9);
 		lyricTv.setSingleLine(true);
 		lyricTv.setEllipsize(TextUtils.TruncateAt.END);
 		lyricTv.setText(getMusicWidgetLyric());
@@ -882,7 +883,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 		labelTv.setText(getWidgetLabel(item));
 		labelTv.setTextColor(0xFFFFFFFF);
-		NokiaDimens.textSize(labelTv, 11);
+		NokiaFontManager.textSize(labelTv, 11);
 		labelTv.setSingleLine(true);
 		row.addView(labelTv);
 
@@ -891,7 +892,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		infoTv.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		infoTv.setTextColor(0xFFAAAAAA);
-		NokiaDimens.textSize(infoTv, 10);
+		NokiaFontManager.textSize(infoTv, 10);
 		infoTv.setGravity(Gravity.END);
 		infoTv.setSingleLine(true);
 		infoTv.setText(getWidgetInfoText(item));

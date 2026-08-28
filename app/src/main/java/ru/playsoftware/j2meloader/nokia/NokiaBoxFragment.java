@@ -24,6 +24,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.PreferenceManager;
 
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -263,7 +264,7 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		tv.setText("安装");
 		tv.setTextColor(0xFFFFFFFF);
-		NokiaDimens.textSize(tv, 9);
+		NokiaFontManager.textSize(tv, 9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
 		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
@@ -284,7 +285,7 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		tv.setText("JAR 全局设置");
 		tv.setTextColor(0xFFFFFFFF);
-		NokiaDimens.textSize(tv, 9);
+		NokiaFontManager.textSize(tv, 9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
 		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));
@@ -311,7 +312,7 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		tv.setText(app.getTitle());
 		tv.setTextColor(0xFFFFFFFF);
-		NokiaDimens.textSize(tv, 9);
+		NokiaFontManager.textSize(tv, 9);
 		tv.setSingleLine(true);
 		tv.setEllipsize(TextUtils.TruncateAt.END);
 		tv.setMaxWidth(NokiaDimens.dp(getResources(), 72));

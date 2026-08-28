@@ -15,6 +15,7 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -55,7 +56,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 		if (userFontScale <= 0f) {
 			userFontScale = 1f;
 		}
-		NokiaDimens.sUserFontScale = userFontScale;
+		NokiaFontManager.setUserFontScale(userFontScale);
 		int dpi = config.densityDpi;
 		int fixed = dpi;
 		int[] standards = {120, 160, 213, 240, 320, 480, 640};
@@ -216,7 +217,7 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 				} else {
 					size = 10f;
 				}
-				NokiaDimens.textSize(tv, size);
+				NokiaFontManager.textSize(tv, size);
 				fitCenterTextToWidth(tv);
 			}
 			tv.setVisibility(View.VISIBLE);

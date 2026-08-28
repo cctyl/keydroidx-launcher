@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 
@@ -115,7 +116,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		TextView tvAction = new TextView(requireContext());
 		tvAction.setText(NokiaKeyBinding.getActionName(action));
 		tvAction.setTextColor(0xFFFFFFFF);
-		NokiaDimens.textSize(tvAction, 11);
+		NokiaFontManager.textSize(tvAction, 11);
 		LinearLayout.LayoutParams lpAction = new LinearLayout.LayoutParams(
 				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
 		row.addView(tvAction, lpAction);
@@ -130,14 +131,14 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 			tvKey.setText("未绑定");
 			tvKey.setTextColor(0xFFFF8A80);
 		}
-		NokiaDimens.textSize(tvKey, 10);
+		NokiaFontManager.textSize(tvKey, 10);
 		row.addView(tvKey);
 
 		// 录制提示箭头
 		TextView tvHint = new TextView(requireContext());
 		tvHint.setText(" >");
 		tvHint.setTextColor(0xFF9fb3d1);
-		NokiaDimens.textSize(tvHint, 11);
+		NokiaFontManager.textSize(tvHint, 11);
 		row.addView(tvHint);
 
 		// 点击 → 进入录制
@@ -277,7 +278,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		tvInfo.setText(NokiaKeyBinding.getActionName(confirmOccupied) + " → "
 				+ NokiaKeyBinding.keyName(confirmKeycode));
 		tvInfo.setTextColor(0xFFE0E0E0);
-		NokiaDimens.textSize(tvInfo, 10);
+		NokiaFontManager.textSize(tvInfo, 10);
 		recordStatusBar.addView(tvInfo);
 
 		// 取消
@@ -303,7 +304,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		btn.setPadding(padH, padV, padH, padV);
 		btn.setText(text);
 		btn.setTextColor(color);
-		NokiaDimens.textSize(btn, 11);
+		NokiaFontManager.textSize(btn, 11);
 		btn.setClickable(true);
 		btn.setFocusable(true);
 		btn.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
@@ -367,7 +368,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		recordStatusText.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		recordStatusText.setTextColor(0xFF64B5F6);
-		NokiaDimens.textSize(recordStatusText, 11);
+		NokiaFontManager.textSize(recordStatusText, 11);
 		recordStatusText.setTypeface(null, android.graphics.Typeface.BOLD);
 		recordStatusBar.addView(recordStatusText);
 

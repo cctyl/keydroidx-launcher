@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -178,7 +179,7 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 				empty.setText(tabProtected ? "暂无保护的应用" : "没有可清理的后台应用");
 			}
 			empty.setTextColor(0xFF8A93A5);
-			NokiaDimens.textSize(empty, 10);
+			NokiaFontManager.textSize(empty, 10);
 			listLayout.addView(empty);
 			clearHighlight();
 			focusIndex = -1;
@@ -236,7 +237,7 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 		nameTv.setText(t.name);
 		nameTv.setTextColor(0xFFFFFFFF);
-		NokiaDimens.textSize(nameTv, 11);
+		NokiaFontManager.textSize(nameTv, 11);
 		nameTv.setSingleLine(true);
 		nameTv.setEllipsize(TextUtils.TruncateAt.END);
 		row.addView(nameTv);
@@ -255,7 +256,7 @@ public class NokiaBackgroundManagerFragment extends NokiaPageFragment {
 			TextView clearTv = new TextView(ctx);
 			clearTv.setText("可清");
 			clearTv.setTextColor(0xFF55606F);
-			NokiaDimens.textSize(clearTv, 9);
+			NokiaFontManager.textSize(clearTv, 9);
 			row.addView(clearTv);
 		}
 		return row;

@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -504,7 +505,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 			TextView empty = new TextView(requireContext());
 			empty.setText("暂无组件，按左软键添加");
 			empty.setTextColor(0xFFAAAAAA);
-			NokiaDimens.textSize(empty, 12);
+			NokiaFontManager.textSize(empty, 12);
 			empty.setGravity(Gravity.CENTER);
 			empty.setPadding(0, NokiaDimens.dp(getResources(), 20), 0, 0);
 			listLayout.addView(empty);
@@ -532,7 +533,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 				TextView tvCheck = new TextView(requireContext());
 				tvCheck.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 24), NokiaDimens.dp(getResources(), 24)));
 				tvCheck.setGravity(Gravity.CENTER);
-				NokiaDimens.textSize(tvCheck, 13);
+				NokiaFontManager.textSize(tvCheck, 13);
 				boolean isChecked = i < checked.size() && checked.get(i);
 				tvCheck.setText(isChecked ? "[✓]" : "[ ]");
 				tvCheck.setTextColor(isChecked ? 0xFF4CAF50 : 0xFF888888);
@@ -560,7 +561,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tv.setText(item.label);
 			tv.setTextColor(0xFFFFFFFF);
-			NokiaDimens.textSize(tv, 12);
+			NokiaFontManager.textSize(tv, 12);
 			tv.setSingleLine(true);
 			tv.setEllipsize(TextUtils.TruncateAt.END);
 			row.addView(tv);
@@ -571,7 +572,7 @@ public class NokiaWidgetSettingsFragment extends NokiaPageFragment {
 					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 			tvTag.setText(item.getTypeTag());
 			tvTag.setTextColor(0xFF999999);
-			NokiaDimens.textSize(tvTag, 9);
+			NokiaFontManager.textSize(tvTag, 9);
 			row.addView(tvTag);
 
 			final int index = i;
