@@ -13,6 +13,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.ui.NokiaFeedbackFragment;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import ru.playsoftware.j2meloader.R;
 
@@ -20,7 +22,8 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 
 	private View btnGithub;
 	private View btnBilibili;
-	private int focusIndex = 0; // 0: btnGithub, 1: btnBilibili, 2: 底部纯文本浏览状态
+	private View btnFeedback;
+	private int focusIndex = 0; // 0: GitHub, 1: Bilibili, 2: 意见反馈, 3: 底部纯文本浏览状态
 
 	@Override
 	protected int getLayoutRes() {
@@ -39,7 +42,7 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 
 	@Override
 	public String getSoftLeftText() {
-		return focusIndex >= 0 && focusIndex <= 1 ? "打开" : "";
+		return focusIndex >= 0 && focusIndex <= 2 ? "打开" : "";
 	}
 
 	@Override
@@ -51,6 +54,7 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 	protected void onScrollPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		btnGithub = view.findViewById(R.id.btnGithub);
 		btnBilibili = view.findViewById(R.id.btnBilibili);
+		btnFeedback = view.findViewById(R.id.btnFeedback);
 
 		if (btnGithub != null) {
 			btnGithub.setOnClickListener(v -> {
@@ -65,6 +69,14 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 				focusIndex = 1;
 				updateFocus();
 				openUrl("https://www.bilibili.com/video/BV1WxMX6yEHX");
+			});
+		}
+
+		if (btnFeedback != null) {
+			btnFeedback.setOnClickListener(v -> {
+				focusIndex = 2;
+				updateFocus();
+				openFeedback();
 			});
 		}
 
@@ -87,6 +99,13 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 				btnBilibili.setBackgroundColor(normalBg);
 			}
 		}
+		if (btnFeedback != null) {
+			if (focusIndex == 2) {
+				btnFeedback.setBackground(NokiaTheme.createSelectionDrawable(requireContext(), 4));
+			} else {
+				btnFeedback.setBackgroundColor(normalBg);
+			}
+		}
 		if (getActivity() instanceof NokiaDesktopActivity) {
 			((NokiaDesktopActivity) getActivity()).refreshPageBar();
 		}
@@ -95,27 +114,30 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 	@Override
 	public boolean onDirection(int action) {
 		if (action == NokiaKeyBinding.ACTION_DOWN) {
-			if (focusIndex == 0) {
-				focusIndex = 1;
+			if (focusIndex < 2) {
+				focusIndex++;
 				updateFocus();
 				return true;
-			} else {
-				// focusIndex >= 1，向下滚动
-				if (focusIndex == 1) {
-					focusIndex = 2;
-					updateFocus();
-				}
-				scrollDown();
-				return true;
 			}
-		} else if (action == NokiaKeyBinding.ACTION_UP) {
+			// focusIndex >= 2：先切到纯文本浏览态，再向下滚动
 			if (focusIndex == 2) {
+				focusIndex = 3;
+				updateFocus();
+			}
+			scrollDown();
+			return true;
+		} else if (action == NokiaKeyBinding.ACTION_UP) {
+			if (focusIndex == 3) {
 				if (pageScrollView != null && pageScrollView.getScrollY() > 10) {
 					scrollUp();
 				} else {
-					focusIndex = 1;
+					focusIndex = 2;
 					updateFocus();
 				}
+				return true;
+			} else if (focusIndex == 2) {
+				focusIndex = 1;
+				updateFocus();
 				return true;
 			} else if (focusIndex == 1) {
 				focusIndex = 0;
@@ -142,6 +164,9 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 		} else if (focusIndex == 1) {
 			openUrl("https://www.bilibili.com/video/BV1WxMX6yEHX");
 			return true;
+		} else if (focusIndex == 2) {
+			openFeedback();
+			return true;
 		}
 		return true;
 	}
@@ -163,6 +188,14 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 	@Override
 	public boolean onBack() {
 		return onSoftRight();
+	}
+
+	/** 打开 common 的意见反馈页（挂在桌面 midPanel，走桌面按键绑定与软键栏）。 */
+	private void openFeedback() {
+		if (getActivity() instanceof NokiaDesktopActivity) {
+			NokiaLog.i("About", "导航 -> 意见反馈");
+			((NokiaDesktopActivity) getActivity()).openFragment(new NokiaFeedbackFragment());
+		}
 	}
 
 	private void openUrl(String url) {

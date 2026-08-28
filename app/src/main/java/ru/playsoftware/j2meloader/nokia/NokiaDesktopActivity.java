@@ -171,6 +171,19 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		return mid != null ? mid.getHeight() : 0;
 	}
 
+	@Override
+	public void finish() {
+		// common 的通用页面（如意见反馈页）在提交成功后会调用 requireActivity().finish()；
+		// 本 Activity 是 HOME，直接 finish 等于退出桌面，因此有返回栈时改为出栈返回上一层。
+		FragmentManager fm = getSupportFragmentManager();
+		if (fm.getBackStackEntryCount() > 0) {
+			NokiaLog.i("Desktop", "finish() 被子页面调用 -> 出栈返回上一层");
+			exitCurrent();
+			return;
+		}
+		super.finish();
+	}
+
 	/**
 	 * common {@link KeyResolver} 实现：把物理按键交给桌面按键绑定解析。
 	 * 动作取值与 {@link NokiaKeyBinding#ACTION_UP} 等常量一致（也即 common NokiaKeyAction 的取值）。
@@ -189,8 +202,11 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	 */
 	public void refreshPageBar() {
 		Fragment f = getSupportFragmentManager().findFragmentById(R.id.midPanel);
-		if (f instanceof NokiaPage) {
-			NokiaPage page = (NokiaPage) f;
+		// 用 common 的 NokiaPage 判定：桌面页面（NokiaPage 继承它）与 common 自带页面
+		// （如意见反馈页）都能被装配底栏。
+		if (f instanceof io.github.cctyl.nokia.common.ui.page.NokiaPage) {
+			io.github.cctyl.nokia.common.ui.page.NokiaPage page =
+					(io.github.cctyl.nokia.common.ui.page.NokiaPage) f;
 			CharSequence left = page.getSoftLeftText();
 			CharSequence center = page.getPageTitle();
 			CharSequence right = page.getSoftRightText();

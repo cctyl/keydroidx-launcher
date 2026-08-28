@@ -2,6 +2,16 @@ plugins {
     id 'com.android.application'
 }
 
+// 意见反馈上报配置：从 local.properties 读取（该文件 git 忽略，密钥不入库）
+// 与 keydroidx-music 等生态 App 共用同一套 FEEDBACK_* 键
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def feedbackUrl = localProperties.getProperty('FEEDBACK_UPLOAD_URL', 'http://127.0.0.1:9421/upload')
+def feedbackKey = localProperties.getProperty('FEEDBACK_SECRET_KEY', '')
+
 def midletArchivesBaseName
 
 android {
@@ -18,6 +28,8 @@ android {
         resValue 'string', 'app_name', 'KeydroidXLauncher'
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "FEEDBACK_UPLOAD_URL", "\"${feedbackUrl}\""
+        buildConfigField "String", "FEEDBACK_SECRET_KEY", "\"${feedbackKey}\""
     }
 
     signingConfigs {
