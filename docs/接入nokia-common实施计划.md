@@ -1,9 +1,10 @@
 # 接入 nokia-common 实施计划
 
-> **状态**：已评审（决策已拍板），待实施
+> **状态**：阶段 0/1/2 已完成；阶段 3 收敛部分完成（第 2 步经评估取消）；阶段 4 待实施
 > **分支**：`feature/common-module`
 > **前置文档**：`keydroidx-core/docs/12-architecture-layering.md`（注意：该文档已过时，common 实际范围更大，见本文 §二）
 > **调研日期**：2026-08-28
+> **范围原则（2026-08-29 复审）**：本计划的一切条目都必须服务于「消除桌面与 common 的两套重复 UI」。经逐条复审：凡是「不消除重复、属于新能力或架构洁癖」的条目，要么取消，要么明确标注为非收敛项。
 
 ---
 
@@ -91,7 +92,9 @@ common 版是后出的重构版、能力超集（v 级/分级持久化/installCr
 
 同步方式：EmulatorApplication 调 common `init(ctx)` + `setTag("NokiaDesktop")` 保持 logcat TAG 不变；600+ 调用点 `d(sub,msg)` 与 common `d(tag,msg)` 形参兼容，纯机械换 import；桌面 `log_file_enabled` 设置项保留、内部代理到 common 分级控制（`nokia_desktop_settings` 的 key 不变）。
 
-### D7 feedback 反馈 —— ✅ 已决：直接接入
+### D7 feedback 反馈 —— ✅ 已决：直接接入 ⚠️ 非收敛项
+
+> **性质标注**：桌面原本没有反馈功能，本条是**新能力补齐**，与「消除两套重复 UI」的主目标无关（复审时确认：属于用户知情拍板，保留）。
 
 桌面原本无反馈功能，本期接入。密钥从 `keydroidx-music/local.properties` 原样复制 `FEEDBACK_UPLOAD_URL` / `FEEDBACK_SECRET_KEY` 两行到 launcher `local.properties`（已 git 忽略），`app/build.gradle` 注入 BuildConfig，EmulatorApplication `NokiaFeedback.init(config)`。反馈页用 common `NokiaFeedbackFragment`，入口加在设置组页/关于页。
 
@@ -163,7 +166,8 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 - **暂不做的部分**：common `NokiaFontManager` 的字体/缩放状态未在 EmulatorApplication 初始化、也未在设置变更处双写。原因：当前桌面没有任何代码消费 common 的字体状态，且 common 不认识 `custom_*` 字体 id（会退回内置字体），此时同步会埋下"自定义字体被静默替换"的隐患。**待阶段 3 引入 common 控件（或 D5 把自定义字体能力贡献回 common）时一并处理。**
 走查：字体缩放切换后文字尺寸按倍率变化（0.85x/1.0x/1.5x 实测状态栏文字高度 15/19/27px）；**3 套内置字体切换、自定义字体导入/删除、J2ME 文字渲染待真机目视确认**（待补）。
 
-**阶段 2 出口标准**：工具类全部单一来源到 common；真机全功能走查通过；单测全绿；`assembleOpenRelease -x lint` + proguard 装机验证一次。
+**阶段 2 出口标准**：工具类全部单一来源到 common；真机全功能走查通过；`assembleOpenRelease -x lint` + proguard 装机验证一次。
+> 注：本工程无单元测试（`testOpenDebugUnitTest` 为 NO-SOURCE），原"单测全绿"标准修正为「编译通过 + 装机走查通过」。已完成。
 
 ### 阶段 3：页面契约体系（中风险，逐层小步）
 
@@ -173,12 +177,11 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 3. `NokiaOptionsDialog` 按键解析改走 `KeyResolver` 契约（不再强转 Activity）。
 4. NokiaBaseActivity/NokiaOptionsDialog 按 D4 保留，仅内部调用已换 common。
 
-**待做（第 2 步，风险最高的一块）**：
-5. 桌面三个页面基类**保留**（240dp/壁纸/isDirectionEnabled 等桌面语义），把 `(NokiaDesktopActivity) requireActivity()` 强转改为宿主接口调用。
-   现状：约 **90 处强转 / 30 个文件**，且绝大多数用的是桌面专有能力（`openFragment`/`openBox`/`openMenu`/`openDesktopSettings`/`recreate`/`isDefaultLauncher`/`reloadKeyBindings`/`getKeyBinding`/`requestSetDefaultLauncher`），不是 common `NokiaPageHost` 能覆盖的。
-   做法：新增桌面级 `NokiaDesktopHost extends NokiaPageHost`（声明上述桌面能力），`NokiaDesktopActivity` 实现它；页面强转逐个改为该接口。需逐调用点判断：凡是把宿主当 Activity/Context 用的（如 `safeDrawable(host, resId)`）保持原强转不动。
+**~~待做（第 2 步）~~ — ❌ 已评估取消（2026-08-29）**：
+5. ~~桌面三个页面基类**保留**（240dp/壁纸/isDirectionEnabled 等桌面语义），把 `(NokiaDesktopActivity) requireActivity()` 强转改为宿主接口调用。~~
+   **取消理由**：按「消除两套重复 UI」的动机逐条审视——桌面页面在 common 中**没有对应的另一份**，本身不构成"两套"，改强转不产生任何收敛收益；页面所依赖的能力（`openFragment`/`getScale`/`getMidPanelHeight` 等）全部是桌面专有，即便抽象成 `NokiaDesktopHost extends NokiaPageHost` 也只能是桌面接口，页面依然搬不进 common（即所谓"下沉"），接口化收益（可测性/解耦）在本工程无单测、无第二宿主的现状下为零。约 90 处强转属于「页面本来就该依赖桌面宿主」的正常代码，保留原样。
 
-走查（全页面回归）：14 个 PageFragment + 9 个 ListPage + 2 个 ScrollPage 子类逐一：进入/返回、软键三栏文案、方向键循环焦点、LEFT/RIGHT 钩子、DOWN/UP 配对（软键不双触发）、录制态按键捕获、锁屏键、页面状态上报（Shizuku）。
+**阶段 3 走查（已完成，2026-08-29 全页面回归）**：功能表/百宝箱/桌面设置 6 组及子页（外观与显示、字体选择、主题设置、按键绑定、桌面内容各子页、系统与权限、高级设置、关于）+ 通用选项弹窗逐一进入/返回，底栏三栏文案逐页核对正确，零崩溃；主题列表显示桌面命名（common 调色板已对齐）。锁屏键、录制态按键捕获、Shizuku 页面状态上报未覆盖（需真机手动验证）。
 
 ### 阶段 4：feedback 接入（D7）
 
@@ -194,8 +197,10 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 - 每个 commit 可独立 revert；阶段 2 每步截图对比基线。
 - **双进程**：涉及 Theme/Font/Log 的改动必须同时验证主进程与 `:midlet` 进程。
 - **API 19 回归**：阶段 2.6/2.7 完成后在 4.4 模拟器跑一轮（4.4 兼容是硬规则）。
-- **release 验证**：阶段 2 出口、阶段 3 出口各做一次 `assembleOpenRelease -x lint` 装机（proguard keep 规则可能需为 common 增补）。
+  - ⚠️ **挂账（2026-08-29 复审发现漏项）**：尚未执行。release 构建一直 `-x lint`，编译期拦不住 `>19` API 误用，运行时 `NoSuchMethodError` 风险真实存在（尤其本次 common 新合入的 NokiaLog/NokiaTheme/getThemes 等代码）。需要一台 API 19 模拟器或 4.4 真机验证冷启动 + 主流程。
+- **release 验证**：阶段 2 出口已完成（装机无崩溃、主题渲染正确）。阶段 3 仅收敛接口，改动小，随阶段 4 一起做一次。
 - **兼容红线**：SP 文件名/key、keyprovider uri、ACTION_* 常量值全程不变。
+- **D2 收尾挂账**：common 稳定后删除 settings.gradle 中的 `includeBuild('../keydroidx-core')`，回到 mavenLocal/远程坐标形态。
 
 ## 六、后续议项（本计划不覆盖）
 
