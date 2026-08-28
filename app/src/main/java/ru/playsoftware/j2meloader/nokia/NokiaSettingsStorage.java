@@ -121,12 +121,26 @@ public class NokiaSettingsStorage {
 		// 首次启动：后台线程构建默认快捷应用（含 PackageManager 批量查询）
 		NokiaLog.i("SettingsStorage", "shortcut_apps 未配置，后台生成默认快捷应用");
 		final Handler mainHandler = new Handler(Looper.getMainLooper());
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				long start = System.currentTimeMillis();
-				final List<ShortcutApp> defaults = buildDefaultShortcutApps();
-				long elapsed = System.currentTimeMillis() - start;
+        new Thread(new Runnable() {
+                @Override
+                public void run() {
+                        long start = System.currentTimeMillis();
+                        final List<ShortcutApp> defaults;
+                        try {
+                                defaults = buildDefaultShortcutApps();
+                        } catch (Throwable t) {
+                                // 最后防线：默认构建里任何未预料的异常（如 ROM 层 IPC bug）都不允许带崩进程。
+                                // 不落盘（保留 null），下次冷启动会重新尝试构建。
+                                NokiaLog.e("SettingsStorage", "构建默认快捷应用失败，本次返回空列表且不落盘", t);
+                                mainHandler.post(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                                callback.onLoaded(new ArrayList<>());
+                                        }
+                                });
+                                return;
+                        }
+                        long elapsed = System.currentTimeMillis() - start;
 				// 写回前 double-check：构建默认值期间，设置页等可能已经保存了用户配置，
 				// 此时禁止覆盖，否则用户的 7 个选择会被"回滚"成默认值（安卓/J2ME 全部丢失）。
 				final List<ShortcutApp> actual;
@@ -220,15 +234,23 @@ public class NokiaSettingsStorage {
 		for (String[] entry : MUSIC_APP_PRIORITY) {
 			String pkg = entry[0];
 			String label = entry[1];
-			try {
-				pm.getPackageInfo(pkg, 0);
-			} catch (PackageManager.NameNotFoundException e) {
-				continue; // 未安装，尝试下一个
-			}
-			Intent launch = pm.getLaunchIntentForPackage(pkg);
-			if (launch == null || launch.getComponent() == null) {
-				continue;
-			}
+                try {
+                        pm.getPackageInfo(pkg, 0);
+                } catch (PackageManager.NameNotFoundException e) {
+                        continue; // 未安装，尝试下一个
+                }
+                Intent launch;
+                try {
+                        launch = pm.getLaunchIntentForPackage(pkg);
+                } catch (Throwable t) {
+                        // 展讯等 ROM 的 CTA 权限钩子可能对后台线程的 PackageManager IPC 抛 NPE（系统层 bug），
+                        // 这里兜底跳过该项，避免「构建默认快捷栏」的后台线程把整个进程带崩
+                        NokiaLog.w("SettingsStorage", "查询音乐应用启动 Intent 失败，跳过: " + label + " (" + pkg + ")");
+                        continue;
+                }
+                if (launch == null || launch.getComponent() == null) {
+                        continue;
+                }
 			launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 			String appKey = launch.getComponent().getPackageName() + "/"
 					+ launch.getComponent().getClassName();
@@ -241,14 +263,21 @@ public class NokiaSettingsStorage {
 
 	/** 通过包名检查是否已安装，并取主启动 Activity 加入默认列表 */
 	private void addPackageApp(PackageManager pm, List<ShortcutApp> out, String pkg, String label) {
-		try {
-			pm.getPackageInfo(pkg, 0);
-		} catch (PackageManager.NameNotFoundException e) {
-			NokiaLog.i("SettingsStorage", "默认应用未安装，跳过: " + label + " (" + pkg + ")");
-			return;
-		}
-		Intent launch = pm.getLaunchIntentForPackage(pkg);
-		if (launch == null || launch.getComponent() == null) {
+        try {
+                pm.getPackageInfo(pkg, 0);
+        } catch (PackageManager.NameNotFoundException e) {
+                NokiaLog.i("SettingsStorage", "默认应用未安装，跳过: " + label + " (" + pkg + ")");
+                return;
+        }
+        Intent launch;
+        try {
+                launch = pm.getLaunchIntentForPackage(pkg);
+        } catch (Throwable t) {
+                // 同 addMusicApp：ROM 层 CTA 钩子可能对后台线程 IPC 抛 NPE，兜底跳过
+                NokiaLog.w("SettingsStorage", "查询默认应用启动 Intent 失败，跳过: " + label + " (" + pkg + ")");
+                return;
+        }
+        if (launch == null || launch.getComponent() == null) {
 			NokiaLog.w("SettingsStorage", "默认应用无启动 Intent，跳过: " + label + " (" + pkg + ")");
 			return;
 		}
@@ -261,10 +290,17 @@ public class NokiaSettingsStorage {
 
 	/** 通过系统隐式 Intent 解析出可用 Activity 并加入默认列表 */
 	private void addActionApp(PackageManager pm, List<ShortcutApp> out, String key, String label) {
-		Intent intent = buildActionIntent(key);
-		if (intent == null) return;
-		ResolveInfo ri = pm.resolveActivity(intent, 0);
-		if (ri == null || ri.activityInfo == null) {
+                Intent intent = buildActionIntent(key);
+                if (intent == null) return;
+                ResolveInfo ri;
+                try {
+                        ri = pm.resolveActivity(intent, 0);
+                } catch (Throwable t) {
+                        // 同 addMusicApp：ROM 层 CTA 钩子可能对后台线程 IPC 抛 NPE，兜底跳过
+                        NokiaLog.w("SettingsStorage", "解析系统应用失败，跳过: " + label + " (" + key + ")");
+                        return;
+                }
+                if (ri == null || ri.activityInfo == null) {
 			NokiaLog.i("SettingsStorage", "默认应用无可用 Activity，跳过: " + label + " (" + key + ")");
 			return;
 		}
