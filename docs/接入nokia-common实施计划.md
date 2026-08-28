@@ -183,12 +183,22 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 
 **阶段 3 走查（已完成，2026-08-29 全页面回归）**：功能表/百宝箱/桌面设置 6 组及子页（外观与显示、字体选择、主题设置、按键绑定、桌面内容各子页、系统与权限、高级设置、关于）+ 通用选项弹窗逐一进入/返回，底栏三栏文案逐页核对正确，零崩溃；主题列表显示桌面命名（common 调色板已对齐）。锁屏键、录制态按键捕获、Shizuku 页面状态上报未覆盖（需真机手动验证）。
 
-### 阶段 4：feedback 接入（D7）
+### 阶段 4：feedback 接入（D7）— 已完成
 
-1. local.properties 复制密钥两行 → app/build.gradle 注入 BuildConfig。
-2. EmulatorApplication `NokiaFeedback.init(config)`。
-3. 设置组页/关于页加「意见反馈」入口，push common `NokiaFeedbackFragment`（依赖阶段 3 的 NokiaPageHost 对接）；文本输入用 common `NokiaTextInputFragment`。
-4. 走查：提交（含/不含日志附件）、联系方式输入、类型选择弹窗、成功/失败反馈、meta 正确性、9MB 截断。
+1. local.properties 复制密钥两行 → app/build.gradle 注入 BuildConfig。✅
+2. EmulatorApplication `NokiaFeedback.init(config)`（主进程；appName=`KeydroidX-Launcher`，logDir=null 复用 NokiaLog 默认目录）。✅
+3. 关于页加「意见反馈」卡片入口，push common `NokiaFeedbackFragment`（挂在 midPanel）；文本输入走 `NokiaTextInputFragment`。✅
+4. 为了让 common 页面能在桌面宿主里正常工作，配套改了两处：
+   - `refreshPageBar` 改按 **common `NokiaPage`** 判定（桌面 NokiaPage 继承它，所以桌面页面不受影响），否则 common 页面装配不了底栏；
+   - 底栏中键：页面声明了 `getSoftCenterText()` 就用它（common 页面用中键承载「选择/提交」动作），未声明才回退显示页面名（桌面页面一贯行为）。
+   - `NokiaDesktopActivity.finish()` 覆写：有返回栈时改为出栈返回上一层——common 反馈页提交成功后会调 `requireActivity().finish()`，而本 Activity 是 HOME，直接 finish 等于退出桌面。
+5. 走查结果（真机，2026-08-29）：
+   - 底栏「提交 / 选择 / 返回」，五个功能行齐全（问题类型/联系方式/问题描述/附带运行日志/提交按钮）。
+   - 文本输入：进输入页 → 输入 → 按确定回传，值正确回填到对应行。
+   - **日志附件解析正确**：显示「2 个文件 / 240.3KB · 单文件超8MB截断，总量上限约9MB」，证明 logDir=null 复用 NokiaLog 默认目录是对的。
+   - **必填校验顺序正确**：联系方式未填 → 跳转联系方式输入页；类型未选 → 弹类型选择；描述未填 → 跳转描述输入页，均不发网络请求。
+   - **真实提交成功**（用户批准）：提交后约 0.3s 返回成功，自动出栈回到关于页（`finish()` 兜底生效，没有退出桌面），无崩溃。
+   - 未覆盖：9MB 截断（需造超大日志）、失败重试路径。
 
 ---
 
