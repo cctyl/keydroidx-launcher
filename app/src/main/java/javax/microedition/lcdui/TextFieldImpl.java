@@ -271,7 +271,7 @@ class TextFieldImpl {
 			screenContainer.setBackgroundColor(0x00000000); // 100% 透明，完全透出底下 Screen 的主题壁纸
 
 			String title = (ownerTextBox != null) ? ownerTextBox.getTitle() : null;
-			ru.playsoftware.j2meloader.nokia.NokiaTheme.ThemeDef currentTheme = ru.playsoftware.j2meloader.nokia.NokiaTheme.getSelectedTheme(context);
+			io.github.cctyl.nokia.common.ui.NokiaTheme.ThemeDef currentTheme = io.github.cctyl.nokia.common.ui.NokiaTheme.getCurrentTheme(context);
 
 			// 1. 顶部标题与字数栏 (32dp 高度，半透明暗色底，与 HTML .editor-header 一致)
 			LinearLayout header = new LinearLayout(context);

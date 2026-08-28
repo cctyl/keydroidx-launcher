@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import android.app.Dialog;
 import android.os.Bundle;
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import io.github.cctyl.nokia.common.ui.focus.NokiaDialogFocus;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -66,7 +67,7 @@ public class NokiaUninstallDialog extends DialogFragment {
 		softLeft = dialog.findViewById(R.id.softLeft);
 		softRight = dialog.findViewById(R.id.softRight);
 
-		NokiaTheme.ThemeDef theme = NokiaTheme.getSelectedTheme(requireContext());
+		NokiaTheme.ThemeDef theme = NokiaTheme.getCurrentTheme(requireContext());
 		View titleBar = dialog.findViewById(R.id.uninstall_title_bar);
 		if (titleBar != null) titleBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
 		View body = dialog.findViewById(R.id.uninstall_body);

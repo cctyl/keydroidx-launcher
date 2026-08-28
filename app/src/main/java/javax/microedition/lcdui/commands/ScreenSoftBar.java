@@ -92,8 +92,8 @@ public class ScreenSoftBar extends AbstractSoftKeysBar {
 		// 同步当前主题的软键栏背景与文字颜色
 		android.content.Context ctx = binding.rootLayout.getContext();
 		if (ctx != null) {
-			ru.playsoftware.j2meloader.nokia.NokiaTheme.ThemeDef currentTheme = ru.playsoftware.j2meloader.nokia.NokiaTheme.getSelectedTheme(ctx);
-			binding.rootLayout.setBackground(ru.playsoftware.j2meloader.nokia.NokiaTheme.createSoftKeyDrawable(currentTheme));
+			io.github.cctyl.nokia.common.ui.NokiaTheme.ThemeDef currentTheme = io.github.cctyl.nokia.common.ui.NokiaTheme.getCurrentTheme(ctx);
+			binding.rootLayout.setBackground(io.github.cctyl.nokia.common.ui.NokiaTheme.createSoftKeyDrawable(currentTheme));
 			binding.leftButton.setTextColor(currentTheme.accentColor);
 			binding.middleButton.setTextColor(0xFFFFFFFF);
 			binding.rightButton.setTextColor(currentTheme.accentColor);

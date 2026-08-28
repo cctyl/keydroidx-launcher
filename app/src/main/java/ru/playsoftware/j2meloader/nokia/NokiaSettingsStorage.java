@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import ru.playsoftware.j2meloader.R;
 
 import android.content.Context;

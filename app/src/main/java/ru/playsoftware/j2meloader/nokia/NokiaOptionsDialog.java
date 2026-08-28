@@ -5,6 +5,7 @@ import io.github.cctyl.nokia.common.ui.NokiaIcons;
 
 import android.app.Dialog;
 import android.os.Bundle;
+import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import io.github.cctyl.nokia.common.ui.focus.NokiaDialogFocus;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -161,7 +162,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 		// 应用当前主题配色到选项弹窗的标题栏与底栏
 		android.view.View titleBar = dialog.findViewById(R.id.widgetOptionsTitleBar);
 		android.view.View bottomBar = dialog.findViewById(R.id.widgetOptionsBottomBar);
-		NokiaTheme.ThemeDef currentTheme = NokiaTheme.getSelectedTheme(requireContext());
+		NokiaTheme.ThemeDef currentTheme = NokiaTheme.getCurrentTheme(requireContext());
 		if (titleBar != null) {
 			titleBar.setBackground(NokiaTheme.createSoftKeyDrawable(currentTheme));
 		}

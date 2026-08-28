@@ -30,7 +30,7 @@ import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity;
 import io.github.cctyl.nokia.common.ui.focus.NokiaDialogFocus;
 import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
-import ru.playsoftware.j2meloader.nokia.NokiaTheme;
+import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import io.github.cctyl.nokia.common.log.NokiaLog;
 
 /**
@@ -122,7 +122,7 @@ public class NokiaInstallerDialog extends DialogFragment {
 		initViews(dialog);
 		setupKeyListener(dialog);
 
-		NokiaTheme.ThemeDef theme = NokiaTheme.getSelectedTheme(requireContext());
+		NokiaTheme.ThemeDef theme = NokiaTheme.getCurrentTheme(requireContext());
 		View titleBar = dialog.findViewById(R.id.install_title_bar);
 		if (titleBar != null) titleBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
 		View body = dialog.findViewById(R.id.install_body);

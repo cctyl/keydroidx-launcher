@@ -6,6 +6,7 @@ import android.widget.ScrollView;
 
 import androidx.annotation.NonNull;
 
+import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import ru.playsoftware.j2meloader.R;
 
 /**

@@ -17,6 +17,7 @@ import android.content.pm.ServiceInfo;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.graphics.drawable.Drawable;
+import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import io.github.cctyl.nokia.common.ui.drawable.NokiaDashedLineDrawable;
 import android.location.LocationManager;
 import android.media.AudioManager;
