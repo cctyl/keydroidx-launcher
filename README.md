@@ -68,7 +68,7 @@
 3. 在电脑命令行执行该命令：
 
    ```bash
-   adb shell sh /sdcard/Android/data/io.github.cctyl.nokia.debug/files/mini_shizuku.sh
+   adb shell sh /sdcard/Android/data/io.github.cctyl.nokia/files/mini_shizuku.sh
    ```
 
 4. 手机返回 mini_shizuku 页面，按左软键「刷新」，显示「在线」即激活成功。
