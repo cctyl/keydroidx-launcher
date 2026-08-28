@@ -11,6 +11,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -358,8 +359,8 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 
 	/**
 	 * 通过 root shell 把 {@code /data/local/tmp/minishizuku.log} 复制到 {@link NokiaLog}
-	 * 日志目录下，文件名带时间戳。app 自身 uid 无权读 /data/local/tmp，必须经 root；
-	 * 目标目录是 app 私有外存（/sdcard/Android/data/&lt;pkg&gt;/log），root 可写，
+ * 日志目录下，文件名带时间戳。app 自身 uid 无权读 /data/local/tmp，必须经 root；
+ * 目标目录是 app 私有外存（/sdcard/Android/data/&lt;pkg&gt;/files/log），root 可写，
 	 * 复制后用户/我们可直接取走完整原始日志。
 	 */
 	private void copyMinishizukuLog(Shell rootShell) {

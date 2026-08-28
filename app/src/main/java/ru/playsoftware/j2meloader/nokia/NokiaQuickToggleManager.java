@@ -16,6 +16,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.Toast;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import java.lang.reflect.Method;
 
 import ru.playsoftware.mini_shizuku.Shizuku;

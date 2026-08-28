@@ -1,5 +1,6 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import ru.playsoftware.j2meloader.R;
 
 import android.content.Context;
@@ -465,10 +466,14 @@ public class NokiaSettingsStorage {
 		return sp.getBoolean(KEY_LOG_FILE, true);
 	}
 
-	/** 保存日志记录开关（true=详细日志）。 */
+	/**
+	 * 保存日志记录开关（true=详细日志）。
+	 * 同时同步到 common 的日志分级开关，保证两个存储一致（common 初始化时读的是它自己的 SP）。
+	 */
 	public static void setFileLogEnabled(Context ctx, boolean enabled) {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putBoolean(KEY_LOG_FILE, enabled).apply();
+		NokiaLog.setDetailedLogEnabled(ctx, enabled);
 		NokiaLog.i("SettingsStorage", "setFileLogEnabled: " + enabled);
 	}
 

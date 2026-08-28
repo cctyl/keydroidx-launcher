@@ -14,6 +14,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import ru.playsoftware.j2meloader.R;
 
 /**

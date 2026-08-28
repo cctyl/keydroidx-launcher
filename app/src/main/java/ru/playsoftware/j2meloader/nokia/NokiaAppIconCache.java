@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.LruCache;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.concurrent.ExecutorService;

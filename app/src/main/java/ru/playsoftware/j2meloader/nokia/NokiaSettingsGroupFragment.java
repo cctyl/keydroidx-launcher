@@ -1,9 +1,9 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -317,7 +317,6 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 	private void toggleLogEnabled() {
 		boolean next = !NokiaSettingsStorage.isFileLogEnabled(requireContext());
 		NokiaSettingsStorage.setFileLogEnabled(requireContext(), next);
-		NokiaLog.setFileMinLevel(next ? Log.DEBUG : Log.ERROR);
 		NokiaLog.i("SettingsGroup", "日志记录切换为: " + (next ? "开启(详细)" : "关闭(仅错误)"));
 		if (tvNames != null && tvNames.length > 0 && tvNames[0] != null) {
 			tvNames[0].setText(getItemDisplayName(0));

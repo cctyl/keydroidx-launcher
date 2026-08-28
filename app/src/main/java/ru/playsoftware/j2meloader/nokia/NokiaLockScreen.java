@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import io.github.cctyl.nokia.common.log.NokiaLog;
 
 /**
  * 一键锁屏工具。依赖设备管理员权限（DevicePolicyManager.lockNow）。

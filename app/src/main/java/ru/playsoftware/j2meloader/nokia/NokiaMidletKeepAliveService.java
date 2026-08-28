@@ -16,6 +16,7 @@ import android.os.PowerManager;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import javax.microedition.shell.MicroActivity;
 import javax.microedition.shell.MidletThread;
 

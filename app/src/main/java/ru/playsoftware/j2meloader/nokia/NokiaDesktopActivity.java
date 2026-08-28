@@ -20,7 +20,7 @@ import androidx.fragment.app.FragmentManager;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
-import ru.playsoftware.j2meloader.nokia.NokiaLog;
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
 /**
@@ -318,13 +318,13 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 			if (event.getKeyCode() == lastHandledDownKeyCode) {
 				NokiaLog.d("Desktop", "dispatchKeyEvent 拦截已消费按键的 "
 						+ (event.getAction() == KeyEvent.ACTION_UP ? "UP" : "REPEAT")
-						+ " " + NokiaLog.keyName(event.getKeyCode()));
+						+ " " + NokiaKeyBinding.keyName(event.getKeyCode()));
 				return true;
 			}
 			return super.dispatchKeyEvent(event);
 		}
 
-		NokiaLog.d("Desktop", "dispatchKeyEvent 收到按下 " + NokiaLog.keyName(event.getKeyCode()));
+		NokiaLog.d("Desktop", "dispatchKeyEvent 收到按下 " + NokiaKeyBinding.keyName(event.getKeyCode()));
 
 		// 每次按键前重新加载绑定，确保从按键绑定设置返回后的修改立即生效
 		if (keyBinding != null) {
@@ -341,7 +341,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 			// 录制态下：用户按下的任意物理键（含返回键）都照常录成当前动作的绑定，
 			// 不做任何忽略。\"跳过\"只通过屏幕上的触摸按钮触发（onSkipCurrent），
 			// 不会在这里用返回键实现。
-			NokiaLog.i("Desktop", "录制态捕获按键 " + NokiaLog.keyName(kc));
+			NokiaLog.i("Desktop", "录制态捕获按键 " + NokiaKeyBinding.keyName(kc));
 			rec.onKeyRecorded(kc);
 			lastHandledDownKeyCode = kc;
 			return true;
@@ -372,7 +372,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 				}
 			}
 			// 未绑定的按键：允许系统继续处理（如音量键仍然调整音量）
-			NokiaLog.d("Desktop", "未绑定的按键 " + NokiaLog.keyName(event.getKeyCode())
+			NokiaLog.d("Desktop", "未绑定的按键 " + NokiaKeyBinding.keyName(event.getKeyCode())
 					+ "，交给系统处理");
 			resetLastHandledKeyCode();
 			return super.dispatchKeyEvent(event);
@@ -407,7 +407,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity {
 			return true;
 		}
 
-		NokiaLog.d("Desktop", "dispatchKeyEvent 未消费 " + NokiaLog.keyName(event.getKeyCode())
+		NokiaLog.d("Desktop", "dispatchKeyEvent 未消费 " + NokiaKeyBinding.keyName(event.getKeyCode())
 				+ "，交给系统");
 		resetLastHandledKeyCode();
 		return super.dispatchKeyEvent(event);

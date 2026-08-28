@@ -136,9 +136,18 @@ common 版是后出的重构版、能力超集（v 级/分级持久化/installCr
 逐常量核对 unicode 值（抽查 TOGGLE_*、widget 系列）；MaterialIcons ttf 保留 launcher assets 那份（同路径不冲突），后续删重复资源。换 import、删桌面类。
 走查：功能表/widget/快捷开关/弹窗行图标——截图对比（图标字体渲染是视觉回归高发点）。
 
-**2.5 NokiaLog**（约 55 文件 600+ 调用点，含包外文件）
-按 D6：keyName 移 NokiaKeyBinding；删 setEnabled/isEnabled；fileCrash 改签名；EmulatorApplication 换 common init + setTag("NokiaDesktop")；log_file_enabled 代理到 common 分级控制。
-走查：日志落盘（`Android/data/<pkg>/log/yyyyMMdd.log`）、7 天轮转、debug/release 默认级别、设置页日志开关、崩溃 CRASH 记录。
+**2.5 NokiaLog**（约 49 文件 600+ 调用点，含包外文件）
+按 D6：日志实现统一采用 common；迁移事项如下：
+- `keyName(int)` 从 NokiaLog 迁入 `NokiaKeyBinding.keyName()`（逻辑归属更合理），6 文件 22 处调用改走 `NokiaKeyBinding.keyName(...)`。
+- 删桌面 `NokiaLog` 类；所有调用文件切到 `io.github.cctyl.nokia.common.log.NokiaLog`。
+- 旧 API：`setEnabled/isEnabled` 已确认无调用，直接删除；`fileCrash(String, Throwable)` 改为 common 的 `fileCrash(Thread, Throwable)`。
+- 目录按生态约定改为 `<外存>/Android/data/<pkg>/files/log`（旧 `/log` 目录不再清理，历史日志保留）。
+- 桌面「日志记录」开关（`nokia_desktop_settings.log_file_enabled`）继续作为用户级持久源：
+  - `EmulatorApplication` 在 `NokiaLog.init(this)` 后用 `NokiaSettingsStorage.isFileLogEnabled()` 覆盖 common 初始化出的 `sFileMinLevel`。
+  - `NokiaSettingsStorage.setFileLogEnabled()` 双写：写桌面 SP 后调用 `NokiaLog.setDetailedLogEnabled()`，让 common SP 同步，保证两端取值一致。
+- common `NokiaLog.init` 在 `Application.attachBaseContext()` 阶段会因 `getApplicationContext()` 为 null 而 NPE，已修复 common（回退到传入 Context + 加保护）。
+- 标签语义变化：桌面原 `[sub] msg` 统一由 logcat tag 承载，即原 sub 字符串成为 common 的 tag；日志文件不再含统一 `NokiaDesktop` tag。adb 过滤改为 `-s Desktop:* KeyBinding:*` 等组合。
+走查：日志落盘、7 天轮转、debug/release 默认级别、设置页日志开关、崩溃 CRASH 记录、:midlet 进程是否也记录（本阶段仍保持仅主进程）。
 
 **2.6 NokiaTheme**（24 文件，含 J2ME 层 4 处）
 前置：D3 调色板对齐（core 改 + 发 1.0.1，launcher 升版本）。

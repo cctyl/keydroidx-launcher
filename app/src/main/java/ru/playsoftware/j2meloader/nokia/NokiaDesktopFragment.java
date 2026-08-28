@@ -1,5 +1,6 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
 
 import android.app.ActivityManager;
@@ -906,7 +907,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		NokiaKeyBinding kb = host != null ? host.getKeyBinding() : null;
 		int kc = kb != null ? kb.getKeyCode(NokiaKeyBinding.ACTION_LOCK_SCREEN)
 				: KeyEvent.KEYCODE_UNKNOWN;
-		String keyName = NokiaLog.keyName(kc);
+		String keyName = NokiaKeyBinding.keyName(kc);
 		NokiaLog.i("Desktop", "锁屏组件提示文字: 按下" + keyName + "键锁屏");
 		return "按下" + keyName + "键锁屏";
 	}

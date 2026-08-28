@@ -11,6 +11,7 @@ import androidx.preference.PreferenceManager;
 
 import com.google.gson.GsonBuilder;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import java.io.File;
 
 import javax.microedition.lcdui.Canvas;

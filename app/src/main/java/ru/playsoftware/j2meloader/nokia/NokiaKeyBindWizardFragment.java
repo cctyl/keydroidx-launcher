@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -150,7 +151,7 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 		// 同步到全局 JAR 设置
 		NokiaGlobalProfile.syncKeyBindings(requireContext());
 		NokiaLog.i("KeyWizard", "第 " + (action + 1) + " 项 绑定成功 "
-				+ NokiaLog.keyName(keycode));
+				+ NokiaKeyBinding.keyName(keycode));
 
 		int next = action + 1;
 		if (next >= NokiaKeyBinding.ACTION_COUNT) {
@@ -169,7 +170,7 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 		if (state != STATE_RECORDING) return;
 		int action = recordingStep;
 		NokiaLog.i("KeyWizard", "第 " + (action + 1) + " 项 跳过（保留默认 "
-				+ NokiaLog.keyName(keyBinding.getKeyCode(action)) + "）");
+				+ NokiaKeyBinding.keyName(keyBinding.getKeyCode(action)) + "）");
 
 		int next = action + 1;
 		if (next >= NokiaKeyBinding.ACTION_COUNT) {

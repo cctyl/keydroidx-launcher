@@ -15,6 +15,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 
@@ -195,12 +196,12 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		recordingAction = -1;
 
 		NokiaLog.i("KeyBind", "录制完成 action=" + NokiaKeyBinding.getActionName(action)
-				+ " 捕获 " + NokiaLog.keyName(keycode));
+				+ " 捕获 " + NokiaKeyBinding.keyName(keycode));
 
 		int occupied = keyBinding.getActionForKeyCode(keycode);
 		if (occupied >= 0 && occupied != action) {
 			// 该键已被其它动作占用，进入确认模式（复用方向键/确认/返回导航）
-			NokiaLog.w("KeyBind", "录制冲突：" + NokiaLog.keyName(keycode)
+			NokiaLog.w("KeyBind", "录制冲突：" + NokiaKeyBinding.keyName(keycode)
 					+ " 已被 " + NokiaKeyBinding.getActionName(occupied) + " 占用");
 			enterConfirm(action, occupied, keycode);
 			return;
@@ -217,7 +218,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		recordingAction = -1;
 		recordStatusBar.setVisibility(View.GONE);
 		NokiaLog.i("KeyBind", "跳过录制 action=" + NokiaKeyBinding.getActionName(action)
-				+ "（保留默认 " + NokiaLog.keyName(keyBinding.getKeyCode(action)) + "）");
+				+ "（保留默认 " + NokiaKeyBinding.keyName(keyBinding.getKeyCode(action)) + "）");
 	}
 
 	/** 应用绑定并刷新列表。 */
@@ -273,7 +274,7 @@ public class NokiaKeyBindFragment extends NokiaPageFragment implements NokiaKeyR
 		tvInfo.setLayoutParams(new LinearLayout.LayoutParams(
 				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 		tvInfo.setText(NokiaKeyBinding.getActionName(confirmOccupied) + " → "
-				+ NokiaLog.keyName(confirmKeycode));
+				+ NokiaKeyBinding.keyName(confirmKeycode));
 		tvInfo.setTextColor(0xFFE0E0E0);
 		NokiaDimens.textSize(tvInfo, 10);
 		recordStatusBar.addView(tvInfo);

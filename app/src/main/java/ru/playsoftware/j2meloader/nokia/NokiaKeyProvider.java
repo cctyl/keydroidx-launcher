@@ -9,6 +9,7 @@ import android.net.Uri;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import io.github.cctyl.nokia.common.log.NokiaLog;
 
 /**
  * 原键桌面对外数据 Provider。
@@ -98,7 +99,7 @@ public class NokiaKeyProvider extends ContentProvider {
 		for (int i = 0; i < NokiaKeyBinding.ACTION_COUNT && i < keyCodes.length; i++) {
 			int kc = keyCodes[i];
 			String tag = (i < ACTION_TAGS.length) ? ACTION_TAGS[i] : ("ACTION_" + i);
-			String name = NokiaLog.keyName(kc);
+			String name = NokiaKeyBinding.keyName(kc);
 
 			cursor.addRow(new Object[]{
 					tag,

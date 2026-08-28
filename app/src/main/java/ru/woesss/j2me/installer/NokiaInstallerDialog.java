@@ -31,7 +31,7 @@ import ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity;
 import io.github.cctyl.nokia.common.ui.focus.NokiaDialogFocus;
 import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
 import ru.playsoftware.j2meloader.nokia.NokiaTheme;
-import ru.playsoftware.j2meloader.nokia.NokiaLog;
+import io.github.cctyl.nokia.common.log.NokiaLog;
 
 /**
  * 诺基亚风格 JAR 安装弹窗。

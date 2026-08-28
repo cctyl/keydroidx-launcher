@@ -1,5 +1,6 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
 
 import android.os.Bundle;

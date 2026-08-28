@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
+import io.github.cctyl.nokia.common.log.NokiaLog;
 
 /**
  * 桌面辅助工具类，集中处理 Launcher 状态检测、回到桌面 Intent 构建等逻辑。

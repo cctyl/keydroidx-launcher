@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import android.app.admin.DeviceAdminReceiver;
 import android.content.Context;
 import android.content.Intent;
+import io.github.cctyl.nokia.common.log.NokiaLog;
 
 /**
  * 设备管理员 Receiver（无 UI）。仅用于支持桌面「锁屏」一键锁屏息屏，

@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;

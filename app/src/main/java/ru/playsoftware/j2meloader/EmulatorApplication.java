@@ -26,6 +26,7 @@ import android.content.pm.Signature;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.multidex.MultiDex;
@@ -42,9 +43,10 @@ import java.util.Arrays;
 
 import javax.microedition.util.ContextHolder;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import ru.playsoftware.j2meloader.nokia.LauncherThemeProvider;
-import ru.playsoftware.j2meloader.nokia.NokiaLog;
+import ru.playsoftware.j2meloader.nokia.NokiaSettingsStorage;
 import ru.playsoftware.j2meloader.util.Constants;
 
 public class EmulatorApplication extends Application {
@@ -83,7 +85,12 @@ public class EmulatorApplication extends Application {
 		// 避免冷启动进程阶段阻塞首帧；仅主进程延迟，:midlet 子进程保持同步初始化（游戏崩溃上报不受影响）。
 		if (isMainProcess()) {
 			// 文件日志 + 崩溃堆栈落盘：尽早初始化，覆盖冷启动阶段的崩溃。
+			// 日志实现统一走 common；目录按生态约定为 <外存>/files/log。
 			NokiaLog.init(this);
+			// 桌面设置「日志记录」优先：该开关原存在 nokia_desktop_settings，
+			// 为兼容老用户继续以它为准，覆盖 common 初始化时的取值。
+			NokiaLog.setFileMinLevel(NokiaSettingsStorage.isFileLogEnabled(this)
+					? Log.DEBUG : Log.ERROR);
 			installCrashHandler();
 			new Handler(Looper.getMainLooper()).postDelayed(this::initAcra, 2000);
 		} else {
@@ -129,7 +136,7 @@ public class EmulatorApplication extends Application {
 		try {
 			final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
 			Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-				NokiaLog.fileCrash("未捕获异常（主进程）", throwable);
+				NokiaLog.fileCrash(thread, throwable);
 				if (prev != null) {
 					prev.uncaughtException(thread, throwable);
 				} else {

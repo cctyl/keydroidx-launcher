@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import io.github.cctyl.nokia.common.log.NokiaLog;
 
 /**
  * 锁屏广播接收器：供 native 拦截器通过 {@code am broadcast} 触发 Device Admin 锁屏。

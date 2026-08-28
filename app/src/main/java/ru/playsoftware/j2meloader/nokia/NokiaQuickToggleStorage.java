@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;

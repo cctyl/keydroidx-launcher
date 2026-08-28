@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Process;
 
+import io.github.cctyl.nokia.common.log.NokiaLog;
 import javax.microedition.shell.MidletThread;
 
 /**

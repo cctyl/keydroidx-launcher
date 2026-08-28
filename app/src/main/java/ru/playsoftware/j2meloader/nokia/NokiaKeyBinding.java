@@ -2,7 +2,9 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.view.KeyEvent;
+import io.github.cctyl.nokia.common.log.NokiaLog;
 
 /**
  * 按键绑定存储类。
@@ -106,7 +108,7 @@ public class NokiaKeyBinding {
 		for (int i = 0; i < ACTION_COUNT; i++) {
 			int kc = keycodes[i];
 			String state = NokiaKeyBinding.isBound(kc)
-					? NokiaLog.keyName(kc)
+					? keyName(kc)
 					: "未绑定";
 			NokiaLog.i("KeyBinding", "  " + getActionName(i) + " -> " + state);
 		}
@@ -151,7 +153,7 @@ public class NokiaKeyBinding {
 					keycodes[i] = KeyEvent.KEYCODE_UNKNOWN;
 					prefs.edit().putInt(PREF_KEYS[i], KeyEvent.KEYCODE_UNKNOWN).apply();
 					NokiaLog.i("KeyBinding", "清除冲突绑定 "
-							+ getActionName(i) + "（原占用 " + NokiaLog.keyName(keycode) + "）");
+							+ getActionName(i) + "（原占用 " + keyName(keycode) + "）");
 				}
 			}
 		}
@@ -160,7 +162,7 @@ public class NokiaKeyBinding {
 		prefs.edit().putInt(PREF_KEYS[action], keycode).apply();
 		NokiaLog.i("KeyBinding",
 				"setKeyCode " + getActionName(action)
-						+ " : " + NokiaLog.keyName(old) + " -> " + NokiaLog.keyName(keycode));
+						+ " : " + keyName(old) + " -> " + keyName(keycode));
 		notifyProviderChanged();
 	}
 
@@ -216,13 +218,13 @@ public class NokiaKeyBinding {
 	public int resolveAction(KeyEvent event) {
 		if (event.getAction() != KeyEvent.ACTION_DOWN) {
 			NokiaLog.d("KeyBinding", "resolveAction 忽略非按下事件 action="
-					+ event.getAction() + " keyCode=" + NokiaLog.keyName(event.getKeyCode()));
+					+ event.getAction() + " keyCode=" + keyName(event.getKeyCode()));
 			return -1;
 		}
 		int keyCode = event.getKeyCode();
 		int action = getActionForKeyCode(keyCode);
 		if (action >= 0) {
-			NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(keyCode)
+			NokiaLog.d("KeyBinding", "resolveAction " + keyName(keyCode)
 					+ " -> " + getActionName(action) + "(" + action + ")");
 			return action;
 		}
@@ -235,18 +237,18 @@ public class NokiaKeyBinding {
 				|| keyCode == KeyEvent.KEYCODE_SPACE
 				|| keyCode == KeyEvent.KEYCODE_BUTTON_A) {
 			NokiaLog.i("KeyBinding", "resolveAction 通用确认键兜底 "
-					+ NokiaLog.keyName(keyCode) + " -> 确认(" + ACTION_SELECT + ")");
+					+ keyName(keyCode) + " -> 确认(" + ACTION_SELECT + ")");
 			return ACTION_SELECT;
 		}
 
 		// 菜单键兜底为左软键（部分设备没有独立软键，用菜单键代替"选择"）
 		if (keyCode == KeyEvent.KEYCODE_MENU) {
 			NokiaLog.i("KeyBinding", "resolveAction 菜单键兜底 "
-					+ NokiaLog.keyName(keyCode) + " -> 左软键(" + ACTION_SOFT_LEFT + ")");
+					+ keyName(keyCode) + " -> 左软键(" + ACTION_SOFT_LEFT + ")");
 			return ACTION_SOFT_LEFT;
 		}
 
-		NokiaLog.d("KeyBinding", "resolveAction " + NokiaLog.keyName(keyCode)
+		NokiaLog.d("KeyBinding", "resolveAction " + keyName(keyCode)
 				+ " -> 未绑定(-1)");
 		return -1;
 	}
@@ -318,6 +320,54 @@ public class NokiaKeyBinding {
 				return consumeUnmapped; // 表单弹窗返回 false，留给 EditText/列表
 			default:
 				return false;
+		}
+	}
+
+	/**
+	 * 把 keyCode 转成面向用户的中文键名（日志与 UI 通用）。
+	 * 原在 NokiaLog 中；NokiaLog 合并到 common 后迁入本类——按键语义归属按键绑定类更合理。
+	 */
+	public static String keyName(int keyCode) {
+		switch (keyCode) {
+			case KeyEvent.KEYCODE_DPAD_UP:      return "上";
+			case KeyEvent.KEYCODE_DPAD_DOWN:    return "下";
+			case KeyEvent.KEYCODE_DPAD_LEFT:    return "左";
+			case KeyEvent.KEYCODE_DPAD_RIGHT:   return "右";
+			case KeyEvent.KEYCODE_DPAD_CENTER:  return "确认";
+			case KeyEvent.KEYCODE_ENTER:        return "确定";
+			case KeyEvent.KEYCODE_SPACE:        return "空格";
+			case KeyEvent.KEYCODE_BUTTON_A:     return "A";
+			case KeyEvent.KEYCODE_SOFT_LEFT:    return "左软键";
+			case KeyEvent.KEYCODE_SOFT_RIGHT:   return "右软键";
+			case KeyEvent.KEYCODE_MENU:         return "菜单";
+			case KeyEvent.KEYCODE_BACK:         return "返回";
+			case KeyEvent.KEYCODE_ENDCALL:      return "挂机";
+			case KeyEvent.KEYCODE_CALL:         return "通话";
+			case KeyEvent.KEYCODE_CAMERA:       return "相机";
+			case KeyEvent.KEYCODE_VOLUME_UP:    return "音量加";
+			case KeyEvent.KEYCODE_VOLUME_DOWN:  return "音量减";
+			case KeyEvent.KEYCODE_POWER:        return "电源";
+			case KeyEvent.KEYCODE_HOME:         return "Home";
+			case KeyEvent.KEYCODE_STAR:         return "*号";
+			case KeyEvent.KEYCODE_POUND:        return "井号";
+			case KeyEvent.KEYCODE_DEL:          return "删除";
+			case KeyEvent.KEYCODE_CLEAR:        return "清除";
+			case KeyEvent.KEYCODE_0:            return "0";
+			case KeyEvent.KEYCODE_1:            return "1";
+			case KeyEvent.KEYCODE_2:            return "2";
+			case KeyEvent.KEYCODE_3:            return "3";
+			case KeyEvent.KEYCODE_4:            return "4";
+			case KeyEvent.KEYCODE_5:            return "5";
+			case KeyEvent.KEYCODE_6:            return "6";
+			case KeyEvent.KEYCODE_7:            return "7";
+			case KeyEvent.KEYCODE_8:            return "8";
+			case KeyEvent.KEYCODE_9:            return "9";
+			case KeyEvent.KEYCODE_UNKNOWN:      return "未绑定";
+			default:
+				if (Build.VERSION.SDK_INT >= 29) {
+					return KeyEvent.keyCodeToString(keyCode);
+				}
+				return "KEYCODE_" + keyCode;
 		}
 	}
 }
