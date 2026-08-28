@@ -9,6 +9,11 @@ android {
     defaultConfig {
         minSdk MIN_SDK
         targetSdk TARGET_SDK
+        // 把 keep 规则以「消费方规则」导出给宿主 app 的 R8。
+        // server 包被 app_process 按类名反射加载（app 主代码不引用），
+        // 不导出则 :app release 的 R8 会把 server.** 当不可达代码删除/改名，
+        // 导致 app_process 启动即 ClassNotFoundException、服务永远不上线。
+        consumerProguardFiles 'proguard-rules.pro'
     }
 
     buildTypes {

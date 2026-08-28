@@ -30,6 +30,11 @@
 -keep class mmpp.media.** { *; }
 -keep class org.microemu.** { *; }
 -keep class ru.playsoftware.j2meloader.util.SparseIntArrayAdapter { *; }
+# mini_shizuku 服务端被 app_process 按类名反射加载（app 主代码不引用），
+# release R8 默认会当不可达代码删除/改名 -> app_process 启动即
+# ClassNotFoundException、服务永远不上线。必须保名保成员。
+# （库已用 consumerProguardFiles 导出，这里再加一道直保兜底。）
+-keep class ru.playsoftware.mini_shizuku.server.** { *; }
 # Keep the BuildConfig
 -keep class ru.playsoftware.j2meloader.BuildConfig { *; }
 

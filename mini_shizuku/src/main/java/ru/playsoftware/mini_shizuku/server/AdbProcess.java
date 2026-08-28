@@ -29,6 +29,10 @@ public final class AdbProcess {
                     new SocketService().start();
                 } catch (Throwable t) {
                     Log.e(TAG, "SocketService start failed", t);
+                    // 绑定失败（端口被占且旧实例不退）等场景下，主 Looper 继续 loop
+                    // 只会留下一个什么都不做的僵尸 app_process。直接退出进程。
+                    Log.e(TAG, "exiting app_process due to SocketService failure");
+                    System.exit(1);
                 }
             }
         }, "MiniShizuku-Socket").start();

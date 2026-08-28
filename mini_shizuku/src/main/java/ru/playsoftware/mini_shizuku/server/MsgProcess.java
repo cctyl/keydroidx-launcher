@@ -27,6 +27,8 @@ public class MsgProcess implements Runnable {
     private static final String CMD_INTERCEPTOR_START = "INTERCEPTOR_START";
     private static final String CMD_INTERCEPTOR_STOP = "INTERCEPTOR_STOP";
     private static final String CMD_PAGE_STATE = "PAGE_STATE|";
+    /** 请求服务端自行退出（跨 uid 切换激活时，新实例通过 IPC 调用，绕开 kill 权限）。 */
+    private static final String CMD_SERVER_STOP = "SERVER_STOP";
     private static final String EXIT_PREFIX = "EXIT:";
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -61,6 +63,8 @@ public class MsgProcess implements Runnable {
                         handleInterceptorStop();
                     } else if (cmd.startsWith(CMD_PAGE_STATE)) {
                         handlePageState(cmd.substring(CMD_PAGE_STATE.length()));
+                    } else if (cmd.equals(CMD_SERVER_STOP)) {
+                        handleServerStop();
                     } else {
                         // 普通 Shell 命令（静默执行）
                         Log.i(TAG, "exec(silent): " + cmd);
@@ -114,6 +118,27 @@ public class MsgProcess implements Runnable {
         boolean isMain = "1".equals(value.trim());
         Log.i(TAG, "page state: " + (isMain ? "main" : "sub"));
         InterceptorNative.setPageState(isMain);
+    }
+
+    /**
+     * 处理服务端停止请求：回写确认后，延时一小段时间（让回复刷盘）再
+     * {@link System#exit(int)} 结束整个 app_process，释放监听端口。
+     * <p>用于跨 uid 切换激活场景：新启动的 app_process 发现端口被占时，
+     * 通过本命令请旧实例（可能是别的 uid，脚本 kill 不到）自行退出。
+     */
+    private void handleServerStop() {
+        Log.i(TAG, "server stop requested");
+        reply("OK:server stopping");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException ignored) {
+                }
+                System.exit(0);
+            }
+        }, "MiniShizuku-Exit").start();
     }
 
     /**

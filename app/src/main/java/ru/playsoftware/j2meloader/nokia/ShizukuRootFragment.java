@@ -287,11 +287,20 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 			}
 			String apk = requireContext().getApplicationInfo().sourceDir;
 			String pkg = requireContext().getPackageName();
+			// 与 assets/mini_shizuku.sh 保持一致：日志先试固定名，写不动（被其它 uid 占用）
+			// 则退到带 uid 后缀的专属文件，避免 root/adb 混用激活时 app_process 因
+			// "can't create ...: Permission denied" 根本不启动。
 			String script = "trap '' 1; "
 					+ "ps | grep app_process | grep -v grep | while read -r line; do set -- $line; kill -9 $2 2>/dev/null; done; "
+					+ "LOG=/data/local/tmp/minishizuku.log; "
+					+ "if ! ( : >> \"$LOG\" ) 2>/dev/null; then "
+					+ "u=$(id -u 2>/dev/null); [ -z \"$u\" ] && u=$$; "
+					+ "LOG=/data/local/tmp/minishizuku.$u.log; "
+					+ "fi; "
+					+ ": > \"$LOG\" 2>/dev/null; "
 					+ "app_process -Djava.class.path='" + apk + "' -Dapp.package='" + pkg
 					+ "' /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess"
-					+ " >> /data/local/tmp/minishizuku.log 2>&1 &";
+					+ " >> \"$LOG\" 2>&1 &";
 			NokiaLog.i("ShizukuRoot", "执行 root 启动: " + script);
 			// 在 root shell 上执行脚本（复用同一持久 root shell，与 su -c 等价）
 			Shell.Result r = rootShell.newJob().add(script).exec();
@@ -311,8 +320,9 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 	 * <ul>
 	 *   <li>{@code getenforce} - SELinux mode;</li>
 	 *   <li>list {@code app_process} procs (is the server alive? as which uid?);</li>
-	 *   <li>{@code tail /data/local/tmp/minishizuku.log} - where the startup script
-	 *       redirects stdout/stderr; app_process crash stacks / SELinux denials land here;</li>
+	 *   <li>{@code tail /data/local/tmp/minishizuku*.log} - where the startup script
+	 *       redirects stdout/stderr (脚本可能因 root/adb 混用而退到带 uid 后缀的日志);
+	 *       app_process crash stacks / SELinux denials land here;</li>
 	 *   <li>{@code logcat -s MiniShizuku} - server-side Log output (Java-level errors).</li>
 	 * </ul>
 	 * Silently records a single line if the root shell is unavailable; never throws.

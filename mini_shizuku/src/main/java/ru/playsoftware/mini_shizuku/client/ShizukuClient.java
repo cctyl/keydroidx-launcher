@@ -48,6 +48,27 @@ public final class ShizukuClient {
     }
 
     /**
+     * 请求正在运行的服务端自行退出（通过 IPC 发送 {@code SERVER_STOP}，不依赖 kill 权限，
+     * 跨 uid 可达）。用于切换激活方式前主动停掉旧实例，避免端口冲突。
+     *
+     * @return true 表示已连上并发出了停止命令。
+     */
+    public static boolean stopServer() {
+        Socket socket = new Socket();
+        try {
+            socket.connect(new InetSocketAddress(HOST, PORT), CONNECT_TIMEOUT);
+            OutputStream out = socket.getOutputStream();
+            out.write((PREFIX_SILENT + "SERVER_STOP" + "\n").getBytes(UTF8));
+            out.flush();
+            return true;
+        } catch (IOException e) {
+            return false;
+        } finally {
+            closeQuietly(socket);
+        }
+    }
+
+    /**
      * 发送一条命令给服务端静默执行（不回读输出）。
      *
      * @return 是否成功写入（服务在线且发送成功）。
