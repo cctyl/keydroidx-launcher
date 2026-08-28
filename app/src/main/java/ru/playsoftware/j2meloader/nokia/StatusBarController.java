@@ -26,6 +26,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
+import io.github.cctyl.nokia.common.ui.NokiaBatteryDrawable;
 import ru.playsoftware.j2meloader.R;
 
 import java.util.List;
