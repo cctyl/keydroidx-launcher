@@ -2,6 +2,7 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.graphics.Color;
 import android.os.Bundle;
+import io.github.cctyl.nokia.common.ui.drawable.NokiaDashedLineDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
