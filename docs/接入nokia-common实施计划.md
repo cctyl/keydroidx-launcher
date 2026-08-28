@@ -167,10 +167,16 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 
 ### 阶段 3：页面契约体系（中风险，逐层小步）
 
-1. `NokiaDesktopActivity` 实现 common `NokiaPageHost`（refreshPageBar/exitCurrent 签名对齐）+ `KeyResolver`（委托 NokiaKeyBinding.resolveAction）；桌面自有扩展（getKeyBinding/getScale/getMidPanelHeight/scaleMidContent/applyCurrentTheme）保留为桌面级宿主能力。
-2. 桌面 `NokiaPage`/`NokiaFocusHost` → common 接口（ACTION 值已验证一致；common NokiaPage 多 `getSoftCenterText()`，桌面页面补默认实现）。
-3. 桌面三个页面基类**保留**（240dp/壁纸/isDirectionEnabled 等桌面语义），仅把 `(NokiaDesktopActivity) requireActivity()` 强转改为宿主接口调用。
+**已完成（第 1 步）**：
+1. `NokiaDesktopActivity` 实现 common `NokiaPageHost`（refreshPageBar/exitCurrent 签名一致）+ `KeyResolver`（`resolveAction` 委托 NokiaKeyBinding，纯查询不做 reload）。
+2. 桌面 `NokiaFocusHost` 删除，改用 common 同名接口（16 文件）；桌面 `NokiaPage` 改为继承 common `NokiaPage`，中软键给 `default null` 实现；`refreshPageBar` 局部变量改 CharSequence。
+3. `NokiaOptionsDialog` 按键解析改走 `KeyResolver` 契约（不再强转 Activity）。
 4. NokiaBaseActivity/NokiaOptionsDialog 按 D4 保留，仅内部调用已换 common。
+
+**待做（第 2 步，风险最高的一块）**：
+5. 桌面三个页面基类**保留**（240dp/壁纸/isDirectionEnabled 等桌面语义），把 `(NokiaDesktopActivity) requireActivity()` 强转改为宿主接口调用。
+   现状：约 **90 处强转 / 30 个文件**，且绝大多数用的是桌面专有能力（`openFragment`/`openBox`/`openMenu`/`openDesktopSettings`/`recreate`/`isDefaultLauncher`/`reloadKeyBindings`/`getKeyBinding`/`requestSetDefaultLauncher`），不是 common `NokiaPageHost` 能覆盖的。
+   做法：新增桌面级 `NokiaDesktopHost extends NokiaPageHost`（声明上述桌面能力），`NokiaDesktopActivity` 实现它；页面强转逐个改为该接口。需逐调用点判断：凡是把宿主当 Activity/Context 用的（如 `safeDrawable(host, resId)`）保持原强转不动。
 
 走查（全页面回归）：14 个 PageFragment + 9 个 ListPage + 2 个 ScrollPage 子类逐一：进入/返回、软键三栏文案、方向键循环焦点、LEFT/RIGHT 钩子、DOWN/UP 配对（软键不双触发）、录制态按键捕获、锁屏键、页面状态上报（Shizuku）。
 
