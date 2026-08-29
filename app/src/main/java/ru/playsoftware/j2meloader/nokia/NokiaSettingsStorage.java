@@ -363,6 +363,37 @@ public class NokiaSettingsStorage {
 		NokiaLog.i("SettingsStorage", "setWallpaper: " + wallpaperId);
 	}
 
+	// ── 自定义壁纸缩放模式（桌面设置 → 外观与显示 → 壁纸设置） ──
+
+	/** 缩放模式：居中裁剪（铺满屏幕，裁掉溢出部分）。 */
+	public static final int WALLPAPER_SCALE_CROP = 0;
+	/** 缩放模式：拉伸铺满（忽略宽高比，可能变形）。 */
+	public static final int WALLPAPER_SCALE_STRETCH = 1;
+	/** 缩放模式：适应屏幕（完整显示，留边处显示主题背景色）。 */
+	public static final int WALLPAPER_SCALE_FIT = 2;
+
+	private static final String KEY_WALLPAPER_SCALE = "wallpaper_scale";
+
+	/**
+	 * 读取自定义壁纸的缩放模式，默认居中裁剪。
+	 * 静态方法：供 {@link NokiaWallpaper} 在构建背景 Drawable 时读取。
+	 */
+	public static int getWallpaperScale(Context ctx) {
+		int mode = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getInt(KEY_WALLPAPER_SCALE, WALLPAPER_SCALE_CROP);
+		if (mode < WALLPAPER_SCALE_CROP || mode > WALLPAPER_SCALE_FIT) {
+			return WALLPAPER_SCALE_CROP;
+		}
+		return mode;
+	}
+
+	/** 保存自定义壁纸的缩放模式。 */
+	public static void setWallpaperScale(Context ctx, int mode) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putInt(KEY_WALLPAPER_SCALE, mode).apply();
+		NokiaLog.i("SettingsStorage", "setWallpaperScale: " + mode);
+	}
+
 	/** 获取当前壁纸对应的内置 Drawable Resource ID（如果为 custom 则返回 0） */
 	public int getWallpaperDrawableRes() {
 		String wp = getWallpaper();

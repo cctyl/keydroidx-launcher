@@ -302,7 +302,9 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		NokiaTheme.ThemeDef theme = storage.getTheme();
 		View wall = findViewById(R.id.wallpaper);
 		if (wall != null) {
-			wall.setBackground(NokiaTheme.createBackgroundDrawable(theme));
+			// 已设置自定义壁纸时用「主题渐变 + 自定义图片」叠加（全页面统一生效），
+			// 否则沿用主题渐变。
+			wall.setBackground(NokiaWallpaper.createWallpaperDrawable(this, theme));
 		}
 		View bottomBar = findViewById(R.id.bottomPanel);
 		if (bottomBar != null) {
