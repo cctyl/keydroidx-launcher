@@ -153,8 +153,9 @@ public class NokiaQuickToggleSettingsFragment extends NokiaPageFragment {
 			row.setPadding(padH, padV, padH, padV);
 
 			// 1. 复选框标记 [✓] 或 [ ] (普通模式) / 排序序号 (排序模式)
+			// 与「快捷栏设置」页保持一致：复选框统一在行首，字号走 NokiaFontManager（dp 单位 + 全局像素字体）
 			TextView checkTv = new TextView(getContext());
-			checkTv.setTextSize(12);
+			NokiaFontManager.textSize(checkTv, 12);
 			if (mode == MODE_SORT) {
 				checkTv.setText((i + 1) + ".");
 				checkTv.setTextColor(0xFF888888);

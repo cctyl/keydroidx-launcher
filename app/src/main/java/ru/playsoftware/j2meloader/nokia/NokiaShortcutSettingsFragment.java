@@ -268,6 +268,17 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 					} catch (Exception ignored) {}
 				}
 			}
+			// 选中/未选中标记。
+			// 与「快捷开关」设置页保持一致：复选框统一放在行首，且用 WRAP_CONTENT 自适应宽度
+			// ——原先固定在右侧并 setWidth(24dp)，14 号字的 "[✓]" 宽于 24dp 被截断显示不全。
+			TextView tvCheck = new TextView(requireContext());
+			tvCheck.setLayoutParams(new LinearLayout.LayoutParams(
+					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+			NokiaFontManager.textSize(tvCheck, 12);
+			applyCheckState(tvCheck, key);
+			tvCheck.setTag("check_" + i);
+			row.addView(tvCheck);
+
 			ImageView iv = new ImageView(requireContext());
 			iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 24), NokiaDimens.dp(getResources(), 24)));
 			if (listIcon != null) {
@@ -295,24 +306,6 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 			tv.setEllipsize(TextUtils.TruncateAt.END);
 			row.addView(tv);
 
-			// 选中/未选中标记
-			TextView tvCheck = new TextView(requireContext());
-			tvCheck.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-			tvCheck.setWidth(NokiaDimens.dp(getResources(), 24));
-			tvCheck.setHeight(NokiaDimens.dp(getResources(), 24));
-			tvCheck.setGravity(Gravity.CENTER);
-			NokiaFontManager.textSize(tvCheck, 14);
-			if (selectedMap.containsKey(key)) {
-				tvCheck.setText("[✓]");
-				tvCheck.setTextColor(0xFF4CAF50);
-			} else {
-				tvCheck.setText("[ ]");
-				tvCheck.setTextColor(0xFF888888);
-			}
-			tvCheck.setTag("check_" + i);
-			row.addView(tvCheck);
-
 			row.setTag(key);
 			final int index = i;
 			row.setOnClickListener(v -> {
@@ -326,6 +319,18 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 
 		updateCountText();
 		setFocusIndex(0);
+	}
+
+	/**
+	 * 刷新单个复选框的显示（勾选态 / 未勾选态）。
+	 * 构建列表与切换选中都走这里，保证两处样式不会各写一份而失同步。
+	 * 文案末尾的空格用于与后面的应用图标留出间隔（与「快捷开关」页一致）。
+	 */
+	private void applyCheckState(TextView check, String key) {
+		if (check == null) return;
+		boolean selected = selectedMap.containsKey(key);
+		check.setText(selected ? "[✓] " : "[ ] ");
+		check.setTextColor(selected ? 0xFF00FF66 : 0xFF888888);
 	}
 
 	private String makeKeyForItem(NokiaAppItem app) {
@@ -383,13 +388,7 @@ public class NokiaShortcutSettingsFragment extends NokiaListPageFragment {
 			View row = itemViews[index];
 			TextView check = row.findViewWithTag("check_" + index);
 			if (check != null) {
-				if (selectedMap.containsKey(key)) {
-					check.setText("[✓]");
-					check.setTextColor(0xFF4CAF50);
-				} else {
-					check.setText("[ ]");
-					check.setTextColor(0xFF888888);
-				}
+				applyCheckState(check, key);
 			}
 		}
 		updateCountText();
