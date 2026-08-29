@@ -14,8 +14,12 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import io.github.cctyl.nokia.common.ui.drawable.NokiaDashedLineDrawable;
@@ -1394,11 +1398,14 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private void refreshShortcutIcons(final LinearLayout container) {
 		if (container == null || shortcutApps.isEmpty()) return;
 		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		final Resources res = container.getResources();
+		final int targetPx = computeShortcutIconTargetPx();
 		for (int i = 0; i < shortcutApps.size(); i++) {
 			final ShortcutApp app = shortcutApps.get(i);
 			final int index = i;
 			new Thread(() -> {
-				final Drawable icon = loadShortcutIconNow(app);
+				// 预缩放到实际显示尺寸，避免大图每帧缩小绘制（低端机快速滚动叠影的诱因）
+				final Drawable icon = scaleShortcutIcon(loadShortcutIconNow(app), targetPx, res);
 				mainHandler.post(() -> {
 					if (!isAdded() || getView() == null) return;
 					if (index >= container.getChildCount()) return;
@@ -1415,6 +1422,40 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					}
 				});
 			}, "shortcut-icon-" + index).start();
+		}
+	}
+
+	/** 快捷图标目标显示尺寸（与 createShortcutCell 的 iconBase 保持一致），单位 px。 */
+	private int computeShortcutIconTargetPx() {
+		Context ctx = getContext();
+		if (ctx == null) return 0;
+		float fontScale = NokiaSettingsStorage.getFontScale(ctx);
+		float iconScale = 1.0f + (fontScale - 1.0f) * 0.6f;
+		if (iconScale < 0.8f) iconScale = 0.8f;
+		int iconBase = Math.round(22 * iconScale);
+		return NokiaDimens.dp(getResources(), iconBase);
+	}
+
+	/** 把任意 Drawable 预缩放为 targetPx 见方的小位图（等比适配，居中），失败时原样返回。 */
+	private Drawable scaleShortcutIcon(Drawable d, int targetPx, Resources res) {
+		if (d == null || res == null || targetPx <= 0) return d;
+		try {
+			int w = d.getIntrinsicWidth();
+			int h = d.getIntrinsicHeight();
+			if (w <= 0 || h <= 0) return d;
+			float scale = Math.min((float) targetPx / w, (float) targetPx / h);
+			int nw = Math.max(1, Math.round(w * scale));
+			int nh = Math.max(1, Math.round(h * scale));
+			Bitmap bmp = Bitmap.createBitmap(targetPx, targetPx, Bitmap.Config.ARGB_8888);
+			Canvas canvas = new Canvas(bmp);
+			d.setBounds((targetPx - nw) / 2, (targetPx - nh) / 2,
+					(targetPx - nw) / 2 + nw, (targetPx - nh) / 2 + nh);
+			d.draw(canvas);
+			canvas.setBitmap(null);
+			return new BitmapDrawable(res, bmp);
+		} catch (Exception e) {
+			NokiaLog.w("Desktop", "快捷图标预缩放失败: " + e.getMessage());
+			return d;
 		}
 	}
 
