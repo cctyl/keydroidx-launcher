@@ -26,6 +26,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.Selection;
+import android.text.Spannable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
@@ -59,8 +61,16 @@ class TextFieldImpl {
 		@Override
 		public void process() {
 			textview.setText(text);
+			// 用静态 Selection.setSelection 直接操作 Spannable，不依赖 EditText 的 mLayout。
+			// 视图尚未 attach/measure 时调用 EditText.setSelection 会 NPE，导致整个 displayable
+			// 构造中断、displayableContainer 为空，进而漏出 MicroActivity 的白色 window 背景（白屏）。
+			// 索引按 setText 后的实际内容长度取，避免 setSpan 越界。
 			if (text != null) {
-				textview.setSelection(text.length());
+				CharSequence cs = textview.getText();
+				if (cs instanceof Spannable) {
+					int pos = Math.min(text.length(), textview.length());
+					Selection.setSelection((Spannable) cs, pos);
+				}
 			}
 		}
 	};
@@ -207,12 +217,13 @@ class TextFieldImpl {
 		if (textview == null) {
 			textview = new AppCompatEditText(context);
 
-			setMaxSize(maxSize);
-			setConstraints(constraints);
-			setString(text);
-			if (text != null) {
-				textview.setSelection(text.length());
-			}
+				setMaxSize(maxSize);
+				setConstraints(constraints);
+				// 文本与光标位置统一由 setString -> msgSetText（主线程 setText + 设光标）处理。
+				// 不要在 getView 里提前 setSelection：此时 text 已更新但 EditText 内容尚未应用，
+				// 用 J2ME 字段长度去设会导致 setSpan 越界；若用 EditText.setSelection 还会因
+				// 视图未 attach（mLayout 为 null）NPE，最终中断构造、显示白屏。
+				setString(text);
 
 			textview.addTextChangedListener(new TextWatcher() {
 				@Override
