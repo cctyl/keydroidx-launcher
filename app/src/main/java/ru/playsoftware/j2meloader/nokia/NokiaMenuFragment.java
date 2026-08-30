@@ -12,6 +12,8 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -40,6 +42,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import ru.playsoftware.j2meloader.J2meLoaderActivity;
 import ru.playsoftware.j2meloader.R;
@@ -141,13 +145,27 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		public void onReceive(Context context, Intent intent) {
 			String action = intent.getAction();
 			if (action == null) return;
-			// ACTION_PACKAGE_REPLACED 只关心包名，这里统一在刷新时重新 queryIntentActivities
 			NokiaLog.i("Menu", "收到包变化广播: " + action + " data=" + intent.getDataString());
+
+			// 冻结状态变化：列表内容不变，只需重绘当前页的冰块/角标（轻量，主线程直接做）
+			if (NokiaFreezeManager.ACTION_FREEZE_STATE_CHANGED.equals(action)) {
+				invalidateFrozenCache();
+				if (isAdded() && getView() != null) {
+					buildCurrentPage();
+					applyFocusBackground();
+				}
+				return;
+			}
+
+			// 包安装/卸载/替换：列表内容会变，需重新枚举。
 			// 稍作延迟等系统包表稳定，避免偶发仍能查到底层已卸载的残留
 			View v = getView();
 			if (v != null) {
-				v.postDelayed(() -> {
-					if (isAdded()) refreshAppList();
+				v.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						if (isAdded()) refreshAppList();
+					}
 				}, 300);
 			} else {
 				refreshAppList();
@@ -157,6 +175,27 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 
 	/** 应用显示名内存缓存（进程内复用，避免每次进入功能表反复 loadLabel IPC） */
 	private static final Map<String, String> labelCache = new HashMap<>();
+
+	/**
+	 * 进程内应用列表缓存（含已解析的图标）。
+	 * <p>
+	 * 原先每次进入功能表都是 {@code new NokiaMenuFragment()}，完整重跑一遍
+	 * 2 次 {@code queryIntentActivities} + 逐个 {@code loadLabel}，期间网格为空
+	 * —— 这就是「打开功能表先空白一瞬」的根因。缓存后第二次进入零 IPC 直接出图。
+	 * <p>
+	 * 失效时机：包安装/卸载/替换、冻结状态变化（见 packageReceiver）。
+	 */
+	private static final List<NokiaAppItem> cachedItems = new ArrayList<>();
+
+	/** 应用列表构建线程池（仅在缓存缺失时用于后台枚举，避免阻塞主线程）。 */
+	private static final ExecutorService LIST_EXECUTOR = Executors.newSingleThreadExecutor();
+	private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+
+	/** 后台枚举进行中标记，防止重复提交。 */
+	private boolean loadingAsync = false;
+
+	/** 下一次后台枚举完成后是否恢复原页码与焦点（包变化刷新场景）。 */
+	private boolean refreshKeepPosition = false;
 
 	/** 系统图标未加载完成前的占位图标（懒加载） */
 	private Drawable placeholderIcon;
@@ -201,20 +240,151 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		// 先初始化滑动监听（在 buildCurrentPage 之前，使每个 cell 都能挂载）
 		initSwipeListener(view);
 
-		// 延迟到 midPanel 布局完成后再计算行数并构建网格（panelH 需要实测反推）
-		view.post(() -> {
-			if (!isAdded()) return;
-			computeRowsPerPage();
-			// 按 perPage 分配页内缓存数组
-			cellViews = new View[perPage];
-			pageItems = new NokiaAppItem[perPage];
-			loadApps();
+		// 按默认行数预分配页内数组，供首次同步构建使用
+		cellViews = new View[perPage];
+		pageItems = new NokiaAppItem[perPage];
+
+		// 有进程内缓存时先同步构建一版：零 IPC，首帧直接出图。
+		// 原先全部构建都推迟到 view.post() 之后，期间 appGrid 是空的，
+		// 用户会看到「只有标题、没有图标」的空白功能表闪一下。
+		boolean hadCache = applyCachedItems();
+		if (hadCache) {
 			buildCurrentPage();
 			setFocusPos(0);
+			NokiaLog.i("Menu", "复用进程内应用列表缓存，首帧直接构建：" + items.size() + " 项");
+		}
 
-			NokiaLog.i("Menu", "功能表初始化完成（延迟到 panelH 可用）：共 " + items.size() + " 项，"
-					+ totalPages + " 页，每页 " + perPage + " 格（" + COLS + "×" + rowsPerPage + "）");
+		// 延迟到 midPanel 布局完成后再按真实高度计算行数并重建（panelH 需要实测反推）
+		view.post(() -> {
+			if (!isAdded()) return;
+			int oldRows = rowsPerPage;
+			computeRowsPerPage();
+			if (rowsPerPage != oldRows) {
+				// 行数变化：重新分配页内数组
+				cellViews = new View[perPage];
+				pageItems = new NokiaAppItem[perPage];
+			}
+			if (applyCachedItems()) {
+				buildCurrentPage();
+				setFocusPos(0);
+				NokiaLog.i("Menu", "功能表初始化完成（panelH 已可用，复用缓存）：共 " + items.size()
+						+ " 项，" + totalPages + " 页，每页 " + perPage
+						+ " 格（" + COLS + "×" + rowsPerPage + "）");
+			} else {
+				// 无缓存：后台枚举，避免主线程被 queryIntentActivities 阻塞
+				loadAppsAsync();
+			}
 		});
+	}
+
+	/**
+	 * 把进程内缓存的应用列表套用到当前实例。
+	 *
+	 * @return true=缓存可用并已填充 items；false=无缓存
+	 */
+	private boolean applyCachedItems() {
+		synchronized (cachedItems) {
+			if (cachedItems.isEmpty()) {
+				return false;
+			}
+			items.clear();
+			items.addAll(cachedItems);
+		}
+		totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
+		// 翻页后缓存页码可能越界，收敛回有效范围
+		if (pageIndex > totalPages - 1) {
+			pageIndex = Math.max(0, totalPages - 1);
+		}
+		return true;
+	}
+
+	/**
+	 * 后台枚举应用列表并回主线程构建网格。
+	 * <p>
+	 * 仅在缓存缺失时（首次进入 / 安装卸载后）触发。枚举含 2 次
+	 * {@code queryIntentActivities} 与逐个 {@code loadLabel}，是重 IPC，
+	 * 放在主线程会让功能表打开瞬间卡住并长时间空白。
+	 */
+	private void loadAppsAsync() {
+		if (loadingAsync) return;
+		loadingAsync = true;
+		final Context appCtx = requireContext().getApplicationContext();
+		// 包变化刷新时希望保持原页码与焦点；首次进入时为 -1（定位到第一格）
+		final int restorePage = refreshKeepPosition ? pageIndex : -1;
+		final int restoreFocus = refreshKeepPosition ? focusPos : -1;
+		refreshKeepPosition = false;
+		LIST_EXECUTOR.execute(new Runnable() {
+			@Override
+			public void run() {
+				final List<NokiaAppItem> built = buildAppList(appCtx);
+				MAIN_HANDLER.post(new Runnable() {
+					@Override
+					public void run() {
+						loadingAsync = false;
+						if (!isAdded() || getView() == null) return;
+						items.clear();
+						items.addAll(built);
+						totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
+						synchronized (cachedItems) {
+							cachedItems.clear();
+							cachedItems.addAll(built);
+						}
+						// 卸载后页数减少时收敛到最后一页
+						if (restorePage > totalPages - 1) {
+							pageIndex = Math.max(0, totalPages - 1);
+						} else if (restorePage >= 0) {
+							pageIndex = restorePage;
+						}
+						buildCurrentPage();
+						if (restoreFocus >= 0) {
+							int count = Math.min(perPage, items.size() - pageIndex * perPage);
+							setFocusPos(Math.min(restoreFocus, Math.max(0, count - 1)));
+						} else {
+							setFocusPos(0);
+						}
+						NokiaLog.i("Menu", "后台枚举完成并构建：共 " + items.size() + " 项，"
+								+ totalPages + " 页");
+						// S60 意图扫描若尚未完成，完成后会回调刷新当前页图标
+						refreshAfterIconInit();
+						NokiaS60IconMap.initAsync(appCtx, new Runnable() {
+							@Override
+							public void run() {
+								refreshAfterIconInit();
+							}
+						});
+					}
+				});
+			}
+		});
+	}
+
+	/** 清空进程内应用列表缓存（包变化 / 冻结状态变化时调用，下次进入重新枚举）。 */
+	private static void invalidateCachedItems() {
+		synchronized (cachedItems) {
+			cachedItems.clear();
+		}
+	}
+
+	/**
+	 * 冻结状态缓存（仅主线程访问）。
+	 * {@code isAppFrozen} 是 PackageManager Binder 调用，网格每格都要查一次，
+	 * 一页 12 格就是 12 次 IPC，全部堆在主线程。缓存后翻页/重建零 IPC。
+	 */
+	private static final Map<String, Boolean> frozenStateCache = new HashMap<>();
+
+	/** 取冻结状态：先查缓存，未命中才做 Binder 查询并写入缓存。 */
+	private boolean getCachedFrozen(String pkg) {
+		if (pkg == null) return false;
+		Boolean cached = frozenStateCache.get(pkg);
+		if (cached != null) return cached;
+		boolean frozen = NokiaFreezeManager.getInstance(requireContext()).isAppFrozen(pkg);
+		frozenStateCache.put(pkg, frozen);
+		return frozen;
+	}
+
+	/** 冻结状态变化后清空状态缓存（下次构建网格重新查询）。 */
+	private static void invalidateFrozenCache() {
+		frozenStateCache.clear();
 	}
 
 	@Override
@@ -275,17 +445,23 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 
 	// ---- 加载真实安卓应用 ----
 
-	private void loadApps() {
-		items.clear();
+	/**
+	 * 构建完整应用列表（枚举 + 排序 + 固定槽位 + 特殊入口）。
+	 * <p>
+	 * <b>可在后台线程调用</b>：全程只用传入的 appCtx，不触碰 Fragment/UI 状态。
+	 * 内部含 2 次 {@code queryIntentActivities} 与逐个 {@code loadLabel}，是重 IPC。
+	 *
+	 * @return 新的应用列表（调用方负责写回 items 与缓存）
+	 */
+	private List<NokiaAppItem> buildAppList(Context appCtx) {
 		long loadStart = System.currentTimeMillis();
-		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
-		PackageManager pm = host.getPackageManager();
+		PackageManager pm = appCtx.getPackageManager();
 
 		// 图标缓存：内存 + 磁盘 + 后台线程加载（避免主线程逐个 loadIcon IPC 卡顿）
-		NokiaAppIconCache.init(requireContext());
+		NokiaAppIconCache.init(appCtx);
 		// S60 图标缓存：冷启动时桌面已通过 initAsync 异步扫描并持久化；
 		// 此处仅读磁盘缓存（毫秒级，无 PackageManager 批量查询），不阻塞功能表打开
-		NokiaS60IconMap.loadFromDisk(requireContext());
+		NokiaS60IconMap.loadFromDisk(appCtx);
 
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -299,7 +475,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		// 先全部放入临时池 pool，后续再按固定槽位提取
 		List<NokiaAppItem> pool = new ArrayList<>();
 		Set<String> seenPackages = new HashSet<>();
-		String selfPkg = host.getPackageName();
+		String selfPkg = appCtx.getPackageName();
 		for (ResolveInfo ri : list) {
 			ActivityInfo ai = ri.activityInfo;
 			if (ai == null) {
@@ -345,7 +521,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			int s60IconRes = NokiaS60IconMap.getIcon(ai.packageName, label);
 			item.s60IconResId = s60IconRes;
 			if (s60IconRes != 0) {
-				Drawable s60Icon = safeDrawable(host, s60IconRes);
+				Drawable s60Icon = safeDrawable(appCtx, s60IconRes);
 				if (s60Icon != null) {
 					item.icon = s60Icon;
 				}
@@ -371,7 +547,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			if (hit != null) {
 				NokiaLog.d("Menu", "固定槽位 " + (s + 1) + " 命中: " + pkg + " -> " + hit.label);
 				// 替换为 S60 风格图标
-				Drawable s60icon = safeDrawable(host, PINNED_SLOT_ICONS[s]);
+				Drawable s60icon = safeDrawable(appCtx, PINNED_SLOT_ICONS[s]);
 				if (s60icon != null) {
 					hit.icon = s60icon;
 					NokiaLog.d("Menu", "  -> 已替换为 S60 图标");
@@ -384,26 +560,27 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			} else {
 				NokiaLog.d("Menu", "固定槽位 " + (s + 1) + " 未命中，跳过（候选包均不存在）");
 			}
-		}
+	}
 
-		// 被冻结（包级停用）的应用单独枚举后追加，不混入正常应用枚举，保证列表确定性
-		addFrozenApps(pool, host, pm, selfPkg);
+	// 被冻结（包级停用）的应用单独枚举后追加，不混入正常应用枚举，保证列表确定性
+	addFrozenApps(pool, appCtx, pm, selfPkg);
 
-		// 最终顺序：固定槽位 → 应用程序 → 按键绑定 → 桌面设置 → S60匹配应用（按名） → 未匹配应用（按名）
-		items.addAll(pinned);
+	// 最终顺序：固定槽位 → 应用程序 → 按键绑定 → 桌面设置 → S60匹配应用（按名） → 未匹配应用（按名）
+	List<NokiaAppItem> result = new ArrayList<>();
+	result.addAll(pinned);
 
-		// 应用程序图标：优先用 S60 应用程序图标
-		Drawable boxIcon = safeDrawable(host, R.drawable.s60_app);
-		if (boxIcon == null) boxIcon = safeDrawable(host, R.drawable.ic_nokia_box);
-		Drawable settingsIcon = safeDrawable(host, R.drawable.s60_settings);
-		if (settingsIcon == null) settingsIcon = safeDrawable(host, R.drawable.ic_nokia_settings);
-		items.add(new NokiaAppItem(NokiaAppItem.TYPE_BOX, "应用程序", boxIcon, null));
-		// 原始 J2ME-Loader 主界面（启动器/文件选择器/应用列表）入口
-		Drawable mainIcon = safeDrawable(host, R.mipmap.ic_launcher);
-		if (mainIcon == null) mainIcon = boxIcon;
-		items.add(new NokiaAppItem(NokiaAppItem.TYPE_MAIN, "J2ME Loader", mainIcon, null));
-		NokiaLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入 J2meLoaderActivity）");
-		items.add(new NokiaAppItem(NokiaAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
+	// 应用程序图标：优先用 S60 应用程序图标
+	Drawable boxIcon = safeDrawable(appCtx, R.drawable.s60_app);
+	if (boxIcon == null) boxIcon = safeDrawable(appCtx, R.drawable.ic_nokia_box);
+	Drawable settingsIcon = safeDrawable(appCtx, R.drawable.s60_settings);
+	if (settingsIcon == null) settingsIcon = safeDrawable(appCtx, R.drawable.ic_nokia_settings);
+	result.add(new NokiaAppItem(NokiaAppItem.TYPE_BOX, "应用程序", boxIcon, null));
+	// 原始 J2ME-Loader 主界面（启动器/文件选择器/应用列表）入口
+	Drawable mainIcon = safeDrawable(appCtx, R.mipmap.ic_launcher);
+	if (mainIcon == null) mainIcon = boxIcon;
+	result.add(new NokiaAppItem(NokiaAppItem.TYPE_MAIN, "J2ME Loader", mainIcon, null));
+	NokiaLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入 J2meLoaderActivity）");
+	result.add(new NokiaAppItem(NokiaAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
 
 		// 将 pool 拆分为已匹配 S60 图标 和 未匹配，匹配的排在前面。
 		// 使用构建 pool 时记录的 s60IconResId，避免二次调用 getIcon() 因缓存状态变化导致分组不一致。
@@ -421,80 +598,71 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		Collections.sort(matchedPool, labelCmp);
 		Collections.sort(unmatchedPool, labelCmp);
 
-		items.addAll(matchedPool);
-		items.addAll(unmatchedPool);
+		result.addAll(matchedPool);
+		result.addAll(unmatchedPool);
 
-		NokiaLog.i("Menu", "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 匹配 " + matchedPool.size() + " + 未匹配 " + unmatchedPool.size() + "）共 " + items.size() + " 项");
-		totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
-		NokiaLog.i("Menu", "loadApps 主线程耗时 " + (System.currentTimeMillis() - loadStart)
+		NokiaLog.i("Menu", "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 匹配 " + matchedPool.size()
+				+ " + 未匹配 " + unmatchedPool.size() + "）共 " + result.size() + " 项");
+		NokiaLog.i("Menu", "buildAppList 耗时 " + (System.currentTimeMillis() - loadStart)
 				+ "ms（枚举 + label，不含系统图标 IPC）");
+		return result;
+		}
 
-		// S60 图标缓存：冷启动时桌面已后台扫描（scanStarted 防重复）；此处仅确保扫描已发起，
-		// 完成后在主线程刷新当前页应用图标（不重建网格，不影响焦点/分页）
-		NokiaS60IconMap.initAsync(requireContext(), new Runnable() {
-			@Override
-			public void run() {
-				refreshAfterIconInit();
-			}
-		});
-	}
-
-	/**
-	 * 包安装/卸载/替换后刷新应用列表：重新枚举并重建当前页，尽量保持当前页与焦点位置。
-	 * 卸载导致当前页变空（越界）时，焦点收敛到新列表末尾。
-	 */
-	private void refreshAppList() {
+		/**
+		* 包安装/卸载/替换后刷新应用列表：缓存失效并重新枚举，尽量保持当前页与焦点位置。
+		* 卸载导致当前页变空（越界）时，焦点收敛到新列表末尾。
+		*/
+		private void refreshAppList() {
 		if (!isAdded() || getView() == null) return;
 		NokiaLog.i("Menu", "刷新应用列表（包变化触发）");
 		int oldPage = pageIndex;
 		int oldFocus = focusPos;
 		// 允许本次刷新后再次应用 S60 图标缓存（新装应用也走一次）
 		iconRefreshDone = false;
-		loadApps();
-		// 若卸载后总页数减少，收敛到最后一页
-		if (pageIndex > totalPages - 1) {
-			pageIndex = Math.max(0, totalPages - 1);
+		// 缓存已失效，走后台重新枚举（不再在主线程做重 IPC），完成后恢复原页码与焦点
+		refreshKeepPosition = true;
+		invalidateCachedItems();
+		loadAppsAsync();
+		NokiaLog.d("Menu", "已提交后台刷新：page=" + (oldPage + 1) + " focus=" + oldFocus);
 		}
-		buildCurrentPage();
-		// 焦点保持原位置，越界则收敛到当前页末尾
-		int count = Math.min(perPage, items.size() - pageIndex * perPage);
-		int newFocus = Math.min(oldFocus, Math.max(0, count - 1));
-		setFocusPos(newFocus);
-		NokiaLog.i("Menu", "刷新完成: page=" + (pageIndex + 1) + "/" + totalPages
-				+ " focus=" + newFocus + " 共 " + items.size() + " 项");
-	}
 
-	/**
-	 * S60 图标异步扫描完成后：用最新缓存刷新当前页各应用的图标（仅替换 ImageView，不重建网格）。
-	 */
-	private void refreshAfterIconInit() {
-		if (iconRefreshDone || !isAdded() || getView() == null) return;
-		iconRefreshDone = true;
-		long start = System.currentTimeMillis();
-		for (int i = 0; i < perPage; i++) {
-			NokiaAppItem item = pageItems[i];
-			View cell = cellViews[i];
-			if (item == null || cell == null) continue;
-			if (item.type != NokiaAppItem.TYPE_APP) continue;
-			if (item.launchIntent == null || item.launchIntent.getComponent() == null) continue;
-			String pkg = item.launchIntent.getComponent().getPackageName();
-			int resId = NokiaS60IconMap.getIcon(pkg, item.label);
-			if (resId == 0) continue;
-			Drawable s60Icon = safeDrawable((NokiaDesktopActivity) requireActivity(), resId);
-			if (s60Icon == null) continue;
-			s60Icon.setFilterBitmap(false);
-			item.icon = s60Icon;
-			item.s60IconResId = resId; // 同步更新匹配结果
-			if (cell instanceof LinearLayout) {
-				View iv = ((LinearLayout) cell).getChildAt(0);
-				if (iv instanceof ImageView) {
-					((ImageView) iv).setImageDrawable(s60Icon);
+		/**
+		 * S60 图标异步扫描完成后：用最新缓存刷新当前页各应用的图标（仅替换 ImageView，不重建网格）。
+		 * 同时把更新后的 item 写回进程内缓存，保证下次进入功能表直接用新图标。
+		 */
+		private void refreshAfterIconInit() {
+			if (iconRefreshDone || !isAdded() || getView() == null) return;
+			iconRefreshDone = true;
+			long start = System.currentTimeMillis();
+			int updated = 0;
+			for (int i = 0; i < perPage; i++) {
+				NokiaAppItem item = pageItems[i];
+				View cell = cellViews[i];
+				if (item == null || cell == null) continue;
+				if (item.type != NokiaAppItem.TYPE_APP) continue;
+				if (item.launchIntent == null || item.launchIntent.getComponent() == null) continue;
+				String pkg = item.launchIntent.getComponent().getPackageName();
+				int resId = NokiaS60IconMap.getIcon(pkg, item.label);
+				if (resId == 0 || resId == item.s60IconResId) continue;
+				Drawable s60Icon = safeDrawable(requireContext(), resId);
+				if (s60Icon == null) continue;
+				s60Icon.setFilterBitmap(false);
+				item.icon = s60Icon;
+				item.s60IconResId = resId; // 同步更新匹配结果
+				updated++;
+				if (cell instanceof LinearLayout) {
+					View iv = ((LinearLayout) cell).getChildAt(0);
+					if (iv instanceof ImageView) {
+						((ImageView) iv).setImageDrawable(s60Icon);
+					}
 				}
 			}
+			if (updated > 0) {
+				// 当前页的 item 与缓存中的是同一批对象（缓存存引用），原地已更新，无需重写缓存
+				NokiaLog.i("Menu", "S60 图标缓存更新后刷新当前页 " + updated + " 个图标，耗时 "
+						+ (System.currentTimeMillis() - start) + "ms");
+			}
 		}
-		long elapsed = System.currentTimeMillis() - start;
-		NokiaLog.i("Menu", "S60 图标缓存更新后刷新当前页图标，耗时 " + elapsed + "ms");
-	}
 
 	/** 在应用池中按包名查找第一个命中的项并移除，返回之；未命中返回 null。 */
 	@Nullable
@@ -518,7 +686,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 	 * 包被冻结但组件可用，解冻后即可正常启动。组件本身也停用的（如 STK 的 StkMain、
 	 * MT 的 NoBg/Dark 主题别名、抖音 CarPlay 入口）无法启动，一律跳过，绝不混入列表。
 	 */
-	private void addFrozenApps(List<NokiaAppItem> pool, NokiaDesktopActivity host,
+	private void addFrozenApps(List<NokiaAppItem> pool, Context appCtx,
 			PackageManager pm, String selfPkg) {
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -560,7 +728,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			NokiaAppItem item = new NokiaAppItem(NokiaAppItem.TYPE_APP, label, null, launch);
 			item.s60IconResId = NokiaS60IconMap.getIcon(ai.packageName, label);
 			if (item.s60IconResId != 0) {
-				Drawable s60Icon = safeDrawable(host, item.s60IconResId);
+				Drawable s60Icon = safeDrawable(appCtx, item.s60IconResId);
 				if (s60Icon != null) {
 					item.icon = s60Icon;
 				}
@@ -585,9 +753,9 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		return false;
 	}
 
-	private Drawable safeDrawable(NokiaDesktopActivity host, int resId) {
+	private Drawable safeDrawable(Context ctx, int resId) {
 		try {
-			Drawable d = ContextCompat.getDrawable(host, resId);
+			Drawable d = ContextCompat.getDrawable(ctx, resId);
 			// API 19 上多个 ImageView 共享同一 Bitmap 时，硬件加速渲染可能触发
 			// Adreno GL_INVALID_OPERATION 导致图标变黑；mutate 隔离 Drawable 状态
 			if (d != null) {
@@ -667,7 +835,6 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 							pkg = item.launchIntent.getPackage();
 						}
 					}
-					boolean isFrozen = (pkg != null && NokiaFreezeManager.getInstance(requireContext()).isAppFrozen(pkg));
 
 					FrameLayout iconContainer = new FrameLayout(requireContext());
 					iconContainer.setLayoutParams(new LinearLayout.LayoutParams(
@@ -704,8 +871,9 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 					iconContainer.addView(iv);
 
 					// 若已被系统级真实冻结，用冰块效果全包围覆盖图标；若仅在名单中未冻结，显示雪花角标
-					boolean isRealFrozen = NokiaFreezeManager.getInstance(requireContext()).isAppFrozen(pkg);
-					boolean isInList = NokiaFreezeManager.getInstance(requireContext()).isInFreezeList(pkg);
+					boolean isRealFrozen = getCachedFrozen(pkg);
+					boolean isInList = pkg != null
+							&& NokiaFreezeManager.getInstance(requireContext()).isInFreezeList(pkg);
 					if (isRealFrozen) {
 						ImageView iceCover = new ImageView(requireContext());
 						FrameLayout.LayoutParams coverLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
@@ -1024,6 +1192,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 					NokiaFreezeManager.getInstance(requireContext()).unfreezeApp(pkg, (success, msg) -> {
 						if (isAdded()) {
 							Toast.makeText(requireContext(), success ? ("已解冻: " + item.label) : ("解冻失败: " + msg), Toast.LENGTH_SHORT).show();
+							invalidateFrozenCache();
 							buildCurrentPage();
 						}
 					});
@@ -1034,6 +1203,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 					NokiaFreezeManager.getInstance(requireContext()).freezeApp(pkg, (success, msg) -> {
 						if (isAdded()) {
 							Toast.makeText(requireContext(), success ? ("已冻结: " + item.label) : ("冻结失败: " + msg), Toast.LENGTH_SHORT).show();
+							invalidateFrozenCache();
 							buildCurrentPage();
 						}
 					});
@@ -1043,6 +1213,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 					"移出冻结列表", true, false, () -> {
 				NokiaFreezeManager.getInstance(requireContext()).removeFromFreezeList(pkg);
 				Toast.makeText(requireContext(), "已移出冻结列表", Toast.LENGTH_SHORT).show();
+				invalidateFrozenCache();
 				buildCurrentPage();
 			}));
 		} else {
@@ -1050,6 +1221,7 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 					"加入冻结列表", true, false, () -> {
 				NokiaFreezeManager.getInstance(requireContext()).addToFreezeList(pkg);
 				Toast.makeText(requireContext(), "已加入冻结列表", Toast.LENGTH_SHORT).show();
+				invalidateFrozenCache();
 				buildCurrentPage();
 			}));
 		}
