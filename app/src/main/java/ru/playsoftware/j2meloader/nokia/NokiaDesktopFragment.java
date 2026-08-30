@@ -240,13 +240,6 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					}
 				}
 			});
-			// rebuildWidgetArea 已在 buildToggleBar 前调用（当时 toggleCells 为空），
-			// 这里手动把开关单元格补进焦点列表；之后快捷栏异步加载完成会整体重建
-			for (View cell : toggleCells) {
-				if (cell != null) {
-					focusTargets.add(cell);
-				}
-			}
 		}
 
 		// 注册广播接收器监听系统开关状态变化
@@ -555,6 +548,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	/** 构建开关单元格（根据 NokiaQuickToggleStorage 中启用的开关动态创建）。 */
 	private void buildToggleBar() {
 		if (quickToggleBar == null) return;
+		List<View> oldToggleCells = new ArrayList<>(toggleCells);
 		quickToggleBar.removeAllViews();
 		toggleCells.clear();
 
@@ -569,6 +563,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			if (quickToggleScroll != null) quickToggleScroll.setVisibility(View.GONE);
 			if (quickToggleDivider != null) quickToggleDivider.setVisibility(View.GONE);
 			toggleStates = new boolean[0];
+			syncToggleFocusTargets(oldToggleCells);
 			return;
 		}
 
@@ -629,6 +624,33 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 			quickToggleBar.addView(cell);
 			toggleCells.add(cell);
+		}
+		syncToggleFocusTargets(oldToggleCells);
+	}
+
+	/**
+	 * 把当前开关单元格同步回焦点列表。
+	 * <p>
+	 * 开关栏位于焦点列表末尾。buildToggleBar() 重建开关栏后，
+	 * 旧的单元格 View 已被从 quickToggleBar 移除，但 focusTargets
+	 * 里仍可能残留旧引用。此处精确移除旧引用并追加新单元格，
+	 * 避免方向键高亮/点击落到不可见的旧 View 上。
+	 */
+	private void syncToggleFocusTargets(List<View> oldCells) {
+		boolean wasFocusedOnToggle = focusIndex >= 0 && focusIndex < focusTargets.size()
+				&& oldCells.contains(focusTargets.get(focusIndex));
+		for (View old : oldCells) {
+			focusTargets.remove(old);
+		}
+		for (View cell : toggleCells) {
+			if (cell != null) {
+				focusTargets.add(cell);
+			}
+		}
+		if (focusIndex >= focusTargets.size()) {
+			setFocusIndex(Math.max(0, focusTargets.size() - 1));
+		} else if (wasFocusedOnToggle && focusIndex >= 0) {
+			setFocusIndex(focusIndex);
 		}
 	}
 
