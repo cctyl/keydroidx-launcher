@@ -13,6 +13,7 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
@@ -58,6 +59,14 @@ public class StatusBarController {
 	private TelephonyManager telephonyManager;
 	private SubscriptionManager subscriptionManager;
 	private WifiManager wifiManager;
+
+	// 省电模式：监听 Settings.Global.LOW_POWER_MODE 变化，开启后电量格变黄。
+	private final ContentObserver powerSaveObserver = new ContentObserver(new Handler()) {
+		@Override
+		public void onChange(boolean selfChange) {
+			updatePowerSaveMode();
+		}
+	};
 
 	private final SignalListener listener1 = new SignalListener(0);
 	private final SignalListener listener2 = new SignalListener(1);
@@ -147,6 +156,7 @@ public class StatusBarController {
 		updateBluetooth();
 		updateCarriers();
 		updateBattery();
+		updatePowerSaveMode();
 
 		IntentFilter filter = new IntentFilter();
 		filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
@@ -161,6 +171,9 @@ public class StatusBarController {
 		ContentResolver cr = activity.getContentResolver();
 		cr.registerContentObserver(
 				Settings.Global.getUriFor(Settings.Global.AIRPLANE_MODE_ON), false, airplaneObserver);
+		// 兜底/实时同步省电模式开关（低电量自动触发或手动开启）。
+		cr.registerContentObserver(
+				Settings.Global.getUriFor("low_power"), false, powerSaveObserver);
 
 		// 订阅就绪后自动重注册信号监听（应对 MIUI 启动瞬间订阅未就绪的情况）。
 		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
@@ -195,6 +208,11 @@ public class StatusBarController {
 		}
 		try {
 			activity.getContentResolver().unregisterContentObserver(airplaneObserver);
+		} catch (Exception ignore) {
+			// 忽略
+		}
+		try {
+			activity.getContentResolver().unregisterContentObserver(powerSaveObserver);
 		} catch (Exception ignore) {
 			// 忽略
 		}
@@ -524,6 +542,36 @@ public class StatusBarController {
 			ivBattery.setImageDrawable(batteryDrawable);
 		}
 		batteryDrawable.setBatteryState(pct, isCharging);
+		batteryDrawable.setPowerSaveMode(isPowerSaveModeOn());
+	}
+
+	/** 读取系统省电模式状态并同步到电池图标。 */
+	private void updatePowerSaveMode() {
+		if (batteryDrawable == null) return;
+		batteryDrawable.setPowerSaveMode(isPowerSaveModeOn());
+	}
+
+	/**
+	 * 判断系统是否处于省电模式。
+	 * <p>API 21+ 使用 PowerManager.isPowerSaveMode()；低版本（4.4）原生无此能力，
+	 * 直接读取 Settings.Global["low_power"] 兜底。
+	 */
+	private boolean isPowerSaveModeOn() {
+		if (Build.VERSION.SDK_INT >= 21) {
+			try {
+				PowerManager pm = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
+				if (pm != null && pm.isPowerSaveMode()) {
+					return true;
+				}
+			} catch (Exception e) {
+				Log.w(TAG, "isPowerSaveMode failed", e);
+			}
+		}
+		try {
+			return Settings.Global.getInt(activity.getContentResolver(), "low_power", 0) == 1;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	@SuppressLint("MissingPermission")
