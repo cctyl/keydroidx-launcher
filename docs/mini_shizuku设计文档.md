@@ -218,6 +218,7 @@ adb -s <serial> shell cat /data/local/tmp/minishizuku.log
 
 - **手机重启后服务会停止**：重新执行上面两条命令即可（脚本已留在 `/data/local/tmp/`）。
 - **包名自动识别**：脚本会先找正式版 `io.github.cctyl.nokia`，找不到再找调试版 `io.github.cctyl.nokia.debug`，无需手工指定。
+- **release+debug 共存时脚本永远用 release 启动**，且每次执行脚本都会先 `kill -9` 所有旧的 `app_process`（「杀好启坏」）。若设备上的 release 是 08-28 修复前的旧版（服务端类被 R8 删除，见下方已知坑），激活会失效且反复执行都无效——更新 release 或先卸载它。
 - **多设备**：所有 adb 命令都要带 `-s <serial>`，避免误装/误操作其他设备。
 - **无线设备掉线**：`adb connect <ip>:5555` 重连后设备列表会刷新，直接执行脚本即可。
 
@@ -278,3 +279,62 @@ for dex in [n for n in z.namelist() if n.endswith('.dex')]:
    ```
 4. 对比：同 APK 在 Android 5+ 设备上是否正常（正常 → 基本锁定 Dalvik 主 dex 问题）
 5. 注意：`dalvik-cache` 不可写（`Dex cache directory isn't writable`）是另一类问题，通常出现在 APK 被复制到 `/data/local/tmp` 等非安装路径时；用真实安装路径（`pm path`）启动可走系统已生成的缓存，规避此问题
+
+## 已知坑：release 构建服务端类被 R8 删除（与 release 共存时激活失效）
+
+### 现象（2026-08-30 实测复现）
+
+| 场景 | 结果 |
+|---|---|
+| 只装 debug，执行脚本 | 激活成功 |
+| release+debug 共存且已激活，再执行脚本 | 失效，且反复执行仍失效 |
+| 卸载 release 后执行脚本 | 激活成功 |
+
+报错不会回显到 adb（服务端起不来就静默退出），脚本自身输出完全正常，极具迷惑性。
+
+### 根因（三因素叠加）
+
+1. **R8 删除服务端类**：服务端类（`AdbProcess` 等）仅由 `app_process` 按类名加载，主 app 代码从不引用。release 开启 `minifyEnabled true` 且无 keep 规则时，R8 把整个 `ru.playsoftware.mini_shizuku.server.**` 当不可达代码删除 → 用该 release 启动服务必然 `ClassNotFoundException`，进程退出，服务永不在线。
+2. **脚本包名探测 release 优先**：`for p in io.github.cctyl.nokia io.github.cctyl.nokia.debug`，release 共存时 CLASSPATH 永远指向 release 的 APK。
+3. **脚本先杀后启**：脚本每次执行都先 `kill -9` 所有 `app_process`，会把正在正常运行的服务（哪怕是用 debug 启动的）先杀掉，再用残缺的 release 启动 → 「杀好启坏」，表现为激活失效且反复执行都无效。
+
+### 修复（08-28 ba66018 已提交）
+
+`mini_shizuku/build.gradle` 通过 `consumerProguardFiles 'proguard-rules.pro'` 把 keep 规则导出给宿主 app 的 R8，server 包不再被删除/改名。该修复只对**修复后构建的 release** 生效——设备上的旧 release 必须重装才能解决。
+
+### 防御加固（2026-08-30）
+
+`app/build.gradle` 的 release buildType 补充 `multiDexKeepProguard file('multidex-config.pro')`：若未来方法数增长触发 dex 拆分，服务端类仍会留在主 dex（与上一节 4.4 Dalvik 问题同源）。
+
+### 排查要点（按此顺序）
+
+1. `adb shell "ps -A | grep app_process"` —— 进程是否存在
+2. `adb shell cat /data/local/tmp/minishizuku.log` —— 见 `could not find class ... AdbProcess` 即为本坑或 4.4 multidex 坑，重装最新构建的 release
+3. `adb shell "cat /proc/net/tcp6 | grep 2904"` —— 10500（0x2904）是否在监听（双栈监听只出现在 tcp6 表，tcp 表查不到属正常）
+4. `adb shell "cat /proc/<pid>/cmdline | tr '\0' ' '"` —— 确认 CLASSPATH 指向哪个 APK、`-Dapp.package` 是哪个包名
+5. 判别新旧 release：本坑只存在于 08-28 修复前构建的历史 release，重装最新构建后复测即可区分
+
+## 已知坑：CRLF 行尾污染（脚本执行报 trap/syntax error）
+
+### 现象
+
+执行 `adb shell sh .../mini_shizuku.sh` 报（引号不闭合是 `\r` 混入的典型特征）：
+
+- 空行 `\r` → `: inaccessible or not found`
+- `trap '' 1\r` → ``trap: bad signal '1``
+- `do\r` → `syntax error: unexpected 'do`
+
+脚本在语法解析阶段即中断，与激活状态、已装哪些包无关。
+
+### 根因
+
+Windows 上 git `core.autocrlf=true` 且 `.gitattributes` 未保护 `*.sh` 时，检出会把 assets 里的脚本转成 CRLF 打进 APK；`ShizukuAdbFragment.extractScript()` 按原始字节释放到设备；设备端 mksh 把行尾 `\r` 当命令内容解析。
+
+### 修复（已提交）
+
+1. `.gitattributes` 增加 `*.sh text eol=lf`（根治，`eol=lf` 优先级高于 `core.autocrlf`）；
+2. `ShizukuAdbFragment.extractScript()` 释放前调用 `normalizeLf()` 把 CRLF/孤立 CR 归一化为 LF（兜底，可救已构建出的 CRLF APK）。
+
+### 快速判别
+
+`adb pull` 设备上的脚本后按 `\r` 搜索；或直接 `adb push` 仓库根目录的 LF 版 `mini_shizuku.sh` 覆盖设备文件后再执行（注意 push 目标路径要与执行路径一致，release 共存时脚本探测包名的逻辑不受脚本存放位置影响）。

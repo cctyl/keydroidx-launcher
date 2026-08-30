@@ -54,6 +54,10 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
+            // 与 debug 保持一致：若未来方法数增长触发 dex 拆分，mini_shizuku
+            // 服务端类（AdbProcess 等，由 app_process 按类名反射加载）必须留在
+            // 主 dex。未启用 multidex 时本项不生效，无副作用。
+            multiDexKeepProguard file('multidex-config.pro')
             signingConfig signingConfigs.release
         }
         debug {

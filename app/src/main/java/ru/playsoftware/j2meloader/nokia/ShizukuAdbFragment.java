@@ -14,11 +14,13 @@ import androidx.annotation.Nullable;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.focus.NokiaFocusHost;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 import ru.playsoftware.j2meloader.R;
 
@@ -113,12 +115,17 @@ public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 		OutputStream out = null;
 		try {
 			in = am.open(ASSET_SCRIPT);
-			out = new FileOutputStream(target);
+			ByteArrayOutputStream bos = new ByteArrayOutputStream();
 			byte[] buf = new byte[4096];
 			int n;
 			while ((n = in.read(buf)) > 0) {
-				out.write(buf, 0, n);
+				bos.write(buf, 0, n);
 			}
+			out = new FileOutputStream(target);
+			// 释放前强制归一化换行符：Windows 上 core.autocrlf=true 会把 assets 污染成
+			// CRLF，mksh 执行带 \r 的脚本会报 "trap: bad signal '1" /
+			// "syntax error: unexpected 'do"，导致 mini_shizuku 激活失败。
+			out.write(normalizeLf(bos.toByteArray()));
 			out.flush();
 			NokiaLog.i("ShizukuAdb", "脚本已释放: " + target.getAbsolutePath()
 					+ " (" + target.length() + "B)");
@@ -134,6 +141,23 @@ public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 				try { out.close(); } catch (IOException ignored) {}
 			}
 		}
+	}
+
+	/** 把 CRLF / 孤立 CR 归一化为 LF。 */
+	private static byte[] normalizeLf(byte[] src) {
+		byte[] dst = new byte[src.length];
+		int j = 0;
+		for (int i = 0; i < src.length; i++) {
+			byte b = src[i];
+			if (b == '\r') {
+				if (i + 1 < src.length && src[i + 1] == '\n') {
+					continue; // 跳过 CR，保留后面的 LF
+				}
+				b = '\n'; // 孤立 CR 视为换行
+			}
+			dst[j++] = b;
+		}
+		return j == src.length ? dst : Arrays.copyOf(dst, j);
 	}
 
 	/** 把当前命令文本复制到系统剪贴板。 */

@@ -1,2 +1,7 @@
 *.h linguist-language=C
 *.inl linguist-language=C
+
+# shell 脚本必须保持 LF：设备端 mksh 执行 CRLF 脚本会报
+# "trap: bad signal '1" / "syntax error: unexpected 'do"，
+# 表现为 mini_shizuku 激活失败。eol=lf 优先级高于 core.autocrlf。
+*.sh text eol=lf
