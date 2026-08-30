@@ -28,7 +28,9 @@ import io.github.cctyl.nokia.common.ui.focus.NokiaFocusHost;
 import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.applist.AppItem;
@@ -71,6 +73,30 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 	private AppRepository appRepository;
 	private List<AppItem> appItems = new ArrayList<>();
 	private SharedPreferences preferences;
+
+	/**
+	 * 进程内 JAR 应用列表缓存（跨 Fragment 实例复用）。
+	 * <p>
+	 * 原先每次进入都是新实例 → view.post 才订阅 Room → 异步查询回调后才有内容，
+	 * 期间 appContainer 为空——这就是「打开应用程序先空白一瞬」的根因。
+	 * 缓存后再次进入零查询直接出图；数据库回调仍是权威数据，内容变化时才重建。
+	 */
+	private static final List<AppItem> cachedAppItems = new ArrayList<>();
+
+	/**
+	 * 已解码的 JAR 图标缓存（key = 图标路径 + ":" + 文件 mtime）。
+	 * populateAppCell 原先用 {@code Drawable.createFromPath} 主线程解码，
+	 * 每次进入都对每个 JAR 重跑一遍磁盘 IO + PNG 解码。
+	 * key 带 mtime：覆盖安装同一 JAR 时图标文件被重写（路径不变），
+	 * mtime 变化使旧缓存自然失效，避免显示旧图标。
+	 */
+	private static final Map<String, Drawable> cachedIcons = new HashMap<>();
+
+	/** 图标缓存 key：路径 + 修改时间。覆盖安装后 mtime 变化即换新 key。 */
+	private static String iconCacheKey(String imgPath) {
+		if (imgPath == null) return null;
+		return imgPath + ":" + new File(imgPath).lastModified();
+	}
 
 	// ---- 文件选择器 ----
 	private ActivityResultLauncher<String> openFileLauncher;
@@ -116,11 +142,24 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 		appScroll = view.findViewById(R.id.appScroll);
 		appContainer = view.findViewById(R.id.appContainer);
 
-		// 延迟到 midPanel 布局完成后再计算行数（panelH 需要实测反推）
+		// 有进程内缓存时同步构建一版：零查询、零磁盘 IO，首帧直接出图。
+		// Room 订阅仍在 view.post 里照常进行，数据回来后内容一致则不重建。
+		if (!cachedAppItems.isEmpty()) {
+			appItems = new ArrayList<>(cachedAppItems);
+			buildGrid();
+			NokiaLog.i("Box", "复用进程内 JAR 列表缓存，首帧直接构建：" + appItems.size() + " 个应用");
+		}
+
+		// 延迟到 midPanel 布局完成后再计算行数并订阅数据（panelH 需要实测反推）
 		view.post(() -> {
 			if (!isAdded()) return;
+			int oldRows = rowsPerPage;
 			computeRowsPerPage();
-			// 订阅已安装 JAR 应用数据（数据回调会触发 buildGrid）
+			if (rowsPerPage != oldRows && !appItems.isEmpty()) {
+				// 行数变化影响行高均分结果，重建一次（纯 View 操作，无 IO）
+				buildGrid();
+			}
+			// 订阅已安装 JAR 应用数据（数据回调会触发 onDbUpdated）
 			appRepository.observeApps(getViewLifecycleOwner(), this::onDbUpdated);
 			NokiaLog.i("Box", "应用程序初始化完成（延迟到 panelH 可用），等待数据加载…");
 		});
@@ -165,9 +204,53 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 	// ============================
 
 	private void onDbUpdated(List<AppItem> items) {
-		NokiaLog.i("Box", "onDbUpdated 收到 " + (items != null ? items.size() : 0) + " 个应用");
-		appItems = items != null ? items : new ArrayList<>();
+		List<AppItem> fresh = items != null ? items : new ArrayList<>();
+		NokiaLog.i("Box", "onDbUpdated 收到 " + fresh.size() + " 个应用");
+		// 内容与缓存一致时跳过重建：避免「先显示缓存版、Room 回调后又闪一次」
+		// 的多余重排（安装/卸载/重命名才会走到重建分支）。
+		if (isSameAppList(fresh, appItems)) {
+			// 覆盖安装同一 JAR：列表三项字段全同，但图标文件被重写（mtime 变化），
+			// 缓存 key 随之改变 → 检测到任一图标缓存失效即重建，让新图标上屏。
+			if (hasStaleIconCache()) {
+				NokiaLog.i("Box", "列表未变但图标文件已更新（覆盖安装），重建网格");
+			} else {
+				NokiaLog.d("Box", "数据与缓存一致，跳过重建");
+				return;
+			}
+		}
+		appItems = fresh;
+		synchronized (cachedAppItems) {
+			cachedAppItems.clear();
+			cachedAppItems.addAll(appItems);
+		}
 		buildGrid();
+	}
+
+	/** 是否存在「列表指向的图标文件 mtime 已变、缓存 key 失效」的项（覆盖安装检测）。 */
+	private boolean hasStaleIconCache() {
+		for (AppItem app : appItems) {
+			String imgPath = app.getImagePathExt();
+			if (imgPath == null) continue;
+			if (!cachedIcons.containsKey(iconCacheKey(imgPath))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** 按标题+路径逐项比对两个列表是否内容一致（Room 回调去重用）。 */
+	private static boolean isSameAppList(List<AppItem> a, List<AppItem> b) {
+		if (a.size() != b.size()) return false;
+		for (int i = 0; i < a.size(); i++) {
+			AppItem x = a.get(i);
+			AppItem y = b.get(i);
+			if (!TextUtils.equals(x.getTitle(), y.getTitle())
+					|| !TextUtils.equals(x.getPathExt(), y.getPathExt())
+					|| !TextUtils.equals(x.getImagePathExt(), y.getImagePathExt())) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	// ============================
@@ -296,14 +379,25 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 	private void populateAppCell(LinearLayout cell, AppItem app) {
 		ImageView iv = new ImageView(requireContext());
 		iv.setLayoutParams(new LinearLayout.LayoutParams(NokiaDimens.dp(getResources(), 36), NokiaDimens.dp(getResources(), 36)));
-		// 加载 JAR 图标
+		// 加载 JAR 图标：优先取进程内缓存，未命中才做磁盘解码并回填。
+		// createFromPath 是主线程磁盘 IO + PNG 解码，应用多时每次进入都全量重跑
+		// 是明显的卡顿来源；卸载后旧图标会因路径不再被引用而自然失效。
 		String imgPath = app.getImagePathExt();
 		if (imgPath != null) {
-			try {
-				Drawable icon = Drawable.createFromPath(imgPath);
-				if (icon != null) iv.setImageDrawable(icon);
-			} catch (Exception e) {
-				NokiaLog.w("Box", "加载图标失败: " + imgPath + " " + e.getMessage());
+			String cacheKey = iconCacheKey(imgPath);
+			Drawable icon = cachedIcons.get(cacheKey);
+			if (icon == null) {
+				try {
+					icon = Drawable.createFromPath(imgPath);
+					if (icon != null) {
+						cachedIcons.put(cacheKey, icon);
+					}
+				} catch (Exception e) {
+					NokiaLog.w("Box", "加载图标失败: " + imgPath + " " + e.getMessage());
+				}
+			}
+			if (icon != null) {
+				iv.setImageDrawable(icon);
 			}
 		}
 		cell.addView(iv);
@@ -529,6 +623,11 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 	private void doUninstall(AppItem app) {
 		if (app == null) return;
 		NokiaLog.i("Box", "执行卸载: " + app.getTitle());
+		// 图标文件即将被删除，同步清掉进程内缓存（重装同路径应用时不至于显示旧图）
+		String imgPath = app.getImagePathExt();
+		if (imgPath != null) {
+			cachedIcons.remove(iconCacheKey(imgPath));
+		}
 		AppUtils.deleteApp(app);
 		appRepository.delete(app);
 	}
