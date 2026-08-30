@@ -303,6 +303,11 @@ public class NokiaS60IconMap {
 	 * 注意：精确包名表 / label 表不依赖本缓存，优先级更高，结果恒不受缓存影响。
 	 */
 	public static void loadFromDisk(Context context) {
+		// 进程内只加载一次：桌面每次 onResume 都会调用本方法，
+		// 重复读 SharedPreferences 白白占用主线程时间（首帧期间尤其明显）。
+		if (appContext != null) {
+			return;
+		}
 		appContext = context.getApplicationContext();
 		long start = System.currentTimeMillis();
 		try {

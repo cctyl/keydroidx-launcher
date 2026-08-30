@@ -13,6 +13,8 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.media.ExifInterface;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.DisplayMetrics;
 
 import androidx.annotation.NonNull;
@@ -23,6 +25,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
@@ -58,6 +62,12 @@ public final class NokiaWallpaper {
 	/** 进程内解码缓存（不 recycle 旧图：可能仍被正在绘制的 Drawable 持有）。 */
 	private static Bitmap cachedBitmap;
 
+	/** 后台解码是否已启动（避免并发预热重复起线程）。 */
+	private static boolean decodeStarted;
+
+	/** 解码完成前挂起的回调（等待期间可能有多个调用方请求同一张壁纸）。 */
+	private static final List<Runnable> pendingCallbacks = new ArrayList<>();
+
 	private NokiaWallpaper() {
 	}
 
@@ -82,12 +92,78 @@ public final class NokiaWallpaper {
 	 */
 	public static Drawable createWallpaperDrawable(Context ctx, NokiaTheme.ThemeDef theme) {
 		Drawable base = NokiaTheme.createBackgroundDrawable(theme);
-		Bitmap bmp = getCachedBitmap(ctx);
+		// 只用已解码的缓存：解码是「磁盘 IO + 全屏位图分配」，绝不能在合成背景时触发，
+		// 否则桌面首帧会被壁纸解码阻塞（冷启动最明显的卡顿来源）。
+		// 解码一律走 preloadAsync() 预热，未就绪时先显示主题渐变。
+		Bitmap bmp = peekBitmap();
 		if (bmp == null) {
 			return base;
 		}
 		int mode = NokiaSettingsStorage.getWallpaperScale(ctx);
 		return new LayerDrawable(new Drawable[]{base, new WallpaperDrawable(bmp, mode)});
+	}
+
+	/** 壁纸位图是否已在内存中（无需再解码）。 */
+	public static synchronized boolean isBitmapReady() {
+		return cachedBitmap != null && !cachedBitmap.isRecycled();
+	}
+
+	/**
+	 * 后台预解码自定义壁纸并写入缓存，完成后在主线程回调。
+	 * <p>
+	 * 全屏 PNG 的解码 + 位图分配在主线程可达数十~数百毫秒，是桌面冷启动最重的一次主线程 IO。
+	 * 因此调用方应先铺主题渐变出首帧，再由本方法在后台补齐壁纸层。
+	 * <p>
+	 * 同一时刻只会有最多一个解码线程；并发调用方的回调会在解码完成后一次性派发。
+	 *
+	 * @param onReady 完成后在主线程回调，可为 null
+	 */
+	public static void preloadAsync(final Context ctx, final Runnable onReady) {
+		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		if (isBitmapReady() || !hasCustomWallpaper(ctx)) {
+			if (onReady != null) {
+				mainHandler.post(onReady);
+			}
+			return;
+		}
+		boolean needStart;
+		synchronized (NokiaWallpaper.class) {
+			if (onReady != null) {
+				pendingCallbacks.add(onReady);
+			}
+			needStart = !decodeStarted;
+			decodeStarted = true;
+		}
+		if (!needStart) {
+			return;
+		}
+		final Context appCtx = ctx.getApplicationContext();
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				Bitmap bmp = null;
+				try {
+					bmp = BitmapFactory.decodeFile(getWallpaperFile(appCtx).getAbsolutePath());
+					if (bmp == null) {
+						NokiaLog.w(TAG, "壁纸文件解码失败，回退主题背景");
+					}
+				} catch (OutOfMemoryError e) {
+					NokiaLog.e(TAG, "壁纸解码内存不足，回退主题背景");
+				}
+				List<Runnable> callbacks;
+				synchronized (NokiaWallpaper.class) {
+					if (bmp != null) {
+						cachedBitmap = bmp;
+					}
+					decodeStarted = false;
+					callbacks = new ArrayList<>(pendingCallbacks);
+					pendingCallbacks.clear();
+				}
+				for (Runnable r : callbacks) {
+					mainHandler.post(r);
+				}
+			}
+		}, "wallpaper-decode").start();
 	}
 
 	/** 丢弃解码缓存（导入/清除/切换缩放模式后调用）。 */
@@ -184,25 +260,12 @@ public final class NokiaWallpaper {
 
 	// ---- 内部实现 ----
 
-	private static synchronized Bitmap getCachedBitmap(Context ctx) {
-		if (cachedBitmap != null && !cachedBitmap.isRecycled()) {
-			return cachedBitmap;
-		}
-		if (!hasCustomWallpaper(ctx)) {
-			return null;
-		}
-		try {
-			Bitmap bmp = BitmapFactory.decodeFile(getWallpaperFile(ctx).getAbsolutePath());
-			if (bmp == null) {
-				NokiaLog.w(TAG, "壁纸文件解码失败，回退主题背景");
-				return null;
-			}
-			cachedBitmap = bmp;
-			return bmp;
-		} catch (OutOfMemoryError e) {
-			NokiaLog.e(TAG, "壁纸解码内存不足，回退主题背景");
-			return null;
-		}
+	/**
+	 * 取已解码的缓存位图；未解码返回 null，<b>不触发解码</b>。
+	 * 供主线程合成背景时安全调用。
+	 */
+	private static synchronized Bitmap peekBitmap() {
+		return (cachedBitmap != null && !cachedBitmap.isRecycled()) ? cachedBitmap : null;
 	}
 
 	/**

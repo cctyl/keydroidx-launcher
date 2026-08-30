@@ -60,6 +60,9 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
+		// 壁纸解码预热：全屏 PNG 解码 + 位图分配很慢，先起后台线程，
+		// 让首帧先铺主题渐变，解码完成后再由 applyWallpaper 叠加壁纸层。
+		NokiaWallpaper.preloadAsync(this, null);
 		applyCurrentTheme();
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_nokia);
@@ -300,12 +303,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	public void applyCurrentTheme() {
 		NokiaSettingsStorage storage = new NokiaSettingsStorage(this);
 		NokiaTheme.ThemeDef theme = storage.getTheme();
-		View wall = findViewById(R.id.wallpaper);
-		if (wall != null) {
-			// 已设置自定义壁纸时用「主题渐变 + 自定义图片」叠加（全页面统一生效），
-			// 否则沿用主题渐变。
-			wall.setBackground(NokiaWallpaper.createWallpaperDrawable(this, theme));
-		}
+		applyWallpaper(theme);
 		View bottomBar = findViewById(R.id.bottomPanel);
 		if (bottomBar != null) {
 			bottomBar.setBackground(NokiaTheme.createSoftKeyDrawable(theme));
@@ -318,6 +316,41 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		if (bottomRight != null) {
 			bottomRight.setTextColor(theme.accentColor);
 		}
+	}
+
+	/**
+	 * 应用全屏背景：先铺主题渐变保证首帧立刻可见，自定义壁纸解码完成后再叠加。
+	 * <p>
+	 * 壁纸解码（磁盘读取 + 全屏位图分配）在主线程可达数十~数百毫秒，
+	 * 同步执行会直接把桌面首帧拖慢；而「渐变 → 壁纸」的切换几乎不可感知。
+	 */
+	private void applyWallpaper(final NokiaTheme.ThemeDef theme) {
+		final View wall = findViewById(R.id.wallpaper);
+		if (wall == null) {
+			return;
+		}
+		wall.setBackground(NokiaTheme.createBackgroundDrawable(theme));
+		// 未设置自定义壁纸：主题渐变就是最终背景
+		if (!NokiaWallpaper.hasCustomWallpaper(this)) {
+			return;
+		}
+		// 已解码：一次性铺好「渐变 + 壁纸」
+		if (NokiaWallpaper.isBitmapReady()) {
+			wall.setBackground(NokiaWallpaper.createWallpaperDrawable(this, theme));
+			return;
+		}
+		NokiaWallpaper.preloadAsync(this, new Runnable() {
+			@Override
+			public void run() {
+				if (isFinishing()) {
+					return;
+				}
+				View w = findViewById(R.id.wallpaper);
+				if (w != null) {
+					w.setBackground(NokiaWallpaper.createWallpaperDrawable(NokiaDesktopActivity.this, theme));
+				}
+			}
+		});
 	}
 
 	protected void onDestroy() {

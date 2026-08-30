@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
 
+import android.app.Activity;
 import android.app.ActivityManager;
 import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
@@ -64,6 +65,8 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.mini_shizuku.Shizuku;
@@ -91,6 +94,41 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	/** 后台管理组件计数缓存（由后台线程刷新，主线程只读，避免 TCP 卡顿）。 */
 	private volatile int cachedBgCount = -1;
+
+	/**
+	 * 离开过桌面后才需要在 onResume 重建内容区。
+	 * 冷启动时 {@link #onPageCreated} 刚完成全量构建，紧接着的 onResume 会再构建一遍
+	 * （快捷栏 + 组件区 + 开关栏全量重建，含若干主线程 Binder 调用），
+	 * 等于把首屏耗时翻倍。
+	 */
+	private boolean contentDirty = false;
+
+	/**
+	 * 快捷栏图标 / 冻结角标的后台线程池。
+	 * 原先每个快捷项各起一个线程，8 项就是 8 个线程并发做 PackageManager IPC + 位图分配，
+	 * 冷启动时容易抢占 CPU 并引发 GC 抖动，拖慢主线程。
+	 */
+	private static final ExecutorService ICON_EXECUTOR = Executors.newFixedThreadPool(2);
+
+	/** 冻结角标 View 的 tag（用于查找/去重）。 */
+	private static final String TAG_FREEZE_BADGE = "freeze_badge";
+	/** 组件行右侧信息文字的 tag（用于局部刷新，避免整区重建）。 */
+	private static final String TAG_WIDGET_INFO = "widget_info";
+
+	// ---- 单次组件区渲染内共享的实时数据快照 ----
+	// 组件行原本各自独立查询（音乐行甚至查 3 次 ContentProvider），
+	// 这些都是主线程同步 Binder 调用，组件越多越慢，故在同一次渲染内合并为一次。
+
+	/** 音乐播放状态快照。 */
+	private MusicSnapshot musicSnapshot;
+	/** 内存信息快照（total &lt;= 0 表示尚未查询）。 */
+	private long memTotal = -1;
+	private long memAvail;
+	/** 存储信息快照（total &lt;= 0 表示尚未查询）。 */
+	private long storageTotal = -1;
+	private long storageAvail;
+	/** WiFi IP 文本快照。 */
+	private String ipText;
 
 	/** 快捷栏项数（动态） */
 	private int shortcutCount = 0;
@@ -168,6 +206,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		widgetItems.clear();
 		focusIndex = -1;
 		selectedView = null;
+		// 本次已完整构建过内容区：无论冷启动还是从返回栈恢复，
+		// 紧接着的 onResume 都不必再重建一遍。
+		contentDirty = false;
 
 		loadShortcutBarAsync(view);
 		rebuildWidgetArea(view);
@@ -178,7 +219,16 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		quickToggleDivider = view.findViewById(R.id.quickToggleDivider);
 		if (quickToggleBar != null) {
 			buildToggleBar();
-			syncToggleStatesFromSystem();
+			// 开关状态要读 Wifi/Settings/Bluetooth/Audio/Location 等多处系统服务，
+			// 每开关 1~2 次 Binder 调用，累加起来会拖慢首帧。
+			// 推迟到首帧绘制完成之后再同步：桌面先出来，指示灯随后补齐（延迟不可感知）。
+			view.post(new Runnable() {
+				@Override
+				public void run() {
+					if (!isAdded()) return;
+					syncToggleStatesFromSystem();
+				}
+			});
 			// mini_shizuku 在线状态需在后台探测（socket 操作，不能在主线程）。
 			// 探测结果回来后若状态有变化，重绘开关图标——亮度图标依赖该状态
 			// （未激活时固定显示 brightness_low）。
@@ -211,56 +261,90 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		super.onResume();
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
 		host.refreshPageBar();
-		// 从桌面设置返回后刷新组件区（可能有增删改）
-		View view = getView();
-		if (view != null) {
-			loadShortcutBarAsync(view);
-			rebuildWidgetArea(view);
-		}
 		// 注册音乐播放状态 ContentObserver（监听播放态变化刷新组件行）
 		registerMusicPlaybackObserver();
 		// 异步刷新后台管理组件计数（countBackgroundProcesses 含 shizuku TCP，不能在主线程）
 		refreshBgCountAsync();
-		// 更新开关栏状态
-		if (quickToggleBar != null) {
-			syncToggleStatesFromSystem();
-			// 重新探测 mini_shizuku 在线状态：用户在 Shizuku 激活页启动服务后回到桌面，
-			// 缓存可能仍是旧值，会导致亮度图标停在不正确的档位。
-			// 探测本身是 TCP，必须在后台线程（与上面的 refreshBgCountAsync 同理）。
-			NokiaQuickToggleManager.refreshShizukuStateAsync(new Runnable() {
-				@Override
-				public void run() {
-					if (isAdded() && getView() != null) {
-						renderToggleViews();
-					}
-				}
-			});
+
+		if (!contentDirty) {
+			// 冷启动：onPageCreated 刚完成全量构建，这里重复重建等于把首屏耗时翻倍
+			return;
 		}
+		contentDirty = false;
+		View view = getView();
+		if (view == null) return;
+		// 从桌面设置返回后刷新快捷栏/组件区/开关栏（可能有增删改）
+		loadShortcutBarAsync(view);
+		rebuildWidgetArea(view);
+		if (quickToggleBar == null) return;
+		buildToggleBar();
+		syncToggleStatesFromSystem();
+		// 重新探测 mini_shizuku 在线状态：用户在 Shizuku 激活页启动服务后回到桌面，
+		// 缓存可能仍是旧值，会导致亮度图标停在不正确的档位。
+		// 探测本身是 TCP，必须在后台线程（与上面的 refreshBgCountAsync 同理）。
+		NokiaQuickToggleManager.refreshShizukuStateAsync(new Runnable() {
+			@Override
+			public void run() {
+				if (isAdded() && getView() != null) {
+					renderToggleViews();
+				}
+			}
+		});
 		NokiaLog.d("Desktop", "桌面 onResume，已刷新组件区");
 	}
 
 	@Override
 	public void onPause() {
 		super.onPause();
+		// 离开桌面后再次回来需要重建内容区（桌面设置可能增删改了组件/快捷栏/开关）
+		contentDirty = true;
 		unregisterToggleReceiver();
 		unregisterMusicPlaybackObserver();
 	}
 
-	/** 后台线程计算后台进程数并回主线程刷新组件区（避免主线程 TCP 卡顿）。 */
+	/** 后台线程计算后台进程数并回主线程刷新「后台管理」组件行（避免主线程 TCP 卡顿）。 */
 	private void refreshBgCountAsync() {
 		Context c = getContext();
 		if (c == null) return;
 		final Context appCtx = c.getApplicationContext();
-		new Thread(() -> {
-			NokiaBgManagerHelper.probeShizukuSync();
-			int count = NokiaBgManagerHelper.countBackgroundProcesses(appCtx);
-			if (getActivity() == null) return;
-			getActivity().runOnUiThread(() -> {
-				if (!isAdded() || getView() == null) return;
-				cachedBgCount = count;
-				rebuildWidgetArea(getView());
-			});
+		// 单独起线程，不占用 ICON_EXECUTOR：探测含 TCP，可能耗时较久，
+		// 混进图标线程池会拖慢快捷栏图标的加载。
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				NokiaBgManagerHelper.probeShizukuSync();
+				final int count = NokiaBgManagerHelper.countBackgroundProcesses(appCtx);
+				Activity activity = getActivity();
+				if (activity == null) return;
+				activity.runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						if (!isAdded() || getView() == null) return;
+						cachedBgCount = count;
+						// 只改这一行的文字：整体重建会连带重查内存/存储/音乐 Provider
+						updateBgManagerRowText(getView());
+					}
+				});
+			}
 		}, "desktop-bg-count").start();
+	}
+
+	/**
+	 * 只刷新「后台管理」组件行右侧的计数文字，不整体重建组件区。
+	 * 计数是异步回来的，此时重建整区属于纯浪费（还会造成组件行闪烁/焦点跳动）。
+	 */
+	private void updateBgManagerRowText(View view) {
+		LinearLayout notifArea = view.findViewById(R.id.notificationArea);
+		if (notifArea == null) return;
+		for (int i = 0; i < widgetItems.size() && i < notifArea.getChildCount(); i++) {
+			NokiaWidgetItem item = widgetItems.get(i);
+			if (item.type != NokiaWidgetItem.TYPE_BG_MANAGER) continue;
+			View row = notifArea.getChildAt(i);
+			TextView infoTv = row.findViewWithTag(TAG_WIDGET_INFO);
+			if (infoTv != null) {
+				infoTv.setText(getWidgetInfoText(item));
+			}
+		}
 	}
 
 	// ---- 构建快捷栏 ----
@@ -343,11 +427,14 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			}
 		});
 
+		// 冻结角标不依赖 S60 图标扫描，先单独刷一次（后台查 PackageManager）
+		refreshShortcutCellsAsync(container, false);
+
 		Context ctx = getContext();
 		if (ctx != null) {
 			NokiaS60IconMap.initAsync(ctx, () -> {
 				if (!isAdded() || getView() == null) return;
-				refreshShortcutIcons(container);
+				refreshShortcutCellsAsync(container, true);
 			});
 		}
 	}
@@ -380,6 +467,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private void rebuildMusicWidgetRowOnly(View view) {
 		LinearLayout notifArea = view.findViewById(R.id.notificationArea);
 		if (notifArea == null) return;
+		// 播放状态已变化，快照必须重新查询
+		musicSnapshot = null;
 		for (int i = 0; i < widgetItems.size(); i++) {
 			if (widgetItems.get(i).type == NokiaWidgetItem.TYPE_MUSIC_PLAYER) {
 				// 仅替换该行 View，并更新焦点列表对应项
@@ -404,6 +493,10 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private void rebuildWidgetArea(View view) {
 		LinearLayout notifArea = view.findViewById(R.id.notificationArea);
 		if (notifArea == null) return;
+
+		// 同一次渲染共享一份实时数据快照：内存/存储/音乐原本每个组件行都独立查询一次
+		//（音乐行甚至查 3 次 ContentProvider），都是主线程同步 Binder 调用，组件越多越慢。
+		resetWidgetDataSnapshot();
 
 		// 先清空旧 View（但保留其他非焦点子 View，如果有的话）
 		notifArea.removeAllViews();
@@ -657,6 +750,13 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			public void onReceive(Context context, Intent intent) {
 				if (!isAdded() || quickToggleBar == null) return;
 				syncToggleStatesFromSystem();
+				// 冻结状态变化后快捷栏角标也要跟着变（后台查 PackageManager）
+				if (NokiaFreezeManager.ACTION_FREEZE_STATE_CHANGED.equals(intent.getAction())) {
+					View v = getView();
+					if (v != null) {
+						refreshShortcutCellsAsync(v.findViewById(R.id.shortcutContainer), false);
+					}
+				}
 			}
 		};
 		IntentFilter filter = new IntentFilter();
@@ -785,6 +885,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private View createMusicPlayerWidgetRow(NokiaWidgetItem item) {
 		Context ctx = getContext();
 		if (ctx == null) return null;
+		MusicSnapshot music = getMusicSnapshot();
 		LinearLayout row = new LinearLayout(ctx);
 		row.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -817,7 +918,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		NokiaFontManager.textSize(titleTv, 11);
 		titleTv.setSingleLine(true);
 		titleTv.setEllipsize(TextUtils.TruncateAt.END);
-		titleTv.setText(getMusicWidgetTitle());
+		titleTv.setText(music.title);
 		textCol.addView(titleTv);
 
 		// 第二行：当前歌词 / 占位
@@ -828,7 +929,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		NokiaFontManager.textSize(lyricTv, 9);
 		lyricTv.setSingleLine(true);
 		lyricTv.setEllipsize(TextUtils.TruncateAt.END);
-		lyricTv.setText(getMusicWidgetLyric());
+		lyricTv.setText(music.lyric);
 		textCol.addView(lyricTv);
 
 		// 进度条（横条）
@@ -844,7 +945,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		barTrack.setBackground(trackBg);
 
 		View barFill = new View(ctx);
-		int fillW = Math.max(0, (int) (getMusicWidgetProgressRatio() * barW));
+		int fillW = Math.max(0, (int) (music.progress * barW));
 		barFill.setLayoutParams(new LinearLayout.LayoutParams(fillW, barH));
 		android.graphics.drawable.GradientDrawable fillBg = new android.graphics.drawable.GradientDrawable();
 		fillBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
@@ -863,64 +964,68 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		return row;
 	}
 
-	/** 音乐组件：读取播放状态 Provider 的歌名/歌手标题。 */
-	private String getMusicWidgetTitle() {
+	/** 音乐播放状态快照：一次 ContentProvider 查询的结果，供同一行的标题/歌词/进度复用。 */
+	private static final class MusicSnapshot {
+		String title = "音乐播放器（未播放）";
+		String lyric = "暂无歌词";
+		float progress;
+	}
+
+	/** 清空实时数据快照，下次取用时重新查询（每次组件区渲染/音乐状态变化时调用）。 */
+	private void resetWidgetDataSnapshot() {
+		musicSnapshot = null;
+		memTotal = -1;
+		storageTotal = -1;
+		ipText = null;
+	}
+
+	/**
+	 * 取音乐播放状态快照（同一次渲染内只查询一次 ContentProvider）。
+	 * 原先标题/歌词/进度各查一次，等于一个组件行发了 3 次跨进程查询，
+	 * 且 Provider 不存在时每次都要构造一次异常（含堆栈填充），代价很高。
+	 */
+	private MusicSnapshot getMusicSnapshot() {
+		if (musicSnapshot != null) {
+			return musicSnapshot;
+		}
+		MusicSnapshot s = new MusicSnapshot();
+		musicSnapshot = s;
+		Context ctx = getContext();
+		if (ctx == null) return s;
 		Cursor c = null;
 		try {
-			c = getContext().getContentResolver().query(
-					MUSIC_PLAYBACK_URI, null, null, null, null);
-			if (c != null && c.moveToFirst()) {
-				String title = c.getString(c.getColumnIndexOrThrow("title"));
-				String artist = c.getString(c.getColumnIndexOrThrow("artist"));
-				boolean playing = c.getInt(c.getColumnIndexOrThrow("is_playing")) == 1;
+			c = ctx.getContentResolver().query(MUSIC_PLAYBACK_URI, null, null, null, null);
+			if (c == null || !c.moveToFirst()) return s;
+			int iTitle = c.getColumnIndex("title");
+			int iArtist = c.getColumnIndex("artist");
+			int iPlaying = c.getColumnIndex("is_playing");
+			int iLyric = c.getColumnIndex("lyric_text");
+			int iPos = c.getColumnIndex("position_ms");
+			int iDur = c.getColumnIndex("duration_ms");
+			if (iTitle >= 0) {
+				String title = c.getString(iTitle);
+				String artist = iArtist >= 0 ? c.getString(iArtist) : null;
 				if (title != null && !title.isEmpty()) {
-					String label = title + (artist != null && !artist.isEmpty() ? " - " + artist : "");
-					return playing ? label : label + "  [暂停]";
+					boolean playing = iPlaying >= 0 && c.getInt(iPlaying) == 1;
+					s.title = title
+							+ (artist != null && !artist.isEmpty() ? " - " + artist : "")
+							+ (playing ? "" : "  [暂停]");
 				}
+			}
+			if (iLyric >= 0) {
+				String lyric = c.getString(iLyric);
+				if (lyric != null && !lyric.isEmpty()) s.lyric = lyric;
+			}
+			if (iPos >= 0 && iDur >= 0) {
+				long dur = c.getLong(iDur);
+				if (dur > 0) s.progress = (float) c.getLong(iPos) / dur;
 			}
 		} catch (Exception e) {
 			NokiaLog.w("Desktop", "读取音乐播放状态失败: " + e.getMessage());
 		} finally {
 			if (c != null) c.close();
 		}
-		return "音乐播放器（未播放）";
-	}
-
-	/** 音乐组件：读取当前歌词行。 */
-	private String getMusicWidgetLyric() {
-		Cursor c = null;
-		try {
-			c = getContext().getContentResolver().query(
-					MUSIC_PLAYBACK_URI, null, null, null, null);
-			if (c != null && c.moveToFirst()) {
-				String lyric = c.getString(c.getColumnIndexOrThrow("lyric_text"));
-				if (lyric != null && !lyric.isEmpty()) return lyric;
-			}
-		} catch (Exception e) {
-			NokiaLog.w("Desktop", "读取音乐歌词失败: " + e.getMessage());
-		} finally {
-			if (c != null) c.close();
-		}
-		return "暂无歌词";
-	}
-
-	/** 音乐组件：读取播放进度比例 [0,1]。 */
-	private float getMusicWidgetProgressRatio() {
-		Cursor c = null;
-		try {
-			c = getContext().getContentResolver().query(
-					MUSIC_PLAYBACK_URI, null, null, null, null);
-			if (c != null && c.moveToFirst()) {
-				long pos = c.getLong(c.getColumnIndexOrThrow("position_ms"));
-				long dur = c.getLong(c.getColumnIndexOrThrow("duration_ms"));
-				if (dur > 0) return (float) pos / dur;
-			}
-		} catch (Exception e) {
-			NokiaLog.w("Desktop", "读取音乐进度失败: " + e.getMessage());
-		} finally {
-			if (c != null) c.close();
-		}
-		return 0f;
+		return s;
 	}
 
 	/** 创建无进度条的普通组件行（日历/使用时长/可编辑类型）。 */
@@ -981,6 +1086,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		infoTv.setGravity(Gravity.END);
 		infoTv.setSingleLine(true);
 		infoTv.setText(getWidgetInfoText(item));
+		// 打 tag：后台管理计数等异步数据回来后可只改这一处文字，无需整区重建
+		infoTv.setTag(TAG_WIDGET_INFO);
 		row.addView(infoTv);
 
 		setupWidgetRowClick(row, item);
@@ -1025,8 +1132,19 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		}
 	}
 
-	/** 获取 WiFi IPv4 地址；未连接 WiFi 或无 IP 时返回 "未连接"。 */
+	/**
+	 * 获取 WiFi IPv4 地址（同一次渲染内缓存）。
+	 * 组件区可能有多个 IP 组件，逐个查 WifiManager 会重复发起 Binder 调用。
+	 */
 	private String getWifiIpAddress() {
+		if (ipText == null) {
+			ipText = queryWifiIpAddress();
+		}
+		return ipText;
+	}
+
+	/** 实际查询 WiFi IPv4 地址；未连接 WiFi 或无 IP 时返回 "未连接"。 */
+	private String queryWifiIpAddress() {
 		try {
 			Context ctx = getContext();
 			if (ctx == null) return "未连接";
@@ -1047,81 +1165,77 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	// ---- 进度条数据 ----
 
-	/** 返回已用比例 [0,1] 和百分比文字。 */
-	private float getMemoryUsedRatio() {
+	/**
+	 * 取内存信息快照（同一次渲染只查一次）。
+	 * 比例与百分比文字原本各自调一次 {@code ActivityManager.getMemoryInfo()}，
+	 * 即一个内存组件行发两次 Binder 调用。
+	 */
+	private void queryMemoryInfo() {
+		if (memTotal >= 0) return;
+		memTotal = 0;
+		memAvail = 0;
 		try {
 			Context ctx = getContext();
-			if (ctx == null) return 0;
+			if (ctx == null) return;
 			ActivityManager am = (ActivityManager) ctx
 					.getSystemService(Context.ACTIVITY_SERVICE);
-			if (am == null) return 0;
+			if (am == null) return;
 			ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
 			am.getMemoryInfo(mi);
-			long total = mi.totalMem;
-			long avail = mi.availMem;
-			if (total <= 0) return 0;
-			return (float) (total - avail) / total;
+			memTotal = mi.totalMem;
+			memAvail = mi.availMem;
 		} catch (Exception e) {
-			return 0;
+			memTotal = 0;
 		}
 	}
 
+	/** 返回已用比例 [0,1]。 */
+	private float getMemoryUsedRatio() {
+		queryMemoryInfo();
+		if (memTotal <= 0) return 0;
+		return (float) (memTotal - memAvail) / memTotal;
+	}
+
+	/** 返回已用百分比文字。 */
 	private String getMemoryPercentText() {
+		queryMemoryInfo();
+		if (memTotal <= 0) return "";
+		return (int) ((memTotal - memAvail) * 100 / memTotal) + "%";
+	}
+
+	/**
+	 * 取存储信息快照（同一次渲染只构造一次 {@link StatFs}）。
+	 * 比例与百分比文字原本各自构造一次 StatFs，即一次 statvfs 系统调用 ×2。
+	 */
+	private void queryStorageInfo() {
+		if (storageTotal >= 0) return;
+		storageTotal = 0;
+		storageAvail = 0;
 		try {
-			Context ctx = getContext();
-			if (ctx == null) return "";
-			ActivityManager am = (ActivityManager) ctx
-					.getSystemService(Context.ACTIVITY_SERVICE);
-			if (am == null) return "";
-			ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
-			am.getMemoryInfo(mi);
-			long total = mi.totalMem;
-			long avail = mi.availMem;
-			if (total <= 0) return "";
-			int pct = (int) ((total - avail) * 100 / total);
-			return pct + "%";
+			File dataDir = Environment.getDataDirectory();
+			StatFs stat = new StatFs(dataDir.getPath());
+			if (Build.VERSION.SDK_INT >= 18) {
+				storageTotal = stat.getBlockCountLong() * stat.getBlockSizeLong();
+				storageAvail = stat.getAvailableBlocksLong() * stat.getBlockSizeLong();
+			} else {
+				storageTotal = (long) stat.getBlockCount() * stat.getBlockSize();
+				storageAvail = (long) stat.getAvailableBlocks() * stat.getBlockSize();
+			}
 		} catch (Exception e) {
-			return "";
+			storageTotal = 0;
 		}
 	}
 
 	private float getStorageUsedRatio() {
-		try {
-			File dataDir = Environment.getDataDirectory();
-			StatFs stat = new StatFs(dataDir.getPath());
-			long total, avail;
-			if (Build.VERSION.SDK_INT >= 18) {
-				total = stat.getBlockCountLong() * stat.getBlockSizeLong();
-				avail = stat.getAvailableBlocksLong() * stat.getBlockSizeLong();
-			} else {
-				total = (long) stat.getBlockCount() * stat.getBlockSize();
-				avail = (long) stat.getAvailableBlocks() * stat.getBlockSize();
-			}
-			if (total <= 0) return 0;
-			return (float) (total - avail) / total;
-		} catch (Exception e) {
-			return 0;
-		}
+		queryStorageInfo();
+		if (storageTotal <= 0) return 0;
+		return (float) (storageTotal - storageAvail) / storageTotal;
 	}
 
 	private String getStoragePercentText() {
-		try {
-			File dataDir = Environment.getDataDirectory();
-			StatFs stat = new StatFs(dataDir.getPath());
-			long total, avail;
-			if (Build.VERSION.SDK_INT >= 18) {
-				total = stat.getBlockCountLong() * stat.getBlockSizeLong();
-				avail = stat.getAvailableBlocksLong() * stat.getBlockSizeLong();
-			} else {
-				total = (long) stat.getBlockCount() * stat.getBlockSize();
-				avail = (long) stat.getAvailableBlocks() * stat.getBlockSize();
-			}
-			if (total <= 0) return "";
-			int pct = (int) ((total - avail) * 100 / total);
-			return pct + "%";
-		} catch (Exception e) {
-			return "";
-		}
+		queryStorageInfo();
+		if (storageTotal <= 0) return "";
+		return (int) ((storageTotal - storageAvail) * 100 / storageTotal) + "%";
 	}
 
 	// ---- 不可编辑类型实时数据 ----
@@ -1236,7 +1350,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				row.setOnClickListener(v -> {
 					Context c = getContext();
 					if (c == null) return;
-					String ip = getWifiIpAddress();
+					String ip = queryWifiIpAddress();
 					if (!"未连接".equals(ip)) {
 						ClipboardManager cm = (ClipboardManager) c
 								.getSystemService(Context.CLIPBOARD_SERVICE);
@@ -1392,24 +1506,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		}
 		iconContainer.addView(iv);
 
-		// 判断快捷应用是否被冻结
-		String pkg = null;
-		if (app.type == ShortcutApp.TYPE_ANDROID) {
-			Intent intent = app.getLaunchIntent();
-			if (intent != null) {
-				if (intent.getComponent() != null) pkg = intent.getComponent().getPackageName();
-				else if (!TextUtils.isEmpty(intent.getPackage())) pkg = intent.getPackage();
-			}
-		}
-		if (pkg != null && NokiaFreezeManager.getInstance(ctx).isAppFrozen(pkg)) {
-			ImageView badgeIv = new ImageView(ctx);
-			int badgeSize = Math.max(NokiaDimens.dp(getResources(), 8), Math.round(NokiaDimens.dp(getResources(), 10) * iconScale));
-			FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(badgeSize, badgeSize);
-			badgeLp.gravity = Gravity.BOTTOM | Gravity.END;
-			badgeIv.setLayoutParams(badgeLp);
-			badgeIv.setImageResource(R.drawable.ic_nokia_ice_badge);
-			iconContainer.addView(badgeIv);
-		}
+		// 冻结角标不在这里同步查询：isAppFrozen() 是一次 PackageManager Binder 调用，
+		// 快捷栏 8 项就是 8 次主线程 IPC（应用不存在时还要构造异常）。
+		// 改为随图标一起在后台线程解析（见 refreshShortcutCellsAsync / applyFreezeBadge）。
 
 		cell.addView(iconContainer);
 
@@ -1475,34 +1574,90 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		return null;
 	}
 
-	private void refreshShortcutIcons(final LinearLayout container) {
+	/**
+	 * 后台解析快捷栏单元格的「图标 + 冻结角标」，完成后回主线程更新。
+	 * <p>
+	 * 走共享线程池（ICON_EXECUTOR）：原先每个快捷项各起一个线程，8 项就是 8 个线程
+	 * 并发做 PackageManager IPC + 位图分配，冷启动时容易抢占 CPU 并引发 GC 抖动，
+	 * 反而拖慢主线程的首帧渲染。
+	 *
+	 * @param withIcons 是否同时重新加载图标；false 表示只刷新冻结角标
+	 *                  （冻结状态广播后调用，不必重解码图标）
+	 */
+	private void refreshShortcutCellsAsync(final LinearLayout container, final boolean withIcons) {
 		if (container == null || shortcutApps.isEmpty()) return;
 		final Handler mainHandler = new Handler(Looper.getMainLooper());
 		final Resources res = container.getResources();
 		final int targetPx = computeShortcutIconTargetPx();
+		final Context appCtx = requireContext().getApplicationContext();
 		for (int i = 0; i < shortcutApps.size(); i++) {
 			final ShortcutApp app = shortcutApps.get(i);
 			final int index = i;
-			new Thread(() -> {
-				// 预缩放到实际显示尺寸，避免大图每帧缩小绘制（低端机快速滚动叠影的诱因）
-				final Drawable icon = scaleShortcutIcon(loadShortcutIconNow(app), targetPx, res);
-				mainHandler.post(() -> {
-					if (!isAdded() || getView() == null) return;
-					if (index >= container.getChildCount()) return;
-					View child = container.getChildAt(index);
-					if (!(child instanceof LinearLayout)) return;
-					View firstChild = ((LinearLayout) child).getChildAt(0);
-					if (firstChild instanceof FrameLayout) {
-						View ivChild = ((FrameLayout) firstChild).getChildAt(0);
-						if (ivChild instanceof ImageView && icon != null) {
-							((ImageView) ivChild).setImageDrawable(icon);
+			ICON_EXECUTOR.execute(new Runnable() {
+				@Override
+				public void run() {
+					// 预缩放到实际显示尺寸，避免大图每帧缩小绘制（低端机快速滚动叠影的诱因）
+					final Drawable icon = withIcons
+							? scaleShortcutIcon(loadShortcutIconNow(app), targetPx, res)
+							: null;
+					final boolean frozen = isShortcutAppFrozen(app, appCtx);
+					mainHandler.post(new Runnable() {
+						@Override
+						public void run() {
+							if (!isAdded() || getView() == null) return;
+							if (index >= container.getChildCount()) return;
+							View child = container.getChildAt(index);
+							if (!(child instanceof LinearLayout)) return;
+							View firstChild = ((LinearLayout) child).getChildAt(0);
+							if (!(firstChild instanceof FrameLayout)) return;
+							FrameLayout iconBox = (FrameLayout) firstChild;
+							if (withIcons && icon != null) {
+								View ivChild = iconBox.getChildAt(0);
+								if (ivChild instanceof ImageView) {
+									((ImageView) ivChild).setImageDrawable(icon);
+								}
+							}
+							applyFreezeBadge(iconBox, frozen, res);
 						}
-					} else if (firstChild instanceof ImageView && icon != null) {
-						((ImageView) firstChild).setImageDrawable(icon);
-					}
-				});
-			}, "shortcut-icon-" + index).start();
+					});
+				}
+			});
 		}
+	}
+
+	/** 快捷应用当前是否处于冻结状态（PackageManager IPC，仅在后台线程调用）。 */
+	private static boolean isShortcutAppFrozen(ShortcutApp app, Context ctx) {
+		if (app.type != ShortcutApp.TYPE_ANDROID) return false;
+		Intent intent = app.getLaunchIntent();
+		if (intent == null) return false;
+		String pkg = intent.getComponent() != null
+				? intent.getComponent().getPackageName()
+				: intent.getPackage();
+		if (TextUtils.isEmpty(pkg)) return false;
+		return NokiaFreezeManager.getInstance(ctx).isAppFrozen(pkg);
+	}
+
+	/** 显示/移除快捷图标右下角的冻结角标（幂等）。 */
+	private void applyFreezeBadge(FrameLayout iconBox, boolean frozen, Resources res) {
+		View existing = iconBox.findViewWithTag(TAG_FREEZE_BADGE);
+		if (!frozen) {
+			if (existing != null) iconBox.removeView(existing);
+			return;
+		}
+		if (existing != null) return;
+		Context ctx = getContext();
+		if (ctx == null) return;
+		ImageView badgeIv = new ImageView(ctx);
+		float fontScale = NokiaSettingsStorage.getFontScale(ctx);
+		float iconScale = 1.0f + (fontScale - 1.0f) * 0.6f;
+		if (iconScale < 0.8f) iconScale = 0.8f;
+		int badgeSize = Math.max(NokiaDimens.dp(res, 8), Math.round(NokiaDimens.dp(res, 10) * iconScale));
+		FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(badgeSize, badgeSize);
+		badgeLp.gravity = Gravity.BOTTOM | Gravity.END;
+		badgeIv.setLayoutParams(badgeLp);
+		badgeIv.setImageResource(R.drawable.ic_nokia_ice_badge);
+		badgeIv.setTag(TAG_FREEZE_BADGE);
+		iconBox.addView(badgeIv);
 	}
 
 	/** 快捷图标目标显示尺寸（与 createShortcutCell 的 iconBase 保持一致），单位 px。 */
