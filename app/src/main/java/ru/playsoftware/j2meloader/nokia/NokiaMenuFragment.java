@@ -270,6 +270,12 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 				NokiaLog.i("Menu", "功能表初始化完成（panelH 已可用，复用缓存）：共 " + items.size()
 						+ " 项，" + totalPages + " 页，每页 " + perPage
 						+ " 格（" + COLS + "×" + rowsPerPage + "）");
+				// 缓存命中也要静默后台校准一次：Fragment View 销毁期间（在返回栈中）
+				// 包变化广播接收器已注销，期间安装/卸载的应用不会进缓存；
+				// 不校准的话新装应用会一直缺席，直到进程重启。
+				// 校准在后台枚举，结果与当前一致时不重绘（见 loadAppsAsync）。
+				refreshKeepPosition = true;
+				loadAppsAsync();
 			} else {
 				// 无缓存：后台枚举，避免主线程被 queryIntentActivities 阻塞
 				loadAppsAsync();
@@ -322,6 +328,12 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 					public void run() {
 						loadingAsync = false;
 						if (!isAdded() || getView() == null) return;
+						// 校准场景（缓存命中后后台重新枚举）：数据无变化时跳过重建，
+						// 避免每次进入功能表都白画一遍网格。
+						if (isSameMenuList(built, items)) {
+							NokiaLog.d("Menu", "后台校准：应用列表无变化，跳过重建");
+							return;
+						}
 						items.clear();
 						items.addAll(built);
 						totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
@@ -363,6 +375,24 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		synchronized (cachedItems) {
 			cachedItems.clear();
 		}
+	}
+
+	/** 按类型+名称+启动组件逐项比对两个应用列表是否内容一致（后台校准去重用）。 */
+	private static boolean isSameMenuList(List<NokiaAppItem> a, List<NokiaAppItem> b) {
+		if (a.size() != b.size()) return false;
+		for (int i = 0; i < a.size(); i++) {
+			NokiaAppItem x = a.get(i);
+			NokiaAppItem y = b.get(i);
+			if (x == null || y == null) return false;
+			if (x.type != y.type || !TextUtils.equals(x.label, y.label)) return false;
+			ComponentName cx = x.launchIntent != null ? x.launchIntent.getComponent() : null;
+			ComponentName cy = y.launchIntent != null ? y.launchIntent.getComponent() : null;
+			if (!TextUtils.equals(cx != null ? cx.flattenToString() : null,
+					cy != null ? cy.flattenToString() : null)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
