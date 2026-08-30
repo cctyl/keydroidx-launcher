@@ -58,6 +58,7 @@ import javax.microedition.shell.MicroActivity;
 import javax.microedition.util.ContextHolder;
 
 import androidx.annotation.NonNull;
+import androidx.core.view.ViewCompat;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.fragment.app.FragmentManager;
@@ -95,6 +96,8 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 	private ArrayAdapter<ShaderInfo> spShaderAdapter;
 	private String workDir;
 	private boolean needShow;
+	/** 载入配置期间为 true，用于抑制开关监听器误触发预设覆写 */
+	private boolean loading;
 
 	private ActivityConfigBinding binding;
 
@@ -181,6 +184,9 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 
 		binding.keepAspectRatioToggle.setOnCheckedChangeListener(this::onLockAspectChanged);
 		binding.showScreenSizePresets.setOnClickListener(this::showScreenPresets);
+		ViewCompat.setTooltipText(binding.scaleTypeHint, getText(R.string.pref_screen_scale_type_hint));
+		binding.forceStretchFillToggle.setOnCheckedChangeListener(this::onForceStretchFillChanged);
+		ViewCompat.setTooltipText(binding.forceStretchFillToggle, getText(R.string.pref_force_stretch_fill_hint));
 		binding.swapScreenSides.setOnClickListener(this);
 		binding.addScreenSizeToPresets.setOnClickListener(v -> addResolutionToPresets());
 		binding.showFontSizePresets.setOnClickListener(this);
@@ -315,6 +321,30 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 				listener.onFocusChange(binding.screenHeight, false);
 				binding.screenHeight.setOnFocusChangeListener(null);
 			}
+		}
+	}
+
+	@SuppressLint("SetTextI18n")
+	private void onForceStretchFillChanged(CompoundButton cb, boolean isChecked) {
+		if (loading) {
+			return;
+		}
+		if (isChecked) {
+			binding.screenWidth.setText("240");
+			binding.screenHeight.setText("320");
+			binding.scaleTypeSelector.setSelection(2);
+			params.screenWidth = 240;
+			params.screenHeight = 320;
+			params.screenScaleType = 2;
+		} else {
+			int dw = display.getWidth();
+			int dh = display.getHeight();
+			binding.screenWidth.setText(Integer.toString(dw));
+			binding.screenHeight.setText(Integer.toString(dh));
+			binding.scaleTypeSelector.setSelection(1);
+			params.screenWidth = dw;
+			params.screenHeight = dh;
+			params.screenScaleType = 1;
 		}
 	}
 
@@ -553,9 +583,11 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 
 	@SuppressLint("SetTextI18n")
 	public void loadParams(boolean reloadFromFile) {
-		if (reloadFromFile) {
-			loadConfig();
-		}
+		loading = true;
+		try {
+			if (reloadFromFile) {
+				loadConfig();
+			}
 		int screenWidth = params.screenWidth;
 		if (screenWidth != 0) {
 			binding.screenWidth.setText(Integer.toString(screenWidth));
@@ -573,6 +605,8 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 		binding.immediateProcessingToggle.setChecked(params.immediateMode);
 		binding.parallelScreenRedrawingToggle.setChecked(params.parallelRedrawScreen);
 		binding.forceFullscreenToggle.setChecked(params.forceFullscreen);
+		binding.forceStretchFillToggle.setChecked(
+				params.screenWidth == 240 && params.screenHeight == 320 && params.screenScaleType == 2);
 		binding.graphicalModeSelector.setSelection(params.graphicsMode);
 		binding.showFpsToggle.setChecked(params.showFps);
 		binding.shaderSelector.setSelection(0);
@@ -616,6 +650,9 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 			systemProperties = ContextHolder.getAssetAsString("defaults/system.props");
 		}
 		binding.systemProperties.setText(systemProperties);
+		} finally {
+			loading = false;
+		}
 	}
 
 	private void saveParams() {

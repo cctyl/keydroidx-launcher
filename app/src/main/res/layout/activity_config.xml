@@ -227,6 +227,7 @@
                 android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textColor="?attr/textColorSecondary"
                 android:textSize="15sp"
+                app:tooltipText="@string/pref_screen_scale_type_hint"
                 app:layout_constraintEnd_toStartOf="@+id/barrier_screen_config"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/screen_gravity_hint"
@@ -357,6 +358,18 @@
                 app:layout_constraintTop_toBottomOf="@+id/parallel_screen_redrawing_toggle" />
 
             <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/force_stretch_fill_toggle"
+                style="@style/SwitchStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/height_config_row"
+                android:checked="false"
+                android:text="@string/PREF_FORCE_STRETCH_FILL"
+                app:tooltipText="@string/pref_force_stretch_fill_hint"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/force_fullscreen_toggle" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/show_fps_toggle"
                 style="@style/SwitchStyle"
                 android:layout_width="0dp"
@@ -365,7 +378,7 @@
                 android:text="@string/PREF_SHOW_FPS"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/force_fullscreen_toggle" />
+                app:layout_constraintTop_toBottomOf="@+id/force_stretch_fill_toggle" />
 
 
             <TextView

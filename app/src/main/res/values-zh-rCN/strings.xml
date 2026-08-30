@@ -63,6 +63,8 @@
     <string name="PREF_IMMEDIATE">实时处理模式</string>
     <string name="PREF_SHOW_FPS">显示 FPS</string>
     <string name="PREF_FORCE_FULLSCREEN">强制全屏</string>
+    <string name="PREF_FORCE_STRETCH_FILL">强制铺满（240×320 拉伸）</string>
+    <string name="pref_force_stretch_fill_hint">一键预设，用于老 S40 游戏只画屏幕左上角、画面铺不满的情况。\n\n开启：屏幕宽设为 240、高设为 320、缩放类型设为“填充窗口”（拉伸铺满全屏，可能轻微变形）。\n关闭：屏幕尺寸恢复为物理屏尺寸，缩放类型设为“适应窗口”（保持比例，可能留黑边）。</string>
     <string name="PREF_LIMIT_FPS">限制 FPS</string>
     <string name="PREF_FONT_OPTIONS">字体选项</string>
     <string name="PREF_WIDTH">宽度</string>
@@ -129,9 +131,10 @@
     <string name="pref_screen_gravity_right">右</string>
     <string name="pref_screen_gravity_top">顶部</string>
     <string name="pref_screen_scale_type">缩放类型</string>
-    <string name="pref_screen_scale_type_fill">填充窗口 (忽略宽高比)</string>
-    <string name="pref_screen_scale_type_fit">适应窗口</string>
-    <string name="pref_screen_scale_type_none">按照设置尺寸</string>
+    <string name="pref_screen_scale_type_none">不缩放（按设置尺寸，可能留空）</string>
+    <string name="pref_screen_scale_type_fit">适应窗口（保持比例，可能留黑边）</string>
+    <string name="pref_screen_scale_type_fill">填充窗口（拉伸铺满，可能变形）</string>
+    <string name="pref_screen_scale_type_hint">选择画面如何铺满屏幕：\n• 不缩放：按上方填写的宽高 1:1 显示在左上角，多余屏幕留空。\n• 适应窗口：保持原始比例缩放到最大，可能上下/左右留黑边，不变形。\n• 填充窗口：拉伸铺满整屏，可能轻微变形。\n提示：若游戏只画左上角（老 S40 游戏硬编码为 240×320），请先用上方“尺寸预设”选 240×320，再选“填充窗口”即可铺满全屏。</string>
     <string name="pref_vk_hide_hint">已禁用</string>
     <string name="unlimited">无限制</string>
     <string name="parallel_screen_redrawing">同步画面绘制</string>

@@ -77,6 +77,8 @@
     <string name="PREF_IMMEDIATE">Immediate processing mode</string>
     <string name="PREF_SHOW_FPS">Show FPS</string>
     <string name="PREF_FORCE_FULLSCREEN">Force fullscreen</string>
+    <string name="PREF_FORCE_STRETCH_FILL">Force fill (240×320 stretch)</string>
+    <string name="pref_force_stretch_fill_hint">One-click preset for old S40 games that only paint the top-left corner of the screen.\n\nOn: sets screen width=240, height=320, scale type=Fill window (stretched to full screen, may distort slightly).\nOff: restores screen size to the physical display and scale type=Fit window (keeps aspect ratio, may letterbox).</string>
     <string name="PREF_LIMIT_FPS">Limit FPS</string>
     <string name="PREF_FONT_OPTIONS">Font options</string>
     <string name="PREF_WIDTH">Width</string>
@@ -146,9 +148,10 @@
     <string name="pref_screen_gravity_right">Right</string>
     <string name="pref_screen_gravity_top">Top</string>
     <string name="pref_screen_scale_type">Scale type</string>
-    <string name="pref_screen_scale_type_fill">Fill window (ignore aspect ratio)</string>
-    <string name="pref_screen_scale_type_fit">Fit to window</string>
-    <string name="pref_screen_scale_type_none">As is</string>
+    <string name="pref_screen_scale_type_none">No scaling (use set size, may leave empty area)</string>
+    <string name="pref_screen_scale_type_fit">Fit window (keep aspect ratio, may letterbox)</string>
+    <string name="pref_screen_scale_type_fill">Fill window (stretch to full screen, may distort)</string>
+    <string name="pref_screen_scale_type_hint">How the virtual screen is drawn to the display:\n• No scaling: drawn 1:1 at the top-left, the rest of the screen is empty.\n• Fit window: scaled to the largest size while keeping the aspect ratio; black bars may appear on the sides/top/bottom, no distortion.\n• Fill window: stretched to fill the whole screen; may distort slightly.\nTip: if a game only paints the top-left corner (old S40 games hardcoded to 240×320), first pick the matching size preset (e.g. 240×320) above, then choose Fill window to fill the screen.</string>
     <string name="pref_vk_hide_hint">disabled</string>
     <string name="unlimited">unlimited</string>
     <string name="parallel_screen_redrawing">Parallel screen redrawing</string>
