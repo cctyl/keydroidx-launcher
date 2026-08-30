@@ -994,12 +994,27 @@ public class NokiaQuickToggleManager {
 		}, "power-action").start();
 	}
 
-	/** 后台线程安全地弹 Toast（电源命令在子线程执行）。 */
+	/** 复用的 Toast 实例：显示新提示前先 cancel 掉上一条。 */
+	private static Toast sToast = null;
+
+	/**
+	 * 后台线程安全地弹 Toast。
+	 * <p>
+	 * 复用同一实例并在 show 前 cancel：Toast 内部是队列式入队的，若每次都新建并 show，
+	 * 快速连点（亮度四档循环时很容易连点找档位）会让多条提示依次排队显示，
+	 * 累计可达数秒，观感上就像单条 Toast 停留过久。cancel 后只保留最新一条。
+	 */
 	private static void showToastOnMain(final Context appCtx, final String msg) {
+		final Context ctx = appCtx == null ? null : appCtx.getApplicationContext();
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
-				Toast.makeText(appCtx, msg, Toast.LENGTH_SHORT).show();
+				if (ctx == null) return;
+				if (sToast != null) {
+					sToast.cancel();
+				}
+				sToast = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT);
+				sToast.show();
 			}
 		});
 	}
