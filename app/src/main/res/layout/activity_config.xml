@@ -217,6 +217,17 @@
                 app:layout_constraintStart_toEndOf="@+id/barrier_screen_config"
                 app:layout_constraintTop_toBottomOf="@+id/screen_orientation_hint" />
 
+            <ImageButton
+                android:id="@+id/scale_type_tips"
+                style="@style/ImageButtonStyle"
+                android:layout_width="@dimen/height_config_row"
+                android:layout_height="0dp"
+                android:contentDescription="@string/pref_screen_scale_type"
+                app:srcCompat="@drawable/ic_info_24"
+                app:layout_constraintBottom_toBottomOf="@+id/scale_type_hint"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="@+id/scale_type_hint" />
+
             <TextView
                 android:id="@+id/scale_type_hint"
                 android:layout_width="0dp"
@@ -227,9 +238,8 @@
                 android:textAppearance="?android:attr/textAppearanceSmall"
                 android:textColor="?attr/textColorSecondary"
                 android:textSize="15sp"
-                app:tooltipText="@string/pref_screen_scale_type_hint"
                 app:layout_constraintEnd_toStartOf="@+id/barrier_screen_config"
-                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintStart_toEndOf="@+id/scale_type_tips"
                 app:layout_constraintTop_toBottomOf="@+id/screen_gravity_hint"
                 app:layout_constraintWidth_min="wrap" />
 
@@ -353,9 +363,20 @@
                 android:layout_height="@dimen/height_config_row"
                 android:checked="false"
                 android:text="@string/PREF_FORCE_FULLSCREEN"
-                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/force_fullscreen_tips"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/parallel_screen_redrawing_toggle" />
+
+            <ImageButton
+                android:id="@+id/force_fullscreen_tips"
+                style="@style/ImageButtonStyle"
+                android:layout_width="@dimen/height_config_row"
+                android:layout_height="0dp"
+                android:contentDescription="@string/PREF_FORCE_FULLSCREEN"
+                app:srcCompat="@drawable/ic_info_24"
+                app:layout_constraintBottom_toBottomOf="@+id/force_fullscreen_toggle"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@+id/force_fullscreen_toggle" />
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/force_stretch_fill_toggle"
@@ -364,10 +385,20 @@
                 android:layout_height="@dimen/height_config_row"
                 android:checked="false"
                 android:text="@string/PREF_FORCE_STRETCH_FILL"
-                app:tooltipText="@string/pref_force_stretch_fill_hint"
-                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/force_stretch_fill_tips"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/force_fullscreen_toggle" />
+
+            <ImageButton
+                android:id="@+id/force_stretch_fill_tips"
+                style="@style/ImageButtonStyle"
+                android:layout_width="@dimen/height_config_row"
+                android:layout_height="0dp"
+                android:contentDescription="@string/PREF_FORCE_STRETCH_FILL"
+                app:srcCompat="@drawable/ic_info_24"
+                app:layout_constraintBottom_toBottomOf="@+id/force_stretch_fill_toggle"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@+id/force_stretch_fill_toggle" />
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/show_fps_toggle"

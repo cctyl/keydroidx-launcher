@@ -62,7 +62,8 @@
     <string name="PREF_FILTER">图像虚化</string>
     <string name="PREF_IMMEDIATE">实时处理模式</string>
     <string name="PREF_SHOW_FPS">显示 FPS</string>
-    <string name="PREF_FORCE_FULLSCREEN">强制全屏</string>
+    <string name="PREF_FORCE_FULLSCREEN">隐藏软键栏（强制全屏）</string>
+    <string name="pref_force_fullscreen_hint">控制 J2ME 软键栏——即屏幕底部的左/右 Command 标签条（如“选项 / 退出”那一行）。\n\n开启：隐藏软键栏，游戏可画到那块区域，用满虚拟屏高。\n关闭：显示软键栏，虚拟屏底部一条留给软键，游戏可画区域变小。\n\n此开关只影响虚拟屏内部布局，不会缩放/拉伸画面。多数 S40 游戏自己会调 setFullScreenMode(true)，所以通常看不出变化，主要用来兑那些还留着软键栏的游戏。</string>
     <string name="PREF_FORCE_STRETCH_FILL">强制铺满（240×320 拉伸）</string>
     <string name="pref_force_stretch_fill_hint">一键预设，用于老 S40 游戏只画屏幕左上角、画面铺不满的情况。\n\n开启：屏幕宽设为 240、高设为 320、缩放类型设为“填充窗口”（拉伸铺满全屏，可能轻微变形）。\n关闭：屏幕尺寸恢复为物理屏尺寸，缩放类型设为“适应窗口”（保持比例，可能留黑边）。</string>
     <string name="PREF_LIMIT_FPS">限制 FPS</string>

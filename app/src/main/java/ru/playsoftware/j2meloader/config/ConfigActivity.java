@@ -58,7 +58,6 @@ import javax.microedition.shell.MicroActivity;
 import javax.microedition.util.ContextHolder;
 
 import androidx.annotation.NonNull;
-import androidx.core.view.ViewCompat;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.fragment.app.FragmentManager;
@@ -184,9 +183,10 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 
 		binding.keepAspectRatioToggle.setOnCheckedChangeListener(this::onLockAspectChanged);
 		binding.showScreenSizePresets.setOnClickListener(this::showScreenPresets);
-		ViewCompat.setTooltipText(binding.scaleTypeHint, getText(R.string.pref_screen_scale_type_hint));
+		binding.scaleTypeTips.setOnClickListener(v -> showTips(R.string.pref_screen_scale_type, R.string.pref_screen_scale_type_hint));
 		binding.forceStretchFillToggle.setOnCheckedChangeListener(this::onForceStretchFillChanged);
-		ViewCompat.setTooltipText(binding.forceStretchFillToggle, getText(R.string.pref_force_stretch_fill_hint));
+		binding.forceFullscreenTips.setOnClickListener(v -> showTips(R.string.PREF_FORCE_FULLSCREEN, R.string.pref_force_fullscreen_hint));
+		binding.forceStretchFillTips.setOnClickListener(v -> showTips(R.string.PREF_FORCE_STRETCH_FILL, R.string.pref_force_stretch_fill_hint));
 		binding.swapScreenSides.setOnClickListener(this);
 		binding.addScreenSizeToPresets.setOnClickListener(v -> addResolutionToPresets());
 		binding.showFontSizePresets.setOnClickListener(this);
@@ -346,6 +346,14 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 			params.screenHeight = dh;
 			params.screenScaleType = 1;
 		}
+	}
+
+	private void showTips(int titleRes, int messageRes) {
+		new AlertDialog.Builder(this)
+				.setTitle(titleRes)
+				.setMessage(messageRes)
+				.setPositiveButton(android.R.string.ok, null)
+				.show();
 	}
 
 	void loadConfig() {
