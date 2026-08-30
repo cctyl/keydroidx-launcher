@@ -125,6 +125,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private final List<NokiaQuickToggleItem> activeToggles = new ArrayList<>();
 	private final List<View> toggleCells = new ArrayList<>();
 	private boolean[] toggleStates = new boolean[0];
+	/** 快捷开关图标尺寸（dp，随字号缩放），重绘亮度图标时复用。 */
+	private int toggleIconSizeDp = 18;
 	private BroadcastReceiver toggleStateReceiver;
 	private boolean receiverRegistered = false;
 
@@ -177,6 +179,17 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		if (quickToggleBar != null) {
 			buildToggleBar();
 			syncToggleStatesFromSystem();
+			// mini_shizuku 在线状态需在后台探测（socket 操作，不能在主线程）。
+			// 探测结果回来后若状态有变化，重绘开关图标——亮度图标依赖该状态
+			// （未激活时固定显示 brightness_low）。
+			NokiaQuickToggleManager.refreshShizukuStateAsync(new Runnable() {
+				@Override
+				public void run() {
+					if (isAdded() && getView() != null) {
+						renderToggleViews();
+					}
+				}
+			});
 			// rebuildWidgetArea 已在 buildToggleBar 前调用（当时 toggleCells 为空），
 			// 这里手动把开关单元格补进焦点列表；之后快捷栏异步加载完成会整体重建
 			for (View cell : toggleCells) {
@@ -211,6 +224,17 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 更新开关栏状态
 		if (quickToggleBar != null) {
 			syncToggleStatesFromSystem();
+			// 重新探测 mini_shizuku 在线状态：用户在 Shizuku 激活页启动服务后回到桌面，
+			// 缓存可能仍是旧值，会导致亮度图标停在不正确的档位。
+			// 探测本身是 TCP，必须在后台线程（与上面的 refreshBgCountAsync 同理）。
+			NokiaQuickToggleManager.refreshShizukuStateAsync(new Runnable() {
+				@Override
+				public void run() {
+					if (isAdded() && getView() != null) {
+						renderToggleViews();
+					}
+				}
+			});
 		}
 		NokiaLog.d("Desktop", "桌面 onResume，已刷新组件区");
 	}
@@ -470,6 +494,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		boolean useWeight = count <= 4;
 		int fixedCellWidth = NokiaDimens.dp(getResources(), Math.round(48 * toggleScale));
 		int iconSize = Math.round(18 * toggleScale);
+		toggleIconSizeDp = iconSize; // 存下来，renderToggleViews 重绘亮度图标时复用同一尺寸
 		int dotSize = Math.max(3, Math.round(4 * toggleScale));
 		int dotMarginTop = Math.max(1, Math.round(1 * toggleScale));
 
@@ -491,7 +516,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			iv.setLayoutParams(new LinearLayout.LayoutParams(
 					NokiaDimens.dp(getResources(), iconSize), NokiaDimens.dp(getResources(), iconSize)));
 			iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-			iv.setImageDrawable(NokiaIcons.get(ctx, item.getIconUnicode(), 0xFFFFFFFF, iconSize));
+			iv.setImageDrawable(NokiaIcons.get(ctx, item.getIconUnicode(ctx), 0xFFFFFFFF, iconSize));
 			iv.setTag("icon");
 			cell.addView(iv);
 
@@ -531,14 +556,27 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	/** 纯视图渲染：根据当前内存中的 toggleStates[] 刷新单元格图标和指示灯（0 延迟）。 */
 	private void renderToggleViews() {
+		Context ctx = getContext();
 		for (int i = 0; i < toggleCells.size(); i++) {
 			View cell = toggleCells.get(i);
 			if (cell == null) continue;
 			boolean on = (i < toggleStates.length) && toggleStates[i];
+			NokiaQuickToggleItem item = (i < activeToggles.size()) ? activeToggles.get(i) : null;
 
 			ImageView iv = cell.findViewWithTag("icon");
 			if (iv != null) {
-				iv.setAlpha(on ? 1.0f : 0.35f);
+				// 亮度图标随档位变化（低/中/高/自动），需按当前档位重新取字符。
+				// 亮度不是二值开关，档位由图标本身表达，故图标恒为全不透明
+				// ——否则最暗档会被压到 0.35 透明度，几乎看不清。
+				if (item != null && item.type == NokiaQuickToggleItem.TYPE_BRIGHTNESS) {
+					if (ctx != null) {
+						iv.setImageDrawable(NokiaIcons.get(ctx, item.getIconUnicode(ctx),
+								0xFFFFFFFF, toggleIconSizeDp));
+					}
+					iv.setAlpha(1.0f);
+				} else {
+					iv.setAlpha(on ? 1.0f : 0.35f);
+				}
 			}
 			View dot = cell.findViewWithTag("dot");
 			if (dot != null) {
@@ -556,6 +594,25 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		final Context ctx = getContext();
 		if (ctx == null) return;
 		final NokiaQuickToggleItem item = activeToggles.get(index);
+
+		// 电源类操作（关机/重启/Recovery/Fastboot）不可逆且会丢失未保存数据：
+		// 先二次确认，且不做状态乐观更新（它们本就没有持续的开关态）。
+		if (NokiaQuickToggleItem.isPowerAction(item.type)) {
+			confirmPowerAction(item);
+			return;
+		}
+
+		// 亮度是四档循环（低→中→高→自动），不是二值开关：无法用 !state 预估下一态，
+		// 因此不做乐观更新，由 toggleBrightness 在主线程同步推进档位后再统一渲染。
+		if (item.type == NokiaQuickToggleItem.TYPE_BRIGHTNESS) {
+			// toggleBrightness 忽略传入的 targetOn，自行切到下一档并同步写入档位缓存
+			NokiaQuickToggleManager.toggle(ctx, item.type, false);
+			// 此刻缓存已是新档位，渲染出来的图标与 Toast 提示才一致
+			toggleStates[index] = NokiaQuickToggleManager.isBrightnessHigh(ctx);
+			renderToggleViews();
+			return;
+		}
+
 		final boolean targetOn = !toggleStates[index];
 
 		// 1. 立即乐观更新内存状态并刷新 UI，消除点击延迟感
@@ -564,6 +621,29 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 		// 2. 异步执行切换链路
 		NokiaQuickToggleManager.toggle(ctx, item.type, targetOn);
+	}
+
+	/**
+	 * 电源类操作的二次确认弹窗。
+	 * 复用 {@link NokiaOptionsDialog}：它已接入用户按键映射（Dialog 是独立 Window，
+	 * Activity 的按键分发对其无效）与当前主题配色，无需另造一个确认框。
+	 */
+	private void confirmPowerAction(final NokiaQuickToggleItem item) {
+		NokiaLog.i("Desktop", "电源操作二次确认: " + item.name + " type=" + item.type);
+		List<NokiaOptionsDialog.OptionItem> options = new ArrayList<>();
+		options.add(new NokiaOptionsDialog.OptionItem(
+				item.getIconUnicode(), "确认" + item.name, true, false,
+				new Runnable() {
+					@Override
+					public void run() {
+						Context ctx = getContext();
+						if (ctx == null) return;
+						NokiaQuickToggleManager.toggle(ctx, item.type, true);
+					}
+				}));
+		options.add(new NokiaOptionsDialog.OptionItem(
+				NokiaIcons.ICON_CLOSE, "取消", true, false, null));
+		NokiaOptionsDialog.show(getParentFragmentManager(), "确认" + item.name, options);
 	}
 
 	// ---- 广播接收器 ----

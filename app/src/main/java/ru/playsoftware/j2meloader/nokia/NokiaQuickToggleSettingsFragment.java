@@ -172,7 +172,8 @@ public class NokiaQuickToggleSettingsFragment extends NokiaPageFragment {
 			ivLp.rightMargin = iconMargin;
 			iv.setLayoutParams(ivLp);
 			int iconColor = (item.enabled || mode == MODE_SORT) ? 0xFFFFFFFF : 0xFF666666;
-			iv.setImageDrawable(NokiaIcons.get(getContext(), item.getIconUnicode(), iconColor, 18));
+			// 传 Context：亮度图标会按当前档位（低/中/高/自动）显示不同图标
+			iv.setImageDrawable(NokiaIcons.get(getContext(), item.getIconUnicode(getContext()), iconColor, 18));
 			row.addView(iv);
 
 			// 3. 开关名称

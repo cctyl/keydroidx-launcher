@@ -2,6 +2,8 @@ package ru.playsoftware.j2meloader.nokia;
 
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
 
+import android.content.Context;
+
 import ru.playsoftware.j2meloader.R;
 
 public class NokiaQuickToggleItem {
@@ -21,7 +23,12 @@ public class NokiaQuickToggleItem {
 	public static final int TYPE_FREEZE = 12;     // 一键冻结
 	public static final int TYPE_UNFREEZE = 13;   // 一键解冻
 	public static final int TYPE_CLEAN_BG = 14;   // 清理后台
-	public static final int TYPE_COUNT = 15;
+	// 电源类：需 mini_shizuku（shell）权限，瞬态动作无开关状态，触发前须二次确认
+	public static final int TYPE_SHUTDOWN = 15;   // 关机
+	public static final int TYPE_REBOOT = 16;     // 重启
+	public static final int TYPE_RECOVERY = 17;   // 重启到 Recovery
+	public static final int TYPE_FASTBOOT = 18;   // 重启到 Fastboot / Bootloader
+	public static final int TYPE_COUNT = 19;
 
 	public final int type;
 	public final String id;
@@ -37,8 +44,24 @@ public class NokiaQuickToggleItem {
 		this.enabled = enabled;
 	}
 
+	/**
+	 * 获取图标字符（无 Context 版本）。
+	 * 仅用于拿不到 Context 的兜底场景：对亮度这类<b>随状态变化</b>的开关，
+	 * 只能返回默认档位的图标。需要正确反映当前状态时请用
+	 * {@link #getIconUnicode(Context)}。
+	 */
 	public String getIconUnicode() {
+		return getIconUnicode(null);
+	}
+
+	/**
+	 * 获取图标字符，传入 Context 以便按当前系统状态返回合适的图标。
+	 * 目前只有亮度会随档位切换图标（低/中/高/自动四档）。
+	 */
+	public String getIconUnicode(Context context) {
 		switch (type) {
+			case TYPE_BRIGHTNESS:
+				return NokiaQuickToggleManager.getBrightnessIconUnicode(context);
 			case TYPE_WIFI: return NokiaIcons.TOGGLE_WIFI;
 			case TYPE_DATA: return NokiaIcons.TOGGLE_DATA;
 			case TYPE_BLUETOOTH: return NokiaIcons.TOGGLE_BLUETOOTH;
@@ -47,15 +70,27 @@ public class NokiaQuickToggleItem {
 			case TYPE_SOUND: return NokiaIcons.TOGGLE_SOUND;
 			case TYPE_ROTATE: return NokiaIcons.TOGGLE_ROTATE;
 			case TYPE_LOCK: return NokiaIcons.TOGGLE_LOCK;
-			case TYPE_BRIGHTNESS: return NokiaIcons.TOGGLE_BRIGHTNESS;
 			case TYPE_LOCATION: return NokiaIcons.TOGGLE_LOCATION;
 			case TYPE_HOTSPOT: return NokiaIcons.TOGGLE_HOTSPOT;
 			case TYPE_SAVER: return NokiaIcons.TOGGLE_SAVER;
 			case TYPE_FREEZE: return NokiaIcons.TOGGLE_FREEZE;
 			case TYPE_UNFREEZE: return NokiaIcons.TOGGLE_UNFREEZE;
 			case TYPE_CLEAN_BG: return NokiaIcons.TOGGLE_CLEAN_BG;
+			case TYPE_SHUTDOWN: return NokiaIcons.TOGGLE_SHUTDOWN;
+			case TYPE_REBOOT: return NokiaIcons.TOGGLE_REBOOT;
+			case TYPE_RECOVERY: return NokiaIcons.TOGGLE_RECOVERY;
+			case TYPE_FASTBOOT: return NokiaIcons.TOGGLE_FASTBOOT;
 			default: return NokiaIcons.ICON_SETTINGS;
 		}
+	}
+
+	/**
+	 * 是否为电源类操作（关机 / 重启 / Recovery / Fastboot）。
+	 * 这类操作破坏性且不可逆，桌面触发前必须二次确认，且不做开关状态乐观更新。
+	 */
+	public static boolean isPowerAction(int type) {
+		return type == TYPE_SHUTDOWN || type == TYPE_REBOOT
+				|| type == TYPE_RECOVERY || type == TYPE_FASTBOOT;
 	}
 
 	public static NokiaQuickToggleItem createDefault(int type) {
@@ -90,6 +125,15 @@ public class NokiaQuickToggleItem {
 				return new NokiaQuickToggleItem(TYPE_UNFREEZE, "unfreeze", "一键解冻", R.drawable.ic_nokia_unfreeze, false);
 			case TYPE_CLEAN_BG:
 				return new NokiaQuickToggleItem(TYPE_CLEAN_BG, "clean_bg", "清理后台", R.drawable.ic_nokia_clean, true);
+			// 电源类默认全部关闭：破坏性且不可逆，需用户在设置里主动启用
+			case TYPE_SHUTDOWN:
+				return new NokiaQuickToggleItem(TYPE_SHUTDOWN, "shutdown", "关机", R.drawable.ic_nokia_settings, false);
+			case TYPE_REBOOT:
+				return new NokiaQuickToggleItem(TYPE_REBOOT, "reboot", "重启", R.drawable.ic_nokia_settings, false);
+			case TYPE_RECOVERY:
+				return new NokiaQuickToggleItem(TYPE_RECOVERY, "recovery", "重启到Recovery", R.drawable.ic_nokia_settings, false);
+			case TYPE_FASTBOOT:
+				return new NokiaQuickToggleItem(TYPE_FASTBOOT, "fastboot", "重启到Fastboot", R.drawable.ic_nokia_settings, false);
 			default:
 				return new NokiaQuickToggleItem(type, "unknown_" + type, "未知开关", R.drawable.ic_nokia_settings, false);
 		}
