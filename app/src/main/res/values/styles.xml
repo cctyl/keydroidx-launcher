@@ -109,6 +109,11 @@
         <item name="android:windowAnimationStyle">@style/Animation.NokiaDesktop</item>
     </style>
 
+    <!-- MicroActivity（:midlet 进程）专用主题：冷启动/首帧前用黑底，避免原 #fafafa 近白闪屏 -->
+    <style name="Theme.MicroActivity" parent="AppTheme.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
     <style name="Animation.NokiaDesktop" parent="@android:style/Animation.Activity">
         <item name="android:activityOpenEnterAnimation">@null</item>
         <item name="android:activityOpenExitAnimation">@null</item>

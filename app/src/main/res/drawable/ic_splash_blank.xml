@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <!-- 全透明占位图标，用于 Android 12+ SplashScreen，使闪屏不显示 launcher 图标 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,0" />
+</vector>

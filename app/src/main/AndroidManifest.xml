@@ -179,7 +179,7 @@
         <activity
             android:name="javax.microedition.shell.MicroActivity"
             android:exported="false"
-            android:theme="@style/AppTheme.NoActionBar"
+            android:theme="@style/Theme.MicroActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
             android:launchMode="singleTask"
             android:process=":midlet" />
