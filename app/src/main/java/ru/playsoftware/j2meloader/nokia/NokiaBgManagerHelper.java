@@ -52,17 +52,15 @@ public final class NokiaBgManagerHelper {
 
 	// ---- mini_shizuku 状态缓存（避免主线程 TCP 探测卡顿）----
 
-	/** 后台探测线程：周期性更新 {@link #shizukuActivated} 缓存。 */
+	/** 后台探测线程：执行 Shizuku 在线探测（TCP）；缓存按需刷新，不再常驻轮询。 */
 	private static final HandlerThread PROBE_THREAD;
 	private static final Handler PROBE_HANDLER;
-	private static final long PROBE_INTERVAL_MS = 3000L;
 	private static volatile boolean shizukuActivated = false;
 
 	private static final Runnable PROBE_RUNNABLE = new Runnable() {
 		@Override
 		public void run() {
 			doProbe();
-			PROBE_HANDLER.postDelayed(PROBE_RUNNABLE, PROBE_INTERVAL_MS);
 		}
 	};
 
@@ -88,7 +86,7 @@ public final class NokiaBgManagerHelper {
 		PROBE_THREAD = new HandlerThread("NokiaShizukuProbe");
 		PROBE_THREAD.start();
 		PROBE_HANDLER = new Handler(PROBE_THREAD.getLooper());
-		// 首次立即探测一次，之后周期刷新
+		// 首次立即探测一次；之后按需刷新（probeShizukuSync / requestProbe），不再常驻轮询
 		PROBE_HANDLER.post(PROBE_RUNNABLE);
 	}
 
@@ -102,7 +100,7 @@ public final class NokiaBgManagerHelper {
 
 	/**
 	 * mini_shizuku 是否已激活（读缓存，不阻塞主线程）。
-	 * 缓存由后台线程每 {@link #PROBE_INTERVAL_MS} 刷新一次；4.4 恒为 true。
+	 * 缓存不自动刷新；需准确值时由调用方主动探测刷新（probeShizukuSync / requestProbe），4.4 恒为 true。
 	 */
 	public static boolean isShizukuActivated() {
 		return shizukuActivated;
