@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.ui.NokiaFeedbackFragment;
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
 
 import android.os.Bundle;
@@ -34,6 +35,7 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 			NokiaIcons.ICON_SYSTEM,        // 系统与权限
 			NokiaIcons.ICON_ADVANCED,      // 高级设置
 			NokiaIcons.ICON_INFO,          // 关于
+			NokiaIcons.ICON_FEEDBACK,      // 意见反馈
 	};
 
 	private static final String[] ITEM_NAMES = {
@@ -43,6 +45,7 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 			"系统与权限",
 			"高级设置",
 			"关于",
+			"意见反馈",
 	};
 
 	private static final int[] ITEM_GROUPS = {
@@ -52,6 +55,7 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 			NokiaSettingsGroupFragment.GROUP_SYSTEM,
 			-1, // 高级设置（独立页面）
 			-2, // 关于（独立页面）
+			-3, // 意见反馈（独立页面）
 	};
 
 
@@ -136,6 +140,9 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 		} else if (group == -2) {
 			NokiaLog.i("DesktopSettings", "进入关于页面");
 			host.openFragment(new NokiaAboutFragment());
+		} else if (group == -3) {
+			NokiaLog.i("DesktopSettings", "进入意见反馈页面");
+			host.openFragment(new NokiaFeedbackFragment());
 		} else {
 			NokiaLog.i("DesktopSettings", "进入设置分组: " + ITEM_NAMES[focusIndex]);
 			host.openFragment(NokiaSettingsGroupFragment.newInstance(group));

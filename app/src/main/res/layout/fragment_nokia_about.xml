@@ -72,32 +72,6 @@
                     android:textSize="10sp" />
             </LinearLayout>
 
-            <!-- 意见反馈卡片 -->
-            <LinearLayout
-                android:id="@+id/btnFeedback"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="8dp"
-                android:layout_marginBottom="10dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="意见反馈"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="提交问题与建议，可选附带运行日志"
-                    android:textColor="#B0BEC5"
-                    android:textSize="10sp" />
-            </LinearLayout>
-
             <!-- 作者信息 -->
             <TextView
                 android:layout_width="wrap_content"
