@@ -18,6 +18,7 @@ import javax.microedition.lcdui.Canvas;
 import javax.microedition.lcdui.keyboard.KeyMapper;
 
 import ru.playsoftware.j2meloader.config.Config;
+import ru.playsoftware.j2meloader.util.FileUtils;
 import ru.playsoftware.j2meloader.config.ProfileModel;
 import ru.playsoftware.j2meloader.config.ProfilesManager;
 import ru.playsoftware.j2meloader.util.Constants;
@@ -69,6 +70,35 @@ public final class NokiaGlobalProfile {
 			prefs.edit().putString(Constants.PREF_DEFAULT_PROFILE, PROFILE_NAME).apply();
 			NokiaLog.i("GlobalProfile", "设置默认 profile = " + PROFILE_NAME);
 		}
+	}
+
+	/**
+	 * 把「全局 profile」的配置覆盖到单个 JAR 的 config 目录。
+	 * 与首次安装 JAR 时自动套用默认 profile 的逻辑一致（{@link FileUtils#copyFiles} +
+	 * {@link Config#startApp} 中计算 configDir 的方式）：configDir 不存在会自动创建，
+	 * 只覆盖 config.json / 键盘布局等 profile 文件，不删改 per-app 的 dex/icon/data。
+	 * 供百宝箱「同步全部」按已装 JAR 列表逐个调用，避免扫磁盘目录漏掉未启动过的 JAR。
+	 * 在后台线程调用；返回是否同步成功（pathExt 非空且能定位 configDir）。
+	 */
+	public static boolean syncAppConfig(Context context, String name, String pathExt) {
+		if (pathExt == null) {
+			NokiaLog.w("GlobalProfile", "syncAppConfig: pathExt 为空，跳过 " + name);
+			return false;
+		}
+		Context app = context.getApplicationContext();
+		ensureGlobalProfile(app);
+		File globalDir = new File(Config.getProfilesDir(), PROFILE_NAME);
+		File appDirFile = new File(pathExt);
+		File parent = appDirFile.getParentFile();
+		File grand = parent == null ? null : parent.getParentFile();
+		if (grand == null) {
+			NokiaLog.w("GlobalProfile", "syncAppConfig: 无法定位 workDir, pathExt=" + pathExt);
+			return false;
+		}
+		File configDir = new File(grand.getPath() + Config.MIDLET_CONFIGS_DIR + appDirFile.getName());
+		FileUtils.copyFiles(globalDir, configDir, null);
+		NokiaLog.i("GlobalProfile", "syncAppConfig: 已同步 " + name + " -> " + configDir.getAbsolutePath());
+		return true;
 	}
 
 	/** 打开全局 JAR 设置界面（与编辑单个 JAR 设置完全相同的界面）。 */

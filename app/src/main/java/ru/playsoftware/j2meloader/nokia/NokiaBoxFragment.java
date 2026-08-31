@@ -7,6 +7,8 @@ import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
@@ -14,6 +16,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
@@ -577,6 +580,46 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 	// ============================
 
 	/**
+	 * 弹出诺基亚风格确认弹窗：把全局 JAR 设置覆盖到所有已装 JAR。
+	 */
+	private void showSyncAllDialog() {
+		NokiaLog.i("Box", "弹出同步全局设置确认弹窗");
+		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_SETTINGS,
+				"确定，覆盖全部", true, false, () -> {
+			NokiaLog.i("Box", "确认同步全局设置到所有 JAR");
+			doSyncAll();
+		}));
+		items.add(new NokiaOptionsDialog.OptionItem(0,
+				"取消", true, false, () -> {
+			NokiaLog.i("Box", "取消同步全局设置");
+		}));
+		NokiaOptionsDialog.show(getParentFragmentManager(),
+				"同步全局设置\n将覆盖所有已装 JAR 的设置，确定？", items);
+	}
+
+	/** 后台执行同步，完成后 Toast 提示数量（按百宝箱已装 JAR 列表逐个同步，避免扫磁盘漏掉未启动过的 JAR）。 */
+	private void doSyncAll() {
+		final android.content.Context appCtx = requireContext().getApplicationContext();
+		final List<AppItem> apps = new ArrayList<>(appItems);
+		new Thread(() -> {
+			int n = 0;
+			for (AppItem a : apps) {
+				if (NokiaGlobalProfile.syncAppConfig(appCtx, a.getTitle(), a.getPathExt())) {
+					n++;
+				}
+			}
+			final int total = n;
+			new Handler(Looper.getMainLooper()).post(() -> {
+				if (!isAdded()) return;
+				Toast.makeText(requireContext(),
+						total > 0 ? "已同步 " + total + " 个 JAR" : "无可同步的 JAR",
+						Toast.LENGTH_SHORT).show();
+			});
+		}, "sync-global").start();
+	}
+
+	/**
 	 * 弹出诺基亚风格选项菜单弹窗（启动/设置/卸载）。
 	 */
 	private void showAppOptionsMenu(AppItem app) {
@@ -638,7 +681,7 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 
 	/**
 	 * 根据当前焦点动态更新底部软键文字（由 NokiaPage getter 决定，这里只通知 Activity 重新装配）。
-	 * 选中"安装"或"JAR全局设置"时，左软键文字隐藏；选中 JAR 应用时显示"选项"。
+	 * 选中"安装"时左软键隐藏；选中"JAR全局设置"时显示"同步全部"；选中 JAR 应用时显示"选项"。
 	 */
 	private void updateSoftKeys() {
 		NokiaDesktopActivity host = (NokiaDesktopActivity) requireActivity();
@@ -651,6 +694,11 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 
 	@Override
 	public boolean onSoftLeft() {
+		// JAR 全局设置 → 左软键"同步全部"（把全局配置覆盖到所有已装 JAR）
+		if (focusIndex == 1) {
+			showSyncAllDialog();
+			return true;
+		}
 		// JAR 应用（focusIndex >= 2）→ 选项菜单
 		if (focusIndex >= 2) {
 			int appIdx = focusIndex - 2;
@@ -687,7 +735,8 @@ public class NokiaBoxFragment extends NokiaPageFragment {
 
 	@Override
 	public String getSoftLeftText() {
-		// JAR 应用（focusIndex >= 2）→ 左软键"选项"；安装/JAR全局设置 → 隐藏
+		// JAR 全局设置 → 左软键"同步全部"；JAR 应用→"选项"；安装 → 隐藏
+		if (focusIndex == 1) return "同步全部";
 		return focusIndex >= 2 ? "选项" : null;
 	}
 
