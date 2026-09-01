@@ -211,4 +211,11 @@
     <string name="default_label">"%s (默认)"</string>
     <string name="not_saved_exists">已存在</string>
     <string name="alert_rewrite_profile">名为“%1$s”的配置文件已存在。\n你想覆盖它吗？</string>
+
+    <!-- 桌面前台保活服务（NokiaDesktopKeepAliveService）。
+         标题不用 app_name：那是 build.gradle 的 resValue（KeydroidXLauncher / Debug 后缀），无中文翻译。 -->
+    <string name="keepalive_channel_name">桌面后台保活</string>
+    <string name="keepalive_channel_desc">保持原键桌面进程在后台存活，按 Home 回来时无需重建</string>
+    <string name="keepalive_notification_title">原键桌面</string>
+    <string name="keepalive_notification_text">正在运行</string>
 </resources>

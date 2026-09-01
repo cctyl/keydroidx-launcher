@@ -234,6 +234,18 @@
                 android:value="Keep J2ME midlet process alive while user backgrounds it (hangup feature)" />
         </service>
 
+        <!-- 原键桌面主进程保活前台服务（主进程，未声明 android:process）。
+             注意：本服务【不持有任何 WakeLock / WifiLock】——前台服务只提升进程优先级，
+             持锁才会被系统判为「阻止系统休眠」并触发高耗电提示。详见服务类注释。 -->
+        <service
+            android:name=".nokia.NokiaDesktopKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keep the launcher process alive while the user backgrounds it, so returning Home reuses the existing process instead of a cold start" />
+        </service>
+
         <!-- 挂机 jar 清除通道（后台管理组件显式广播 → :midlet 进程内优雅销毁） -->
         <receiver
             android:name=".nokia.NokiaMidletControlReceiver"

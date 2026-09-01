@@ -96,6 +96,32 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 			}
 		}
 
+		// Android 13+ 通知权限：桌面保活的常驻通知依赖它。
+		// 未授权时通知会被系统直接屏蔽——保活优先级照给，但用户既看不到也管不了它，
+		// 因此向导完成后（首启不再有更强的界面诉求时）主动申请一次。
+		if (keyBinding.isWizardDone()) {
+			requestPostNotificationsIfNeeded();
+		}
+	}
+
+	/** 申请通知权限的请求码（API 33+ 保活常驻通知用）。 */
+	private static final int REQ_POST_NOTIFICATIONS = 1002;
+
+	/**
+	 * Android 13（API 33）起通知权限默认关闭，未授予时应用发出的所有通知都会被系统静默丢弃。
+	 * 保活的前台服务不依赖它（前台服务优先级与通知能否显示无关），但通知不可见会导致
+	 * 用户既不知道桌面在常驻、也无法在系统里关掉它，所以这里申请一次。
+	 */
+	private void requestPostNotificationsIfNeeded() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+			return;
+		}
+		if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+				== PackageManager.PERMISSION_GRANTED) {
+			return;
+		}
+		requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+				REQ_POST_NOTIFICATIONS);
 	}
 
 	/** 重新从 SharedPreferences 加载按键绑定到内存（向导/绑定界面完成后调用，确保立即生效）。 */
@@ -291,6 +317,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	}
 
 	@Override
+	protected void onStop() {
+		// 拉起常驻保活服务（首次离开桌面时启动，之后永不停止）。
+		// 注意该服务不持有任何锁，只做保活，不会触发系统的高耗电提示。
+		NokiaDesktopKeepAliveService.start(this);
+		super.onStop();
+	}
+
+	@Override
 	protected void onPause() {
 		resumedFlag = false;
 		super.onPause();
@@ -368,6 +402,12 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 				&& grantResults.length > 0
 				&& grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 			statusBarController.onPermissionGranted();
+		}
+		if (requestCode == REQ_POST_NOTIFICATIONS) {
+			boolean granted = grantResults.length > 0
+					&& grantResults[0] == PackageManager.PERMISSION_GRANTED;
+			NokiaLog.i("Desktop", "通知权限申请结果 granted=" + granted
+					+ "（未授予时保活通知被系统屏蔽，前台服务保活优先级不受影响）");
 		}
 	}
 
