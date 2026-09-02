@@ -45,6 +45,7 @@ import javax.microedition.util.ContextHolder;
 
 import io.github.cctyl.nokia.common.feedback.NokiaFeedback;
 import io.github.cctyl.nokia.common.feedback.NokiaFeedbackConfig;
+import io.github.cctyl.nokia.common.feedback.NokiaInstall;
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import ru.playsoftware.j2meloader.nokia.LauncherThemeProvider;
@@ -100,10 +101,13 @@ public class EmulatorApplication extends Application {
 			// 保证「附带运行日志」抓到的就是我们实际落盘的那份。
 			NokiaFeedback.init(new NokiaFeedbackConfig(
 					BuildConfig.FEEDBACK_UPLOAD_URL,
+					BuildConfig.FEEDBACK_INSTALL_URL,
 					BuildConfig.FEEDBACK_SECRET_KEY,
 					"KeydroidX-Launcher",
 					BuildConfig.VERSION_NAME,
 					null));
+			// 首次安装 / 版本升级时自动上报一次设备信息（后台、幂等、静默）
+			NokiaInstall.reportOnce(this);
 			installCrashHandler();
 			new Handler(Looper.getMainLooper()).postDelayed(this::initAcra, 2000);
 		} else {
