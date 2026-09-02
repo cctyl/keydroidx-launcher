@@ -134,3 +134,30 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
 **Product flavors（`app/build.gradle`）。** `play`/`open`/`fdroid`/`dev` 都是完整模拟器（`FULL_EMULATOR=true`），区别仅在分发渠道、`versionNameSuffix` 与 proguard 文件；`open` 是非 Play 构建，也是本地开发应使用的一个。`midlet` 特殊：`FULL_EMULATOR=false`，它不构建模拟器，而是从 J2ME 应用的源码（读取自 `src/midlet/resources/MIDLET-META-INF/MANIFEST.MF`）构建一个独立的 Android APK。`dev` 在配置期调用 `generateVersionCode()`（git rev-list）—— 非 git 工作副本会回退到 version code 1（已在 `app/build.gradle` 中打补丁）。
 
 **Release 签名。** `signingConfigs.release` 读取 `keystore.properties`（在未运行于 Bitrise CI 时）。Debug 构建使用默认 debug 密钥；release 构建需要本地的 `test.jks`。
+
+
+
+## 统一日志规范（强制使用 NokiaLog）
+
+为了配合生态统一日志收集与意见反馈（`NokiaFeedbackActivity`），**本项目禁止直接使用原生 `android.util.Log` 或引入第三方日志库，必须强制统一使用 `keydroidx-core` 提供的 `NokiaLog`**。
+
+### 8.1 接入与使用规范
+1. **Application 初始化**：
+   ```kotlin
+   NokiaLog.setTag("KeydroidX-Music")
+   NokiaLog.init(this) // 自动读取详细日志开关决定落盘级别
+   NokiaLog.installCrashHandler(this) // 崩溃自动抓取瞬时落盘
+   ```
+2. **业务代码打印（零成本桥接）**：
+   - 在 Kotlin 文件头部添加别名导入，现有 `Log.d/i/w/e` 代码无需改动即可自动享受分级过滤与落盘：
+     ```kotlin
+     import io.github.cctyl.keydroidx.music.util.NLog as Log
+     ```
+   - 或直接调用：`NokiaLog.d("Tag", "msg")`、`NokiaLog.e("Tag", "msg", throwable)`。
+3. **日志分级与持久化开关**：
+   - **详细日志关闭（默认/Release）**：仅记录 `ERROR` 与 `FATAL` 崩溃堆栈，零文件 I/O 损耗。
+   - **详细日志开启（Debug/排查）**：记录所有 `DEBUG`、`INFO`、`WARN` 业务日志。
+   - 主界面/设置页选项菜单必须提供「详细日志：开/关」切换项（调用 `NokiaLog.setDetailedLogEnabled`）。
+4. **日志落盘约定**：
+   - 统一输出至 `/sdcard/Android/data/<包名>/log/yyyyMMdd.log`，按天自动轮转，保留 7 天。
+
