@@ -271,6 +271,14 @@
             android:authorities="${applicationId}.keyprovider"
             android:exported="true" />
 
+        <!-- mini_shizuku 密钥派发 Provider：按身份（特权 uid / 同签名）派发进程级 K。
+             外部同签名应用与本 app 自身经此获取 K，再走 TCP 10500 发 <K>|<命令>；
+             app_process server 经此拉取 K 做校验。authority 形如 ${applicationId}.shizuku。 -->
+        <provider
+            android:name=".nokia.NokiaShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:exported="true" />
+
 
         <!-- 锁屏广播接收器：供 native 拦截器通过 am broadcast 触发 Device Admin 锁屏 -->
         <receiver

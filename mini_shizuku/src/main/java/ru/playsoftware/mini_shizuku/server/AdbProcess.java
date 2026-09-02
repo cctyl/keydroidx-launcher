@@ -21,6 +21,13 @@ public final class AdbProcess {
     public static void main(String[] args) {
         Log.i(TAG, "MiniShizuku server starting...");
         Looper.prepareMainLooper();
+        // 读取 -Dapp.package（启动脚本注入），初始化 ServerEnv authority
+        String hostPkg = System.getProperty("app.package");
+        if (hostPkg != null && hostPkg.length() > 0) {
+            ServerEnv.init(hostPkg);
+        } else {
+            Log.w(TAG, "app.package not set; K 鉴权将不可用");
+        }
         // 在独立线程中启动 TCP 监听，避免阻塞主 Looper
         new Thread(new Runnable() {
             @Override
@@ -29,8 +36,6 @@ public final class AdbProcess {
                     new SocketService().start();
                 } catch (Throwable t) {
                     Log.e(TAG, "SocketService start failed", t);
-                    // 绑定失败（端口被占且旧实例不退）等场景下，主 Looper 继续 loop
-                    // 只会留下一个什么都不做的僵尸 app_process。直接退出进程。
                     Log.e(TAG, "exiting app_process due to SocketService failure");
                     System.exit(1);
                 }

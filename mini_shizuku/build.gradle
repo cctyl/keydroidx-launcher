@@ -27,3 +27,9 @@ android {
         abortOnError false
     }
 }
+
+dependencies {
+    // mini_shizuku client（第三方 SDK + launcher 自身共用）：TCP + 密钥 K。
+    // 经 settings.gradle 的 dependencySubstitution 以源码形式替换为 core 仓库的同坐标模块。
+    api 'io.github.cctyl.nokia:mini-shizuku-client'
+}

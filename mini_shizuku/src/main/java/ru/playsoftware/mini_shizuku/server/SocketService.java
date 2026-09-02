@@ -71,7 +71,7 @@ public class SocketService {
     }
 
     /**
-     * 连接已在跑的旧服务实例（127.0.0.1:PORT），发送 {@code SERVER_STOP} 命令
+     * 连接已在跑的旧服务实例（127.0.0.1:PORT），发送带密钥的 {@code SERVER_STOP} 命令
      * 请其自行退出。跨 uid 可达（TCP loopback，不依赖 kill 权限）。
      *
      * @return true 表示已连上并发出停止命令；false 表示连不上（可能没有旧实例）。
@@ -81,7 +81,10 @@ public class SocketService {
         try {
             socket.connect(new InetSocketAddress("127.0.0.1", PORT), 500);
             OutputStream out = socket.getOutputStream();
-            out.write(("EXEC|SERVER_STOP\n").getBytes(Charset.forName("UTF-8")));
+            // v3：协议为 <K>|<inner>，接管停止命令同样需带 K（由本进程 ServerEnv 向 launcher 拉取）
+            String k = ServerEnv.fetchK();
+            String line = (k != null ? k : "") + "|EXEC|SERVER_STOP";
+            out.write((line + "\n").getBytes(Charset.forName("UTF-8")));
             out.flush();
             socket.setSoTimeout(800);
             try {

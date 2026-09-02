@@ -10,12 +10,14 @@ import java.net.Socket;
 import java.nio.charset.Charset;
 
 /**
- * 处理单个客户端连接：读取一行命令，交给 {@link ShellUtil} 以 shell 身份执行。
+ * 处理单个客户端连接：读取一行命令，先校验密钥 K，再交给 {@link ShellUtil} 以 shell 身份执行。
  * <p>
- * 行协议（与客户端 {@code ShizukuClient} 保持一致，无共享类）：
+ * 行协议 v3（与客户端约定一致，无共享类）：
  * <ul>
- *     <li>{"<@literal EXEC>"} + "|" + 命令 —— 静默执行，不回写输出（兼容旧 exec）。</li>
- *     <li>{"<@literal EXEC_OUT>"} + "|" + 命令 —— 执行后逐行回写 stdout/stderr，
+ *     <li>每行 = {@code <K>|<inner>}，{@code <inner>} 为原协议串。</li>
+ *     <li>{@code PING} → 回 {@code OK:pong}（可选探活，不需 K）。</li>
+ *     <li>{@code EXEC} + "|" + 命令 —— 静默执行，不回写输出（兼容旧 exec）。</li>
+ *     <li>{@code EXEC_OUT} + "|" + 命令 —— 执行后逐行回写 stdout/stderr，
  *         最后回写一行 {@code EXIT:<code>} 作为结束标记。</li>
  * </ul>
  */
@@ -49,28 +51,25 @@ public class MsgProcess implements Runnable {
                 if (command.isEmpty()) {
                     continue;
                 }
-                if (command.startsWith(PREFIX_OUTPUT)) {
-                    handleExecWithOutput(command.substring(PREFIX_OUTPUT.length()));
-                } else {
-                    // 先剥掉 EXEC| 前缀（客户端 exec() 会带上前缀），再判断是否拦截器命令
-                    String cmd = command;
-                    if (cmd.startsWith(PREFIX_SILENT)) {
-                        cmd = cmd.substring(PREFIX_SILENT.length()).trim();
-                    }
-                    if (cmd.equals(CMD_INTERCEPTOR_START)) {
-                        handleInterceptorStart();
-                    } else if (cmd.equals(CMD_INTERCEPTOR_STOP)) {
-                        handleInterceptorStop();
-                    } else if (cmd.startsWith(CMD_PAGE_STATE)) {
-                        handlePageState(cmd.substring(CMD_PAGE_STATE.length()));
-                    } else if (cmd.equals(CMD_SERVER_STOP)) {
-                        handleServerStop();
-                    } else {
-                        // 普通 Shell 命令（静默执行）
-                        Log.i(TAG, "exec(silent): " + cmd);
-                        ShellUtil.execute(cmd);
-                    }
+                // 探活握手，不需 K
+                if (command.equals("PING")) {
+                    reply("OK:pong");
+                    continue;
                 }
+                // v3：行 = <K>|<inner>。取首段 K 校验，过则处理 inner。
+                int sep = command.indexOf('|');
+                if (sep < 0) {
+                    reply("ERR:unauthorized");
+                    break;
+                }
+                String k = command.substring(0, sep);
+                String inner = command.substring(sep + 1);
+                if (!ServerEnv.verify(k)) {
+                    Log.w(TAG, "unauthorized command, rejecting");
+                    reply("ERR:unauthorized");
+                    break;
+                }
+                dispatch(inner);
             }
         } catch (IOException e) {
             Log.e(TAG, "read command failed", e);
@@ -79,6 +78,32 @@ public class MsgProcess implements Runnable {
                 socket.close();
             } catch (IOException ignored) {
             }
+        }
+    }
+
+    /** 处理通过鉴权后的 inner 命令（即原协议串）。 */
+    private void dispatch(String command) {
+        if (command.startsWith(PREFIX_OUTPUT)) {
+            handleExecWithOutput(command.substring(PREFIX_OUTPUT.length()));
+            return;
+        }
+        // 先剥掉 EXEC| 前缀，再判断是否拦截器命令
+        String cmd = command;
+        if (cmd.startsWith(PREFIX_SILENT)) {
+            cmd = cmd.substring(PREFIX_SILENT.length()).trim();
+        }
+        if (cmd.equals(CMD_INTERCEPTOR_START)) {
+            handleInterceptorStart();
+        } else if (cmd.equals(CMD_INTERCEPTOR_STOP)) {
+            handleInterceptorStop();
+        } else if (cmd.startsWith(CMD_PAGE_STATE)) {
+            handlePageState(cmd.substring(CMD_PAGE_STATE.length()));
+        } else if (cmd.equals(CMD_SERVER_STOP)) {
+            handleServerStop();
+        } else {
+            // 普通 Shell 命令（静默执行）
+            Log.i(TAG, "exec(silent): " + cmd);
+            ShellUtil.execute(cmd);
         }
     }
 

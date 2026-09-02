@@ -39,7 +39,7 @@ public class NokiaQuickToggleManager {
 
 	// ==================== mini_shizuku 在线状态缓存 ====================
 	//
-	// Shizuku.isRunning() 内部是一次 TCP 连接（见 ShizukuClient），在主线程调用会抛
+	// Shizuku.isRunning() 内部是一次 TCP 连接（见 MiniShizuku），在主线程调用会抛
 	// NetworkOnMainThreadException。而开关图标的渲染（buildToggleBar / renderToggleViews）
 	// 都跑在主线程且需要据此决定亮度图标，因此这里缓存检测结果，UI 只读缓存，
 	// 真正的探测一律放在后台线程。

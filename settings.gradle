@@ -30,5 +30,6 @@ include ':app', ':dexlib', ':mini_shizuku'
 includeBuild('../keydroidx-core') {
     dependencySubstitution {
         substitute module('io.github.cctyl.nokia:nokia-common') using project(':nokia-common')
+        substitute module('io.github.cctyl.nokia:mini-shizuku-client') using project(':nokia-mini-shizuku')
     }
 }

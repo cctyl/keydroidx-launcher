@@ -48,6 +48,7 @@ import io.github.cctyl.nokia.common.feedback.NokiaFeedbackConfig;
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import ru.playsoftware.j2meloader.nokia.LauncherThemeProvider;
+import ru.playsoftware.mini_shizuku.Shizuku;
 import ru.playsoftware.j2meloader.nokia.NokiaSettingsStorage;
 import ru.playsoftware.j2meloader.util.Constants;
 
@@ -86,6 +87,8 @@ public class EmulatorApplication extends Application {
 		// ACRA 崩溃上报初始化（含签名校验 IPC）延迟到主线程约 2s 后执行，
 		// 避免冷启动进程阶段阻塞首帧；仅主进程延迟，:midlet 子进程保持同步初始化（游戏崩溃上报不受影响）。
 		if (isMainProcess()) {
+			// mini_shizuku client 注入应用级 Context（供其调用本进程的 provider 取 K）
+			Shizuku.init(this);
 			// 文件日志 + 崩溃堆栈落盘：尽早初始化，覆盖冷启动阶段的崩溃。
 			// 日志实现统一走 common；目录按生态约定为 <外存>/files/log。
 			NokiaLog.init(this);
