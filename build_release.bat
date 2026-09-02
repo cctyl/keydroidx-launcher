@@ -6,7 +6,7 @@ REM  Build openRelease APK (skip lint, as lint breaks the
 REM  release build), then open the output folder in Explorer.
 REM
 REM  Output: app\build\outputs\apk\open\release\
-REM          KeydroidXLauncher-*-open-release.apk
+REM          KeydroidXLauncher-v*-open-release.apk
 REM
 REM  Usage: build_release.bat
 REM ============================================================
