@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>通知中心 - UI 原型</title>
+<style>
+  /* ============ 基准：240x320，放大 2.5 倍展示 ============ */
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background:#3a3a3a;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+  }
+
+  .phone {
+    width:240px;
+    height:320px;
+    transform:scale(2.5);
+    transform-origin:top center;
+    margin-bottom:220px;
+    background:linear-gradient(180deg,#0a1f4d 0%,#123268 45%,#0a1f4d 100%);
+    border:2px solid #000;
+    position:relative;
+    overflow:hidden;
+    color:#e8eefc;
+    user-select:none;
+  }
+
+  /* ============ 顶部状态栏（与桌面一致） ============ */
+  .statusbar {
+    height:20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 4px;
+    font-size:10px;
+    background:rgba(0,0,0,0.25);
+  }
+  .statusbar .left-icons, .statusbar .right-icons {
+    display:flex; align-items:center; gap:3px;
+  }
+  .icon-wifi, .icon-plane {
+    width:12px; height:12px; display:inline-block;
+  }
+  .battery {
+    width:16px; height:9px; border:1px solid #e8eefc; border-radius:1px;
+    position:relative;
+  }
+  .battery::before {
+    content:""; position:absolute; inset:1px 5px 1px 1px; background:#7ec84a;
+  }
+  .battery::after {
+    content:""; position:absolute; right:-3px; top:2px;
+    width:2px; height:4px; background:#e8eefc;
+  }
+
+  /* ============ 页头 ============ */
+  .header {
+    height:24px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:bold;
+    border-bottom:1px dashed rgba(255,255,255,0.35);
+    color:#ffffff;
+  }
+
+  /* ============ 通知列表 ============ */
+  .notif-list {
+    position:absolute;
+    top:44px; bottom:20px; left:0; right:0;
+    overflow:hidden;
+    padding:2px 0;
+  }
+
+  .notif {
+    padding:5px 6px 5px 8px;
+    border-bottom:1px dotted rgba(255,255,255,0.18);
+    display:flex; gap:6px;
+    position:relative;
+  }
+  .notif .app-icon {
+    flex:0 0 20px; height:20px;
+    border-radius:3px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px;
+    color:#fff;
+  }
+  .notif .body { flex:1; min-width:0; }
+  .notif .row1 {
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .notif .app-name {
+    font-size:10px; color:#9db4e0;
+  }
+  .notif .time {
+    font-size:9px; color:#7f96c4;
+  }
+  .notif .title {
+    font-size:12px; color:#ffffff;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .notif .text {
+    font-size:10px; color:#b8c8ea;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  /* 未读小蓝点 */
+  .notif.unread .app-icon::after {
+    content:""; position:absolute; left:2px; top:50%;
+    width:4px; height:4px; margin-top:-2px;
+    border-radius:50%; background:#4f9cf9;
+  }
+
+  /* ============ 焦点高亮（实心反白条，符合规范 6.3） ============ */
+  .notif.focused {
+    background:#ffe680;               /* 诺基亚经典选中黄 */
+  }
+  .notif.focused .app-name,
+  .notif.focused .time  { color:#5a4a00; }
+  .notif.focused .title { color:#000000; font-weight:bold; }
+  .notif.focused .text  { color:#333333; }
+  .notif.focused.unread .app-icon::after { background:#0a1f4d; }
+
+  /* ============ 滚动条 ============ */
+  .scrollbar {
+    position:absolute; right:1px; top:46px; bottom:22px;
+    width:3px;
+  }
+  .scrollbar .thumb {
+    position:absolute; left:0; width:3px;
+    background:rgba(255,255,255,0.45); border-radius:2px;
+  }
+
+  /* ============ 空状态（规范 39） ============ */
+  .empty {
+    position:absolute; top:44px; bottom:20px; left:0; right:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:8px;
+    color:#9db4e0;
+  }
+  .empty .big { font-size:26px; opacity:0.7; }
+  .empty .msg1 { font-size:12px; color:#ffffff; }
+  .empty .msg2 { font-size:10px; }
+
+  /* ============ 底部软键栏 ============ */
+  .softbar {
+    position:absolute; bottom:0; left:0; right:0;
+    height:20px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 6px;
+    font-size:11px;
+    background:rgba(0,0,0,0.3);
+    border-top:1px solid rgba(255,255,255,0.15);
+  }
+  .softbar .sk { color:#ffffff; }
+  .softbar .sk.center { color:transparent; }
+
+  /* ============ 选项弹窗（规范 15，复用 NokiaOptionsDialog 样式思路） ============ */
+  .options-menu {
+    position:absolute;
+    left:6px; bottom:24px;
+    width:110px;
+    background:linear-gradient(180deg,#16336e,#0d244f);
+    border:1px solid #6f8cc4;
+    border-radius:3px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.6);
+    display:none;
+    z-index:20;
+  }
+  .options-menu .opt {
+    padding:5px 8px;
+    font-size:11px;
+    color:#e8eefc;
+    border-bottom:1px dotted rgba(255,255,255,0.15);
+  }
+  .options-menu .opt:last-child { border-bottom:none; }
+  .options-menu .opt.focused { background:#ffe680; color:#000; font-weight:bold; }
+
+  /* ============ 确认对话框（规范 16） ============ */
+  .dialog-mask {
+    position:absolute; inset:0;
+    background:rgba(0,0,0,0.45);
+    display:none;
+    z-index:30;
+  }
+  .dialog {
+    position:absolute;
+    left:20px; right:20px; top:110px;
+    background:linear-gradient(180deg,#16336e,#0d244f);
+    border:1px solid #6f8cc4;
+    border-radius:4px;
+    padding:10px 8px;
+    z-index:31;
+    display:none;
+  }
+  .dialog .d-title { font-size:12px; font-weight:bold; color:#fff; text-align:center; }
+  .dialog .d-text  { font-size:10px; color:#b8c8ea; text-align:center; margin-top:6px; }
+  .dialog .d-btns  { display:flex; justify-content:space-around; margin-top:10px; }
+  .dialog .d-btn {
+    padding:3px 14px; font-size:11px; border-radius:2px; color:#e8eefc;
+  }
+  .dialog .d-btn.focused { background:#ffe680; color:#000; font-weight:bold; }
+
+  /* ============ Toast（规范 17） ============ */
+  .toast {
+    position:absolute;
+    left:50%; top:150px; transform:translateX(-50%);
+    background:rgba(0,0,0,0.75);
+    color:#fff; font-size:11px;
+    padding:5px 12px; border-radius:3px;
+    display:none; z-index:40; white-space:nowrap;
+  }
+
+  /* ============ 说明区（页面外的原型说明） ============ */
+  .doc {
+    color:#ddd; font-size:13px; max-width:640px; line-height:1.7;
+    background:#2b2b2b; padding:12px 16px; border-radius:6px;
+  }
+  .doc h3 { color:#ffe680; margin-bottom:6px; }
+  .doc kbd {
+    background:#555; border-radius:3px; padding:1px 6px; font-size:12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+
+  <!-- 顶部状态栏 -->
+  <div class="statusbar">
+    <div class="left-icons">
+      <span class="icon-wifi">📶</span>
+      <span class="icon-plane">✈</span>
+    </div>
+    <div class="right-icons">
+      <span class="battery"></span>
+      <span>08:52</span>
+    </div>
+  </div>
+
+  <!-- 页头 -->
+  <div class="header">通知中心</div>
+
+  <!-- 通知列表 -->
+  <div class="notif-list" id="notifList">
+    <div class="notif unread" data-id="1">
+      <div class="app-icon" style="background:#0f9d58">短</div>
+      <div class="body">
+        <div class="row1"><span class="app-name">信息</span><span class="time">08:47</span></div>
+        <div class="title">10086</div>
+        <div class="text">您本月已使用流量 3.2GB，剩余 6.8GB…</div>
+      </div>
+    </div>
+    <div class="notif unread" data-id="2">
+      <div class="app-icon" style="background:#d93025">微</div>
+      <div class="body">
+        <div class="row1"><span class="app-name">微信</span><span class="time">08:30</span></div>
+        <div class="title">张三</div>
+        <div class="text">中午一起吃饭吗？</div>
+      </div>
+    </div>
+    <div class="notif" data-id="3">
+      <div class="app-icon" style="background:#1a73e8">邮</div>
+      <div class="body">
+        <div class="row1"><span class="app-name">邮件</span><span class="time">昨天</span></div>
+        <div class="title">GitHub</div>
+        <div class="text">[keydroidx-launcher] New pull request #42</div>
+      </div>
+    </div>
+    <div class="notif" data-id="4">
+      <div class="app-icon" style="background:#f4b400">日</div>
+      <div class="body">
+        <div class="row1"><span class="app-name">日历</span><span class="time">昨天</span></div>
+        <div class="title">日程提醒</div>
+        <div class="text">下午 3:00 项目周会</div>
+      </div>
+    </div>
+    <div class="notif" data-id="5">
+      <div class="app-icon" style="background:#e37400">系</div>
+      <div class="body">
+        <div class="row1"><span class="app-name">系统</span><span class="time">昨天</span></div>
+        <div class="title">存储空间</div>
+        <div class="text">SD 卡剩余空间不足 10%</div>
+      </div>
+    </div>
+    <div class="notif" data-id="6">
+      <div class="app-icon" style="background:#7248b9">音</div>
+      <div class="body">
+        <div class="row1"><span class="app-name">音乐</span><span class="time">周一</span></div>
+        <div class="title">每日推荐已更新</div>
+        <div class="text">为你推荐 30 首新歌</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空状态 -->
+  <div class="empty" id="emptyState" style="display:none">
+    <div class="big">🔔</div>
+    <div class="msg1">没有通知</div>
+    <div class="msg2">新通知会显示在这里</div>
+  </div>
+
+  <!-- 滚动条 -->
+  <div class="scrollbar" id="scrollbar"><div class="thumb" id="scrollThumb"></div></div>
+
+  <!-- 选项菜单（左软键） -->
+  <div class="options-menu" id="optionsMenu">
+    <div class="opt" data-act="clear">清除</div>
+    <div class="opt" data-act="clearAll">全部清除</div>
+    <div class="opt" data-act="detail">通知设置</div>
+  </div>
+
+  <!-- 确认对话框 -->
+  <div class="dialog-mask" id="dialogMask"></div>
+  <div class="dialog" id="dialog">
+    <div class="d-title">全部清除？</div>
+    <div class="d-text">将删除全部 6 条通知，此操作无法撤销。</div>
+    <div class="d-btns">
+      <div class="d-btn focused" data-act="cancel">取消</div>
+      <div class="d-btn" data-act="confirm">清除</div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">已清除</div>
+
+  <!-- 底部软键栏 -->
+  <div class="softbar">
+    <span class="sk" id="skLeft">选项</span>
+    <span class="sk center">打开</span>
+    <span class="sk" id="skRight">返回</span>
+  </div>
+</div>
+
+<div class="doc">
+  <h3>通知中心原型 - 操作说明（原型用键盘模拟按键）</h3>
+  <b>屏幕契约</b><br>
+  screenId: notifications.center ｜ viewport: 240×320<br><br>
+  <b>按键映射</b><br>
+  ↑/↓（键盘方向键）：移动焦点，滚动跟随焦点（规范 45）<br>
+  中键/确认（<kbd>Enter</kbd>）：打开该通知对应的应用<br>
+  左软键（<kbd>Q</kbd>）：选项 → 清除 / 全部清除 / 通知设置<br>
+  右软键（<kbd>E</kbd> / <kbd>Esc</kbd>）：返回桌面<br>
+  END：回桌面（原型未模拟）<br><br>
+  <b>软键栏</b>：选项 ｜ （打开） ｜ 返回<br><br>
+  <b>状态</b><br>
+  正常：实心黄色焦点条 + 未读蓝点<br>
+  空状态：无通知时显示图标 + 「没有通知」<br>
+  破坏性操作（全部清除）需二次确认，默认焦点在「取消」<br><br>
+  <b>视觉</b>：复用桌面深蓝主题、点线分隔、240dp 基准；焦点为诺基亚经典黄色高亮条
+</div>
+
+<script>
+(function(){
+  var list      = document.getElementById('notifList');
+  var emptyEl   = document.getElementById('emptyState');
+  var scrollEl  = document.getElementById('scrollThumb');
+  var menu      = document.getElementById('optionsMenu');
+  var mask      = document.getElementById('dialogMask');
+  var dialog    = document.getElementById('dialog');
+  var toast     = document.getElementById('toast');
+  var items     = [].slice.call(list.querySelectorAll('.notif'));
+  var focusIdx  = 0;
+  var mode      = 'list';           // list | menu | dialog
+  var menuIdx   = 0;
+  var dlgIdx    = 0;
+  var toastTimer= null;
+
+  function refreshItems(){ items = [].slice.call(list.querySelectorAll('.notif')); }
+
+  function updateScroll(){
+    var listH = 320 - 44 - 20;                       // 可视高度
+    var contentH = items.length ? items.length * 47 : 0;
+    if (contentH <= listH) { scrollEl.style.height='0px'; return; }
+    var th = listH / contentH * listH;
+    var ty = (list.scrollTop / (contentH - listH)) * (listH - th);
+    scrollEl.style.height = th + 'px';
+    scrollEl.style.top = ty + 'px';
+  }
+
+  function renderFocus(){
+    items.forEach(function(el,i){ el.classList.toggle('focused', i===focusIdx && mode==='list'); });
+    // 焦点滚动跟随
+    if (mode==='list' && items[focusIdx]) {
+      var el = items[focusIdx];
+      var top = el.offsetTop, bot = top + el.offsetHeight;
+      if (top < list.scrollTop) list.scrollTop = top;
+      else if (bot > list.scrollTop + list.clientHeight) list.scrollTop = bot - list.clientHeight;
+    }
+    updateScroll();
+  }
+
+  function emptyCheck(){
+    var has = items.length > 0;
+    list.style.display  = has ? '' : 'none';
+    emptyEl.style.display = has ? 'none' : 'flex';
+    document.getElementById('skLeft').textContent = has ? '选项' : '';
+  }
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toast.style.display='none'; }, 1800);
+  }
+
+  function openMenu(){ mode='menu'; menuIdx=0; renderMenu(); menu.style.display='block'; renderFocus(); }
+  function closeMenu(){ mode='list'; menu.style.display='none'; renderFocus(); }
+  function renderMenu(){
+    [].forEach.call(menu.querySelectorAll('.opt'), function(o,i){
+      o.classList.toggle('focused', i===menuIdx);
+    });
+  }
+
+  function openDialog(){ mode='dialog'; dlgIdx=0; renderDlg(); mask.style.display='block'; dialog.style.display='block'; }
+  function closeDialog(){ mode='list'; mask.style.display='none'; dialog.style.display='none'; renderFocus(); }
+  function renderDlg(){
+    [].forEach.call(dialog.querySelectorAll('.d-btn'), function(b,i){
+      b.classList.toggle('focused', i===dlgIdx);
+    });
+  }
+
+  function clearFocused(){
+    if (items[focusIdx]) {
+      items[focusIdx].remove();
+      refreshItems();
+      if (focusIdx >= items.length) focusIdx = Math.max(0, items.length-1);
+      emptyCheck(); renderFocus();
+      showToast('已清除');
+    }
+  }
+  function clearAll(){
+    items.forEach(function(el){ el.remove(); });
+    refreshItems(); focusIdx = 0;
+    emptyCheck(); renderFocus();
+    showToast('已清除全部通知');
+  }
+
+  // ===== 按键处理（原型仅模拟；真机走 NokiaKeyBinding 语义层） =====
+  document.addEventListener('keydown', function(e){
+    var k = e.key;
+
+    if (mode === 'menu') {
+      if (k==='ArrowUp')   { menuIdx=Math.max(0,menuIdx-1); renderMenu(); }
+      if (k==='ArrowDown') { menuIdx=Math.min(2,menuIdx+1); renderMenu(); }
+      if (k==='Enter') {
+        var act = menu.querySelectorAll('.opt')[menuIdx].dataset.act;
+        closeMenu();
+        if (act==='clear')    clearFocused();
+        if (act==='clearAll') openDialog();
+        if (act==='detail')   showToast('通知设置（示意）');
+      }
+      if (k==='e'||k==='E'||k==='Escape') closeMenu();
+      e.preventDefault(); return;
+    }
+
+    if (mode === 'dialog') {
+      if (k==='ArrowLeft')  { dlgIdx=0; renderDlg(); }
+      if (k==='ArrowRight') { dlgIdx=1; renderDlg(); }
+      if (k==='Enter') {
+        if (dlgIdx===1) { closeDialog(); clearAll(); }
+        else closeDialog();
+      }
+      if (k==='e'||k==='E'||k==='Escape') closeDialog();
+      e.preventDefault(); return;
+    }
+
+    // list 模式
+    if (k==='ArrowUp')   { if(focusIdx>0){focusIdx--; renderFocus();} }
+    else if (k==='ArrowDown') { if(focusIdx<items.length-1){focusIdx++; renderFocus();} }
+    else if (k==='Enter') {
+      if (items[focusIdx]) {
+        items[focusIdx].classList.remove('unread');
+        showToast('打开应用（示意）');
+      }
+    }
+    else if (k==='q'||k==='Q') { if (items.length) openMenu(); }
+    else if (k==='e'||k==='E'||k==='Escape') { showToast('返回桌面（示意）'); }
+    if (['ArrowUp','ArrowDown','Enter'].indexOf(k)>=0 || k==='q'||k==='Q') e.preventDefault();
+  });
+
+  emptyCheck(); renderFocus();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>通知中心 - 入口设计原型</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#3a3a3a; color:#ddd;
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+    padding:20px; display:flex; flex-direction:column; align-items:center;
+  }
+  h2 { color:#ffe680; font-size:16px; margin-bottom:4px; }
+  .sub { font-size:12px; color:#aaa; margin-bottom:18px; }
+
+  .flow { display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; justify-content:center; }
+  .node { display:flex; flex-direction:column; align-items:center; }
+  .node .cap { font-size:12px; color:#ffe680; margin-bottom:6px; }
+  .node .cap .tag { color:#8fd18f; font-weight:normal; }
+  .arrow { font-size:26px; color:#ffe680; margin-top:280px; }
+
+  /* 240x320 基准，放大 2 倍；外层占位盒保证布局正确 */
+  .device { width:480px; height:640px; position:relative; }
+  .phone {
+    width:240px; height:320px;
+    transform:scale(2); transform-origin:top left;
+    background:linear-gradient(180deg,#0a1f4d 0%,#123268 45%,#0a1f4d 100%);
+    border:2px solid #000; position:relative; overflow:hidden;
+    color:#e8eefc; font-size:11px; user-select:none;
+  }
+
+  /* ---- 状态栏 ---- */
+  .statusbar {
+    height:20px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 4px; font-size:10px; background:rgba(0,0,0,0.25);
+  }
+  .battery {
+    width:16px; height:9px; border:1px solid #e8eefc; border-radius:1px;
+    position:relative; display:inline-block; vertical-align:-1px;
+  }
+  .battery::before { content:""; position:absolute; inset:1px 5px 1px 1px; background:#7ec84a; }
+  .battery::after  { content:""; position:absolute; right:-3px; top:2px; width:2px; height:4px; background:#e8eefc; }
+
+  /* ---- 焦点/分隔线 ---- */
+  .focused { background:#ffe680 !important; color:#000 !important; }
+  .focused .dim, .focused .sub2, .focused .t { color:#333 !important; }
+  .dline { height:1px; border-top:1px dotted rgba(255,255,255,0.35); }
+
+  /* ---- 桌面：顶部快捷栏 ---- */
+  .shortcutbar { height:30px; display:flex; align-items:center; gap:8px; padding:3px 8px; }
+  .shortcutbar .item {
+    width:24px; height:24px; border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; color:#fff;
+  }
+  .shortcutbar .zone { padding:2px 4px; border-radius:3px; display:flex; gap:8px; }
+  .shortcutbar .zone.focused { background:#ffe680; }
+
+  /* ---- 桌面：通知条（新增主入口） ---- */
+  .notifbar {
+    margin:2px 6px; padding:4px 6px;
+    display:flex; align-items:center; gap:6px;
+    border:1px dotted rgba(255,255,255,0.3); border-radius:3px;
+  }
+  .notifbar .bell { font-size:12px; }
+  .notifbar .txt { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .notifbar .cnt {
+    font-size:10px; background:#4f9cf9; color:#fff;
+    border-radius:8px; padding:0 5px;
+  }
+  .notifbar.focused .cnt { background:#0a1f4d; color:#ffe680; }
+  .notifbar .hint { font-size:9px; color:#7f96c4; text-align:center; margin-top:1px; }
+  .notifbar-empty {
+    margin:2px 6px; padding:3px 6px; text-align:center;
+    font-size:10px; color:#7f96c4;
+    border:1px dotted rgba(255,255,255,0.18); border-radius:3px;
+  }
+
+  /* ---- 桌面：组件区 / 快捷开关 ---- */
+  .widgetzone { padding:6px 8px; }
+  .widgetzone .zone { padding:2px 4px; border-radius:3px; }
+  .widgetzone .wrow { display:flex; justify-content:space-between; font-size:10px; }
+  .widgetzone .sub2 { color:#9db4e0; }
+  .quickbar { height:22px; display:flex; align-items:center; gap:6px; padding:0 8px; }
+  .quickbar .zone { padding:1px 4px; border-radius:3px; font-size:10px; }
+  .bottom-space { flex:1; }
+
+  /* ---- 软键栏 ---- */
+  .softbar {
+    position:absolute; bottom:0; left:0; right:0; height:20px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 6px; font-size:11px;
+    background:rgba(0,0,0,0.3); border-top:1px solid rgba(255,255,255,0.15);
+  }
+
+  /* ---- 通知中心页（复用已确认设计） ---- */
+  .header {
+    height:24px; display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:bold; color:#fff;
+    border-bottom:1px dashed rgba(255,255,255,0.35);
+  }
+  .notif-list { position:absolute; top:44px; bottom:20px; left:0; right:0; overflow:hidden; }
+  .notif { padding:5px 6px 5px 8px; border-bottom:1px dotted rgba(255,255,255,0.18); display:flex; gap:6px; position:relative; }
+  .notif .app-icon { flex:0 0 20px; height:20px; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; }
+  .notif .body { flex:1; min-width:0; }
+  .notif .row1 { display:flex; justify-content:space-between; align-items:baseline; }
+  .notif .app-name { font-size:10px; color:#9db4e0; }
+  .notif .time { font-size:9px; color:#7f96c4; }
+  .notif .title { font-size:12px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .notif .text  { font-size:10px; color:#b8c8ea; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .notif.unread .app-icon::after {
+    content:""; position:absolute; left:2px; top:50%; width:4px; height:4px;
+    margin-top:-2px; border-radius:50%; background:#4f9cf9;
+  }
+  .notif.focused .app-name, .notif.focused .time { color:#5a4a00; }
+  .notif.focused .title { color:#000; font-weight:bold; }
+  .notif.focused .text  { color:#333; }
+  .notif.focused.unread .app-icon::after { background:#0a1f4d; }
+
+  /* ---- 功能表格子 ---- */
+  .grid { padding:8px 6px; display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .cell { text-align:center; padding:4px 0; border-radius:3px; }
+  .cell .ico {
+    width:28px; height:28px; margin:0 auto 2px; border-radius:4px;
+    display:flex; align-items:center; justify-content:center; font-size:14px; color:#fff;
+  }
+  .cell .lb { font-size:10px; color:#e8eefc; }
+  .cell.focused .lb { color:#000; }
+  .cell .newdot {
+    position:relative;
+  }
+  .cell .badge {
+    position:absolute; top:-2px; right:-4px;
+    min-width:12px; height:12px; line-height:12px;
+    background:#4f9cf9; color:#fff; border-radius:6px; font-size:8px; padding:0 3px;
+  }
+
+  /* ---- 说明 ---- */
+  .doc {
+    margin-top:26px; max-width:900px; background:#2b2b2b;
+    padding:12px 18px; border-radius:6px; font-size:13px; line-height:1.75;
+  }
+  .doc h3 { color:#ffe680; font-size:14px; margin:10px 0 4px; }
+  .doc kbd { background:#555; border-radius:3px; padding:1px 6px; font-size:12px; }
+  .doc table { border-collapse:collapse; margin-top:6px; font-size:12px; }
+  .doc td, .doc th { border:1px solid #555; padding:4px 8px; text-align:left; }
+  .doc th { color:#ffe680; }
+  .pick { color:#8fd18f; font-weight:bold; }
+  .no   { color:#d98b8b; }
+</style>
+</head>
+<body>
+
+<h2>通知中心 · 入口设计原型</h2>
+<div class="sub">左：主入口（桌面通知条，可交互） ｜ 中：功能表兜底入口 ｜ 右：按键直达（进阶）</div>
+
+<div class="flow">
+
+  <!-- ============ 节点 1：桌面（主入口，可交互） ============ -->
+  <div class="node">
+    <div class="cap">① 桌面 <span class="tag">主入口（推荐）</span></div>
+    <div class="device"><div class="phone" id="p1">
+
+      <div class="statusbar">
+        <span>📶 ✈</span>
+        <span><span class="battery"></span> 08:52</span>
+      </div>
+
+      <!-- 顶部快捷栏 -->
+      <div class="shortcutbar">
+        <div class="zone" id="zShortcut">
+          <div class="item" style="background:#0f9d58">短</div>
+          <div class="item" style="background:#d93025">微</div>
+          <div class="item" style="background:#1a73e8">浏</div>
+          <div class="item" style="background:#7248b9">音</div>
+          <div class="item" style="background:#e37400">照</div>
+        </div>
+      </div>
+      <div class="dline"></div>
+
+      <!-- 通知条（新增） -->
+      <div class="notifbar" id="zNotifBar">
+        <span class="bell">🔔</span>
+        <span class="txt"><b>3 条未读通知</b> · 微信：中午一起吃饭吗？</span>
+        <span class="cnt" id="badge">3</span>
+      </div>
+      <div class="notifbar hint" id="zHint" style="display:none;border:none;margin:0">（无通知时不占桌面空间，功能表入口常驻）</div>
+      <div class="dline"></div>
+
+      <!-- 组件区（示意） -->
+      <div class="widgetzone">
+        <div class="zone" id="zWidget">
+          <div class="wrow"><span>中国移动</span><span class="sub2">4G</span></div>
+          <div class="wrow"><span class="sub2">存储空间 6.2GB / 12GB</span></div>
+        </div>
+      </div>
+
+      <div class="dline"></div>
+      <!-- 快捷开关 -->
+      <div class="quickbar">
+        <div class="zone" id="zQuick">
+          <span>Wi-Fi 开</span> · <span>蓝牙 关</span> · <span>静音 关</span>
+        </div>
+      </div>
+
+      <div class="softbar">
+        <span id="p1Left">功能表</span>
+        <span style="color:#9db4e0" id="p1Center">打开</span>
+        <span>桌面设置</span>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="arrow">→</div>
+
+  <!-- ============ 节点 2：通知中心（点确认进入） ============ -->
+  <div class="node">
+    <div class="cap">② 通知中心 <span class="tag">确认键进入</span></div>
+    <div class="device"><div class="phone" id="p2">
+
+      <div class="statusbar">
+        <span>📶 ✈</span>
+        <span><span class="battery"></span> 08:52</span>
+      </div>
+      <div class="header">通知中心</div>
+
+      <div class="notif-list">
+        <div class="notif unread focused">
+          <div class="app-icon" style="background:#0f9d58">短</div>
+          <div class="body">
+            <div class="row1"><span class="app-name">信息</span><span class="time">08:47</span></div>
+            <div class="title">10086</div>
+            <div class="text">您本月已使用流量 3.2GB…</div>
+          </div>
+        </div>
+        <div class="notif unread">
+          <div class="app-icon" style="background:#d93025">微</div>
+          <div class="body">
+            <div class="row1"><span class="app-name">微信</span><span class="time">08:30</span></div>
+            <div class="title">张三</div>
+            <div class="text">中午一起吃饭吗？</div>
+          </div>
+        </div>
+        <div class="notif unread">
+          <div class="app-icon" style="background:#1a73e8">邮</div>
+          <div class="body">
+            <div class="row1"><span class="app-name">邮件</span><span class="time">昨天</span></div>
+            <div class="title">GitHub</div>
+            <div class="text">[keydroidx-launcher] New PR #42</div>
+          </div>
+        </div>
+        <div class="notif">
+          <div class="app-icon" style="background:#f4b400">日</div>
+          <div class="body">
+            <div class="row1"><span class="app-name">日历</span><span class="time">昨天</span></div>
+            <div class="title">日程提醒</div>
+            <div class="text">下午 3:00 项目周会</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="softbar">
+        <span>选项</span><span style="color:#9db4e0">打开</span><span>返回</span>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ============ 节点 3：功能表兜底入口 ============ -->
+  <div class="node">
+    <div class="cap">③ 功能表 <span class="tag">兜底 / 可发现</span></div>
+    <div class="device"><div class="phone" id="p3">
+      <div class="statusbar">
+        <span>📶 ✈</span>
+        <span><span class="battery"></span> 08:52</span>
+      </div>
+      <div class="header">功能表</div>
+
+      <div class="grid">
+        <div class="cell"><div class="ico" style="background:#0f9d58">电</div><div class="lb">电话</div></div>
+        <div class="cell"><div class="ico" style="background:#1a73e8">信</div><div class="lb">信息</div></div>
+        <div class="cell"><div class="ico" style="background:#e37400">联</div><div class="lb">联系人</div></div>
+
+        <div class="cell"><div class="ico" style="background:#7248b9">箱</div><div class="lb">百宝箱</div></div>
+        <div class="cell focused">
+          <div class="ico newdot" style="background:#d93025">🔔<span class="badge">3</span></div>
+          <div class="lb">通知中心</div>
+        </div>
+        <div class="cell"><div class="ico" style="background:#5f6368">设</div><div class="lb">设置</div></div>
+
+        <div class="cell"><div class="ico" style="background:#f4b400">音</div><div class="lb">音乐</div></div>
+        <div class="cell"><div class="ico" style="background:#0f9d58">照</div><div class="lb">相机</div></div>
+        <div class="cell"><div class="ico" style="background:#1a73e8">浏</div><div class="lb">浏览器</div></div>
+      </div>
+
+      <div class="softbar">
+        <span>选项</span><span style="color:#9db4e0">打开</span><span>返回</span>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ============ 节点 4：按键直达（进阶） ============ -->
+  <div class="node">
+    <div class="cap">④ 按键绑定 <span class="tag">进阶 · 一键直达</span></div>
+    <div class="device"><div class="phone" id="p4">
+      <div class="statusbar">
+        <span>📶 ✈</span>
+        <span><span class="battery"></span> 08:52</span>
+      </div>
+      <div class="header">按键绑定</div>
+
+      <div style="padding:6px 8px; font-size:11px; line-height:2">
+        <div>上　　<span style="color:#9db4e0">KEYCODE_DPAD_UP</span></div>
+        <div>下　　<span style="color:#9db4e0">KEYCODE_DPAD_DOWN</span></div>
+        <div>左软键<span style="color:#9db4e0">KEYCODE_SOFT_LEFT</span></div>
+        <div>右软键<span style="color:#9db4e0">KEYCODE_SOFT_RIGHT</span></div>
+        <div>确认键<span style="color:#9db4e0">KEYCODE_DPAD_CENTER</span></div>
+        <div>锁屏　<span style="color:#9db4e0">未绑定</span></div>
+        <div class="focused" style="padding:2px 4px;border-radius:3px">
+          通知　<span style="color:#5a4a00">未绑定 → 可绑定任意物理键</span>
+        </div>
+      </div>
+
+      <div class="softbar">
+        <span>绑定</span><span style="color:#9db4e0">确定</span><span>返回</span>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+
+<div class="doc">
+  <h3>推荐方案：三层入口</h3>
+  <table>
+    <tr><th>层级</th><th>入口</th><th>路径</th><th>成本</th><th>结论</th></tr>
+    <tr>
+      <td>主入口</td><td>桌面通知条</td>
+      <td>桌面 → 方向键移到通知条 → 确认键</td>
+      <td>中（新 view + 接入 focusTargets）</td>
+      <td class="pick">推荐</td>
+    </tr>
+    <tr>
+      <td>兜底</td><td>功能表格子</td>
+      <td>左软键 → 功能表 → 通知中心</td>
+      <td>低（NokiaMenuFragment:613 后加一项）</td>
+      <td class="pick">推荐，先做这个</td>
+    </tr>
+    <tr>
+      <td>进阶</td><td>按键直达</td>
+      <td>任意界面按绑定的键</td>
+      <td>高（NokiaKeyBinding 6 处并行结构）</td>
+      <td>后续</td>
+    </tr>
+    <tr>
+      <td>不推荐</td><td>顶部快捷栏</td>
+      <td>快捷栏加「通知」图标</td>
+      <td>低，但挤占用户自定义快捷栏</td>
+      <td class="no">否</td>
+    </tr>
+    <tr>
+      <td>不推荐</td><td>桌面设置子项</td>
+      <td>右软键 → 系统与权限 → 通知中心</td>
+      <td>层级太深，与「快捷」目标相反</td>
+      <td class="no">否（仅放授权/开关）</td>
+    </tr>
+  </table>
+
+  <h3>为什么主入口是「桌面通知条」</h3>
+  1. 通知条只在<b>有通知时</b>出现，无通知不占桌面空间 —— 不破坏现有桌面布局；<br>
+  2. 它本身就是信息展示（未读数 + 最新一条摘要），用户不进页面也能看到关键内容；<br>
+  3. 复用现有焦点体系：作为第 2 个焦点区插入 <code>focusTargets</code>（快捷栏 → 通知条 → 组件 → 快捷开关），方向键即可到达，确认键进入；<br>
+  4. 桌面按 Home 键就到，路径最短：<b>Home → ↓ → 确认</b>，真正免下拉。
+
+  <h3>按键语义（桌面页，通知条聚焦时）</h3>
+  ↑/↓：跨区移动焦点（快捷栏 ⇄ 通知条 ⇄ 组件 ⇄ 快捷开关）<br>
+  确认键：进入通知中心，并自动定位到<b>最新一条</b><br>
+  左软键：功能表（<span class="no">保持不变</span>，不抢软键）<br>
+  右软键：桌面设置（<span class="no">保持不变</span>）<br>
+  长按确认键（可选）：直接全部清除，二次确认后执行
+
+  <h3>落地落点（已确认的代码位置）</h3>
+  主入口：<code>fragment_nokia_desktop.xml</code> 快捷栏下方新增通知条；<code>NokiaDesktopFragment.collectWidgetTargets()</code>（:1949）与 <code>onDirection()</code>（:1963）加一个焦点区；确认进入走 <code>NokiaDesktopActivity.openFragment()</code>（:659）<br>
+  兜底入口：<code>NokiaMenuFragment.java:613</code> 后追加 <code>TYPE_NOTIFICATION</code> 项 + <code>NokiaAppItem</code> 新常量，格子可带未读角标<br>
+  数据层：<code>NokiaNotificationListenerService.java:17</code> 已有空壳 + Manifest 已注册 + 授权弹窗已就绪（<code>NokiaDesktopFragment.java:1155</code>），只需补 <code>getActiveNotifications()</code><br>
+  设置位：桌面设置 → 系统与权限 加「通知中心」（开关 + 授权引导）
+
+  <h3>原型操作</h3>
+  点击节点①后用 <kbd>↑</kbd> <kbd>↓</kbd> 在桌面焦点区间移动，<kbd>Enter</kbd> 在通知条上进入通知中心（演示会闪一下 Toast）。
+</div>
+
+<script>
+// 桌面原型：方向键在焦点区之间移动，通知条上按 Enter 表示进入通知中心
+(function(){
+  var zones = [
+    document.getElementById('zShortcut'),
+    document.getElementById('zNotifBar'),
+    document.getElementById('zWidget'),
+    document.getElementById('zQuick')
+  ];
+  var idx = 1; // 默认演示焦点在通知条
+  var center = document.getElementById('p1Center');
+
+  function render(){
+    zones.forEach(function(z,i){ z.classList.toggle('focused', i===idx); });
+    center.textContent = (idx===1) ? '打开' : '';
+    center.style.color = (idx===1) ? '#9db4e0' : 'transparent';
+  }
+
+  document.addEventListener('keydown', function(e){
+    if (e.key==='ArrowDown') { idx = Math.min(zones.length-1, idx+1); render(); e.preventDefault(); }
+    else if (e.key==='ArrowUp') { idx = Math.max(0, idx-1); render(); e.preventDefault(); }
+    else if (e.key==='Enter') {
+      if (idx===1) {
+        var bar = zones[1];
+        bar.style.opacity = '0.3';
+        setTimeout(function(){ bar.style.opacity='1'; }, 180);
+      }
+      e.preventDefault();
+    }
+  });
+  render();
+})();
+</script>
+</body>
+</html>
