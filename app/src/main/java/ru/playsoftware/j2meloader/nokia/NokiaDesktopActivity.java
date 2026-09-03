@@ -55,6 +55,8 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	 * 复位为 KEYCODE_UNKNOWN 表示当前无待配对事件。
 	 */
 	private int lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+	/** 待在 UP（抬起按键）时执行锁屏的物理按键 keyCode；KEYCODE_UNKNOWN 表示无待处理锁屏。 */
+	private int pendingLockScreenKeyCode = KeyEvent.KEYCODE_UNKNOWN;
 	/** 最近一次上报给拦截器的页面状态，避免重复发送 TCP */
 	private String lastReportedPageState = null;
 
@@ -101,6 +103,13 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		// 因此向导完成后（首启不再有更强的界面诉求时）主动申请一次。
 		if (keyBinding.isWizardDone()) {
 			requestPostNotificationsIfNeeded();
+			// 拉起常驻保活前台服务并常驻。【必须在桌面 onCreate 启动】，绝不在 onStop 启动——
+			// onStop 往往就是息屏/锁屏发生的瞬间，那时启动前台服务会把它 onCreate/onStartCommand/
+			// startForeground 全部挤进【桌面主线程】，恰好砸进「窗口焦点从有变无」的敏感窗口，
+			// 曾引发「Application does not have a focused window」ANR → 展讯看门狗强杀进程 →
+			// 系统自动 Clearing preferred home → 按 HOME 弹出桌面选择器。
+			// 在 onCreate 启动时桌面处于前台态，服务早已常驻，息屏过渡期不再有任何 FGS 启动动作。
+			NokiaDesktopKeepAliveService.start(this);
 		}
 	}
 
@@ -317,16 +326,9 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	}
 
 	@Override
-	protected void onStop() {
-		// 拉起常驻保活服务（首次离开桌面时启动，之后永不停止）。
-		// 注意该服务不持有任何锁，只做保活，不会触发系统的高耗电提示。
-		NokiaDesktopKeepAliveService.start(this);
-		super.onStop();
-	}
-
-	@Override
 	protected void onPause() {
 		resumedFlag = false;
+		resetLastHandledKeyCode();
 		super.onPause();
 		if (statusBarController != null) {
 			statusBarController.stop();
@@ -427,6 +429,18 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
 		if (event.getAction() != KeyEvent.ACTION_DOWN) {
+			// 锁屏动作专用闭环：必须在 UP（抬手）时才真正执行 lockNow()。
+			// 若在 DOWN 触发，屏幕息屏与窗口隐藏极快，随后的 UP 事件到达系统时将失去前台接收窗口，
+			// 引发 InputDispatcher 5秒超时 ANR。
+			if (event.getAction() == KeyEvent.ACTION_UP
+					&& event.getKeyCode() == pendingLockScreenKeyCode) {
+				pendingLockScreenKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+				lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+				NokiaLog.i("Desktop", "锁屏按键抬起（UP）：执行锁屏");
+				lockScreen();
+				return true;
+			}
+
 			// 若此前对应的 DOWN 已被本层消费，则把 UP / REPEAT 一并吞掉：
 			// 避免它落入 view 层级（底部软键仍处于 pressed）被系统合成 performClick，
 			// 导致一次按压触发两次动作。
@@ -496,13 +510,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		NokiaLog.d("Desktop", "解析动作 " + NokiaKeyBinding.getActionName(action)
 				+ "(" + action + ")");
 
-		// 锁屏动作：仅在桌面待机屏生效，按下所绑定的按键（默认挂机键 ENDCALL）即锁屏。
-		// 挂机键在无通话时通常能送达前台 Activity；若某些 ROM 拦截，可用其它按键重新绑定。
+		// 锁屏动作：仅在桌面待机屏生效。
+		// 关键：DOWN 阶段只记录 keyCode 并拦截，绝不在 DOWN 阶段调用 lockScreen()！
+		// 必须等待用户手指抬起（UP）时才调用 lockNow()，确保输入事件成对闭环。
 		if (action == NokiaKeyBinding.ACTION_LOCK_SCREEN) {
 			Fragment lockHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 			if (lockHost instanceof NokiaDesktopFragment) {
-				NokiaLog.i("Desktop", "锁屏动作触发（桌面）：执行锁屏");
-				lockScreen();
+				NokiaLog.i("Desktop", "锁屏按键按下（DOWN）：已拦截，等待抬起执行");
+				pendingLockScreenKeyCode = event.getKeyCode();
 				lastHandledDownKeyCode = event.getKeyCode();
 				return true;
 			}
@@ -531,6 +546,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	/** 复位「已消费 DOWN 的 keyCode」，用于本层未消费该按键的路径，避免误吞后续 UP。 */
 	private void resetLastHandledKeyCode() {
 		lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+		pendingLockScreenKeyCode = KeyEvent.KEYCODE_UNKNOWN;
 	}
 
 	/**

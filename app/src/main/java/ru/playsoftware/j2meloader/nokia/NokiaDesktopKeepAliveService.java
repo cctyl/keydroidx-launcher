@@ -20,10 +20,15 @@ import ru.playsoftware.j2meloader.R;
 /**
  * 原键桌面主进程保活前台 Service（主进程，manifest 未声明 android:process）。
  * <p>
- * <b>常驻策略</b>：桌面首次离开前台（onStop）时拉起，之后【永不主动停止】，通知长期常驻。
- * 选择常驻而非「退后台才启动」的原因：按需模式每次都要在「刚离开桌面的那一瞬间」
- * 调用 startForegroundService，这是 Android 12+ 后台启动 FGS 限制唯一可能命中的时机；
- * 常驻后服务早已运行，不存在这个启动窗口，保活更可靠。
+ * <b>常驻策略</b>：桌面 onCreate（向导完成后）即拉起，之后【永不主动停止】，通知长期常驻。
+ * <p>
+ * <b>为何在 onCreate 而非 onStop 启动</b>：早期版本在 {@code NokiaDesktopActivity.onStop()}
+ * 里启动本服务，但 onStop 往往就是息屏/锁屏发生的瞬间。那时启动前台服务会把它
+ * onCreate/onStartCommand/startForeground 全部挤进桌面主线程，恰好砸进「窗口焦点
+ * 从有变无」的敏感过渡窗口，曾引发 {@code Application does not have a focused window} ANR
+ * → 展讯看门狗强杀进程 → 系统自动 Clearing preferred home → 按 HOME 弹出桌面选择器。
+ * 在 onCreate 启动时桌面处于前台态，服务早已常驻，息屏过渡期不再有任何 FGS 启动动作去搅窗口焦点。
+ * 进程被系统回收后，靠 START_STICKY 自举重启，无需 app 主动拉。
  * 代价是通知栏长期占用，用户可在通知上长按关闭该渠道。
  * <p>
  * <b>本服务绝不持有 WakeLock / WifiLock。</b>

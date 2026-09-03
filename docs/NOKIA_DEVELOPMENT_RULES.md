@@ -702,3 +702,83 @@ public void fixMidContentHeight(final View content, final boolean topAlign) {
 
 **禁止** 将 `category.HOME`、`category.DEFAULT` 与 `category.LAUNCHER` 混合在同一个 `<intent-filter>` 标签内。混合声明会导致部分 Android 系统（特别是 Android 10+ 的 RoleManager / PreferredActivity 解析策略）产生匹配歧义，导致系统无法持久化保存默认桌面设置，从而在按 Home / 挂机键时反复弹出“选择主屏幕应用”。
 
+### 14. 破坏性/息屏类物理按键动作必须在 UP（抬键）执行规范（重要）
+
+**凡是导致屏幕熄灭、窗口销毁、Activity 退出或失去输入焦点的物理按键动作（如一键锁屏 `lockNow()`、`finish()` 等），必须在 `ACTION_UP`（抬键）阶段执行，严禁在 `ACTION_DOWN`（按下）阶段直接触发！**
+
+这是按键驱动型系统中最隐蔽、破坏力极大的物理时序陷阱，曾导致「锁屏后解锁反复弹出选择主屏幕应用弹窗」及「每次锁屏后功能表内存缓存全部丢失、启动奇慢」的严重系统级故障。
+
+#### 一、Android 底层输入管线死锁机理（ANR 根因）
+
+每个物理按键的物理交互必然由 **按下（DOWN）** 和 **抬起（UP）** 两个硬件事件成对产生。人类手指按下物理键到松开，必然存在 **100ms ~ 200ms 的物理按压延时**：
+
+```
+物理操作:  [手指按下 DOWN] ---------- 约 140ms -----------> [手指抬起 UP]
+              │                                              │
+              ▼                                              ▼
+错误做法:  立即调用 lockNow() 息屏                             InputReader 产生 UP 事件
+              │                                              │
+              ▼                                              ▼
+系统状态:  桌面窗口瞬间隐藏/销毁 (mViewVisibility=8)           InputDispatcher 寻找目标窗口派发
+           Input focus changed to null (无持焦窗口)          发现当前聚焦 App 的窗口早已灰飞烟灭！
+                                                             │
+                                                             ▼
+                                                    死等接收窗口出现 (超时 5000ms)
+                                                             │
+                                                             ▼
+                                                    【ANR: Application does not have a focused window】
+                                                    【Dropping KEY event because there is no focused window】
+```
+
+当 `lockNow()` 在 `DOWN` 时刻被调用，系统仅耗时约 **38ms** 便将桌面窗口的 `ViewVisibility` 设为 `8 (GONE)` 并将输入焦点撤销。当 140ms 用户手指抬起时，硬件生成的 `KEY_UP` 事件到达 `InputDispatcher`，却发现**该事件所属的前台 App 根本没有可用窗口接听按键**。依照 Android 规范，输入管线会死等 5 秒超时，随后判定 `Application does not have a focused window` 抛出 ANR！
+
+#### 二、连锁恶果复盘
+
+1. **进程强杀与功能表缓存丢失**：
+   发生 ANR 后，系统看门狗（如 `UnisocWatchdog` 或 `ActivityManager`）会立即将桌面进程强杀（`Killing ... (adj ...): anr`）。桌面堆内存里的静态与单例缓存（如 `NokiaMenuFragment.cachedItems`）被操作系统清空。用户解锁后点进功能表，面对的是被重新冷启动的全新进程，必须从磁盘或 `PackageManager` 全量重新加载，造成严重的掉帧卡顿。
+2. **默认桌面被系统主动剥夺（Safety Net 触发）**：
+   在 Android 系统架构中（`ActivityTaskManagerService` / `AppErrors`），系统对默认桌面（`ROLE_HOME`）有防死锁保护机制：**一旦默认桌面发生 ANR 或崩溃，系统判定该桌面应用存在致命故障，为防止用户死锁在黑屏中无法操作手机，会自动执行 `Clearing package preferred activities from <桌面包名>` 抹除默认桌面偏好，并发送 `ACTION_PREFERRED_ACTIVITY_CHANGED` 广播**。因此，用户解锁按挂机键/HOME键时，系统因找不到默认桌面，只能强制唤出 `ResolverActivity` 弹窗让用户重新选择桌面！
+
+#### 三、历史隐蔽性分析（为什么在 1.2.1 未爆发，而在去除挤压动画后必现）
+
+- **1.2.1 版本（`f39bb42d`）**：桌面使用 Android 原生主题 `@style/AppTheme.NoActionBar`，保留了系统默认的窗口退出转场动画（约 **250ms ~ 300ms**）。当用户在 140ms 抬起手指时，桌面窗口虽在退场但动画尚未结束，**窗口句柄依然有效，恰好“兜住”并消费了该 `UP` 事件**，使得该隐患被系统动画巧合掩盖。
+- **Commit `4cd2d1f`（优化返回桌面挤压动画）**：为了消除从其他应用返回桌面时的挤压与滑入感，将 `NokiaDesktopActivity` 的主题转场动画全部置为 `@null`（0ms 瞬间关闭）。**这一改动抽走了原本长达 300ms 的动画安全缓冲垫**，导致窗口在 38ms 内即彻底注销。用户 140ms 松手产生的孤儿 `UP` 键无处安放，致使 5 秒超时 ANR 变成 100% 稳定必现。
+
+#### 四、标准规范代码范式
+
+处理锁屏、退出或任何破坏前台窗口的按键动作时，必须采用**「DOWN 阶段预拦截，UP 阶段终结并执行」**的标准闭环：
+
+```java
+// 1. 定义待在 UP 阶段执行动作的按键记录
+private int pendingLockScreenKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+
+@Override
+public boolean dispatchKeyEvent(KeyEvent event) {
+    // 2. 非 DOWN 阶段：在 UP 到达时优先消费，再执行破坏性动作
+    if (event.getAction() != KeyEvent.ACTION_DOWN) {
+        if (event.getAction() == KeyEvent.ACTION_UP
+                && event.getKeyCode() == pendingLockScreenKeyCode) {
+            pendingLockScreenKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+            lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+            NokiaLog.i("Desktop", "锁屏按键抬起（UP）：消费按键并执行锁屏");
+            lockScreen(); // 关键：此时 UP 已被完全消费，输入队列为空，安全执行锁屏
+            return true;
+        }
+        // 处理常规按键 UP 拦截...
+        return super.dispatchKeyEvent(event);
+    }
+
+    // 3. DOWN 阶段：只做拦截与标记，绝不调用 lockScreen()
+    if (action == NokiaKeyBinding.ACTION_LOCK_SCREEN) {
+        if (lockHost instanceof NokiaDesktopFragment) {
+            NokiaLog.i("Desktop", "锁屏按键按下（DOWN）：已拦截，等待抬起执行");
+            pendingLockScreenKeyCode = event.getKeyCode();
+            lastHandledDownKeyCode = event.getKeyCode();
+            return true; // 消费 DOWN，保持屏幕与窗口焦点完好
+        }
+    }
+    ...
+}
+```
+
+

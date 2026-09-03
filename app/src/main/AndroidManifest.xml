@@ -150,15 +150,12 @@
         </activity>
         <activity
             android:name=".nokia.NokiaDesktopActivity"
-            android:clearTaskOnLaunch="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"
-            android:resumeWhilePausing="true"
             android:screenOrientation="portrait"
             android:stateNotNeeded="true"
-            android:taskAffinity=""
             android:theme="@style/Theme.NokiaDesktop">
             <!-- 标准 Launcher 过滤器（包含 DEFAULT） -->
             <intent-filter>
@@ -236,7 +233,10 @@
 
         <!-- 原键桌面主进程保活前台服务（主进程，未声明 android:process）。
              注意：本服务【不持有任何 WakeLock / WifiLock】——前台服务只提升进程优先级，
-             持锁才会被系统判为「阻止系统休眠」并触发高耗电提示。详见服务类注释。 -->
+             持锁才会被系统判为「阻止系统休眠」并触发高耗电提示。详见服务类注释。
+             启动时机：桌面 onCreate（向导完成后）即拉起常驻，绝不在 onStop 启动——
+             在 onStop（息屏/离开前台）时启动会砸进窗口焦点切换的敏感窗口，
+             曾引发「Application does not have a focused window」ANR。 -->
         <service
             android:name=".nokia.NokiaDesktopKeepAliveService"
             android:exported="false"
