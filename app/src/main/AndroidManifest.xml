@@ -31,6 +31,17 @@
     <!-- 后台清理组件：killBackgroundProcesses() 所需（normal 级，安装即授予） -->
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
+    <!-- 读取与展示应用列表相关权限：
+         - QUERY_ALL_PACKAGES: Android 11+ 原生系统级软件包可见性
+         - CTA_QUERY_ALL_PACKAGES: 展锐/按键机工信部进网 CTA 规范应用列表权限
+         - GET_INSTALLED_APPS: 小米/通用 ROM 读取已安装应用列表权限 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission android:name="com.unisoc.permission.CTA_QUERY_ALL_PACKAGES"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.GET_INSTALLED_APPS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- 卸载应用：Intent.ACTION_DELETE 需要此权限（API 34+ 官方要求，但部分定制 ROM
          在 API 33 上也会检查；正常权限，安装即授予，不影响旧版 API）。 -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"

@@ -42,6 +42,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 
 	private static final String ACTION_HOME = Intent.ACTION_MAIN;
 	private static final String CATEGORY_HOME = Intent.CATEGORY_HOME;
+	private static NokiaDesktopActivity sInstance = null;
 	private StatusBarController statusBarController;
 	private NokiaKeyBinding keyBinding;
 	private NokiaLockServer lockServer;
@@ -67,6 +68,7 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		NokiaWallpaper.preloadAsync(this, null);
 		applyCurrentTheme();
 		super.onCreate(savedInstanceState);
+		sInstance = this;
 		setContentView(R.layout.activity_nokia);
 		setupNokiaUi();
 		findViewById(R.id.midPanel).setVisibility(View.VISIBLE);
@@ -390,6 +392,9 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	}
 
 	protected void onDestroy() {
+		if (sInstance == this) {
+			sInstance = null;
+		}
 		if (lockServer != null) {
 			lockServer.stop();
 		}
@@ -728,6 +733,10 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 				NokiaLog.w("Desktop", "上报页面状态失败: " + e.getMessage());
 			}
 		}, "nokia-page-state").start();
+	}
+
+	public static NokiaDesktopActivity getInstance() {
+		return sInstance;
 	}
 
 	// ---- 内部方法 ----

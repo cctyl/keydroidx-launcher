@@ -78,6 +78,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 						NokiaIcons.ICON_LOG,          // 日志记录
 						NokiaIcons.ICON_HOME,         // 默认桌面设置
 						NokiaIcons.ICON_NOTIFICATIONS, // 通知中心
+						NokiaIcons.ICON_SETTINGS,     // 核心权限管理
 				};
 			default:
 				return new String[0];
@@ -93,7 +94,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			case GROUP_CONTENT:
 				return new String[]{"顶部快捷栏设置", "桌面组件设置", "快捷开关"};
 			case GROUP_SYSTEM:
-				return new String[]{"日志记录", "默认桌面设置", "通知中心"};
+				return new String[]{"日志记录", "默认桌面设置", "通知中心", "系统权限自检"};
 			default:
 				return new String[0];
 		}
@@ -224,6 +225,10 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			return NokiaMusicSessionReader.isNotificationListenerEnabled(requireContext())
 					? "通知中心：已授权" : "通知中心：未授权";
 		}
+		if (group == GROUP_SYSTEM && index == 3) {
+			boolean appList = io.github.cctyl.nokia.common.permission.NokiaPermissionManager.hasAppListPermission(requireContext());
+			return appList ? "系统权限：已就绪" : "系统权限：待修复";
+		}
 		return itemNames[index];
 	}
 
@@ -319,6 +324,28 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			case 2:
 				NokiaLog.i("SettingsGroup", "进入通知中心设置");
 				host.openFragment(new NokiaNotificationSettingsFragment());
+				return true;
+			case 3:
+				NokiaLog.i("SettingsGroup", "系统权限自检与申请");
+				io.github.cctyl.nokia.common.permission.NokiaPermissionManager.requestCorePermissions(
+						host,
+						"需要读取应用列表与电话状态以正常展示桌面内容",
+						new com.hjq.permissions.OnPermissionCallback() {
+							@Override
+							public void onGranted(java.util.List<String> permissions, boolean allGranted) {
+								if (tvNames != null && tvNames.length > 3 && tvNames[3] != null) {
+									tvNames[3].setText(getItemDisplayName(3));
+								}
+								android.widget.Toast.makeText(requireContext(), "系统核心权限已就绪", android.widget.Toast.LENGTH_SHORT).show();
+							}
+
+							@Override
+							public void onDenied(java.util.List<String> permissions, boolean doNotAskAgain) {
+								if (tvNames != null && tvNames.length > 3 && tvNames[3] != null) {
+									tvNames[3].setText(getItemDisplayName(3));
+								}
+							}
+						});
 				return true;
 			default:
 				return false;

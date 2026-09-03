@@ -13,6 +13,7 @@ import android.os.Looper;
 import android.widget.Toast;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.permission.NokiaPermissionManager;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -36,6 +37,10 @@ public class NokiaFreezeManager {
 
 	/** 广播：当冻结状态或冻结列表发生变化时发送，通知功能表和桌面快捷栏刷新图标角标 */
 	public static final String ACTION_FREEZE_STATE_CHANGED = "ru.playsoftware.j2meloader.nokia.ACTION_FREEZE_STATE_CHANGED";
+	/** 广播 extra：发生变更的包名（单包冻结/解冻时携带，供接收方预写缓存） */
+	public static final String EXTRA_PACKAGE = "extra_package";
+	/** 广播 extra：该包预期冻结状态（true=已冻结，false=已解冻） */
+	public static final String EXTRA_FROZEN = "extra_frozen";
 
 	private static volatile NokiaFreezeManager sInstance;
 	private final Context appContext;
@@ -127,7 +132,8 @@ public class NokiaFreezeManager {
 			if (ai != null) {
 				return !ai.enabled;
 			}
-		} catch (Exception ignored) {
+		} catch (Exception e) {
+			NokiaLog.w(TAG, "isAppFrozen err pkg=" + packageName + " msg=" + e.getMessage());
 		}
 		return false;
 	}
@@ -138,6 +144,23 @@ public class NokiaFreezeManager {
 	public void notifyStateChanged() {
 		Intent intent = new Intent(ACTION_FREEZE_STATE_CHANGED);
 		intent.setPackage(appContext.getPackageName());
+		appContext.sendBroadcast(intent);
+	}
+
+	/**
+	 * 发送携带预期冻结状态的变更广播（单包冻结/解冻成功后调用）。
+	 * <p>pm disable-user 通过 Shizuku 返回成功后，PackageManagerService 对部分包（尤其
+	 * targetSdk 较高的包）的状态更新存在数秒级延迟，导致接收方即时查询 getApplicationInfo
+	 * 仍返回旧状态、毒化缓存。携带此 extra 后，接收方可优先用预期值预写缓存，避免延迟。
+	 *
+	 * @param pkg     发生变更的包名
+	 * @param frozen  预期冻结状态（true=已冻结，false=已解冻）
+	 */
+	public void notifyStateChanged(String pkg, boolean frozen) {
+		Intent intent = new Intent(ACTION_FREEZE_STATE_CHANGED);
+		intent.setPackage(appContext.getPackageName());
+		intent.putExtra(EXTRA_PACKAGE, pkg);
+		intent.putExtra(EXTRA_FROZEN, frozen);
 		appContext.sendBroadcast(intent);
 	}
 
@@ -152,7 +175,12 @@ public class NokiaFreezeManager {
 		executor.execute(() -> {
 			boolean ok = executeFreeze(packageName);
 			mainHandler.post(() -> {
-				notifyStateChanged();
+				// 成功时携带预期状态预写缓存，避免 PMS 状态更新延迟导致冰块不立即显示
+				if (ok) {
+					notifyStateChanged(packageName, true);
+				} else {
+					notifyStateChanged();
+				}
 				if (callback != null) {
 					callback.onResult(ok, ok ? "已冻结" : "冻结失败，请检查 mini_shizuku 权限");
 				}
@@ -167,7 +195,11 @@ public class NokiaFreezeManager {
 		executor.execute(() -> {
 			boolean ok = executeUnfreeze(packageName);
 			mainHandler.post(() -> {
-				notifyStateChanged();
+				if (ok) {
+					notifyStateChanged(packageName, false);
+				} else {
+					notifyStateChanged();
+				}
 				if (callback != null) {
 					callback.onResult(ok, ok ? "已解冻" : "解冻失败");
 				}
@@ -193,7 +225,11 @@ public class NokiaFreezeManager {
 				} catch (InterruptedException ignored) {}
 			}
 			mainHandler.post(() -> {
-				notifyStateChanged();
+				if (targetPkg != null) {
+					notifyStateChanged(targetPkg, false);
+				} else {
+					notifyStateChanged();
+				}
 				try {
 					Intent intent = null;
 					PackageManager pm = appContext.getPackageManager();
@@ -212,7 +248,8 @@ public class NokiaFreezeManager {
 						NokiaLog.i(TAG, "成功解冻并启动: " + (label != null ? label : targetPkg)
 								+ " -> " + intent.getComponent());
 					} else {
-						Toast.makeText(appContext, "无法启动应用", Toast.LENGTH_SHORT).show();
+						// 启动 Intent 解析为空：极大可能是缺少读取应用列表权限导致
+						handleLaunchFailurePermissionRepair(targetPkg, label);
 					}
 				} catch (Exception e) {
 					NokiaLog.e(TAG, "解冻后启动失败: " + targetPkg, e);
@@ -220,6 +257,33 @@ public class NokiaFreezeManager {
 				}
 			});
 		});
+	}
+
+	/**
+	 * 当解冻后无法解析到启动 Intent 时触发的权限自愈流程
+	 */
+	private void handleLaunchFailurePermissionRepair(String targetPkg, String label) {
+		NokiaDesktopActivity desktopActivity = NokiaDesktopActivity.getInstance();
+		if (desktopActivity != null && !desktopActivity.isFinishing()) {
+			NokiaLog.w(TAG, "解析启动 Intent 失败，检查并引导应用列表权限自愈: " + targetPkg);
+			NokiaPermissionManager.requestAppListPermission(desktopActivity,
+					"需要应用列表权限以定位并启动应用",
+					new com.hjq.permissions.OnPermissionCallback() {
+						@Override
+						public void onGranted(java.util.List<String> permissions, boolean allGranted) {
+							// 权限修复成功，自动断点续传重新启动目标应用
+							NokiaLog.i(TAG, "应用列表权限自愈成功，自动重试启动: " + targetPkg);
+							unfreezeAndLaunch(null, targetPkg, label);
+						}
+
+						@Override
+						public void onDenied(java.util.List<String> permissions, boolean doNotAskAgain) {
+							Toast.makeText(appContext, "缺少权限，无法启动应用", Toast.LENGTH_SHORT).show();
+						}
+					});
+		} else {
+			Toast.makeText(appContext, "无法启动应用", Toast.LENGTH_SHORT).show();
+		}
 	}
 
 	/**

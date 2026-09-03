@@ -17,6 +17,9 @@ import io.github.cctyl.nokia.common.ui.focus.NokiaFocusHost;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.cctyl.nokia.common.permission.NokiaPermissionManager;
+import com.hjq.permissions.OnPermissionCallback;
+import com.hjq.permissions.Permission;
 import ru.playsoftware.j2meloader.R;
 
 /**
@@ -210,7 +213,7 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 				.replace(R.id.midPanel, new NokiaDesktopFragment())
 				.commitAllowingStateLoss();
 		NokiaLog.i("KeyWizard", "返回桌面待机屏");
-		// 向导结束后：若尚未是默认桌面，则询问是否设为默认桌面
+		// 向导结束后：若尚未是默认桌面，则询问是否设为默认桌面；之后检查并批量请求核心权限
 		askSetDefaultLauncher();
 	}
 
@@ -223,11 +226,52 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 				() -> {
 					NokiaLog.i("KeyWizard", "用户选择设置默认桌面");
 					host.requestSetDefaultLauncher();
+					checkAndRequestPermissions(host);
 				}));
 		items.add(new NokiaOptionsDialog.OptionItem(0, "稍后再说", true, false,
-				() -> NokiaLog.i("KeyWizard", "用户选择稍后再说")));
+				() -> {
+					NokiaLog.i("KeyWizard", "用户选择稍后再说");
+					checkAndRequestPermissions(host);
+				}));
 		NokiaOptionsDialog.show(host.getSupportFragmentManager(), "设为默认桌面？", items);
 		NokiaLog.i("KeyWizard", "弹出默认桌面询问窗");
+	}
+
+	/** 向导完成后检查核心运行时权限，若有缺失则弹出复古诺基亚对话框批量引导授权 */
+	private void checkAndRequestPermissions(NokiaDesktopActivity host) {
+		if (host == null || host.isFinishing()) return;
+		// 收集未授权的核心权限（电话状态用于顶栏信号/卡信息，应用列表用于功能表和解冻）
+		List<String> needed = new ArrayList<>();
+		if (!NokiaPermissionManager.isGranted(host, Permission.READ_PHONE_STATE)) {
+			needed.add(Permission.READ_PHONE_STATE);
+		}
+		if (!NokiaPermissionManager.isGranted(host, Permission.GET_INSTALLED_APPS)) {
+			needed.add(Permission.GET_INSTALLED_APPS);
+		}
+
+		if (needed.isEmpty()) {
+			NokiaLog.i("KeyWizard", "核心权限已全部就绪，无需额外申请");
+			return;
+		}
+
+		NokiaLog.i("KeyWizard", "向导结束批量申请权限: " + needed);
+		NokiaPermissionManager.requestWithNokiaDialog(
+				host,
+				"系统权限申请",
+				"桌面需要电话状态与应用列表权限，以显示信号状态及展示/启动应用。",
+				needed,
+				new OnPermissionCallback() {
+					@Override
+					public void onGranted(List<String> permissions, boolean allGranted) {
+						NokiaLog.i("KeyWizard", "向导批量权限全部授予成功");
+					}
+
+					@Override
+					public void onDenied(List<String> permissions, boolean doNotAskAgain) {
+						NokiaLog.w("KeyWizard", "向导批量权限部分被拒: " + permissions + ", doNotAskAgain=" + doNotAskAgain);
+					}
+				}
+		);
 	}
 
 	// ---- NokiaFocusHost（INTRO / DONE 状态使用）----

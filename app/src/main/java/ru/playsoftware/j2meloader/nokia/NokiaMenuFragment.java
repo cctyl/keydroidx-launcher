@@ -150,6 +150,16 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 			// 冻结状态变化：列表内容不变，只需重绘当前页的冰块/角标（轻量，主线程直接做）
 			if (NokiaFreezeManager.ACTION_FREEZE_STATE_CHANGED.equals(action)) {
 				invalidateFrozenCache();
+				// pm disable-user 通过 Shizuku 返回成功后，PMS 对部分包（targetSdk 较高者）
+				// 的状态更新存在数秒级延迟，buildCurrentPage 即时查询 getApplicationInfo
+				// 会返回旧状态、毒化缓存导致冰块不显示。优先用广播携带的预期值预写缓存。
+				String changedPkg = intent.getStringExtra(NokiaFreezeManager.EXTRA_PACKAGE);
+				if (changedPkg != null) {
+					boolean expectedFrozen = intent.getBooleanExtra(
+							NokiaFreezeManager.EXTRA_FROZEN, false);
+					frozenStateCache.put(changedPkg, expectedFrozen);
+					NokiaLog.d("Menu", "预写冻结缓存: " + changedPkg + " -> " + expectedFrozen);
+				}
 				if (isAdded() && getView() != null) {
 					buildCurrentPage();
 					applyFocusBackground();
