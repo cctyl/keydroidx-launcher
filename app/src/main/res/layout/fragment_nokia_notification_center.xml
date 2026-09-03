@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知中心页：标题 + 状态提示条（未授权/读取中）+ 通知列表 + 空状态。
+     根宽 240dp（由 NokiaPageFragment 统一处理缩放），根高 match_parent。
+     列表项在代码中动态构建（见 NokiaNotificationCenterFragment）。 -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent">
+
+    <TextView
+        android:id="@+id/notifCenterTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="4dp"
+        android:text="通知中心"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <!-- 状态提示条：未授权时显示说明 + 引导，读取中短暂显示；正常态隐藏 -->
+    <TextView
+        android:id="@+id/notifCenterHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/notifCenterTitle"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textColor="#9DB4E0"
+        android:textSize="10sp"
+        android:visibility="gone" />
+
+    <ScrollView
+        android:id="@+id/notifCenterScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/notifCenterHint"
+        android:layout_marginTop="4dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/notifCenterList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp" />
+    </ScrollView>
+
+    <!-- 空状态（规范 39：每个空列表必须解释自己） -->
+    <LinearLayout
+        android:id="@+id/notifCenterEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/notifCenterEmptyIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#7F96C4"
+            android:textSize="26sp" />
+
+        <TextView
+            android:id="@+id/notifCenterEmptyTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="没有通知"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/notifCenterEmptyText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="新通知会显示在这里"
+            android:textColor="#7F96C4"
+            android:textSize="10sp" />
+    </LinearLayout>
+</RelativeLayout>

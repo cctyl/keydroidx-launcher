@@ -66,12 +66,60 @@
         android:layout_marginStart="6dp"
         android:layout_marginEnd="6dp" />
 
+    <!-- 通知条：有通知时显示未读数与最新摘要，确认键进入通知中心。
+         无通知 / 用户关闭 / 未授权时 GONE，桌面布局与无通知条时完全一致
+         （RelativeLayout 中 GONE 视图按零尺寸点参与锚定，notificationArea 自动上移）。 -->
+    <LinearLayout
+        android:id="@+id/notifBarContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/shortcutDivider"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/notifBarIcon"
+            android:layout_width="14dp"
+            android:layout_height="14dp" />
+
+        <TextView
+            android:id="@+id/notifBarText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#B8C8EA"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/notifBarBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/bg_nokia_bubble"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:textColor="#FFFFFF"
+            android:textSize="9sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
     <!-- 桌面组件区：填充快捷栏下方到便捷开关栏之间的剩余空间，动态渲染用户添加的组件 -->
     <LinearLayout
         android:id="@+id/notificationArea"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/shortcutDivider"
+        android:layout_below="@id/notifBarContainer"
         android:layout_above="@id/quickToggleDivider"
         android:orientation="vertical"
         android:paddingStart="8dp"

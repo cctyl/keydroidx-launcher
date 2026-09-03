@@ -77,6 +77,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 				return new String[]{
 						NokiaIcons.ICON_LOG,          // 日志记录
 						NokiaIcons.ICON_HOME,         // 默认桌面设置
+						NokiaIcons.ICON_NOTIFICATIONS, // 通知中心
 				};
 			default:
 				return new String[0];
@@ -92,7 +93,7 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			case GROUP_CONTENT:
 				return new String[]{"顶部快捷栏设置", "桌面组件设置", "快捷开关"};
 			case GROUP_SYSTEM:
-				return new String[]{"日志记录", "默认桌面设置"};
+				return new String[]{"日志记录", "默认桌面设置", "通知中心"};
 			default:
 				return new String[0];
 		}
@@ -219,6 +220,10 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			boolean isDefault = ((NokiaDesktopActivity) requireActivity()).isDefaultLauncher();
 			return isDefault ? "默认桌面：已设置" : "默认桌面设置";
 		}
+		if (group == GROUP_SYSTEM && index == 2) {
+			return NokiaMusicSessionReader.isNotificationListenerEnabled(requireContext())
+					? "通知中心：已授权" : "通知中心：未授权";
+		}
 		return itemNames[index];
 	}
 
@@ -310,6 +315,10 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 			case 1:
 				NokiaLog.i("SettingsGroup", "默认桌面设置：引导设为默认桌面");
 				host.requestSetDefaultLauncher();
+				return true;
+			case 2:
+				NokiaLog.i("SettingsGroup", "进入通知中心设置");
+				host.openFragment(new NokiaNotificationSettingsFragment());
 				return true;
 			default:
 				return false;

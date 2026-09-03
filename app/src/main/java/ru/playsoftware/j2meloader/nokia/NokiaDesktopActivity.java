@@ -655,6 +655,12 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		switchFragment(new NokiaDesktopSettingsFragment());
 	}
 
+	/** 打开通知中心列表页（功能表格子 / 桌面通知条共用入口）。 */
+	public void openNotificationCenter() {
+		NokiaLog.i("Desktop", "导航 -> 通知中心");
+		switchFragment(new NokiaNotificationCenterFragment());
+	}
+
 	/** 通用打开一个 Fragment 并加入返回栈。 */
 	public void openFragment(Fragment fragment) {
 		switchFragment(fragment);

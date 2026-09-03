@@ -146,6 +146,24 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	/** 组件区项数（动态，由 widgetItems.size() 决定） */
 	private int widgetCount = 0;
 
+	// ---- 通知条（快捷栏下方，见 docs/通知中心功能设计.md 阶段二） ----
+
+	/** 通知条是否参与焦点：1=显示并占用一个焦点位，0=隐藏（focusTargets 中无此条目）。 */
+	private int notifBarCount = 0;
+	private LinearLayout notifBar;
+	private TextView notifBarText;
+	private TextView notifBarBadge;
+
+	/** 通知仓储订阅：通知到达/移除/清除后刷新通知条。回调在主线程（仓储已节流）。 */
+	private final NokiaNotificationRepository.Listener notifRepoListener =
+			new NokiaNotificationRepository.Listener() {
+				@Override
+				public void onNotificationsChanged() {
+					if (!isAdded() || getView() == null) return;
+					refreshNotifBar();
+				}
+			};
+
 	/** 快捷栏第一个焦点索引 */
 	private static final int SHORTCUT_FIRST = 0;
 
@@ -219,6 +237,26 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		settingsStorage = new NokiaSettingsStorage(requireContext());
 		widgetStorage = new NokiaWidgetStorage(requireContext());
 
+		// 通知条（快捷栏下方）：确认键进入通知中心。初始状态按当前通知快照装配
+		notifBar = view.findViewById(R.id.notifBarContainer);
+		notifBarText = view.findViewById(R.id.notifBarText);
+		notifBarBadge = view.findViewById(R.id.notifBarBadge);
+		if (notifBar != null) {
+			android.widget.ImageView ivBell = view.findViewById(R.id.notifBarIcon);
+			if (ivBell != null) {
+				ivBell.setImageDrawable(io.github.cctyl.nokia.common.ui.NokiaIcons.get(
+						requireContext(),
+						io.github.cctyl.nokia.common.ui.NokiaIcons.ICON_NOTIFICATIONS,
+						0xFFB8C8EA, 14));
+			}
+			notifBar.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					((NokiaDesktopActivity) requireActivity()).openNotificationCenter();
+				}
+			});
+		}
+
 		focusTargets.clear();
 		shortcutApps.clear();
 		widgetItems.clear();
@@ -227,6 +265,10 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 本次已完整构建过内容区：无论冷启动还是从返回栈恢复，
 		// 紧接着的 onResume 都不必再重建一遍。
 		contentDirty = false;
+
+		// 通知条初始装配：焦点表已清空，notifBarCount 归零后按当前快照重新挂入
+		notifBarCount = 0;
+		refreshNotifBar();
 
 		loadShortcutBarAsync(view);
 		rebuildWidgetArea(view);
@@ -276,6 +318,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		host.refreshPageBar();
 		// 注册音乐播放状态 ContentObserver（监听播放态变化刷新组件行）
 		registerMusicPlaybackObserver();
+		// 通知条：订阅通知变化并按最新快照刷新（从通知中心清除后回桌面立即同步）
+		NokiaNotificationRepository.get().addListener(notifRepoListener);
+		refreshNotifBar();
 		// 异步刷新后台管理组件计数（countBackgroundProcesses 含 shizuku TCP，不能在主线程）
 		refreshBgCountAsync();
 		// 音乐组件读取播放状态首选 MediaSession，它依赖通知使用权；
@@ -318,6 +363,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		contentDirty = true;
 		unregisterToggleReceiver();
 		unregisterMusicPlaybackObserver();
+		// 通知条订阅随生命周期解除，避免持有已销毁的视图引用
+		NokiaNotificationRepository.get().removeListener(notifRepoListener);
 	}
 
 	/** 后台线程计算后台进程数并回主线程刷新「后台管理」组件行（避免主线程 TCP 卡顿）。 */
@@ -385,6 +432,68 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		});
 	}
 
+	// ---- 通知条 ----
+
+	/**
+	 * 按通知仓储当前快照装配通知条：未读数 + 最新一条摘要。
+	 * 显示条件：设置开关开、已授予通知使用权、当前有通知。三者任一不满足即隐藏。
+	 */
+	private void refreshNotifBar() {
+		if (notifBar == null || !isAdded()) return;
+		Context ctx = getContext();
+		if (ctx == null) return;
+		NokiaNotificationRepository repo = NokiaNotificationRepository.get();
+		List<NokiaNotificationItem> items = repo.getItems();
+		boolean granted = NokiaMusicSessionReader.isNotificationListenerEnabled(ctx);
+		boolean show = NokiaSettingsStorage.isNotificationBarEnabled(ctx)
+				&& granted && !items.isEmpty();
+		if (show) {
+			NokiaNotificationItem latest = repo.getLatest();
+			int unread = repo.getUnreadCount();
+			String countText = unread > 0
+					? unread + " 条未读通知" : items.size() + " 条通知";
+			String summary = latest != null ? latest.displayTitle() : "";
+			if (latest != null && latest.text != null && latest.text.trim().length() > 0) {
+				summary += "：" + latest.text;
+			}
+			notifBarText.setText(countText + " · " + summary);
+			if (unread > 0) {
+				notifBarBadge.setText(String.valueOf(unread));
+				notifBarBadge.setVisibility(View.VISIBLE);
+			} else {
+				notifBarBadge.setVisibility(View.GONE);
+			}
+		}
+		setNotifBarVisible(show);
+	}
+
+	/**
+	 * 切换通知条可见性，并把通知条作为焦点条目插入/移出 focusTargets
+	 * （位置：快捷项之后、组件区之前）。
+	 * notifBarCount 是分区索引计算的单一数据源，必须与 focusTargets 实际内容同步变更。
+	 */
+	private void setNotifBarVisible(boolean visible) {
+		if (notifBar == null) return;
+		boolean was = notifBarCount == 1;
+		if (was == visible) {
+			notifBar.setVisibility(visible ? View.VISIBLE : View.GONE);
+			return;
+		}
+		notifBarCount = visible ? 1 : 0;
+		notifBar.setVisibility(visible ? View.VISIBLE : View.GONE);
+		if (visible) {
+			int at = Math.min(shortcutCount, focusTargets.size());
+			if (!focusTargets.contains(notifBar)) {
+				focusTargets.add(at, notifBar);
+			}
+		} else {
+			focusTargets.remove(notifBar);
+		}
+		if (focusIndex >= focusTargets.size()) {
+			setFocusIndex(Math.max(0, focusTargets.size() - 1));
+		}
+	}
+
 	private void rebuildShortcutBar(List<ShortcutApp> apps) {
 		View view = getView();
 		if (view == null) return;
@@ -422,6 +531,11 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					focusTargets.add(cell);
 				}
 			}
+		}
+
+		// 通知条焦点（排在快捷项之后、组件区之前；notifBarCount=0 时无此条目）
+		if (notifBarCount == 1 && notifBar != null && !focusTargets.contains(notifBar)) {
+			focusTargets.add(notifBar);
 		}
 
 		// 收集组件区焦点（排在快捷项之后）
@@ -520,7 +634,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 					notifArea.removeViewAt(i);
 				}
 				notifArea.addView(newRow, i);
-				int focusIdx = shortcutCount + i;
+				int focusIdx = shortcutCount + notifBarCount + i;
 				if (focusIdx >= 0 && focusIdx < focusTargets.size()) {
 					focusTargets.set(focusIdx, newRow);
 				}
@@ -569,11 +683,15 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			NokiaLog.i("Desktop", "组件区已渲染 " + widgetItems.size() + " 个组件");
 		}
 
-		// 重建焦点列表（保留快捷栏部分，重建组件区部分）
-		// 先清掉旧的组件区焦点
-		int shortcutFocusCount = Math.min(focusTargets.size(), shortcutCount);
-		while (focusTargets.size() > shortcutFocusCount) {
+		// 重建焦点列表（保留「快捷栏 + 通知条」头部，重建组件区部分）
+		// 先清掉旧的组件区焦点（头部长度 = 快捷项 + 通知条）
+		int headFocusCount = Math.min(focusTargets.size(), shortcutCount + notifBarCount);
+		while (focusTargets.size() > headFocusCount) {
 			focusTargets.remove(focusTargets.size() - 1);
+		}
+		// 头部重建后确保通知条焦点在位（notifBarCount=1 时），防御异步构建窗口内的缺席
+		if (notifBarCount == 1 && notifBar != null && !focusTargets.contains(notifBar)) {
+			focusTargets.add(Math.min(shortcutCount, focusTargets.size()), notifBar);
 		}
 		// 重新收集
 		collectWidgetTargets(view);
@@ -2012,15 +2130,21 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	public String getSoftRightText() { return "桌面设置"; }
 
 	// ---- 导航 ----
+	// 分区顺序（自上而下）：顶部快捷栏 → 通知条 → 组件区 → 便捷开关栏。
+	// 索引一律从上往下累加，notifBarCount（0/1）是通知条是否占用一个焦点位的单一数据源。
 
+	private int headCount() { return shortcutCount + notifBarCount; }
 	private int shortcutLast() { return shortcutCount; }
-	private int widgetFirst() { return shortcutCount; }
-	private int widgetLast() { return shortcutCount + widgetCount; }
+	private int notifFirst() { return shortcutCount; }
+	private int notifLast() { return headCount(); }
+	private int widgetFirst() { return notifLast(); }
+	private int widgetLast() { return widgetFirst() + widgetCount; }
 	private int toggleCount() { return toggleCells.size(); }
-	private int toggleFirst() { return shortcutCount + widgetCount; }
+	private int toggleFirst() { return widgetLast(); }
 	private int toggleLast() { return toggleFirst() + toggleCount(); }
 
 	private boolean isInShortcuts() { return focusIndex >= SHORTCUT_FIRST && focusIndex < shortcutLast(); }
+	private boolean isInNotifBar() { return notifBarCount > 0 && focusIndex >= notifFirst() && focusIndex < notifLast(); }
 	private boolean isInWidgets() { return focusIndex >= widgetFirst() && focusIndex < widgetLast(); }
 	private boolean isInToggles() { return focusIndex >= toggleFirst() && focusIndex < toggleLast(); }
 
@@ -2030,18 +2154,26 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			// 在顶部快捷栏按 UP：循环跳到底部区域（开关栏或组件区最末项）
 			if (toggleCount() > 0) newIdx = toggleFirst();
 			else if (widgetCount > 0) newIdx = widgetLast() - 1;
+		} else if (isInNotifBar()) {
+			// 在通知条按 UP：回到快捷栏末项；无快捷项则循环到底部
+			if (shortcutCount > 0) newIdx = shortcutLast() - 1;
+			else if (toggleCount() > 0) newIdx = toggleLast() - 1;
+			else if (widgetCount > 0) newIdx = widgetLast() - 1;
 		} else if (isInWidgets()) {
-			// 在组件区按 UP：上一行组件，若已是第一行则跳入顶部快捷栏
+			// 在组件区按 UP：上一行组件，若已是第一行则跳入通知条或顶部快捷栏
 			if (focusIndex > widgetFirst()) {
 				newIdx = focusIndex - 1;
 			} else {
-				if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
+				if (notifBarCount > 0) newIdx = notifFirst();
+				else if (shortcutCount > 0) newIdx = SHORTCUT_FIRST;
 				else if (toggleCount() > 0) newIdx = toggleFirst();
 			}
 		} else if (isInToggles()) {
-			// 在开关栏按 UP：直接向上离开开关栏，跳入组件区末项或顶部快捷栏
+			// 在开关栏按 UP：直接向上离开开关栏，跳入组件区末项、通知条或顶部快捷栏
 			if (widgetCount > 0) {
 				newIdx = widgetLast() - 1;
+			} else if (notifBarCount > 0) {
+				newIdx = notifFirst();
 			} else if (shortcutCount > 0) {
 				newIdx = SHORTCUT_FIRST;
 			}
@@ -2052,11 +2184,22 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private boolean moveDown() {
 		int newIdx = focusIndex;
 		if (isInShortcuts()) {
-			// 在顶部快捷栏按 DOWN：直接向下离开快捷栏，跳入组件区第一项或开关栏
+			// 在顶部快捷栏按 DOWN：先落通知条，再组件区，再开关栏
+			if (notifBarCount > 0) {
+				newIdx = notifFirst();
+			} else if (widgetCount > 0) {
+				newIdx = widgetFirst();
+			} else if (toggleCount() > 0) {
+				newIdx = toggleFirst();
+			}
+		} else if (isInNotifBar()) {
+			// 在通知条按 DOWN：进入组件区第一项或开关栏；都无则循环回快捷栏
 			if (widgetCount > 0) {
 				newIdx = widgetFirst();
 			} else if (toggleCount() > 0) {
 				newIdx = toggleFirst();
+			} else if (shortcutCount > 0) {
+				newIdx = SHORTCUT_FIRST;
 			}
 		} else if (isInWidgets()) {
 			// 在组件区按 DOWN：下一行组件，若已是最后一行则跳入开关栏（或循环回顶部）
@@ -2087,6 +2230,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			} else if (shortcutCount > 1) {
 				newIdx = shortcutLast() - 1;
 			}
+		} else if (isInNotifBar()) {
+			// 通知条为单行，横向保持聚焦
+			return false;
 		} else if (isInWidgets()) {
 			// 组件区为纵向单列，按 LEFT 保持聚焦，不横向乱跳
 			return false;
@@ -2110,6 +2256,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			} else if (shortcutCount > 1) {
 				newIdx = SHORTCUT_FIRST;
 			}
+		} else if (isInNotifBar()) {
+			// 通知条为单行，按 RIGHT 保持聚焦，不横向乱跳
+			return false;
 		} else if (isInWidgets()) {
 			// 组件区为纵向单列，按 RIGHT 保持聚焦，不横向乱跳
 			return false;

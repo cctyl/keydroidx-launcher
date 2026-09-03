@@ -611,6 +611,10 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 	result.add(new NokiaAppItem(NokiaAppItem.TYPE_MAIN, "J2ME Loader", mainIcon, null));
 	NokiaLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入 J2meLoaderActivity）");
 	result.add(new NokiaAppItem(NokiaAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
+	// 通知中心：读取系统通知并展示，可清除（见 docs/通知中心功能设计.md）
+	Drawable notifIcon = io.github.cctyl.nokia.common.ui.NokiaIcons.get(appCtx,
+			io.github.cctyl.nokia.common.ui.NokiaIcons.ICON_NOTIFICATIONS, 0xFFFFFFFF, 20);
+	result.add(new NokiaAppItem(NokiaAppItem.TYPE_NOTIFICATION, "通知中心", notifIcon, null));
 
 		// 将 pool 拆分为已匹配 S60 图标 和 未匹配，匹配的排在前面。
 		// 使用构建 pool 时记录的 s60IconResId，避免二次调用 getIcon() 因缓存状态变化导致分组不一致。
@@ -1132,6 +1136,10 @@ public class NokiaMenuFragment extends NokiaPageFragment {
 		}
 		if (item.type == NokiaAppItem.TYPE_SETTINGS) {
 			((NokiaDesktopActivity) requireActivity()).openDesktopSettings();
+			return true;
+		}
+		if (item.type == NokiaAppItem.TYPE_NOTIFICATION) {
+			((NokiaDesktopActivity) requireActivity()).openNotificationCenter();
 			return true;
 		}
 		// 原生应用（带 launchIntent）

@@ -558,12 +558,49 @@ public class NokiaSettingsStorage {
 				.getBoolean(KEY_NOTIFY_ACCESS_PROMPT_DISABLED, false);
 	}
 
-	/** 设置是否关闭「通知使用权」授予提示。 */
-	public static void setNotifyAccessPromptDisabled(Context ctx, boolean disabled) {
-		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-				.edit().putBoolean(KEY_NOTIFY_ACCESS_PROMPT_DISABLED, disabled).apply();
-		NokiaLog.i("SettingsStorage", "setNotifyAccessPromptDisabled: " + disabled);
-	}
+        /** 设置是否关闭「通知使用权」授予提示。 */
+        public static void setNotifyAccessPromptDisabled(Context ctx, boolean disabled) {
+                ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                                .edit().putBoolean(KEY_NOTIFY_ACCESS_PROMPT_DISABLED, disabled).apply();
+                NokiaLog.i("SettingsStorage", "setNotifyAccessPromptDisabled: " + disabled);
+        }
+
+        // ── 通知中心（桌面设置 → 系统与权限 → 通知中心） ──
+
+        private static final String KEY_NOTIFICATION_BAR_ENABLED = "notification_bar_enabled";
+        private static final String KEY_NOTIFICATION_SHOW_ONGOING = "notification_show_ongoing";
+
+        /**
+         * 桌面是否显示通知条（有通知时出现在顶部快捷栏下方）。默认开启。
+         * 关闭后仍可从「功能表 → 通知中心」进入列表页。
+         */
+        public static boolean isNotificationBarEnabled(Context ctx) {
+                return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                                .getBoolean(KEY_NOTIFICATION_BAR_ENABLED, true);
+        }
+
+        /** 设置桌面通知条开关。 */
+        public static void setNotificationBarEnabled(Context ctx, boolean enabled) {
+                ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                                .edit().putBoolean(KEY_NOTIFICATION_BAR_ENABLED, enabled).apply();
+                NokiaLog.i("SettingsStorage", "setNotificationBarEnabled: " + enabled);
+        }
+
+        /**
+         * 通知列表是否显示常驻通知（FLAG_ONGOING_EVENT，如音乐播放中、下载中）。
+         * 默认关闭：这类通知无法清除，混在列表里会干扰「未读」语义。
+         */
+        public static boolean isNotificationShowOngoing(Context ctx) {
+                return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                                .getBoolean(KEY_NOTIFICATION_SHOW_ONGOING, false);
+        }
+
+        /** 设置是否显示常驻通知。 */
+        public static void setNotificationShowOngoing(Context ctx, boolean show) {
+                ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                                .edit().putBoolean(KEY_NOTIFICATION_SHOW_ONGOING, show).apply();
+                NokiaLog.i("SettingsStorage", "setNotificationShowOngoing: " + show);
+        }
 
 	// ── 电源键拦截方案（高级设置 → 电源键拦截设置） ──
 

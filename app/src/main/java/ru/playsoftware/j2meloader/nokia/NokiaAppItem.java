@@ -14,8 +14,10 @@ public class NokiaAppItem {
 	public static final int TYPE_BOX = 1;
 	public static final int TYPE_SETTINGS = 3;
 	public static final int TYPE_MAIN = 4;
+	/** 通知中心（系统通知列表，可清除） */
+	public static final int TYPE_NOTIFICATION = 5;
 
-	/** 类型：TYPE_APP / TYPE_BOX / TYPE_SETTINGS / TYPE_MAIN */
+	/** 类型：TYPE_APP / TYPE_BOX / TYPE_SETTINGS / TYPE_MAIN / TYPE_NOTIFICATION */
 	public final int type;
 	/** 显示名称 */
 	public final String label;
