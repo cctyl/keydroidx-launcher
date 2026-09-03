@@ -153,6 +153,10 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private LinearLayout notifBar;
 	private TextView notifBarText;
 	private TextView notifBarBadge;
+	private android.widget.ImageView notifBarIcon;
+
+	/** 通知条空态文案（无通知时常驻显示，保持入口稳定）。 */
+	private static final String EMPTY_NOTIF_TEXT = "暂无通知";
 
 	/** 通知仓储订阅：通知到达/移除/清除后刷新通知条。回调在主线程（仓储已节流）。 */
 	private final NokiaNotificationRepository.Listener notifRepoListener =
@@ -241,14 +245,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		notifBar = view.findViewById(R.id.notifBarContainer);
 		notifBarText = view.findViewById(R.id.notifBarText);
 		notifBarBadge = view.findViewById(R.id.notifBarBadge);
+		notifBarIcon = view.findViewById(R.id.notifBarIcon);
 		if (notifBar != null) {
-			android.widget.ImageView ivBell = view.findViewById(R.id.notifBarIcon);
-			if (ivBell != null) {
-				ivBell.setImageDrawable(io.github.cctyl.nokia.common.ui.NokiaIcons.get(
-						requireContext(),
-						io.github.cctyl.nokia.common.ui.NokiaIcons.ICON_NOTIFICATIONS,
-						0xFFB8C8EA, 14));
-			}
+			// 图标由 refreshNotifBar() 按有无通知切换（铃铛 / 静音铃铛）
 			notifBar.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
@@ -436,7 +435,11 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	/**
 	 * 按通知仓储当前快照装配通知条：未读数 + 最新一条摘要。
-	 * 显示条件：设置开关开、已授予通知使用权、当前有通知。三者任一不满足即隐藏。
+	 * <p>
+	 * 显示条件：设置开关开 且 已授予通知使用权。二者任一不满足即隐藏
+	 * （未授权时显示「暂无通知」是假信息，不如不显示）。
+	 * 满足条件时<b>常驻显示</b>，没有通知也显示空态文案，让用户始终有一个
+	 * 进通知中心的稳定入口，而不是通知条时有时无地跳动。
 	 */
 	private void refreshNotifBar() {
 		if (notifBar == null || !isAdded()) return;
@@ -445,26 +448,43 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		NokiaNotificationRepository repo = NokiaNotificationRepository.get();
 		List<NokiaNotificationItem> items = repo.getItems();
 		boolean granted = NokiaMusicSessionReader.isNotificationListenerEnabled(ctx);
-		boolean show = NokiaSettingsStorage.isNotificationBarEnabled(ctx)
-				&& granted && !items.isEmpty();
+		boolean show = NokiaSettingsStorage.isNotificationBarEnabled(ctx) && granted;
 		if (show) {
-			NokiaNotificationItem latest = repo.getLatest();
-			int unread = repo.getUnreadCount();
-			String countText = unread > 0
-					? unread + " 条未读通知" : items.size() + " 条通知";
-			String summary = latest != null ? latest.displayTitle() : "";
-			if (latest != null && latest.text != null && latest.text.trim().length() > 0) {
-				summary += "：" + latest.text;
-			}
-			notifBarText.setText(countText + " · " + summary);
-			if (unread > 0) {
-				notifBarBadge.setText(String.valueOf(unread));
-				notifBarBadge.setVisibility(View.VISIBLE);
-			} else {
+			if (items.isEmpty()) {
+				// 空态：静音铃铛 + 「暂无通知」，仍可确认键进入通知中心
+				notifBarText.setText(EMPTY_NOTIF_TEXT);
 				notifBarBadge.setVisibility(View.GONE);
+				setNotifBarBell(true);
+			} else {
+				NokiaNotificationItem latest = repo.getLatest();
+				int unread = repo.getUnreadCount();
+				String countText = unread > 0
+						? unread + " 条未读通知" : items.size() + " 条通知";
+				String summary = latest != null ? latest.displayTitle() : "";
+				if (latest != null && latest.text != null && latest.text.trim().length() > 0) {
+					summary += "：" + latest.text;
+				}
+				notifBarText.setText(countText + " · " + summary);
+				if (unread > 0) {
+					notifBarBadge.setText(String.valueOf(unread));
+					notifBarBadge.setVisibility(View.VISIBLE);
+				} else {
+					notifBarBadge.setVisibility(View.GONE);
+				}
+				setNotifBarBell(false);
 			}
 		}
 		setNotifBarVisible(show);
+	}
+
+	/** 切换通知条铃铛图标：静音态（无通知）用划掉的铃铛，有通知用普通铃铛。 */
+	private void setNotifBarBell(boolean muted) {
+		if (notifBarIcon == null) return;
+		notifBarIcon.setImageDrawable(io.github.cctyl.nokia.common.ui.NokiaIcons.get(
+				notifBarIcon.getContext(),
+				muted ? io.github.cctyl.nokia.common.ui.NokiaIcons.ICON_NOTIFICATIONS_OFF
+						: io.github.cctyl.nokia.common.ui.NokiaIcons.ICON_NOTIFICATIONS,
+				muted ? 0xFF7F8C9E : 0xFFB8C8EA, 14));
 	}
 
 	/**

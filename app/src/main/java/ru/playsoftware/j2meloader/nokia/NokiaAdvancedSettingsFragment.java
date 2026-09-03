@@ -17,7 +17,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -38,22 +37,20 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  */
 public class NokiaAdvancedSettingsFragment extends NokiaListPageFragment {
 
+	// 注：原先的「通知使用权」项已移除——它与「系统与权限 → 通知中心 → 通知使用权」
+	// 是同一个系统权限（enabled_notification_listeners / NokiaNotificationListenerService），
+	// 授权入口统一收敛到通知中心设置页。
 	private static final String[] ITEM_ICON_UNICODES = {
 			NokiaIcons.ICON_TERMINAL,  // mini_shizuku
 			NokiaIcons.ICON_POWER,     // 电源键拦截设置
-			NokiaIcons.ICON_MUSIC_NOTE, // 通知使用权（音乐组件读取播放状态用）
 	};
 
 	private static final String[] ITEM_NAMES = {
 			"mini_shizuku",
 			"电源键拦截设置",
-			"通知使用权",
 	};
 
 	private TextView[] tvNames;
-
-	/** 第 3 项行尾的状态文字（已授予 / 未授予）。 */
-	private TextView tvNotifyState;
 
 	// 电源键拦截开关（行尾只读展示，index 1 专属；点击整行进入方案选择页）
 	private NokiaSwitchView interceptorSwitch;
@@ -107,9 +104,8 @@ public class NokiaAdvancedSettingsFragment extends NokiaListPageFragment {
 			tvNames[i] = tvName;
 			row.addView(tvName);
 
-			// 行尾控件：mini_shizuku 用箭头；电源键拦截设置用只读开关（开/关状态）；
-			// 通知使用权用状态文字（已授予/未授予）
-			if (i == 0 || i == 2) {
+			// 行尾控件：mini_shizuku 用箭头；电源键拦截设置用只读开关（开/关状态）
+			if (i == 0) {
 				TextView tvArrow = new TextView(requireContext());
 				tvArrow.setLayoutParams(new LinearLayout.LayoutParams(
 						LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -117,15 +113,6 @@ public class NokiaAdvancedSettingsFragment extends NokiaListPageFragment {
 				tvArrow.setTextColor(0xFFAAAAAA);
 				NokiaFontManager.textSize(tvArrow, 14);
 				row.addView(tvArrow);
-				if (i == 2) {
-					// 状态文字插在箭头前：右侧「已授予 >」/「未授予 >」
-					tvNotifyState = new TextView(requireContext());
-					tvNotifyState.setLayoutParams(new LinearLayout.LayoutParams(
-							LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-					tvNotifyState.setTextColor(0xFF8A93A5);
-					NokiaFontManager.textSize(tvNotifyState, 10);
-					row.addView(tvNotifyState, row.getChildCount() - 1);
-				}
 			} else {
 				interceptorSwitch = new NokiaSwitchView(requireContext(), isInterceptorOn());
 				row.addView(interceptorSwitch);
@@ -146,18 +133,8 @@ public class NokiaAdvancedSettingsFragment extends NokiaListPageFragment {
 
 		// 异步刷新 mini_shizuku 在线状态，更新第 1 项（index 0）文案
 		refreshShizukuStatus();
-		// 通知使用权状态（读 Settings.Secure，同步但极快）
-		refreshNotificationListenerState();
 
 		NokiaLog.i("AdvancedSettings", "高级设置初始化完成");
-	}
-
-	/** 刷新第 3 项「通知使用权」行尾状态文字。 */
-	private void refreshNotificationListenerState() {
-		if (tvNotifyState == null) return;
-		boolean granted = NokiaMusicSessionReader.isNotificationListenerEnabled(requireContext());
-		tvNotifyState.setText(granted ? "已授予" : "未授予");
-		NokiaLog.i("AdvancedSettings", "通知使用权: " + (granted ? "已授予" : "未授予"));
 	}
 
 	/** 列表项名称：mini_shizuku 动态显示在线状态；电源键拦截设置固定名称（开/关由行尾开关展示）。 */
@@ -185,8 +162,6 @@ public class NokiaAdvancedSettingsFragment extends NokiaListPageFragment {
 	@Override
 	public void onResume() {
 		super.onResume();
-		// 从系统「通知使用权」设置页返回后，状态文字要跟上最新授权结果
-		refreshNotificationListenerState();
 		if (interceptorSwitch != null) {
 			boolean on = isInterceptorOn();
 			interceptorSwitch.setChecked(on);
@@ -287,15 +262,6 @@ public class NokiaAdvancedSettingsFragment extends NokiaListPageFragment {
 			case 1:
 				NokiaLog.i("AdvancedSettings", "进入电源键拦截设置");
 				((NokiaDesktopActivity) requireActivity()).openFragment(new NokiaPowerInterceptFragment());
-				return true;
-			case 2:
-				NokiaLog.i("AdvancedSettings", "通知使用权");
-				if (NokiaMusicSessionReader.isNotificationListenerEnabled(requireContext())) {
-					Toast.makeText(requireContext(), "通知使用权已授予", Toast.LENGTH_SHORT).show();
-				} else {
-					NokiaMusicSessionReader.showGrantPrompt(
-							getParentFragmentManager(), requireContext(), false);
-				}
 				return true;
 			default:
 				return false;

@@ -551,7 +551,7 @@ public class NokiaSettingsStorage {
 
 	/**
 	 * 是否已关闭「通知使用权」授予提示（用户在桌面提示弹窗中选了「不再提示」）。
-	 * 关闭后桌面不再主动弹窗，用户仍可从「桌面设置 → 高级设置 → 通知使用权」手动开启。
+	 * 关闭后桌面不再主动弹窗，用户仍可从「桌面设置 → 系统与权限 → 通知中心 → 通知使用权」手动开启。
 	 */
 	public static boolean isNotifyAccessPromptDisabled(Context ctx) {
 		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

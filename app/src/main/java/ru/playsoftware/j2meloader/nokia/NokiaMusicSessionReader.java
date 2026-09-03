@@ -173,18 +173,27 @@ public final class NokiaMusicSessionReader {
 	}
 
 	/**
-	 * 弹出「授予通知使用权」提示弹窗（诺基亚风格），桌面与高级设置共用。
+	 * 弹出「授予通知使用权」提示弹窗（诺基亚风格），桌面首次出现音乐组件时提示。
 	 * <p>
-	 * 未授予时 MediaSession 通道不可用，只能退化到 ContentProvider 查询，
-	 * 而查询会把音乐进程冷启动起来（用户清完后台，桌面又把它拉起来）。
+	 * 该权限同时被通知中心、桌面通知条与音乐组件使用：
+	 * <ul>
+	 *   <li>通知中心：读取系统通知列表、执行清除；</li>
+	 *   <li>音乐组件：用 MediaSessionManager.getActiveSessions 读取播放状态。未授予时只能
+	 *       退化到 ContentProvider 查询，而查询会把音乐进程冷启动起来（用户清完后台，
+	 *       桌面又把它拉起来）。</li>
+	 * </ul>
 	 * 这是需要用户授权的系统权限，必须主动说明用途并给出一键入口，不能默默退化。
+	 * 授权入口统一在「桌面设置 → 系统与权限 → 通知中心 → 通知使用权」。
 	 *
 	 * @param fm       弹窗宿主 FragmentManager
 	 * @param ctx      用于跳转设置页 / 写设置
-	 * @param neverAsk 是否提供「不再提示」项（桌面首次提示需要；设置页手动进入不需要）
+	 * @param neverAsk 是否提供「不再提示」项（桌面首次提示需要）
 	 */
 	public static void showGrantPrompt(FragmentManager fm, final Context ctx, boolean neverAsk) {
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		// 首行灰色说明：权限用途不止音乐组件，避免用户误以为是次要功能而拒绝
+		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_INFO,
+				"用于通知中心与音乐播放状态", false, false, null));
 		items.add(new NokiaOptionsDialog.OptionItem(NokiaIcons.ICON_SETTINGS, "去开启", true, false,
 				new Runnable() {
 					@Override
@@ -204,7 +213,7 @@ public final class NokiaMusicSessionReader {
 						}
 					}));
 		}
-		NokiaOptionsDialog.show(fm, "音乐组件需要通知使用权", items);
+		NokiaOptionsDialog.show(fm, "需要通知使用权", items);
 		NokiaLog.i(TAG, "已弹出通知使用权授予提示");
 	}
 
