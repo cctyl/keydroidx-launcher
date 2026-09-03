@@ -258,6 +258,66 @@ public final class NokiaBgManagerHelper {
 		return out;
 	}
 
+	// ---- 清理结果记忆 ----
+
+	/**
+	 * 被本应用清理掉、且尚未确认其重新启动的包名集合（仅进程内存，桌面进程重启后清空）。
+	 * <p>
+	 * 用途：清理是我们自己做的，那「它已停止」就是已知事实，不需要再查询。
+	 * 桌面「正在播放」组件原先每次渲染都去查音乐 App 的 ContentProvider，而
+	 * {@code query()} 在对方进程不在时会让 AMS 把它<b>冷启动</b>——用户刚在后台管理里
+	 * 清掉音乐，桌面转头又把它拉起来，既自相矛盾又卡顿（实测主线程阻塞 1.2s）。
+	 */
+	private static final Set<String> CLEARED_PKGS =
+			Collections.synchronizedSet(new HashSet<String>());
+
+	/** 记录某个包已被本应用清理（{@link #clearBackgroundTasks} 内部调用）。 */
+	private static void markCleared(String pkg) {
+		if (pkg != null && !pkg.isEmpty()) CLEARED_PKGS.add(pkg);
+	}
+
+	/** 清除「已清理」标记：确认目标包又活过来时调用。 */
+	public static void unmarkCleared(String pkg) {
+		if (pkg != null) CLEARED_PKGS.remove(pkg);
+	}
+
+	/** 目标包是否刚被本应用清理、且尚未确认重新启动。 */
+	public static boolean wasCleared(String pkg) {
+		return pkg != null && CLEARED_PKGS.contains(pkg);
+	}
+
+	/**
+	 * 目标包当前是否有存活进程（<b>只读，绝不拉起进程</b>）。
+	 * <ul>
+	 *   <li>5.0+：走 {@code ps -A}（需 mini_shizuku）；shizuku 未激活时无法判断，返回 true；</li>
+	 *   <li>4.4：走 {@link ActivityManager#getRunningAppProcesses()}。</li>
+	 * </ul>
+	 * 无法判断时按「存活」处理——宁可多查一次，也不能把正在播放的应用误判成已停止。
+	 */
+	public static boolean isPackageAlive(Context ctx, String pkg) {
+		if (ctx == null || pkg == null || pkg.isEmpty()) return true;
+		try {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+				if (!shizukuActivated) return true;
+				return enumerateViaPs(ctx).contains(pkg);
+			}
+			ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+			if (am == null) return true;
+			List<ActivityManager.RunningAppProcessInfo> procs = am.getRunningAppProcesses();
+			if (procs == null) return true;
+			for (ActivityManager.RunningAppProcessInfo p : procs) {
+				if (p.pkgList == null) continue;
+				for (String name : p.pkgList) {
+					if (pkg.equals(name)) return true;
+				}
+			}
+			return false;
+		} catch (Exception e) {
+			NokiaLog.w(TAG, "isPackageAlive 判断失败: " + e.getMessage());
+			return true;
+		}
+	}
+
 	/** 统计当前后台进程数（按包名去重，排除桌面自身与系统应用，含挂机 jar）。供桌面组件行实时显示。 */
 	public static int countBackgroundProcesses(Context ctx) {
 		Set<String> pkgs = enumerateBackgroundPackages(ctx);
@@ -401,6 +461,9 @@ public final class NokiaBgManagerHelper {
 				if (t.prot || MidletStateStore.isMidletTaskKey(t.pkg)) continue;
 				cmd.append("am force-stop ").append(t.pkg).append(";");
 				cleared++;
+				// 记住「是我们杀的」，桌面等调用方据此把该 App 视为已停止，
+				// 不再去跨进程查询（查询会把它重新冷启动）
+				markCleared(t.pkg);
 				NokiaLog.i(TAG, "已清理后台(force-stop): " + t.name + " (" + t.pkg + ")");
 			}
 			if (cmd.length() > 0) {
@@ -418,6 +481,7 @@ public final class NokiaBgManagerHelper {
 				try {
 					am.killBackgroundProcesses(t.pkg);
 					cleared++;
+					markCleared(t.pkg);
 					NokiaLog.i(TAG, "已清理后台(kill): " + t.name + " (" + t.pkg + ")");
 				} catch (Exception e) {
 					NokiaLog.w(TAG, "清理失败: " + t.pkg + " -> " + e.getMessage());

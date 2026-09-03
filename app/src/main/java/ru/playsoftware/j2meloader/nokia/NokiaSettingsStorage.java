@@ -545,6 +545,26 @@ public class NokiaSettingsStorage {
 		NokiaLog.i("SettingsStorage", "setFileLogEnabled: " + enabled);
 	}
 
+	// ── 通知使用权提示开关 ──
+
+	private static final String KEY_NOTIFY_ACCESS_PROMPT_DISABLED = "notify_access_prompt_disabled";
+
+	/**
+	 * 是否已关闭「通知使用权」授予提示（用户在桌面提示弹窗中选了「不再提示」）。
+	 * 关闭后桌面不再主动弹窗，用户仍可从「桌面设置 → 高级设置 → 通知使用权」手动开启。
+	 */
+	public static boolean isNotifyAccessPromptDisabled(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getBoolean(KEY_NOTIFY_ACCESS_PROMPT_DISABLED, false);
+	}
+
+	/** 设置是否关闭「通知使用权」授予提示。 */
+	public static void setNotifyAccessPromptDisabled(Context ctx, boolean disabled) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putBoolean(KEY_NOTIFY_ACCESS_PROMPT_DISABLED, disabled).apply();
+		NokiaLog.i("SettingsStorage", "setNotifyAccessPromptDisabled: " + disabled);
+	}
+
 	// ── 电源键拦截方案（高级设置 → 电源键拦截设置） ──
 
 	/** 电源键拦截：关闭。 */

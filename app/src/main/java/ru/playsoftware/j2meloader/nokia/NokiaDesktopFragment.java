@@ -110,6 +110,17 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	 */
 	private static final ExecutorService ICON_EXECUTOR = Executors.newFixedThreadPool(2);
 
+	/**
+	 * 音乐播放状态相关的跨进程调用专用单线程线程池。
+	 * 这些调用（registerContentObserver / ContentProvider query / MediaSession）在对方
+	 * 进程不在时都会同步等待其冷启动，必须挪出主线程；串行执行还能避免
+	 * register 与 refresh 并发导致的竞态。
+	 */
+	private static final ExecutorService MUSIC_EXECUTOR = Executors.newSingleThreadExecutor();
+
+	/** 音乐状态异步刷新的序号：只应用最后一次刷新的结果，避免乱序覆盖。 */
+	private int musicRefreshSeq = 0;
+
 	/** 冻结角标 View 的 tag（用于查找/去重）。 */
 	private static final String TAG_FREEZE_BADGE = "freeze_badge";
 	/** 组件行右侧信息文字的 tag（用于局部刷新，避免整区重建）。 */
@@ -150,10 +161,17 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		@Override
 		public void onChange(boolean selfChange, Uri uri) {
 			if (!isAdded() || getView() == null) return;
-			rebuildMusicWidgetRowOnly(getView());
+			// 播放状态变化：后台重新取一次最新状态，回来后只重建音乐组件行
+			refreshMusicAsync();
 		}
 	};
 	private boolean musicObserverRegistered = false;
+
+	/**
+	 * 「通知使用权」提示弹窗是否已在本次进程弹过：只提示一次，避免每次回到桌面都打扰用户。
+	 * 用户选了「不再提示」后写入设置（{@link NokiaSettingsStorage#isNotifyAccessPromptDisabled}）永久关闭。
+	 */
+	private boolean notifyAccessPromptShown = false;
 
 	// ---- 便捷开关栏 ----
 
@@ -212,6 +230,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 		loadShortcutBarAsync(view);
 		rebuildWidgetArea(view);
+		// 音乐播放状态异步补齐：组件区已用默认/上次快照先渲染出来，主线程不等待
+		refreshMusicAsync();
 
 		// 便捷开关栏
 		quickToggleScroll = view.findViewById(R.id.quickToggleScroll);
@@ -258,6 +278,9 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		registerMusicPlaybackObserver();
 		// 异步刷新后台管理组件计数（countBackgroundProcesses 含 shizuku TCP，不能在主线程）
 		refreshBgCountAsync();
+		// 音乐组件读取播放状态首选 MediaSession，它依赖通知使用权；
+		// 未授予时主动弹窗说明并给一键入口，而不是默默退化到会冷启动音乐的 Provider 查询
+		maybePromptNotificationAccess();
 
 		if (!contentDirty) {
 			// 冷启动：onPageCreated 刚完成全量构建，这里重复重建等于把首屏耗时翻倍
@@ -269,6 +292,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 从桌面设置返回后刷新快捷栏/组件区/开关栏（可能有增删改）
 		loadShortcutBarAsync(view);
 		rebuildWidgetArea(view);
+		// 音乐播放状态异步补齐：组件区已用默认/上次快照先渲染出来，主线程不等待
+		refreshMusicAsync();
 		if (quickToggleBar == null) return;
 		buildToggleBar();
 		syncToggleStatesFromSystem();
@@ -434,34 +459,57 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 	// ---- 组件区动态渲染 ----
 
-	/** 注册音乐播放状态 ContentObserver（重复注册防抖）。 */
+	/**
+	 * 注册音乐播放状态 ContentObserver（重复注册防抖）。
+	 * <p>
+	 * {@code registerContentObserver} 内部要先拿到 Provider 连接，对方进程不在时会触发
+	 * 冷启动并同步等待（实测与 query 一样可阻塞 1s 以上），因此挪到后台线程执行。
+	 * <p>
+	 * 音乐刚被本应用的后台管理清理时<b>不注册</b>：注册一样会把它冷启动起来，等于用户
+	 * 刚清完后台、桌面又把它拉起来。等 {@link #refreshMusicAsync()} 检测到它重新启动后再补注册。
+	 */
 	private void registerMusicPlaybackObserver() {
 		Context ctx = getContext();
 		if (ctx == null || musicObserverRegistered) return;
-		try {
-			ctx.getContentResolver().registerContentObserver(MUSIC_PLAYBACK_URI, false, musicPlaybackObserver);
-			musicObserverRegistered = true;
-			NokiaLog.i("Desktop", "已注册音乐播放状态 ContentObserver");
-		} catch (Exception e) {
-			NokiaLog.w("Desktop", "注册音乐播放 ContentObserver 失败: " + e.getMessage());
+		if (NokiaBgManagerHelper.wasCleared(MUSIC_PKG)) {
+			NokiaLog.i("Desktop", "音乐已被后台管理清理，暂不注册播放状态监听（避免冷启动）");
+			return;
 		}
+		final Context appCtx = ctx.getApplicationContext();
+		MUSIC_EXECUTOR.execute(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					appCtx.getContentResolver().registerContentObserver(
+							MUSIC_PLAYBACK_URI, false, musicPlaybackObserver);
+					musicObserverRegistered = true;
+					NokiaLog.i("Desktop", "已注册音乐播放状态 ContentObserver");
+				} catch (Exception e) {
+					NokiaLog.w("Desktop", "注册音乐播放 ContentObserver 失败: " + e.getMessage());
+				}
+			}
+		});
 	}
 
 	private void unregisterMusicPlaybackObserver() {
 		Context ctx = getContext();
 		if (ctx == null || !musicObserverRegistered) return;
-		try {
-			ctx.getContentResolver().unregisterContentObserver(musicPlaybackObserver);
-		} catch (Exception ignored) {}
 		musicObserverRegistered = false;
+		final Context appCtx = ctx.getApplicationContext();
+		MUSIC_EXECUTOR.execute(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					appCtx.getContentResolver().unregisterContentObserver(musicPlaybackObserver);
+				} catch (Exception ignored) {}
+			}
+		});
 	}
 
-	/** 仅重建音乐播放组件行（保持焦点不丢失、其余组件不动）。 */
+	/** 仅重建音乐播放组件行（保持焦点不丢失、其余组件不动），用当前快照重绘。 */
 	private void rebuildMusicWidgetRowOnly(View view) {
 		LinearLayout notifArea = view.findViewById(R.id.notificationArea);
 		if (notifArea == null) return;
-		// 播放状态已变化，快照必须重新查询
-		musicSnapshot = null;
 		for (int i = 0; i < widgetItems.size(); i++) {
 			if (widgetItems.get(i).type == NokiaWidgetItem.TYPE_MUSIC_PLAYER) {
 				// 仅替换该行 View，并更新焦点列表对应项
@@ -986,25 +1034,33 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		return row;
 	}
 
-	/** 音乐播放状态快照：一次 ContentProvider 查询的结果，供同一行的标题/歌词/进度复用。 */
+	/** 音乐播放状态快照：一次播放状态读取的结果，供同一行的标题/歌词/进度复用。 */
 	private static final class MusicSnapshot {
 		String title = "音乐播放器（未播放）";
 		String lyric = "暂无歌词";
 		float progress;
+		/** 是否正在播放（MediaSession 通道有效时才有意义）。 */
+		boolean playing;
 	}
 
-	/** 清空实时数据快照，下次取用时重新查询（每次组件区渲染/音乐状态变化时调用）。 */
+	/**
+	 * 清空实时数据快照，下次取用时重新查询（每次组件区渲染/音乐状态变化时调用）。
+	 * 注意：不清除 musicSnapshot——音乐状态由 {@link #refreshMusicAsync()} 单独异步维护，
+	 * 这里清掉会让每次重建组件区都先闪回「未播放」再跳回歌名。
+	 */
 	private void resetWidgetDataSnapshot() {
-		musicSnapshot = null;
 		memTotal = -1;
 		storageTotal = -1;
 		ipText = null;
 	}
 
 	/**
-	 * 取音乐播放状态快照（同一次渲染内只查询一次 ContentProvider）。
-	 * 原先标题/歌词/进度各查一次，等于一个组件行发了 3 次跨进程查询，
-	 * 且 Provider 不存在时每次都要构造一次异常（含堆栈填充），代价很高。
+	 * 取音乐播放状态快照：<b>只返回已有缓存或默认值，绝不发起任何跨进程查询</b>。
+	 * <p>
+	 * 真实状态由 {@link #refreshMusicAsync()} 在后台线程补齐后局部刷新。
+	 * 原先这里同步 query ContentProvider，而 Provider 所在进程不在时 AMS 会冷启动它，
+	 * 主线程同步等待——实测「清理后台 → 返回桌面」时这一下要 1.2s（Skipped 75 frames /
+	 * 单帧 1303ms），正是返回桌面卡顿的根因。
 	 */
 	private MusicSnapshot getMusicSnapshot() {
 		if (musicSnapshot != null) {
@@ -1012,8 +1068,130 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		}
 		MusicSnapshot s = new MusicSnapshot();
 		musicSnapshot = s;
+		return s;
+	}
+
+	/** 组件区是否包含「正在播放」组件（没有就完全不必读播放状态）。 */
+	private boolean hasMusicWidget() {
+		for (int i = 0; i < widgetItems.size(); i++) {
+			if (widgetItems.get(i).type == NokiaWidgetItem.TYPE_MUSIC_PLAYER) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * 后台线程刷新音乐播放状态，回来后只重建音乐组件行。
+	 * <p>
+	 * 读取顺序：
+	 * <ol>
+	 *   <li>MediaSession（{@link NokiaMusicSessionReader}）——只返回已注册的 session，
+	 *       拿不到就是没在播放，<b>不会把对方进程冷启动起来</b>；</li>
+	 *   <li>MediaSession 报告「正在播放」时，再查一次 Provider 补歌词——此时对方进程
+	 *       必然存活（有前台服务），查询是毫秒级，不会冷启动；</li>
+	 *   <li>MediaSession 不可用（未授予通知使用权 / API &lt; 21）时，回退到 Provider 查询。
+	 *       仍在后台线程，主线程不卡；且只有确认对方进程存活时才查——已死就不查，
+	 *       否则会把刚清理掉的音乐重新冷启动起来。</li>
+	 * </ol>
+	 * <p>
+	 * 若音乐是本应用的后台管理刚清理掉的，结论已知（已停止），主线程立刻按「未播放」渲染，
+	 * 后台只用 {@code ps -A} 确认它是否真的还没起来，全程不发任何跨进程查询。
+	 */
+	private void refreshMusicAsync() {
+		if (!hasMusicWidget()) return;
+		Context c = getContext();
+		if (c == null) return;
+		final Context appCtx = c.getApplicationContext();
+		final boolean killedByUs = NokiaBgManagerHelper.wasCleared(MUSIC_PKG);
+		if (killedByUs) {
+			// 我们刚杀掉它 → 它一定没在播放。先把行刷成「未播放」，不必等后台线程
+			musicSnapshot = new MusicSnapshot();
+			View v = getView();
+			if (v != null) rebuildMusicWidgetRowOnly(v);
+		}
+		final int seq = ++musicRefreshSeq;
+		MUSIC_EXECUTOR.execute(new Runnable() {
+			@Override
+			public void run() {
+				MusicSnapshot s;
+				boolean revived = false;
+				if (killedByUs) {
+					if (NokiaBgManagerHelper.isPackageAlive(appCtx, MUSIC_PKG)) {
+						// 它又活过来了：清掉标记，走正常读取
+						NokiaBgManagerHelper.unmarkCleared(MUSIC_PKG);
+						revived = true;
+						s = buildMusicSnapshot(appCtx);
+					} else {
+						s = new MusicSnapshot();
+					}
+				} else {
+					s = buildMusicSnapshot(appCtx);
+				}
+				final boolean needRegisterObserver = revived;
+				// 只应用最后一次刷新的结果，避免多次刷新乱序覆盖
+				if (seq != musicRefreshSeq) return;
+				Activity activity = getActivity();
+				if (activity == null) return;
+				activity.runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						if (!isAdded() || getView() == null) return;
+						musicSnapshot = s;
+						rebuildMusicWidgetRowOnly(getView());
+						// 音乐重启后原先的观察者注册已随对方进程失效，补注册一次
+						if (needRegisterObserver) registerMusicPlaybackObserver();
+					}
+				});
+			}
+		});
+	}
+
+	/**
+	 * 提示授予「通知使用权」（桌面首次出现音乐组件时弹一次）。
+	 * <p>
+	 * 音乐组件读取播放状态首选 MediaSession 通道（不冷启动对方进程），它依赖通知使用权；
+	 * 未授予就只能退化到 ContentProvider 查询，而查询会把音乐进程冷启动起来。
+	 * 这属于需要用户授权的能力，必须主动弹窗说明并给一键入口。
+	 */
+	private void maybePromptNotificationAccess() {
+		if (notifyAccessPromptShown || !hasMusicWidget()) return;
 		Context ctx = getContext();
-		if (ctx == null) return s;
+		if (ctx == null) return;
+		if (NokiaSettingsStorage.isNotifyAccessPromptDisabled(ctx)) return;
+		if (NokiaMusicSessionReader.isNotificationListenerEnabled(ctx)) return;
+		notifyAccessPromptShown = true;
+		NokiaLog.i("Desktop", "弹出通知使用权授予提示");
+		NokiaMusicSessionReader.showGrantPrompt(getParentFragmentManager(), ctx, true);
+	}
+
+	/** 后台线程构建音乐快照：MediaSession 优先，不可用时回退 Provider 查询。 */
+	private MusicSnapshot buildMusicSnapshot(Context appCtx) {
+		NokiaMusicSessionReader.MusicState st = NokiaMusicSessionReader.read(appCtx, MUSIC_PKG);
+		if (st != null && st.hasData()) {
+			MusicSnapshot s = new MusicSnapshot();
+			s.playing = st.playing;
+			s.title = st.title
+					+ (TextUtils.isEmpty(st.artist) ? "" : " - " + st.artist)
+					+ (st.playing ? "" : "  [暂停]");
+			s.progress = st.durationMs > 0 ? (float) st.positionMs / st.durationMs : 0f;
+			// MediaSession 的 metadata 不含歌词，只在播放中补查（此时进程必在，不会冷启动）
+			s.lyric = st.playing ? queryMusicProviderSnapshot(appCtx).lyric : "暂无歌词";
+			return s;
+		}
+		// 回退 Provider：query 在对方进程不在时会把它冷启动起来。
+		// 能判断存活（ps -A / getRunningAppProcesses）就先判一次，已死直接按未播放返回。
+		if (!NokiaBgManagerHelper.isPackageAlive(appCtx, MUSIC_PKG)) {
+			NokiaLog.i("Desktop", "音乐进程未运行，跳过播放状态查询（避免冷启动）");
+			return new MusicSnapshot();
+		}
+		return queryMusicProviderSnapshot(appCtx);
+	}
+
+	/**
+	 * 查询音乐 Provider 拿播放状态（<b>只能在后台线程调用</b>）。
+	 * 标题/歌词/进度一次查完，原先三者各查一次等于发 3 次跨进程查询。
+	 */
+	private MusicSnapshot queryMusicProviderSnapshot(Context ctx) {
+		MusicSnapshot s = new MusicSnapshot();
 		Cursor c = null;
 		try {
 			c = ctx.getContentResolver().query(MUSIC_PLAYBACK_URI, null, null, null, null);
@@ -1028,10 +1206,10 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 				String title = c.getString(iTitle);
 				String artist = iArtist >= 0 ? c.getString(iArtist) : null;
 				if (title != null && !title.isEmpty()) {
-					boolean playing = iPlaying >= 0 && c.getInt(iPlaying) == 1;
+					s.playing = iPlaying >= 0 && c.getInt(iPlaying) == 1;
 					s.title = title
 							+ (artist != null && !artist.isEmpty() ? " - " + artist : "")
-							+ (playing ? "" : "  [暂停]");
+							+ (s.playing ? "" : "  [暂停]");
 				}
 			}
 			if (iLyric >= 0) {
