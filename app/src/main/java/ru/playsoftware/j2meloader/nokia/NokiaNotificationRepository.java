@@ -208,6 +208,13 @@ public final class NokiaNotificationRepository {
 		if (pkg == null || pkg.equals(appCtx.getPackageName())) {
 			return null; // 排除自家通知（保活等）
 		}
+		Notification n = sbn.getNotification();
+		if (n != null && (n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) {
+			// 分组摘要（如 shell 通知的 ranker_group）：本身无内容，且清除摘要会被系统
+			// 连带清掉整组子通知。必须过滤，否则列表出现"Shell"幽灵条目、
+			// 清一条变清全部。
+			return null;
+		}
 		boolean ongoing = sbn.isOngoing();
 		if (ongoing && !NokiaSettingsStorage.isNotificationShowOngoing(appCtx)) {
 			return null; // 常驻通知默认不展示
@@ -216,7 +223,6 @@ public final class NokiaNotificationRepository {
 		String title = null;
 		String text = null;
 		try {
-			Notification n = sbn.getNotification();
 			if (n != null && n.extras != null) {
 				CharSequence t = n.extras.getCharSequence(Notification.EXTRA_TITLE);
 				CharSequence tBig = n.extras.getCharSequence(Notification.EXTRA_TITLE_BIG);
@@ -232,13 +238,13 @@ public final class NokiaNotificationRepository {
 		String appName = resolveAppName(appCtx, pkg);
 		Drawable icon = resolveIcon(appCtx, pkg, appName);
 
-		return new NokiaNotificationItem(
-				keyOf(sbn), pkg, appName,
-				title, text,
-				sbn.getPostTime(), icon,
-				sbn.getNotification() != null ? sbn.getNotification().contentIntent : null,
-				sbn.isClearable(), ongoing,
-				sbn.getTag(), sbn.getId());
+                return new NokiaNotificationItem(
+                                keyOf(sbn), pkg, appName,
+                                title, text,
+                                sbn.getPostTime(), icon,
+                                n != null ? n.contentIntent : null,
+                                sbn.isClearable(), ongoing,
+                                sbn.getTag(), sbn.getId());
 	}
 
 	private String resolveAppName(Context appCtx, String pkg) {

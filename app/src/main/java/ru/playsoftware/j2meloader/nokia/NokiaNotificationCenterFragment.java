@@ -92,6 +92,9 @@ public class NokiaNotificationCenterFragment extends NokiaListPageFragment
 		String focusedKey = focusIndex >= 0 && focusIndex < current.size()
 				? current.get(focusIndex).key : null;
 		rebuildList(focusedKey);
+		// 页面可见期间新到的通知同样视为已读（用户正在看），回桌面后通知条计数才一致。
+		// markAllRead 无变化时不再触发回调，不会形成循环。
+		NokiaNotificationRepository.get().markAllRead();
 	}
 
 	/**
@@ -192,16 +195,6 @@ public class NokiaNotificationCenterFragment extends NokiaListPageFragment
 		}
 		row.addView(ivIcon);
 
-		// 未读蓝点
-		TextView tvDot = new TextView(requireContext());
-		tvDot.setLayoutParams(new LinearLayout.LayoutParams(
-				NokiaDimens.dp(getResources(), 8), LinearLayout.LayoutParams.WRAP_CONTENT));
-		boolean unread = isUnread(item);
-		tvDot.setText(unread ? "●" : "");
-		tvDot.setTextColor(0xFF4F9CF9);
-		NokiaFontManager.textSize(tvDot, 8);
-		row.addView(tvDot);
-
 		// 右侧两行文本区
 		LinearLayout body = new LinearLayout(requireContext());
 		body.setOrientation(LinearLayout.VERTICAL);
@@ -260,11 +253,6 @@ public class NokiaNotificationCenterFragment extends NokiaListPageFragment
 			onSelect();
 		});
 		return row;
-	}
-
-	private boolean isUnread(NokiaNotificationItem item) {
-		// 仓储 markAllRead 后水位线以上的都算未读；此处直接比较水位线
-		return item.postTime > NokiaNotificationRepository.get().getLastReadTime();
 	}
 
 	/** 时间格式：今天 HH:mm / 昨天 / M月d日。 */
@@ -344,6 +332,11 @@ public class NokiaNotificationCenterFragment extends NokiaListPageFragment
 
 	/** 左软键选项弹窗（规范 §15）。未授权时提供授权引导；不可清除的条目置灰。 */
 	private void showOptionsMenu() {
+		// 弹窗是独立窗口，show 是异步的：连按左软键可能叠出两个弹窗，第二个会把第一个
+		// 刚执行过的动作再执行一遍。已显示时直接忽略。
+		if (getParentFragmentManager().findFragmentByTag("NokiaOptions") != null) {
+			return;
+		}
 		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
 		boolean granted = NokiaMusicSessionReader.isNotificationListenerEnabled(requireContext());
 
@@ -369,13 +362,16 @@ public class NokiaNotificationCenterFragment extends NokiaListPageFragment
 		NokiaOptionsDialog.show(getParentFragmentManager(), "通知中心", items);
 	}
 
-	/** 单条清除：走服务 cancel；仓储随 onNotificationRemoved 自动刷新列表。 */
+	/** 单条清除：走服务 cancel；随后强制按系统实际通知列表刷新，不依赖移除回调是否送达。 */
 	private void clearOne(NokiaNotificationItem item) {
 		NokiaNotificationListenerService service = NokiaNotificationListenerService.getInstance();
 		boolean ok = service != null
 				&& service.cancelByKey(item.key, item.pkg, item.tag, item.id);
 		if (ok) {
 			NokiaLog.i("NotifCenter", "已清除通知: " + item.pkg + " " + item.displayTitle());
+			// 系统实际列表是唯一事实来源：个别通知的 onNotificationRemoved 可能延迟或丢失，
+			// 不主动同步会让幽灵行留在列表里，干扰后续清除操作
+			NokiaNotificationRepository.get().refreshFromService();
 		} else {
 			Toast.makeText(requireContext(), "清除失败：通知服务未连接", Toast.LENGTH_SHORT).show();
 		}
@@ -397,6 +393,7 @@ public class NokiaNotificationCenterFragment extends NokiaListPageFragment
 					boolean ok = service != null && service.cancelAll();
 					if (ok) {
 						NokiaLog.i("NotifCenter", "已清除全部通知，共 " + count + " 条");
+						NokiaNotificationRepository.get().refreshFromService();
 					} else {
 						Toast.makeText(requireContext(), "清除失败：通知服务未连接",
 								Toast.LENGTH_SHORT).show();
