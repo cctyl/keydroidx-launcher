@@ -151,7 +151,9 @@ public final class NokiaMusicSessionReader {
 	 * 用 {@code enabled_notification_listeners} 判断——没有官方 API 可以查询自身状态。
 	 */
 	public static boolean isNotificationListenerEnabled(Context ctx) {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return false;
+		// NotificationListenerService 自 API 18 (Android 4.3) 起可用，
+		// enabled_notification_listeners 设置项自 API 18 可读；4.4 (API 19) 支持。
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) return false;
 		String pkg = ctx.getPackageName();
 		String flat;
 		try {
@@ -219,10 +221,13 @@ public final class NokiaMusicSessionReader {
 
 	/** 跳转系统「通知使用权」设置页。 */
 	public static boolean openNotificationListenerSettings(Context ctx) {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) return false;
+		// ACTION_NOTIFICATION_LISTENER_SETTINGS 常量自 API 21 引入，但其字面值
+		// "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS" 在 Android 4.4
+		// (API 19) 上也可能有对应设置页（位于 设置→安全→通知访问）。用字面值 + try/catch
+		// 兜底，避免低版本直接判定不可用而让用户按确认无反应。
 		try {
 			android.content.Intent intent = new android.content.Intent(
-					Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+					"android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
 			intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
 			ctx.startActivity(intent);
 			return true;

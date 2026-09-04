@@ -6,6 +6,7 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -128,6 +129,13 @@ public class NokiaNotificationSettingsFragment extends NokiaListPageFragment {
 	}
 
 	@Override
+	public void onResume() {
+		super.onResume();
+		// 从系统「通知使用权」设置页授权返回后，重新查询状态并刷新文案
+		refreshNames();
+	}
+
+	@Override
 	public String getSoftRightText() {
 		return "返回";
 	}
@@ -152,6 +160,8 @@ public class NokiaNotificationSettingsFragment extends NokiaListPageFragment {
 				// 跳系统「通知使用权」设置页；授权后系统会重绑服务并触发 onListenerConnected
 				if (!NokiaMusicSessionReader.openNotificationListenerSettings(requireContext())) {
 					NokiaLog.w("NotifSettings", "当前系统版本不支持通知使用权设置页");
+					Toast.makeText(requireContext(), "当前系统不支持通知使用权，请到设置→安全→通知访问手动开启",
+							Toast.LENGTH_LONG).show();
 				}
 				return true;
 			case 1:
