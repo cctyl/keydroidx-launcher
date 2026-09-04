@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaFeedbackFragment;
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
+import io.github.cctyl.nokia.common.ui.about.NokiaAboutConfig;
 
 import android.os.Bundle;
 import android.view.Gravity;
@@ -18,7 +19,10 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import io.github.cctyl.nokia.common.util.NokiaDimens;
+import ru.playsoftware.j2meloader.BuildConfig;
 import ru.playsoftware.j2meloader.R;
+
+import java.util.regex.Pattern;
 
 /**
  * 桌面设置主菜单（分类层）。纵向列表展示各大类设置入口：
@@ -139,7 +143,7 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 			host.openFragment(new NokiaAdvancedSettingsFragment());
 		} else if (group == -2) {
 			NokiaLog.i("DesktopSettings", "进入关于页面");
-			host.openFragment(new NokiaAboutFragment());
+			host.openFragment(NokiaAboutFragment.newInstance(buildAboutConfig()));
 		} else if (group == -3) {
 			NokiaLog.i("DesktopSettings", "进入意见反馈页面");
 			host.openFragment(new NokiaFeedbackFragment());
@@ -190,5 +194,51 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 		View v = new View(requireContext());
 		v.setLayoutParams(new LinearLayout.LayoutParams(w, h));
 		return v;
+	}
+
+	/**
+	 * 构造关于页配置：复用 common 的统一关于页，内容与原自定义页对齐。
+	 * 检查更新开启，并传入剥干净的逻辑版本号（见 {@link #stripFlavorSuffix}）。
+	 */
+	private NokiaAboutConfig buildAboutConfig() {
+		return NokiaAboutConfig.createDefault(requireContext())
+				.setAuthor("cctyl")
+				.setRepoUrl("https://github.com/cctyl/keydroidx-launcher")
+				.setVideoUrl("https://www.bilibili.com/video/BV1WxMX6yEHX")
+				.setAcknowledgements(
+						"• J2ME-Loader (nikita36078)\n" +
+							"• 方舟像素字体 / Ark Pixel (TakWolf)\n" +
+							"• 缝合怪像素字体 / Fusion Pixel (TakWolf)\n" +
+							"• Google Material Icons\n" +
+							"• S60 图标库 / s60-icon-pack (x1unix)")
+				.setExtraStatement(
+						"说明：\n" +
+							"KeydroidX（原键）致力于为现代智能按键机打造全套极致流畅的物理按键交互与极简生态体验。" +
+							"欢迎点赞收藏 Star，欢迎共建生态！")
+				.setShowUpdateCheck(true)
+				.setUpdateCurrentVersion(stripFlavorSuffix(BuildConfig.VERSION_NAME))
+				.setShowDetailedLogToggle(true);
+	}
+
+	/**
+	 * 剥离 flavor 渠道后缀（-open/-play/-dev-NNNNN），只保留逻辑版本号。
+	 *
+	 * <p>AGP 构建会把 productFlavors 的 versionNameSuffix 追加到 defaultConfig.versionName 上
+	 * 写进最终 manifest，运行时 {@link BuildConfig#VERSION_NAME} 读到的就是带后缀的串（如 1.3.1-open）。
+	 * 渠道后缀并非 pre-release 标记，但 semver 比较会把它当成修饰段判为更小，
+	 * 导致与 GitHub 裸 tag（如 1.3.1）误判为「有新版本」。这里按 {@link BuildConfig#FLAVOR}
+	 * 把尾部对应后缀剥掉后再交给检查器。</p>
+	 */
+	private static String stripFlavorSuffix(String versionName) {
+		if (versionName == null || versionName.isEmpty()) {
+			return versionName;
+		}
+		String flavor = BuildConfig.FLAVOR;
+		if (flavor == null || flavor.isEmpty()) {
+			return versionName;
+		}
+		// 匹配尾部 "-<flavor>" 或 "-<flavor>-<数字>"（dev 的 versionNameSuffix = "-dev-" + digits）
+		String pattern = "-" + Pattern.quote(flavor) + "(-\\d+)?$";
+		return versionName.replaceFirst(pattern, "");
 	}
 }
