@@ -207,6 +207,13 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	private int toggleIconSizeDp = 18;
 	private BroadcastReceiver toggleStateReceiver;
 	private boolean receiverRegistered = false;
+	/**
+	 * 应用卸载广播接收器：桌面正在显示时被卸载的应用，立即从顶部快捷栏消失。
+	 * 卸载发生在别处（功能表卸载、百宝箱卸载 JAR、桌面不可见期间被卸载）时，
+	 * 由 {@link NokiaSettingsStorage#pruneUnavailableAsync} 在下次加载配置时兜底清理。
+	 */
+	private BroadcastReceiver packageRemovedReceiver;
+	private boolean packageReceiverRegistered = false;
 
 	@Override
 	protected int getLayoutRes() {
@@ -305,6 +312,8 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 
 		// 注册广播接收器监听系统开关状态变化
 		registerToggleReceiver();
+		// 注册应用卸载广播：当场卸载的应用当场从快捷栏移除
+		registerPackageRemovedReceiver();
 
 		NokiaLog.i("Desktop", "桌面待机屏初始化完成：快捷栏 " + shortcutCount
 				+ " 项，组件区 " + widgetCount + " 项");
@@ -361,6 +370,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 		// 离开桌面后再次回来需要重建内容区（桌面设置可能增删改了组件/快捷栏/开关）
 		contentDirty = true;
 		unregisterToggleReceiver();
+		unregisterPackageRemovedReceiver();
 		unregisterMusicPlaybackObserver();
 		// 通知条订阅随生命周期解除，避免持有已销毁的视图引用
 		NokiaNotificationRepository.get().removeListener(notifRepoListener);
@@ -992,6 +1002,82 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 			receiverRegistered = false;
 			NokiaLog.i("Desktop", "已注销开关栏广播接收器");
 		}
+	}
+
+	/** 注册应用卸载广播（带 package data scheme，只接收卸载，不接收安装/替换）。 */
+	private void registerPackageRemovedReceiver() {
+		if (packageReceiverRegistered) return;
+		Context ctx = getContext();
+		if (ctx == null) return;
+		packageRemovedReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				if (!isAdded()) return;
+				// EXTRA_REPLACING=true 表示这是应用更新过程中的临时移除，包马上会装回来，不能删
+				if (intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
+					NokiaLog.i("Desktop", "收到包替换广播，跳过快捷栏清理: " + intent.getDataString());
+					return;
+				}
+				String pkg = intent.getData() != null
+						? intent.getData().getSchemeSpecificPart() : null;
+				if (TextUtils.isEmpty(pkg)) {
+					NokiaLog.w("Desktop", "卸载广播缺少包名，忽略");
+					return;
+				}
+				NokiaLog.i("Desktop", "收到应用卸载广播: " + pkg);
+				removeShortcutByPackage(pkg);
+			}
+		};
+		IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
+		filter.addDataScheme("package");
+		try {
+			ctx.registerReceiver(packageRemovedReceiver, filter);
+			packageReceiverRegistered = true;
+			NokiaLog.i("Desktop", "已注册应用卸载广播接收器");
+		} catch (Exception e) {
+			NokiaLog.e("Desktop", "注册应用卸载广播失败", e);
+		}
+	}
+
+	private void unregisterPackageRemovedReceiver() {
+		if (packageRemovedReceiver != null && packageReceiverRegistered) {
+			try {
+				Context ctx = getContext();
+				if (ctx != null) {
+					ctx.unregisterReceiver(packageRemovedReceiver);
+				}
+			} catch (Exception ignored) {}
+			packageReceiverRegistered = false;
+			NokiaLog.i("Desktop", "已注销应用卸载广播接收器");
+		}
+	}
+
+	/**
+	 * 从快捷栏移除指定包名的应用：更新内存列表 → 落盘 → 重建快捷栏。
+	 * 包名不在快捷栏时直接返回，不做任何重建（卸载别的应用不应打断桌面焦点）。
+	 */
+	private void removeShortcutByPackage(String pkg) {
+		if (TextUtils.isEmpty(pkg) || shortcutApps.isEmpty()) return;
+		List<ShortcutApp> kept = new ArrayList<>(shortcutApps.size());
+		List<String> removed = new ArrayList<>();
+		for (ShortcutApp app : shortcutApps) {
+			if (pkg.equals(NokiaSettingsStorage.packageOf(app))) {
+				removed.add(app.label);
+			} else {
+				kept.add(app);
+			}
+		}
+		if (removed.isEmpty()) {
+			NokiaLog.d("Desktop", "卸载的应用不在快捷栏，无需处理: " + pkg);
+			return;
+		}
+		NokiaLog.i("Desktop", "应用已卸载，从快捷栏移除 " + removed.size() + " 项: " + removed);
+		shortcutApps.clear();
+		shortcutApps.addAll(kept);
+		if (settingsStorage != null) {
+			settingsStorage.setShortcutApps(kept);
+		}
+		rebuildShortcutBar(kept);
 	}
 
 	/** 创建单个组件行 View。内存/存储带进度条，其余类型仅文字。 */
@@ -2387,6 +2473,7 @@ public class NokiaDesktopFragment extends NokiaPageFragment {
 	public void onDestroyView() {
 		super.onDestroyView();
 		unregisterToggleReceiver();
+		unregisterPackageRemovedReceiver();
 		if (bubbleHandler != null) bubbleHandler.removeCallbacks(bubbleHideRunnable);
 		bubbleHandler = null;
 		shortcutNameBubble = null;

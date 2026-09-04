@@ -14,11 +14,13 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.text.TextUtils;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -107,6 +109,8 @@ public class NokiaSettingsStorage {
 	/**
 	 * 异步获取快捷栏应用列表（不阻塞主线程，供冷启动路径使用）。
 	 * - 已配置：同步解析 JSON（毫秒级，无 PackageManager 查询），直接回调；
+	 *   随后在后台校验一遍目标是否仍存在，若发现已卸载的残留项则清理后<b>再回调一次</b>
+	 *   （详见 {@link #pruneUnavailableAsync}）；正常情况只有第一次回调。
 	 * - 首次未配置：在后台线程构建默认快捷应用（含 PackageManager 批量查询）并持久化，
 	 *   完成后回主线程回调。
 	 */
@@ -116,6 +120,9 @@ public class NokiaSettingsStorage {
 		if (json != null) {
 			// 已配置：同步解析（毫秒级，无 IPC），立即回调
 			callback.onLoaded(parseShortcutApps(json));
+			// 随后后台校验一遍：卸载掉的应用不会通知本应用，这里兜底把它从快捷栏里剔掉。
+			// 有剔除时才回写并再次回调（触发快捷栏重建），正常情况下零写盘、零重建。
+			pruneUnavailableAsync(callback);
 			return;
 		}
 		// 首次启动：后台线程构建默认快捷应用（含 PackageManager 批量查询）
@@ -200,6 +207,117 @@ public class NokiaSettingsStorage {
 			return "a:" + pkg;
 		}
 		return "j:" + (app.appKey != null ? app.appKey : app.label);
+	}
+
+	/**
+	 * 后台校验已保存的快捷栏配置，把已卸载的应用剔除掉；有剔除时回写并回调清理后的列表。
+	 * <p>
+	 * 快捷栏是 SharedPreferences 里的一份 JSON 快照，应用被卸载后不会有任何通知，
+	 * 快照里的条目会变成点不开的「幽灵图标」。这里在每次加载配置时按目标是否还存在过滤一次，
+	 * 覆盖全部卸载路径（功能表卸载、百宝箱卸载 JAR、桌面不可见期间被卸载），
+	 * 不依赖 {@link Intent#ACTION_PACKAGE_REMOVED} 是否送达。
+	 * <p>
+	 * 无失效项时既不写盘也不回调（避免无谓地重建快捷栏）。
+	 */
+	public void pruneUnavailableAsync(final OnShortcutAppsLoaded callback) {
+		if (callback == null) return;
+		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				final List<ShortcutApp> cleaned;
+				synchronized (NokiaSettingsStorage.class) {
+					// 重新读取而不是复用入参：校验期间设置页可能刚保存过，
+					// 拿旧列表回写会把用户的选择覆盖掉
+					List<ShortcutApp> stored = parseShortcutApps(
+							prefs.getString(KEY_SHORTCUT_APPS, null));
+					cleaned = filterUnavailable(stored);
+					if (cleaned.size() == stored.size()) {
+						return;
+					}
+					setShortcutApps(cleaned);
+				}
+				NokiaLog.i("SettingsStorage", "快捷栏已清理失效项，剩余 " + cleaned.size() + " 个");
+				mainHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						callback.onLoaded(cleaned);
+					}
+				});
+			}
+		}, "prune-shortcuts").start();
+	}
+
+	/**
+	 * 过滤掉目标已不存在的快捷项（安卓：包名未安装；J2ME：应用数据目录已删除）。
+	 * <strong>仅在后台线程调用</strong>——含 PackageManager IPC 与文件 IO。
+	 *
+	 * @return 清理后的新列表（不改动入参）；无失效项时返回等长的新列表
+	 */
+	public List<ShortcutApp> filterUnavailable(List<ShortcutApp> apps) {
+		if (apps == null || apps.isEmpty()) {
+			return apps;
+		}
+		List<ShortcutApp> kept = new ArrayList<>(apps.size());
+		List<String> removed = new ArrayList<>();
+		PackageManager pm = context.getPackageManager();
+		for (ShortcutApp app : apps) {
+			if (isShortcutAvailable(pm, app)) {
+				kept.add(app);
+			} else {
+				removed.add(app.label + " (" + app.appKey + ")");
+			}
+		}
+		if (!removed.isEmpty()) {
+			NokiaLog.i("SettingsStorage", "快捷栏发现已失效应用 " + removed.size()
+					+ " 个，剔除: " + removed);
+		}
+		return kept;
+	}
+
+	/** 快捷项目标是否仍然存在。仅在后台线程调用。 */
+	private boolean isShortcutAvailable(PackageManager pm, ShortcutApp app) {
+		if (app.type == ShortcutApp.TYPE_ANDROID) {
+			String pkg = packageOf(app);
+			if (TextUtils.isEmpty(pkg)) {
+				// 解析不出包名就无法判定，宁可保留也不擅自删用户配置
+				return true;
+			}
+			try {
+				pm.getPackageInfo(pkg, 0);
+				return true;
+			} catch (PackageManager.NameNotFoundException e) {
+				return false;
+			} catch (Throwable t) {
+				// 与 addPackageApp 同理：部分 ROM 的 CTA 钩子会对后台线程 PackageManager IPC 抛异常
+				NokiaLog.w("SettingsStorage", "校验快捷栏应用是否安装失败，保留: " + pkg);
+				return true;
+			}
+		}
+		// J2ME：appKey(pathExt) 就是应用数据目录的绝对路径，目录被删说明 JAR 已被卸载
+		if (TextUtils.isEmpty(app.appKey)) {
+			return true;
+		}
+		File appDir = new File(app.appKey);
+		if (appDir.isDirectory()) {
+			return true;
+		}
+		// 目录不在，但连它的父目录（模拟器应用根目录）都访问不到时，说明是存储未挂载
+		// 或根目录被整体搬走，不是"这个应用被卸载"——保留配置，避免误删用户勾选的快捷项
+		File parent = appDir.getParentFile();
+		if (parent == null || !parent.isDirectory()) {
+			NokiaLog.w("SettingsStorage", "快捷项目录不可访问（存储未挂载？），保留: "
+					+ app.label + " -> " + app.appKey);
+			return true;
+		}
+		return false;
+	}
+
+	/** 取快捷项对应的安卓包名（appKey 的 "/" 前半段）；取不到返回 null。 */
+	public static String packageOf(ShortcutApp app) {
+		if (app.type != ShortcutApp.TYPE_ANDROID || TextUtils.isEmpty(app.appKey)) return null;
+		int slash = app.appKey.indexOf('/');
+		return slash > 0 ? app.appKey.substring(0, slash) : app.appKey;
 	}
 
 	/**
