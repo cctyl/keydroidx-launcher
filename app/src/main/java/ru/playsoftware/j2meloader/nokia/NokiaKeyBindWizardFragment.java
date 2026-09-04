@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.cctyl.nokia.common.permission.NokiaPermissionManager;
-import com.hjq.permissions.OnPermissionCallback;
 import ru.playsoftware.j2meloader.R;
 
 /**
@@ -225,37 +224,32 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 				() -> {
 					NokiaLog.i("KeyWizard", "用户选择设置默认桌面");
 					host.requestSetDefaultLauncher();
-					checkAndRequestPermissions(host);
+					navigateToPermissionCheckIfNeeded(host);
 				}));
 		items.add(new NokiaOptionsDialog.OptionItem(0, "稍后再说", true, false,
 				() -> {
 					NokiaLog.i("KeyWizard", "用户选择稍后再说");
-					checkAndRequestPermissions(host);
+					navigateToPermissionCheckIfNeeded(host);
 				}));
-		NokiaOptionsDialog.show(host.getSupportFragmentManager(), "设为默认桌面？", items);
+		NokiaOptionsDialog.show(host.getSupportFragmentManager(), "设为默认桌面？", items)
+				// 用户按返回键/右软键直接关掉弹窗时也要接续后续流程，
+				// 否则向导后的权限自检被整条跳过（实测 release 上按返回键即丢失该步骤）。
+				.setOnDismissAction(() -> {
+					NokiaLog.i("KeyWizard", "默认桌面询问窗未选择即关闭");
+					navigateToPermissionCheckIfNeeded(host);
+				});
 		NokiaLog.i("KeyWizard", "弹出默认桌面询问窗");
 	}
 
-	/** 向导完成后检查核心运行时权限，若有缺失则弹出复古诺基亚对话框批量引导授权 */
-	private void checkAndRequestPermissions(NokiaDesktopActivity host) {
+	/** 向导完成后检查核心运行时权限，若有缺失则跳转至「系统权限自检」页面引导授权 */
+	private void navigateToPermissionCheckIfNeeded(NokiaDesktopActivity host) {
 		if (host == null || host.isFinishing()) return;
-		// 统一走 requestCorePermissions：内部 getRequiredAppListPermissions 会动态追加
-		// 展锐 CTA 等厂商专有权限，避免硬编码导致部分权限漏申请（如展锐设备上
-		// CTA_QUERY_ALL_PACKAGES 之前未在向导后申请，只能在解冻失败时被动自愈）。
-		NokiaPermissionManager.requestCorePermissions(
-				host,
-				"桌面需要电话状态与应用列表权限，以显示信号状态及展示/启动应用。",
-				new OnPermissionCallback() {
-					@Override
-					public void onGranted(List<String> permissions, boolean allGranted) {
-						NokiaLog.i("KeyWizard", "向导批量权限全部授予成功");
-					}
-
-					@Override
-					public void onDenied(List<String> permissions, boolean doNotAskAgain) {
-						NokiaLog.w("KeyWizard", "向导批量权限部分被拒: " + permissions + ", doNotAskAgain=" + doNotAskAgain);
-					}
-				});
+		if (NokiaPermissionManager.isCorePermissionsGranted(host)) {
+			NokiaLog.i("KeyWizard", "核心权限已全部授予，跳过自检");
+			return;
+		}
+		NokiaLog.i("KeyWizard", "核心权限存在缺失，打开系统权限自检页");
+		host.openFragment(new NokiaPermissionCheckFragment());
 	}
 
 	// ---- NokiaFocusHost（INTRO / DONE 状态使用）----

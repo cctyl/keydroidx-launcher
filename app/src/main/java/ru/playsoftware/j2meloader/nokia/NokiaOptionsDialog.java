@@ -89,6 +89,8 @@ public class NokiaOptionsDialog extends DialogFragment {
 	private int focusIndex = -1;
 	/** 键码表注入模式（:midlet 进程等非 NokiaDesktopActivity 宿主）；null=宿主 keyBinding 模式 */
 	private int[] overrideKeyCodes;
+	/** 用户未选中任何选项就关闭弹窗（返回键 / 右软键 / 挂机键）时的回调，仅触发一次。 */
+	private Runnable onDismissAction;
 
 	/**
 	 * 静态入口：创建并显示选项弹窗，返回实例以便后续 {@link #setItems(List)} 刷新。
@@ -119,6 +121,34 @@ public class NokiaOptionsDialog extends DialogFragment {
 		dialog.overrideKeyCodes = keyCodes;
 		dialog.show(fm, "NokiaOptions");
 		return dialog;
+	}
+
+	/**
+	 * 设置「未选任何选项就关闭」的回调（返回键 / 右软键 / 挂机键关闭时触发）。
+	 * <p>用于调用方必须接续后续流程的场景：选项回调只在用户真正选中某项时执行，
+	 * 用户按返回键关闭弹窗则整条链断掉（向导后跳转权限自检就曾因此被跳过）。
+	 * 选中任意选项后走 {@link #trigger(int)}，不会触发本回调。
+	 *
+	 * @return 自身，便于 show(...) 后链式调用
+	 */
+	public NokiaOptionsDialog setOnDismissAction(Runnable action) {
+		this.onDismissAction = action;
+		return this;
+	}
+
+	/**
+	 * 关闭弹窗并执行「未选任何选项」回调。
+	 * <p>与 {@link #trigger(int)} 保持一致的时序：先跑回调（可能发起 Fragment 事务），
+	 * 再 dismiss，避免两个事务顺序颠倒导致面板错乱。
+	 */
+	private void dismissWithCancelAction() {
+		if (onDismissAction != null) {
+			Runnable action = onDismissAction;
+			onDismissAction = null;   // 只触发一次，避免重复接续
+			NokiaLog.i(TAG, "未选择任何选项即关闭，执行取消回调");
+			action.run();
+		}
+		dismiss();
 	}
 
 	/**
@@ -199,7 +229,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 			// 返回键由弹窗自己处理（NokiaKeyBinding 不管 BACK）
 			if (keyCode == KeyEvent.KEYCODE_BACK) {
 				NokiaLog.i(TAG, "返回键：关闭选项弹窗");
-				dismiss();
+				dismissWithCancelAction();
 				return true;
 			}
 			int action = resolveActionSafe(event);
@@ -218,7 +248,7 @@ public class NokiaOptionsDialog extends DialogFragment {
 				case NokiaKeyBinding.ACTION_HANGUP:
 				case NokiaKeyBinding.ACTION_SOFT_RIGHT:
 					NokiaLog.i(TAG, "右软键/挂机键：关闭选项弹窗");
-					dismiss();
+					dismissWithCancelAction();
 					return true;
 				case NokiaKeyBinding.ACTION_LEFT:
 				case NokiaKeyBinding.ACTION_RIGHT:

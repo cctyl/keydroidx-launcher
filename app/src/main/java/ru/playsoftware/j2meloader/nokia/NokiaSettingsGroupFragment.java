@@ -230,8 +230,8 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 					? "通知中心：已授权" : "通知中心：未授权";
 		}
 		if (group == GROUP_SYSTEM && index == 3) {
-			boolean appList = io.github.cctyl.nokia.common.permission.NokiaPermissionManager.hasAppListPermission(requireContext());
-			return appList ? "系统权限：已就绪" : "系统权限：待修复";
+			boolean coreGranted = io.github.cctyl.nokia.common.permission.NokiaPermissionManager.isCorePermissionsGranted(requireContext());
+			return coreGranted ? "系统权限：已就绪" : "系统权限：待修复";
 		}
 		return itemNames[index];
 	}
