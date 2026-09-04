@@ -10,9 +10,12 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.regex.Pattern;
+
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import io.github.cctyl.nokia.common.update.NokiaUpdateConfig;
 import io.github.cctyl.nokia.common.update.NokiaUpdateDialog;
+import ru.playsoftware.j2meloader.BuildConfig;
 import ru.playsoftware.j2meloader.R;
 
 public class NokiaAboutFragment extends NokiaScrollPageFragment {
@@ -200,7 +203,34 @@ public class NokiaAboutFragment extends NokiaScrollPageFragment {
 			return;
 		}
 		Toast.makeText(requireContext(), "正在检查更新…", Toast.LENGTH_SHORT).show();
-		NokiaUpdateDialog.checkAndShow(getActivity(), new NokiaUpdateConfig(REPO_URL));
+		// 剥掉 flavor 渠道后缀（-open/-play/-dev-NNNNN）再比较：
+		// 渠道后缀不是 pre-release 标记，但 semver 会把它当成修饰段误判为更小。
+		NokiaUpdateConfig config = new NokiaUpdateConfig(REPO_URL)
+				.setCurrentVersion(stripFlavorSuffix(BuildConfig.VERSION_NAME));
+		NokiaUpdateDialog.checkAndShow(getActivity(), config);
+	}
+
+	/**
+	 * 剥离 flavor 渠道后缀，只保留逻辑版本号。
+	 *
+	 * <p>AGP 构建时会把 productFlavors 里的 {@code versionNameSuffix}
+	 * （如 "-open"、"-play"、"-dev-12345"）追加到 defaultConfig 的 versionName 上，
+	 * 写进最终 manifest。运行时 {@code BuildConfig.VERSION_NAME} 读到的就是带后缀的串
+	 * （如 "1.3.1-open"）。但渠道后缀并非 pre-release 标记，semver 比较时却会把它
+	 * 当成修饰段判为更小，导致与 GitHub 裸 tag（如 "1.3.1"）误判为「有新版本」。
+	 * 这里按 {@link BuildConfig#FLAVOR} 把尾部对应后缀剥掉。</p>
+	 */
+	private static String stripFlavorSuffix(String versionName) {
+		if (versionName == null || versionName.isEmpty()) {
+			return versionName;
+		}
+		String flavor = BuildConfig.FLAVOR;
+		if (flavor == null || flavor.isEmpty()) {
+			return versionName;
+		}
+		// 匹配尾部 "-<flavor>" 或 "-<flavor>-<数字>"（dev 的 versionNameSuffix = "-dev-" + digits）
+		String pattern = "-" + Pattern.quote(flavor) + "(-\\d+)?$";
+		return versionName.replaceFirst(pattern, "");
 	}
 
 	private void openUrl(String url) {
