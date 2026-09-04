@@ -20,6 +20,32 @@
             android:paddingTop="8dp"
             android:paddingBottom="12dp">
 
+            <!-- 检查更新卡片 -->
+            <LinearLayout
+                android:id="@+id/btnCheckUpdate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="检查更新"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="查看 GitHub 最新版本"
+                    android:textColor="#A5D6A7"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
             <!-- 开源项目链接卡片 -->
             <LinearLayout
                 android:id="@+id/btnGithub"
