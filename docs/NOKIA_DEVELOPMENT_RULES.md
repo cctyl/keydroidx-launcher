@@ -92,6 +92,68 @@ items.add(new NokiaOptionsDialog.OptionItem(
 - **警惕「按下状态 + 可点击」的合成点击**：任何在按键处理期间 `setPressed(true)` 的可点击 View，都可能因后续 UP 而被系统合成 `performClick`——即使该 View 从未收到过 DOWN。
 - 新增 / 修改任何按键分发、底部栏视觉反馈逻辑时，以「输入事件完整配对」为标准自查，而不是按某个机型打补丁。
 
+## 长按连发（key repeat）过滤规范（重要）
+
+**「执行类」动作必须过滤 key repeat（即 `getRepeatCount() > 0` 的 `ACTION_DOWN`）事件，方向键例外。** 这是**独立于**上一节 DOWN / UP 配对的另一条防线，两者不可互相替代。
+
+背景与原因（2026-09 实测 bug：桌面按住左软键连键）：
+
+1. Android 的按键连发事件 **action 仍然是 `ACTION_DOWN`**，只有 `getRepeatCount()` 递增（Q968 实测：首次连发出现在按下后约 400ms，之后每约 50ms 一次）。
+2. 因此上一节的配对逻辑（位于 `dispatchKeyEvent` 的「非 DOWN 分支」）**对连发完全无效**——连发根本进不了那个分支，会被当成一次全新的按下完整执行。当初注释里写的「含 REPEAT」是对 Android 连发机制的误解（误以为连发会以非 DOWN 的 action 到达）。
+3. 后果：按住左软键超过约 400ms → 首次按下进功能表，首个连发就弹出第一个应用的选项菜单；随后连发在「弹窗窗口取焦 → trigger 当前选项 → dismiss → Activity 取焦 → 再弹」之间反复横跳，把弹窗首项（冻结 / 解冻）反复执行。日志里 `Desktop` 与 `NokiaOptions` 两个 tag 交替出现即是此循环。
+
+正确做法（已修复，见 `NokiaDesktopActivity.java` 的「长按连发过滤」块与 `NokiaOptionsDialog` 的 `setOnKeyListener`）：
+
+- **判据唯一：`event.getRepeatCount() > 0`**。**不要用 `event.isLongPress()`**——它只在首个连发事件为 `true`（Q968 实测 `flags=0x88` 仅出现在 `repeat=1`，之后回落 `0x8`），用它过滤会漏掉后续几乎全部连发。
+- **方向键放行**：「按住方向键连续移动 / 翻页」是 S40 的既有行为，属于预期功能，不能吞。
+- **两个入口都要改**：`NokiaDesktopActivity.dispatchKeyEvent` 与弹窗自身的 `setOnKeyListener`。弹窗是独立 Window，Activity 层的过滤对它无效（即本节第 3 点的循环）。
+- **录制态一律吞**：按键绑定向导中 `onKeyRecorded` 结束后 `isRecording()` 即为 false，后续连发会漏到正常分发，可能触发下一次录制或导航。
+
+### 本次修复记录（2026-09-04）
+
+**提交编号**：`59bc51e` —— `fix(desktop): 过滤物理按键长按连发，修复桌面按住软键反复弹出选项菜单`
+
+相关提交：`f727052`（引入 `lastHandledDownKeyCode` 的 DOWN/UP 配对修复，其注释中「含 REPEAT」的错误假设即本 bug 的源头）、`779c46e`（锁屏改为 UP 阶段执行）。
+
+> 上一节是「规范」，本节是「本次改了什么、为什么这么改」的留档。日后这块逻辑再出问题，先看本节再改。
+
+**复现现象**：桌面按住左软键不放 → 进入功能表 → 第一个应用的「选项」弹窗被反复弹出、反复关闭，且弹窗首项（冻结 / 解冻）被来回执行。用户原话：「长按被识别为一直按下」。
+
+**排查过程与实测数据**（设备 `192.168.1.5:5555` Q968；左软键键码为 `KEYCODE_MENU`，走 `resolveAction` 的 `MENU → ACTION_SOFT_LEFT` 兜底）：
+
+1. 在 `dispatchKeyEvent` 入口临时打印 `action / keyCode / repeatCount / flags / isLongPress / eventTime`（用后已删除），确认是**标准系统 key repeat**、排除硬件抖动：连发事件 `action` 恒为 `0`（`ACTION_DOWN`），仅 `repeatCount` 递增到 39，未出现「DOWN/UP 成对且 repeat 恒为 0」的抖动特征。
+2. 首次连发出现在按下后 **约 400ms**（`53.242 → 53.637`），之后每 **约 50ms** 一次。即「稍微按长一点」= 越过 400ms 这条线。
+3. **`event.isLongPress()` 不可用作判据**：`FLAG_LONG_PRESS`（`flags=0x88`）仅在 `repeat=1` 出现，`repeat=2` 起 flags 回落 `0x8`。若用它过滤会漏掉后续几乎全部连发。**判据只能是 `getRepeatCount() > 0`。**
+4. 修复前一次 2 秒按压的完整链路：`导航 -> 功能表` ×1 → `弹出选项菜单: 日历` ×5 → `执行选项 (立即冻结)` ×5 → `执行选项 (解冻应用)` ×5；日志中 `Desktop` 与 `NokiaOptions` 两个 tag 交替出现，即「弹窗取焦 → trigger → dismiss → Activity 取焦 → 再弹」的自激振荡。
+5. 修复后同样操作：`执行选项` **0 次**，一次按压只产生一个动作；同时方向键连发仍放行 32 次（自动连发未误杀）。
+
+**具体修改逻辑**：
+
+1. **`NokiaDesktopActivity.dispatchKeyEvent`：DOWN 分支内新增「长按连发过滤」块**
+   - 位置必须在**录制态判定之后、录制块之前**。不能放到录制块之后——录制态下 `NokiaKeyBindFragment.onKeyRecorded` 内部会把 `recording` 置为 false，后续连发会绕过录制块直接走正常分发（触发下一次录制或导航），所以录制态必须由这个过滤块统一兜住。
+   - 只需 `return true` 吞掉，**不必动 `lastHandledDownKeyCode`**：首个 DOWN 已把该字段设为该键码，随后的 UP 仍会被非 DOWN 分支的配对逻辑吞掉，DOWN / UP 闭环不受影响。
+   - 方向键放行（`isDirectionAction()`）：「按住方向键连续移动 / 翻页」是 S40 的既有行为，属于预期功能；一刀切会把它退化成「只走一格」。
+   - 录制态下方向键也吞：此时按键是被录制的键码，不参与导航。
+2. **新增 `isDirectionAction(int)` 私有静态方法**（紧邻 `resetLastHandledKeyCode()`），集中定义「方向类动作」，避免同一判断在过滤块里散写成四路 `||`。
+3. **`NokiaOptionsDialog.setOnKeyListener`：同样新增过滤块，上 / 下方向键放行**
+   - 必须单独加：弹窗是独立 Window，Activity 层的过滤对它无效——这正是上面第 4 点振荡循环的后半段。
+   - 位置在 `if (event.getAction() != ACTION_DOWN) return true;` **之后**，保持「非 DOWN 一律消费」的既有语义不被改动。
+   - 用 `resolveActionSafe(event)` 而非直接取宿主 `keyBinding`，沿用该弹窗既有解析路径（兼容 `:midlet` 进程注入键码表模式）。
+
+**为什么不选其它方案**：
+
+- **不用时间防抖**：实测已排除硬件抖动（repeatCount 单调递增），加防抖属过度设计，且阈值需逐台设备调。
+- **不用 `onKeyLongPress()`**：本层在 `dispatchKeyEvent` 就 `return true`，事件根本到不了 view 层级的 `KeyEvent.dispatch()`，该回调永远不会被触发。
+- **不改 `NokiaKeyBinding.resolveAction()`**：它是纯查表解析，被 J2ME 模拟器等多处复用；把「是否吞连发」的策略塞进解析函数，会让调用方失去区分「方向键」与「执行类动作」的能力。
+
+**未改动（已知同类隐患）**：`NokiaKeyBinding.dispatchDialogKey` 也是「非 DOWN 一律吞、DOWN 一律执行」的同一模式，服务于 J2ME-Loader 侧 config 弹窗（`EditNameDialog` / `LoadProfileDialog` / `SaveProfileDialog` / `ShaderTuneDialog` 等），不在原键桌面链路、本次未实测，故未一并修改。若日后在 J2ME-Loader 设置弹窗里遇到同类连发，照本节方案同样处理。
+
+**回归验证方式**（改动此逻辑后必做）：
+
+- [ ] 桌面按住左软键 2 秒：只进一次功能表；日志有连续 `吞掉长按连发`，且 `弹出选项菜单` / `执行选项` 计数为 0。
+- [ ] 功能表内按住下方向键 2 秒：焦点连续下移；日志出现 `方向键连发放行`，且**没有** `吞掉长按连发`。
+- [ ] 走一遍按键绑定向导：按住一个键只录入一次，不会连带触发导航或下一次录制。
+
 
 ## 进入界面后首个方向键被吞规范（重要）
 
