@@ -27,6 +27,8 @@ import io.github.cctyl.nokia.common.ui.page.NokiaPageHost;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.permission.NokiaPermissionManager;
+import com.hjq.permissions.OnPermissionCallback;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
 /**
@@ -104,7 +106,11 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		// 未授权时通知会被系统直接屏蔽——保活优先级照给，但用户既看不到也管不了它，
 		// 因此向导完成后（首启不再有更强的界面诉求时）主动申请一次。
 		if (keyBinding.isWizardDone()) {
-			requestPostNotificationsIfNeeded();
+			// 启动时核心权限自检（应用列表+电话状态+通知权限+通知使用权全集）：
+			// 覆盖升级用户（向导已完成、不会再走向导后批量申请）以及运行时权限被系统收回的场景，
+			// 缺失则一次性诺基亚风格弹窗引导补齐。POST_NOTIFICATIONS 已纳入全集统一申请，
+			// 不再单独走原生 requestPermissions。
+			checkCorePermissionsOnStartup();
 			// 拉起常驻保活前台服务并常驻。【必须在桌面 onCreate 启动】，绝不在 onStop 启动——
 			// onStop 往往就是息屏/锁屏发生的瞬间，那时启动前台服务会把它 onCreate/onStartCommand/
 			// startForeground 全部挤进【桌面主线程】，恰好砸进「窗口焦点从有变无」的敏感窗口，
@@ -115,24 +121,46 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		}
 	}
 
-	/** 申请通知权限的请求码（API 33+ 保活常驻通知用）。 */
-	private static final int REQ_POST_NOTIFICATIONS = 1002;
+	/** 本次启动是否已做过核心权限自检，避免重复弹窗。 */
+	private boolean corePermissionCheckedThisSession = false;
 
 	/**
-	 * Android 13（API 33）起通知权限默认关闭，未授予时应用发出的所有通知都会被系统静默丢弃。
-	 * 保活的前台服务不依赖它（前台服务优先级与通知能否显示无关），但通知不可见会导致
-	 * 用户既不知道桌面在常驻、也无法在系统里关掉它，所以这里申请一次。
+	 * 启动时核心权限自检：检查核心权限全集（应用列表+电话状态+通知权限+通知使用权）
+	 * 是否就绪，缺失则一次性诺基亚风格弹窗引导授权。
+	 * <p>覆盖两类场景：
+	 * <ul>
+	 *   <li>升级用户：向导已完成，不会再走向导后批量申请，新版本新增的权限需求
+	 *       只能靠启动时检测补齐；</li>
+	 *   <li>运行时权限被系统/用户收回：下次启动桌面时检测到缺失并引导。</li>
+	 * </ul>
+	 * 已全部就绪则不弹；本次启动拒绝后不再弹，下次启动权限仍缺失会再检测。
 	 */
-	private void requestPostNotificationsIfNeeded() {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-			return;
-		}
-		if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-				== PackageManager.PERMISSION_GRANTED) {
-			return;
-		}
-		requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
-				REQ_POST_NOTIFICATIONS);
+	private void checkCorePermissionsOnStartup() {
+		if (corePermissionCheckedThisSession) return;
+		corePermissionCheckedThisSession = true;
+		// 延迟到窗口就绪后检查，避免 onCreate 早期弹窗时机问题
+		getWindow().getDecorView().post(() -> {
+			if (isFinishing() || isDestroyed()) return;
+			if (NokiaPermissionManager.isCorePermissionsGranted(this)) {
+				NokiaLog.i("Desktop", "启动时核心权限自检：全集就绪");
+				return;
+			}
+			NokiaLog.i("Desktop", "启动时核心权限自检：存在缺失项，启动批量引导");
+			NokiaPermissionManager.requestCorePermissions(
+					this,
+					"检测到部分系统权限缺失，桌面需要电话状态、应用列表、通知及通知使用权权限，以显示信号、展示和启动应用、并常驻通知。",
+					new OnPermissionCallback() {
+						@Override
+						public void onGranted(java.util.List<String> permissions, boolean allGranted) {
+							NokiaLog.i("Desktop", "启动时核心权限自检：已补齐 " + permissions);
+						}
+
+						@Override
+						public void onDenied(java.util.List<String> permissions, boolean doNotAskAgain) {
+							NokiaLog.w("Desktop", "启动时核心权限自检：用户拒绝 " + permissions + ", doNotAskAgain=" + doNotAskAgain);
+						}
+					});
+		});
 	}
 
 	/** 重新从 SharedPreferences 加载按键绑定到内存（向导/绑定界面完成后调用，确保立即生效）。 */
@@ -409,12 +437,6 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 				&& grantResults.length > 0
 				&& grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 			statusBarController.onPermissionGranted();
-		}
-		if (requestCode == REQ_POST_NOTIFICATIONS) {
-			boolean granted = grantResults.length > 0
-					&& grantResults[0] == PackageManager.PERMISSION_GRANTED;
-			NokiaLog.i("Desktop", "通知权限申请结果 granted=" + granted
-					+ "（未授予时保活通知被系统屏蔽，前台服务保活优先级不受影响）");
 		}
 	}
 

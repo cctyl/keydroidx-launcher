@@ -19,7 +19,6 @@ import java.util.List;
 
 import io.github.cctyl.nokia.common.permission.NokiaPermissionManager;
 import com.hjq.permissions.OnPermissionCallback;
-import com.hjq.permissions.Permission;
 import ru.playsoftware.j2meloader.R;
 
 /**
@@ -240,26 +239,12 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 	/** 向导完成后检查核心运行时权限，若有缺失则弹出复古诺基亚对话框批量引导授权 */
 	private void checkAndRequestPermissions(NokiaDesktopActivity host) {
 		if (host == null || host.isFinishing()) return;
-		// 收集未授权的核心权限（电话状态用于顶栏信号/卡信息，应用列表用于功能表和解冻）
-		List<String> needed = new ArrayList<>();
-		if (!NokiaPermissionManager.isGranted(host, Permission.READ_PHONE_STATE)) {
-			needed.add(Permission.READ_PHONE_STATE);
-		}
-		if (!NokiaPermissionManager.isGranted(host, Permission.GET_INSTALLED_APPS)) {
-			needed.add(Permission.GET_INSTALLED_APPS);
-		}
-
-		if (needed.isEmpty()) {
-			NokiaLog.i("KeyWizard", "核心权限已全部就绪，无需额外申请");
-			return;
-		}
-
-		NokiaLog.i("KeyWizard", "向导结束批量申请权限: " + needed);
-		NokiaPermissionManager.requestWithNokiaDialog(
+		// 统一走 requestCorePermissions：内部 getRequiredAppListPermissions 会动态追加
+		// 展锐 CTA 等厂商专有权限，避免硬编码导致部分权限漏申请（如展锐设备上
+		// CTA_QUERY_ALL_PACKAGES 之前未在向导后申请，只能在解冻失败时被动自愈）。
+		NokiaPermissionManager.requestCorePermissions(
 				host,
-				"系统权限申请",
 				"桌面需要电话状态与应用列表权限，以显示信号状态及展示/启动应用。",
-				needed,
 				new OnPermissionCallback() {
 					@Override
 					public void onGranted(List<String> permissions, boolean allGranted) {
@@ -270,8 +255,7 @@ public class NokiaKeyBindWizardFragment extends NokiaPageFragment implements Nok
 					public void onDenied(List<String> permissions, boolean doNotAskAgain) {
 						NokiaLog.w("KeyWizard", "向导批量权限部分被拒: " + permissions + ", doNotAskAgain=" + doNotAskAgain);
 					}
-				}
-		);
+				});
 	}
 
 	// ---- NokiaFocusHost（INTRO / DONE 状态使用）----

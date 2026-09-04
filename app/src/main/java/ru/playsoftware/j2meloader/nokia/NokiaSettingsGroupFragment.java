@@ -2,7 +2,11 @@ package ru.playsoftware.j2meloader.nokia;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
 import io.github.cctyl.nokia.common.ui.NokiaIcons;
+import io.github.cctyl.nokia.common.permission.NokiaPermissionManager;
+import com.hjq.permissions.OnPermissionCallback;
+import com.hjq.permissions.Permission;
 
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -326,26 +330,8 @@ public class NokiaSettingsGroupFragment extends NokiaListPageFragment {
 				host.openFragment(new NokiaNotificationSettingsFragment());
 				return true;
 			case 3:
-				NokiaLog.i("SettingsGroup", "系统权限自检与申请");
-				io.github.cctyl.nokia.common.permission.NokiaPermissionManager.requestCorePermissions(
-						host,
-						"需要读取应用列表与电话状态以正常展示桌面内容",
-						new com.hjq.permissions.OnPermissionCallback() {
-							@Override
-							public void onGranted(java.util.List<String> permissions, boolean allGranted) {
-								if (tvNames != null && tvNames.length > 3 && tvNames[3] != null) {
-									tvNames[3].setText(getItemDisplayName(3));
-								}
-								android.widget.Toast.makeText(requireContext(), "系统核心权限已就绪", android.widget.Toast.LENGTH_SHORT).show();
-							}
-
-							@Override
-							public void onDenied(java.util.List<String> permissions, boolean doNotAskAgain) {
-								if (tvNames != null && tvNames.length > 3 && tvNames[3] != null) {
-									tvNames[3].setText(getItemDisplayName(3));
-								}
-							}
-						});
+				NokiaLog.i("SettingsGroup", "进入系统权限自检页");
+				host.openFragment(new NokiaPermissionCheckFragment());
 				return true;
 			default:
 				return false;
