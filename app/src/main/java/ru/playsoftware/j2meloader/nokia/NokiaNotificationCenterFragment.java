@@ -72,6 +72,8 @@ public class NokiaNotificationCenterFragment extends NokiaListPageFragment
 	@Override
 	public void onResume() {
 		super.onResume();
+		// 进入页面主动拉一次全量：补偿 4.4 上连接初期快照拉取失败的时序问题
+		NokiaNotificationRepository.get().refreshFromService();
 		// 进入页面即视为已读
 		NokiaNotificationRepository.get().markAllRead();
 	}

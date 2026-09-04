@@ -76,11 +76,22 @@ public final class NokiaNotificationRepository {
 
 	// ---- 生命周期（由 NokiaNotificationListenerService 回调） ----
 
-	/** 服务已连接：置位并主动拉一次全量快照。 */
+	/**
+	 * 服务已连接：置位并主动拉一次全量快照。
+	 * <p>
+	 * 4.4 上本方法由 Service.onCreate 触发，此时系统可能还没完成 registerListener，
+	 * getActiveNotifications() 会失败或返回空，所以补一次延迟重试（幂等）。
+	 */
 	public void onListenerConnected() {
 		connected = true;
 		NokiaLog.i(TAG, "通知监听已连接，拉取全量快照");
 		refreshFromService();
+		mainHandler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				refreshFromService();
+			}
+		}, 800);
 	}
 
 	public void onListenerDisconnected() {
@@ -99,14 +110,20 @@ public final class NokiaNotificationRepository {
 	 */
 	public void refreshFromService() {
 		NokiaNotificationListenerService service = NokiaNotificationListenerService.getInstance();
-		if (service == null) return;
+		if (service == null) {
+			NokiaLog.w(TAG, "刷新跳过：服务实例为空");
+			return;
+		}
 		StatusBarNotification[] active;
 		try {
 			active = service.getActiveNotifications();
-		} catch (Exception e) {
-			NokiaLog.w(TAG, "getActiveNotifications 失败: " + e.getMessage());
+		} catch (Throwable e) {
+			NokiaLog.w(TAG, "getActiveNotifications 失败: " + e.getClass().getSimpleName()
+					+ " " + e.getMessage());
 			return;
 		}
+		NokiaLog.i(TAG, "getActiveNotifications 返回 "
+				+ (active == null ? "null" : String.valueOf(active.length)) + " 条");
 		applyRaw(active != null ? active : new StatusBarNotification[0]);
 	}
 

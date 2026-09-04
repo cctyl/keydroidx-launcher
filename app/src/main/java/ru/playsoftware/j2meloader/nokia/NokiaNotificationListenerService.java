@@ -38,6 +38,31 @@ public class NokiaNotificationListenerService extends NotificationListenerServic
 		return s != null ? s.getApplicationContext() : null;
 	}
 
+	/**
+	 * 服务被系统绑定。
+	 * <p>
+	 * 连接态以「服务实例就绪」为准，而不是 {@link #onListenerConnected()}：Android 4.4（API19）
+	 * 的 NotificationManagerService 不会派发该回调（5.0+ 才稳定回调），导致 4.4 上
+	 * connected 永远为 false —— 通知中心一直停在「正在读取」且拿不到全量快照。
+	 */
+	@Override
+	public void onCreate() {
+		super.onCreate();
+		instance = this;
+		NokiaLog.i(TAG, "onCreate：服务实例就绪");
+		NokiaNotificationRepository.get().onListenerConnected();
+	}
+
+	@Override
+	public void onDestroy() {
+		if (instance == this) {
+			instance = null;
+		}
+		NokiaLog.w(TAG, "onDestroy：服务实例销毁");
+		NokiaNotificationRepository.get().onListenerDisconnected();
+		super.onDestroy();
+	}
+
 	@Override
 	public void onListenerConnected() {
 		instance = this;
