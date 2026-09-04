@@ -490,8 +490,29 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 		// 如果当前 Fragment 处于录制态（按键绑定设置 / 首次启动向导），
 		// 优先把任意物理键直接喂给它捕获，再走 resolveAction 分发。
 		Fragment curForRec = getSupportFragmentManager().findFragmentById(R.id.midPanel);
-		if (curForRec instanceof NokiaKeyRecorder
-				&& ((NokiaKeyRecorder) curForRec).isRecording()) {
+		boolean recording = curForRec instanceof NokiaKeyRecorder
+				&& ((NokiaKeyRecorder) curForRec).isRecording();
+
+		// ---- 长按连发（key repeat）过滤 ----
+		// Android 的连发事件 action 仍是 ACTION_DOWN，只是 getRepeatCount() 递增，
+		// 因此进不了上面「非 DOWN 分支」的 UP / REPEAT 拦截逻辑，必须在此单独过滤。
+		// 否则按住左软键超过约 400ms 就会持续触发动作：实测会反复进出功能表选项弹窗，
+		// 并把弹窗首项（冻结 / 解冻）反复执行。
+		// 判据只能用 getRepeatCount()：isLongPress() 仅在首个连发事件为 true（Q968 实测）。
+		if (event.getRepeatCount() > 0) {
+			int repeatAction = keyBinding.resolveAction(event);
+			// 方向键放行：「按住方向键连续移动 / 翻页」是 S40 的既有行为，属于预期功能。
+			// 录制态下方向键也要吞：此时它是被录制的键码，不参与导航。
+			if (recording || !isDirectionAction(repeatAction)) {
+				NokiaLog.d("Desktop", "吞掉长按连发 " + NokiaKeyBinding.keyName(event.getKeyCode())
+						+ " repeat=" + event.getRepeatCount()
+						+ " action=" + NokiaKeyBinding.getActionName(repeatAction));
+				return true;
+			}
+			NokiaLog.d("Desktop", "方向键连发放行 repeat=" + event.getRepeatCount());
+		}
+
+		if (recording) {
 			NokiaKeyRecorder rec = (NokiaKeyRecorder) curForRec;
 			int kc = event.getKeyCode();
 			// 录制态下：用户按下的任意物理键（含返回键）都照常录成当前动作的绑定，
@@ -574,6 +595,14 @@ public class NokiaDesktopActivity extends NokiaBaseActivity
 	private void resetLastHandledKeyCode() {
 		lastHandledDownKeyCode = KeyEvent.KEYCODE_UNKNOWN;
 		pendingLockScreenKeyCode = KeyEvent.KEYCODE_UNKNOWN;
+	}
+
+	/** 是否为方向类动作：方向键的长按连发需保留（连续移动 / 翻页），其余动作一律只响应首次按下。 */
+	private static boolean isDirectionAction(int action) {
+		return action == NokiaKeyBinding.ACTION_UP
+				|| action == NokiaKeyBinding.ACTION_DOWN
+				|| action == NokiaKeyBinding.ACTION_LEFT
+				|| action == NokiaKeyBinding.ACTION_RIGHT;
 	}
 
 	/**

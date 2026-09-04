@@ -184,6 +184,18 @@ public class NokiaOptionsDialog extends DialogFragment {
 			if (event.getAction() != KeyEvent.ACTION_DOWN) {
 				return true; // 消费抬起事件
 			}
+			// 长按连发过滤：弹窗是独立 Window，Activity 层的连发过滤对它无效，需自行拦截。
+			// 否则按住左软键会连续 trigger 当前选项——实测把「冻结 / 解冻」反复执行。
+			// 上 / 下方向键放行：列表内连续移动焦点是预期行为。
+			if (event.getRepeatCount() > 0) {
+				int repeatAction = resolveActionSafe(event);
+				if (repeatAction != NokiaKeyBinding.ACTION_UP
+						&& repeatAction != NokiaKeyBinding.ACTION_DOWN) {
+					NokiaLog.d(TAG, "吞掉长按连发 " + NokiaKeyBinding.keyName(keyCode)
+							+ " repeat=" + event.getRepeatCount());
+					return true;
+				}
+			}
 			// 返回键由弹窗自己处理（NokiaKeyBinding 不管 BACK）
 			if (keyCode == KeyEvent.KEYCODE_BACK) {
 				NokiaLog.i(TAG, "返回键：关闭选项弹窗");
