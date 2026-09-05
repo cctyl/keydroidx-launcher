@@ -1,6 +1,8 @@
 # 原键桌面开发规范（详细版）
 
 > 本文件是 `CODEBUDDY.md` 的扩展：收录原键桌面的详细开发规范。这些是**反复踩坑总结的硬性规则**，新增 / 修改任何诺基亚界面、弹窗、按键逻辑前，务必对照本文件自查。主文件概览见 `CODEBUDDY.md`。
+> 
+> 📌 **字体排版全生态唯一事实源**：详见 **`../keydroidx-core/docs/11-typography-and-font-spec.md`**。所有界面文本必须引用 `@dimen/nokia_font_*` 6 级语义 Token（`display:16sp`, `title:13sp`, `body:12sp`, `small_title:11sp`, `caption:9sp`, `micro:7sp`），严禁在布局 XML 中硬编码裸数字号或滥用加粗。
 
 ## 图标与矢量字体规范（Material Icons）（重要）
 
