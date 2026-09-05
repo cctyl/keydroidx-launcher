@@ -44,6 +44,7 @@ NokiaDesktopActivity， 就是按下HOME返回的界面，这里展示一些信�
 `docs/` 目录下有文档
 
 - **详细开发规范（必读）**：`docs/NOKIA_DEVELOPMENT_RULES.md` —— 按键处理、DOWN/UP 配对、软键栏、底部菜单栏、选项弹窗、Android 4.4 兼容、双分辨率适配、设备说明等**硬性规则**全文。
+- **排版与字号规范（唯一事实源）**：`../../keydroidx-core/docs/11-typography-and-font-spec.md` —— 6 级 `@dimen/nokia_font_*` 语义 Token 标准体系。
 
 
 
