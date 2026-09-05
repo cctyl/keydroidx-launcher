@@ -204,6 +204,7 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 	private NokiaAboutConfig buildAboutConfig() {
 		return NokiaAboutConfig.createDefault(requireContext())
 				.setAuthor("cctyl")
+				.setDescription("KeydroidX 桌面是一款专为物理九键 / 全键盘 Android 按键机量身定制的诺基亚 S40/S60 风格桌面启动器，融合 J2ME 与原生应用，纯物理按键驱动，开箱即用获得极简与复古体验。")
 				.setRepoUrl("https://github.com/cctyl/keydroidx-launcher")
 				.setVideoUrl("https://www.bilibili.com/video/BV1WxMX6yEHX")
 				.setAcknowledgements(
@@ -212,10 +213,6 @@ public class NokiaDesktopSettingsFragment extends NokiaListPageFragment {
 							"• 缝合怪像素字体 / Fusion Pixel (TakWolf)\n" +
 							"• Google Material Icons\n" +
 							"• S60 图标库 / s60-icon-pack (x1unix)")
-				.setExtraStatement(
-						"说明：\n" +
-							"KeydroidX（原键）致力于为现代智能按键机打造全套极致流畅的物理按键交互与极简生态体验。" +
-							"欢迎点赞收藏 Star，欢迎共建生态！")
 				.setShowUpdateCheck(true)
 				.setUpdateCurrentVersion(stripFlavorSuffix(BuildConfig.VERSION_NAME))
 				.setShowDetailedLogToggle(true);
