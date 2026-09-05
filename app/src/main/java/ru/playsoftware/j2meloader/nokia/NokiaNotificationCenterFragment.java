@@ -1,4 +1,5 @@
 package ru.playsoftware.j2meloader.nokia;
+import io.github.cctyl.nokia.common.ui.NokiaFontManager;
 
 import android.app.PendingIntent;
 import android.os.Bundle;

@@ -77,7 +77,7 @@ public class Font {
 
 		Typeface family;
 		android.content.Context ctx = ContextHolder.getAppContext();
-		Typeface globalPixelTf = (ctx != null) ? ru.playsoftware.j2meloader.nokia.NokiaFontManager.getGlobalTypeface(ctx) : null;
+		Typeface globalPixelTf = (ctx != null) ? io.github.cctyl.nokia.common.ui.NokiaFontManager.getGlobalTypeface(ctx) : null;
 		if (globalPixelTf != null) {
 			family = globalPixelTf;
 		} else {

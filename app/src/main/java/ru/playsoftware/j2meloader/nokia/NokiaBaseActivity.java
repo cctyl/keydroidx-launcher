@@ -15,6 +15,7 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import io.github.cctyl.nokia.common.ui.NokiaFontManager;
 import io.github.cctyl.nokia.common.util.NokiaDimens;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -45,18 +46,23 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 	@Override
 	protected void attachBaseContext(Context newBase) {
 		Configuration config = newBase.getResources().getConfiguration();
-		// 用户字体缩放（桌面设置 → 字体大小）：统一应用内文字大小，
-		// 同时剥离系统字体缩放，避免系统设置干扰应用内一致性。
+		// 用户字体缩放（桌面设置 → 字体大小）与当前字体 ID：
+		// 统一同步进 common NokiaFontManager 的单一缩放源 sFontScale / sCurrentFontId。
+		// 严禁在此把 Configuration.fontScale 设为 userFontScale（会与 sFontScale 双重缩放），
+		// 仅固定为 1.0 以剥离系统字体设置对 sp 字号的干扰，缩放完全交给 NokiaFontManager。
 		float userFontScale = 1f;
+		String fontId = null;
 		try {
 			userFontScale = NokiaSettingsStorage.getFontScale(newBase);
+			fontId = NokiaSettingsStorage.getFontId(newBase);
 		} catch (Exception ignored) {
 			userFontScale = 1f;
 		}
 		if (userFontScale <= 0f) {
 			userFontScale = 1f;
 		}
-		NokiaFontManager.setUserFontScale(userFontScale);
+		NokiaFontManager.setFontScale(userFontScale);
+		NokiaFontManager.setCurrentFontId(fontId);
 		int dpi = config.densityDpi;
 		int fixed = dpi;
 		int[] standards = {120, 160, 213, 240, 320, 480, 640};
@@ -85,19 +91,19 @@ public abstract class NokiaBaseActivity extends AppCompatActivity {
 			}
 			fixed = nearest;
 		}
-	if (fixed != dpi) {
-		Configuration newConfig = new Configuration(config);
-		newConfig.densityDpi = fixed;
-		newConfig.fontScale = userFontScale;   // 应用用户字体缩放，忽略系统字体设置
-		super.attachBaseContext(newBase.createConfigurationContext(newConfig));
-	} else {
-		// 即便 density 已是标准值，也要显式设置 fontScale（系统字体缩放可能非 1，
-		// 否则 sp 字号会跟随系统字体被放大，导致顶栏溢出、底栏标题截断）。
-		Configuration cfg = new Configuration(config);
-		cfg.fontScale = userFontScale;
-		super.attachBaseContext(newBase.createConfigurationContext(cfg));
+		// Configuration.fontScale 固定为 1.0：剥离系统字体缩放对 sp 字号的干扰，
+		// 用户字体倍率完全由 NokiaFontManager.sFontScale 承担（见规范 §6.1）。
+		if (fixed != dpi) {
+			Configuration newConfig = new Configuration(config);
+			newConfig.densityDpi = fixed;
+			newConfig.fontScale = 1.0f;
+			super.attachBaseContext(newBase.createConfigurationContext(newConfig));
+		} else {
+			Configuration cfg = new Configuration(config);
+			cfg.fontScale = 1.0f;
+			super.attachBaseContext(newBase.createConfigurationContext(cfg));
+		}
 	}
-}
 
 	private TextView tvTime;
 	private final Handler clockHandler = new Handler();

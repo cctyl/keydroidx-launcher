@@ -45,7 +45,7 @@ import androidx.appcompat.widget.AppCompatEditText;
 import io.github.cctyl.nokia.common.util.NokiaDimens;
 
 import javax.microedition.lcdui.event.SimpleEvent;
-import ru.playsoftware.j2meloader.nokia.NokiaFontManager;
+import io.github.cctyl.nokia.common.ui.NokiaFontManager;
 
 class TextFieldImpl {
 	private EditText textview;
@@ -362,7 +362,7 @@ class TextFieldImpl {
 			screenContainer.addView(bodyContainer);
 
 			// 全局像素字体适配
-			ru.playsoftware.j2meloader.nokia.NokiaFontManager.applyFontToViewHierarchy(screenContainer);
+			io.github.cctyl.nokia.common.ui.NokiaFontManager.applyFontToViewHierarchy(screenContainer);
 		}
 		return screenContainer;
 	}

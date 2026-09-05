@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import io.github.cctyl.nokia.common.log.NokiaLog;
+import io.github.cctyl.nokia.common.ui.NokiaFontManager;
 import io.github.cctyl.nokia.common.ui.NokiaTheme;
 import ru.playsoftware.j2meloader.R;
 
@@ -613,6 +614,7 @@ public class NokiaSettingsStorage {
 	public static void setFontId(Context ctx, String fontId) {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putString(KEY_FONT_ID, fontId).apply();
+		NokiaFontManager.setCurrentFontId(fontId);
 		NokiaFontManager.invalidate();
 		notifySettingsChanged(ctx);
 		NokiaLog.i("SettingsStorage", "setFontId: " + fontId);
