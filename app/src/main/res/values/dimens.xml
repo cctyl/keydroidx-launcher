@@ -2,10 +2,8 @@
 <resources>
     <dimen name="height_config_row">40dp</dimen>
 
-    <!-- 诺基亚弹窗尺寸（集中管理，便于多分辨率统一调整） -->
-    <dimen name="nokia_dialog_title_bar_height">26dp</dimen>
-    <dimen name="nokia_dialog_title_text">11sp</dimen>
-    <dimen name="nokia_dialog_body_text">10sp</dimen>
-    <dimen name="nokia_dialog_content_padding">10dp</dimen>
+    <!-- 弹窗文字 Token 统一继承自 nokia-common（对齐 docs/11-typography-and-font-spec.md），
+         此处不再 override nokia_dialog_title_text / nokia_dialog_body_text，避免阻挡新规范生效。 -->
+    <!-- Launcher 安装/卸载弹窗使用较大图标，此处仅保留结构尺寸 override -->
     <dimen name="nokia_dialog_icon_size">48dp</dimen>
 </resources>
