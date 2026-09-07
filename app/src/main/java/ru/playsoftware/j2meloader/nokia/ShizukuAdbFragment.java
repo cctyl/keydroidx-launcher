@@ -52,6 +52,8 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 	private static final String TARGET_SCRIPT_NAME = "mini_shizuku.sh";
 
 	private TextView tvCommand;
+	/** 完整 adb 命令是否已生成并回填到界面。释放失败时保持 false，禁止复制到占位/错误文本。 */
+	private volatile boolean commandReady;
 
 	@Override
 	protected int getLayoutRes() {
@@ -69,13 +71,27 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 				final String cmd = buildCommand(ctx);
 				if (cmd == null) {
 					KeydroidxLog.e("ShizukuAdb", "释放脚本失败，命令不可用");
+					// 失败必须显式落到界面，否则用户看到的仍是 XML 占位符，复制出来的是残缺命令。
+					if (tvCommand != null) {
+						tvCommand.post(new Runnable() {
+							@Override
+							public void run() {
+								if (tvCommand != null) {
+									tvCommand.setText("命令生成失败：脚本释放失败，请返回后重进本页重试");
+								}
+							}
+						});
+					}
 					return;
 				}
 				if (tvCommand != null) {
 					tvCommand.post(new Runnable() {
 						@Override
 						public void run() {
-							if (tvCommand != null) tvCommand.setText(cmd);
+							if (tvCommand != null) {
+								tvCommand.setText(cmd);
+								commandReady = true;
+							}
 						}
 					});
 				}
@@ -121,7 +137,7 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 			while ((n = in.read(buf)) > 0) {
 				bos.write(buf, 0, n);
 			}
-			out = new FileOutputStream(target);
+			out = openForWrite(target);
 			// 释放前强制归一化换行符：Windows 上 core.autocrlf=true 会把 assets 污染成
 			// CRLF，mksh 执行带 \r 的脚本会报 "trap: bad signal '1" /
 			// "syntax error: unexpected 'do"，导致 mini_shizuku 激活失败。
@@ -140,6 +156,21 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 			if (out != null) {
 				try { out.close(); } catch (IOException ignored) {}
 			}
+		}
+	}
+
+	/**
+	 * 打开目标文件输出流。若目标文件已存在且无法覆盖写（例如曾用 adb push 手工推入、
+	 * 属主为 shell 的残留文件，应用 uid 无权写别人属主的文件），先删除旧文件再重建。
+	 */
+	private static OutputStream openForWrite(File target) throws IOException {
+		try {
+			return new FileOutputStream(target);
+		} catch (IOException e) {
+			if (target.exists() && target.delete()) {
+				return new FileOutputStream(target);
+			}
+			throw e;
 		}
 	}
 
@@ -163,6 +194,10 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 	/** 把当前命令文本复制到系统剪贴板。 */
 	private void copyCommand() {
 		if (tvCommand == null) return;
+		if (!commandReady) {
+			Toast.makeText(requireContext(), "命令尚未就绪", Toast.LENGTH_SHORT).show();
+			return;
+		}
 		CharSequence text = tvCommand.getText();
 		if (text == null || text.length() == 0) {
 			Toast.makeText(requireContext(), "命令尚未就绪", Toast.LENGTH_SHORT).show();
