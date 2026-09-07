@@ -28,6 +28,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
+
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.multidex.MultiDex;
 import androidx.preference.PreferenceManager;
@@ -78,6 +80,17 @@ public class EmulatorApplication extends Application {
 
 		// 向 common 注入桌面主题提供者（主进程与 :midlet 进程都需要，J2ME 层换用 common 主题后依赖此注入）
 		KeydroidxTheme.setThemeProvider(new LauncherThemeProvider());
+
+		// 同步全局字体 ID 与缩放比例（主进程与 :midlet 子进程均需同步，确保各进程弹窗与视图字号一致）
+		try {
+			float userFontScale = KeydroidxSettingsStorage.getFontScale(this);
+			String fontId = KeydroidxSettingsStorage.getFontId(this);
+			if (userFontScale > 0f) {
+				KeydroidxFontManager.setFontScale(userFontScale);
+			}
+			KeydroidxFontManager.setCurrentFontId(fontId);
+		} catch (Exception ignored) {
+		}
 
 		// 主题与向量图设置必须早期同步完成（毫秒级，直接决定首帧主题），不能延迟
 		SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);

@@ -22,6 +22,7 @@ package javax.microedition.shell;
 import static ru.playsoftware.j2meloader.util.Constants.*;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -85,6 +86,7 @@ import javax.microedition.lcdui.keyboard.VirtualKeyboard;
 import javax.microedition.location.LocationProviderImpl;
 import javax.microedition.util.ContextHolder;
 
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
 import ru.playsoftware.j2meloader.BuildConfig;
@@ -92,6 +94,7 @@ import ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity;
 import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 import ru.playsoftware.j2meloader.nokia.KeydroidxMidletKeepAliveService;
 import ru.playsoftware.j2meloader.nokia.KeydroidxOptionsDialog;
+import ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage;
 import ru.playsoftware.j2meloader.util.MidletStateStore;
 import ru.playsoftware.mini_shizuku.Shizuku;
 import ru.playsoftware.j2meloader.R;
@@ -119,6 +122,27 @@ public class MicroActivity extends AppCompatActivity {
 	private int[] nokiaKeyCodes;
 
 	public ActivityMicroBinding binding;
+
+	@Override
+	protected void attachBaseContext(Context newBase) {
+		try {
+			float userFontScale = KeydroidxSettingsStorage.getFontScale(newBase);
+			String fontId = KeydroidxSettingsStorage.getFontId(newBase);
+			if (userFontScale > 0f) {
+				KeydroidxFontManager.setFontScale(userFontScale);
+			}
+			KeydroidxFontManager.setCurrentFontId(fontId);
+		} catch (Exception ignored) {
+		}
+		Configuration config = newBase.getResources().getConfiguration();
+		if (config.fontScale != 1.0f) {
+			Configuration newConfig = new Configuration(config);
+			newConfig.fontScale = 1.0f;
+			super.attachBaseContext(newBase.createConfigurationContext(newConfig));
+		} else {
+			super.attachBaseContext(newBase);
+		}
+	}
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {

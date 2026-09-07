@@ -19,17 +19,42 @@ package ru.playsoftware.j2meloader.base;
 import static ru.playsoftware.j2meloader.util.Constants.PREF_BLACK_BACKGROUND;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.os.Bundle;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage;
 
 @SuppressLint("Registered")
 public class BaseActivity extends AppCompatActivity {
+
+	@Override
+	protected void attachBaseContext(Context newBase) {
+		try {
+			float userFontScale = KeydroidxSettingsStorage.getFontScale(newBase);
+			String fontId = KeydroidxSettingsStorage.getFontId(newBase);
+			if (userFontScale > 0f) {
+				KeydroidxFontManager.setFontScale(userFontScale);
+			}
+			KeydroidxFontManager.setCurrentFontId(fontId);
+		} catch (Exception ignored) {
+		}
+		Configuration config = newBase.getResources().getConfiguration();
+		if (config.fontScale != 1.0f) {
+			Configuration newConfig = new Configuration(config);
+			newConfig.fontScale = 1.0f;
+			super.attachBaseContext(newBase.createConfigurationContext(newConfig));
+		} else {
+			super.attachBaseContext(newBase);
+		}
+	}
 
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState) {

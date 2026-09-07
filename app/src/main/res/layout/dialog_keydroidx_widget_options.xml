@@ -22,8 +22,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#FFFFFF"
-            android:textSize="@dimen/keydroidx_dialog_title_text"
-            android:textStyle="bold" />
+            android:textSize="@dimen/keydroidx_dialog_title_text" />
     </LinearLayout>
 
     <!-- ========== 选项列表 ========== -->
