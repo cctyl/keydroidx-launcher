@@ -1716,13 +1716,29 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					String pkgAndCls = item.value;
 					if (pkgAndCls != null && pkgAndCls.contains("/")) {
 						String[] parts = pkgAndCls.split("/", 2);
+						String pkg = parts[0];
+						String cls = parts[1];
+						Context ctx = getContext();
+						if (ctx == null) return;
 						KeydroidxLog.i("Desktop", "打开应用组件: " + pkgAndCls);
+
+						Intent intent = new Intent(Intent.ACTION_MAIN);
+						intent.setClassName(pkg, cls);
+						intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+						if (KeydroidxFreezeManager.getInstance(ctx).isAppFrozen(pkg)) {
+							KeydroidxFreezeManager.getInstance(ctx).unfreezeAndLaunch(intent, pkg, item.label);
+							return;
+						}
+
 						try {
-							Intent intent = new Intent(Intent.ACTION_MAIN);
-							intent.setClassName(parts[0], parts[1]);
-							intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 							startActivity(intent);
+							KeydroidxLog.i("Desktop", "启动应用组件成功: " + item.label);
 						} catch (Exception e) {
+							// 兜底：组件可能因应用更新/状态变化而失效，重新解析当前启用入口再试一次
+							if (retryWithLaunchIntent(ctx, pkg, item.label)) {
+								return;
+							}
 							KeydroidxLog.e("Desktop", "打开应用失败: " + pkgAndCls, e);
 						}
 					}
@@ -1813,14 +1829,39 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		Context ctx = getContext();
 		if (ctx == null) return;
 		KeydroidxLog.i("Desktop", "正在播放组件点击：打开音乐播放器");
+		Intent intent = new Intent(Intent.ACTION_MAIN);
+		intent.setClassName(MUSIC_PKG, MUSIC_PLAYER_ACTIVITY);
+		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+		if (KeydroidxFreezeManager.getInstance(ctx).isAppFrozen(MUSIC_PKG)) {
+			KeydroidxFreezeManager.getInstance(ctx).unfreezeAndLaunch(intent, MUSIC_PKG, "音乐");
+			return;
+		}
+
 		try {
-			Intent intent = new Intent(Intent.ACTION_MAIN);
-			intent.setClassName(MUSIC_PKG, MUSIC_PLAYER_ACTIVITY);
-			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 			startActivity(intent);
+			KeydroidxLog.i("Desktop", "启动音乐播放器成功");
 		} catch (Exception e) {
+			if (retryWithLaunchIntent(ctx, MUSIC_PKG, "音乐")) {
+				return;
+			}
 			KeydroidxLog.e("Desktop", "打开音乐播放器失败", e);
 			Toast.makeText(ctx, "未安装音乐播放器", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	/** 启动失败兜底：用 getLaunchIntentForPackage 重新解析启用入口并启动。 */
+	private boolean retryWithLaunchIntent(Context ctx, String pkg, String label) {
+		try {
+			Intent retry = ctx.getPackageManager().getLaunchIntentForPackage(pkg);
+			if (retry == null) return false;
+			retry.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+			startActivity(retry);
+			KeydroidxLog.i("Desktop", "兜底启动成功 " + label + " -> " + retry.getComponent());
+			return true;
+		} catch (Exception e2) {
+			KeydroidxLog.e("Desktop", "兜底启动也失败 " + label, e2);
+			return false;
 		}
 	}
 
