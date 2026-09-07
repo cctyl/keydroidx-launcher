@@ -149,7 +149,7 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 	}
 
 	/** 在 setContentView() 之后调用：初始化时钟并应用分辨率缩放。 */
-	protected void setupNokiaUi() {
+	protected void setupKeydroidxUi() {
 		tvTime = findViewById(R.id.tvTime);
 		applyScale();
 		View topPanel = findViewById(R.id.topPanel);

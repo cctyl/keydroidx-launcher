@@ -28,9 +28,9 @@
 
 // 原键桌面应用包名候选（release 无后缀 / debug 带 .debug）。
 // 回桌面注入时先探测已安装的包；前台判断也用它。
-#define PKG_NOKIA_RELEASE "io.github.cctyl.nokia"
-#define PKG_NOKIA_DEBUG   "io.github.cctyl.nokia.debug"
-#define NOKIA_ACTIVITY    "ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity"
+#define PKG_KEYDROIDX_RELEASE "io.github.cctyl.nokia"
+#define PKG_KEYDROIDX_DEBUG   "io.github.cctyl.nokia.debug"
+#define KEYDROIDX_ACTIVITY    "ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity"
 
 // 注入防抖间隔（毫秒）：仅对亮屏态动作（锁屏/回桌面）生效，防止快速连按导致
 // 注入被系统忽略。息屏态（唤醒）不设防抖。500ms 足够系统完成状态切换 + 状态线程更新。
@@ -51,14 +51,14 @@ static int power_key_fd = -1;
 
 // ---- 状态缓存（由状态线程 500ms 轮询 dumpsys 更新，按键时直接读） ----
 static volatile int screen_awake = 1;        // 屏幕是否亮（默认亮，避免首次按键误锁屏）
-static volatile int front_is_nokia = 0;      // 前台窗口是否为本应用
+static volatile int front_is_keydroidx = 0;      // 前台窗口是否为本应用
 static volatile int front_is_keyguard = 0;   // 前台窗口是否为锁屏界面（Keyguard）
 static char front_package[128] = "";         // 当前前台包名（日志用）
-static char nokia_package[128] = "";         // 探测到的有效本应用包名（缓存，go home 用）
+static char keydroidx_package[128] = "";         // 探测到的有效本应用包名（缓存，go home 用）
 static long long last_inject_ms = 0;         // 上次注入时间（防抖）
 
 // ---- 页面状态（由 App 通过 JNI 上报，区分诺基亚主界面 vs 子页面） ----
-// 1 = 主界面（待机屏 NokiaDesktopFragment），0 = 子页面（功能表/设置/百宝箱等）
+// 1 = 主界面（待机屏 KeydroidxDesktopFragment），0 = 子页面（功能表/设置/百宝箱等）
 static volatile int page_is_main = 1;
 
 // ---- 长按追踪 ----
@@ -115,7 +115,7 @@ static void device_get_name(int fd, char *name, size_t max_len) {
 
 // 判断设备是否为「物理按键设备」：含目标键 + 不含 FN 功能键 + 非 uinput 虚拟设备。
 // 背景：部分手机多个设备声明同一按键（如 madev 声明 KEY_POWER 的 FN 功能键设备，
-// 以及本方案创建的 virtual-nokia-keypad 回放设备），readdir 顺序可能先遇到它们，
+// 以及本方案创建的 virtual-keydroidx-keypad 回放设备），readdir 顺序可能先遇到它们，
 // 导致 grab 错设备（物理电源键在 gpio-keys，却抓到 madev）。此处按特征优先物理设备。
 static int is_physical_key_device(int fd, int key_code) {
     if (!device_has_key(fd, key_code)) {
@@ -209,7 +209,7 @@ int setup_uinput(int evdev_fd) {
 
     struct uinput_user_dev uidev;
     memset(&uidev, 0, sizeof(uidev));
-    snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "virtual-nokia-keypad");
+    snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "virtual-keydroidx-keypad");
     uidev.id.bustype = BUS_VIRTUAL;
     uidev.id.vendor  = 0x1;
     uidev.id.product = 0x1;
@@ -324,9 +324,9 @@ static void extract_front_activity(const char *text, char *out, size_t out_sz) {
 }
 
 // 判断包名是否为本应用（release / debug）。
-static int is_nokia_package(const char *pkg) {
+static int is_keydroidx_package(const char *pkg) {
     if (!pkg || !pkg[0]) return 0;
-    return strcmp(pkg, PKG_NOKIA_RELEASE) == 0 || strcmp(pkg, PKG_NOKIA_DEBUG) == 0;
+    return strcmp(pkg, PKG_KEYDROIDX_RELEASE) == 0 || strcmp(pkg, PKG_KEYDROIDX_DEBUG) == 0;
 }
 
 // 从 dumpsys activity activities 输出提取 resumed activity 包名：
@@ -423,27 +423,27 @@ static void update_front_window() {
             LOGI("state: keyguard=%d (no pkg, raw=%s)", isKg, output);
             front_is_keyguard = isKg;
         }
-        // 解析失败时不改变 front_is_nokia / front_package（保守保持上一次有效值）
+        // 解析失败时不改变 front_is_keydroidx / front_package（保守保持上一次有效值）
         return;
     }
-    int isNokia = is_nokia_package(pkg);
+    int isKeydroidx = is_keydroidx_package(pkg);
     // jar 界面（MicroActivity）归入「非诺基亚应用」（A 态：按挂机键回桌面=挂机），
     // 行为符合《挂机键行为定义.md》界面分层；page_is_main 此时是桌面上报的陈旧值，不参与。
     char activity[256];
     extract_front_activity(output, activity, sizeof(activity));
-    if (isNokia && is_midlet_activity(activity)) {
-        isNokia = 0;
-        LOGI("state: front is MicroActivity (jar) -> treat as non-nokia");
+    if (isKeydroidx && is_midlet_activity(activity)) {
+        isKeydroidx = 0;
+        LOGI("state: front is MicroActivity (jar) -> treat as non-keydroidx");
     }
     // SystemUI 包名承载锁屏界面（Keyguard）
     int isKeyguard = (strcmp(pkg, "com.android.systemui") == 0) ? 1 : 0;
-    if (isNokia != front_is_nokia || strcmp(pkg, front_package) != 0
+    if (isKeydroidx != front_is_keydroidx || strcmp(pkg, front_package) != 0
             || isKeyguard != front_is_keyguard) {
-        LOGI("state: front window pkg=%s isNokia=%d isKeyguard=%d (was pkg=%s isNokia=%d isKeyguard=%d)",
-             pkg, isNokia, isKeyguard, front_package, front_is_nokia, front_is_keyguard);
+        LOGI("state: front window pkg=%s isKeydroidx=%d isKeyguard=%d (was pkg=%s isKeydroidx=%d isKeyguard=%d)",
+             pkg, isKeydroidx, isKeyguard, front_package, front_is_keydroidx, front_is_keyguard);
         strncpy(front_package, pkg, sizeof(front_package) - 1);
         front_package[sizeof(front_package) - 1] = '\0';
-        front_is_nokia = isNokia;
+        front_is_keydroidx = isKeydroidx;
         front_is_keyguard = isKeyguard;
     }
 }
@@ -509,24 +509,24 @@ static void inject_async(const char* cmd) {
 }
 
 // 探测有效包名（缓存，仅首次探测），供 inject_go_home / inject_lock 共用。
-static int ensure_nokia_package() {
-    if (nokia_package[0] != '\0') return 1;
+static int ensure_keydroidx_package() {
+    if (keydroidx_package[0] != '\0') return 1;
     char out[256];
-    if (run_cmd_output("pm path " PKG_NOKIA_RELEASE " 2>/dev/null", out, sizeof(out)) >= 0
+    if (run_cmd_output("pm path " PKG_KEYDROIDX_RELEASE " 2>/dev/null", out, sizeof(out)) >= 0
             && strstr(out, "package:")) {
-        strcpy(nokia_package, PKG_NOKIA_RELEASE);
-    } else if (run_cmd_output("pm path " PKG_NOKIA_DEBUG " 2>/dev/null", out, sizeof(out)) >= 0
+        strcpy(keydroidx_package, PKG_KEYDROIDX_RELEASE);
+    } else if (run_cmd_output("pm path " PKG_KEYDROIDX_DEBUG " 2>/dev/null", out, sizeof(out)) >= 0
             && strstr(out, "package:")) {
-        strcpy(nokia_package, PKG_NOKIA_DEBUG);
+        strcpy(keydroidx_package, PKG_KEYDROIDX_DEBUG);
     } else {
-        LOGE("cannot find nokia package (release/debug)");
+        LOGE("cannot find keydroidx package (release/debug)");
         return 0;
     }
-    LOGI("resolved package=%s", nokia_package);
+    LOGI("resolved package=%s", keydroidx_package);
     return 1;
 }
 
-// 通过 socket 直连 App 的 NokiaLockServer 发送指令（~2ms，无进程创建开销）。
+// 通过 socket 直连 App 的 KeydroidxLockServer 发送指令（~2ms，无进程创建开销）。
 // 返回 0=成功，-1=失败（App 未运行等）。
 static int send_via_socket(const char* msg) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -569,12 +569,12 @@ static void inject_lock() {
         LOGI("lock: sent via socket (fast path)");
     } else {
         LOGW("lock: socket failed, fallback to am broadcast");
-        if (!ensure_nokia_package()) return;
+        if (!ensure_keydroidx_package()) return;
         char cmd[400];
         snprintf(cmd, sizeof(cmd),
                  "am broadcast -a ru.playsoftware.j2meloader.nokia.LOCK_SCREEN "
-                 "-n %s/ru.playsoftware.j2meloader.nokia.NokiaLockReceiver",
-                 nokia_package);
+                 "-n %s/ru.playsoftware.j2meloader.nokia.KeydroidxLockReceiver",
+                 keydroidx_package);
         inject_async(cmd);
     }
 
@@ -592,7 +592,7 @@ static void inject_lock() {
 //   2) resumed activity（dumpsys activity）：相机/InCallUI 等浮层窗口可能让
 //      mCurrentFocus 仍指向桌面（浮层非 focusable），resumed activity 反映真实前台。
 // 复核输出解析失败时保守返回 1（不阻断既有锁屏行为）。
-static int verify_front_really_nokia() {
+static int verify_front_really_keydroidx() {
     char output[4096];
     // 1) fresh mCurrentFocus
     if (run_cmd_output("dumpsys window 2>/dev/null | grep mCurrentFocus",
@@ -602,7 +602,7 @@ static int verify_front_really_nokia() {
         extract_front_package(output, pkg, sizeof(pkg));
         extract_front_activity(output, act, sizeof(act));
         if (pkg[0]) {
-            if (!is_nokia_package(pkg)) {
+            if (!is_keydroidx_package(pkg)) {
                 LOGI("verify: fresh focus pkg=%s 非本应用 -> 降级回桌面", pkg);
                 return 0;
             }
@@ -618,7 +618,7 @@ static int verify_front_really_nokia() {
                        output, sizeof(output)) >= 0) {
         char pkg[128];
         extract_resumed_package(output, pkg, sizeof(pkg));
-        if (pkg[0] && !is_nokia_package(pkg)) {
+        if (pkg[0] && !is_keydroidx_package(pkg)) {
             LOGI("verify: resumed pkg=%s 非本应用(浮层场景) -> 降级回桌面", pkg);
             return 0;
         }
@@ -633,8 +633,8 @@ static void handle_short_press() {
         LOGI("power: consumed (debounce, %lldms since last inject)", now - last_inject_ms);
         return;
     }
-    LOGI("power: short press -> screen=%s frontIsNokia=%d isKeyguard=%d pageIsMain=%d frontPkg='%s'",
-         screen_awake ? "awake" : "asleep", front_is_nokia, front_is_keyguard, page_is_main, front_package);
+    LOGI("power: short press -> screen=%s frontIsKeydroidx=%d isKeyguard=%d pageIsMain=%d frontPkg='%s'",
+         screen_awake ? "awake" : "asleep", front_is_keydroidx, front_is_keyguard, page_is_main, front_package);
 
     if (!screen_awake) {
         // E 息屏 → 唤醒：grab 应已被状态线程释放，系统原生处理。
@@ -651,24 +651,24 @@ static void handle_short_press() {
         LOGI("power: decision=lock [F->E] (keyguard showing)");
         inject_lock();
         last_inject_ms = now_ms();
-    } else if (front_is_nokia && page_is_main) {
+    } else if (front_is_keydroidx && page_is_main) {
         // C 亮屏·原键桌面主界面 → Device Admin 锁屏（熄屏）。
         // 锁屏前即时复核前台（bug 365：相机/拨号浮层 + 2s 轮询陈旧会误判为 C 态），
         // 复核发现前台非本应用则降级 go_home。
-        if (!verify_front_really_nokia()) {
+        if (!verify_front_really_keydroidx()) {
             LOGI("power: decision=go_home [C 降级->A/B] (复核发现前台非桌面)");
             inject_go_home();
             last_inject_ms = now_ms();
         } else {
-            LOGI("power: decision=lock [C->E] (nokia main page)");
+            LOGI("power: decision=lock [C->E] (keydroidx main page)");
             inject_lock();
             last_inject_ms = now_ms();
         }
     } else {
         // A 亮屏·非诺基亚应用 → 回原键桌面主界面
         // B 亮屏·原键桌面其他界面 → 回原键桌面主界面（不锁屏）
-        LOGI("power: decision=go_home [A/B->C] (front=%s, nokia=%d, main=%d)",
-             front_package, front_is_nokia, page_is_main);
+        LOGI("power: decision=go_home [A/B->C] (front=%s, keydroidx=%d, main=%d)",
+             front_package, front_is_keydroidx, page_is_main);
         inject_go_home();
         last_inject_ms = now_ms();
     }

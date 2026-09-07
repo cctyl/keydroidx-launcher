@@ -105,8 +105,8 @@
     </style>
 
     <!-- 诺基亚桌面专用主题：屏蔽普通 Activity 的从右往左滑入/挤压动画，作为底层桌面自然显露 -->
-    <style name="Theme.NokiaDesktop" parent="AppTheme.NoActionBar">
-        <item name="android:windowAnimationStyle">@style/Animation.NokiaDesktop</item>
+    <style name="Theme.KeydroidxDesktop" parent="AppTheme.NoActionBar">
+        <item name="android:windowAnimationStyle">@style/Animation.KeydroidxDesktop</item>
     </style>
 
     <!-- MicroActivity（:midlet 进程）专用主题：冷启动/首帧前用黑底，避免原 #fafafa 近白闪屏 -->
@@ -114,7 +114,7 @@
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 
-    <style name="Animation.NokiaDesktop" parent="@android:style/Animation.Activity">
+    <style name="Animation.KeydroidxDesktop" parent="@android:style/Animation.Activity">
         <item name="android:activityOpenEnterAnimation">@null</item>
         <item name="android:activityOpenExitAnimation">@null</item>
         <item name="android:activityCloseEnterAnimation">@null</item>

@@ -56,10 +56,10 @@ if (Build.VERSION.SDK_INT >= 22) {
 - 重新 `assembleOpenDebug -x lint` 构建成功，`adb -s 4a24ecf install -r` 安装成功。
 - 启动 `KeydroidxDesktopActivity`，logcat 确认：
   - `I/ActivityManager: Displayed ... KeydroidxDesktopActivity` —— **Activity 正常显示**（首次安装 MultiDex 解压约 20s，属正常）。
-  - `I/NokiaDesktop: [Desktop] 首次启动：进入按键绑定向导` —— 桌面逻辑已跑起来。
-  - `D/NokiaSB: registerSignalListeners fallback: probe subIds (both SIMs)` + `onSignalStrengthsChanged slot=0 level=0` —— 顶栏信号走 API 19 单卡降级路径，正常工作。
+  - `I/KeydroidxDesktop: [Desktop] 首次启动：进入按键绑定向导` —— 桌面逻辑已跑起来。
+  - `D/KeydroidxSB: registerSignalListeners fallback: probe subIds (both SIMs)` + `onSignalStrengthsChanged slot=0 level=0` —— 顶栏信号走 API 19 单卡降级路径，正常工作。
   - 原 `NoClassDefFoundError: android.telephony.SubscriptionManager` 已消失。
-- 日志残留 `E/dalvikvm: Could not find class 'android.telephony.SubscriptionManager'` 等是 **Dalvik 验证器无害告警（VFY）**：类引用已被 `SDK_INT >= 22` 守卫、运行时不进入该分支，方法完整执行（后续 `NokiaSB` 日志可证），**非崩溃**。不同 4.4 ROM 的验证器严格度可能不同，但本设备实测通过。
+- 日志残留 `E/dalvikvm: Could not find class 'android.telephony.SubscriptionManager'` 等是 **Dalvik 验证器无害告警（VFY）**：类引用已被 `SDK_INT >= 22` 守卫、运行时不进入该分支，方法完整执行（后续 `KeydroidxSB` 日志可证），**非崩溃**。不同 4.4 ROM 的验证器严格度可能不同，但本设备实测通过。
 - 说明：该 4.4 设备的 `screencap` 无法取帧（pull 仅 1024 字节），故未做截图目视确认；以 logcat 中 Activity `Displayed` + 桌面启动日志为判定依据。
 
 ## 七、受影响文件

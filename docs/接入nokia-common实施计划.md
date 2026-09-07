@@ -90,7 +90,7 @@ common 版是后出的重构版、能力超集（v 级/分级持久化/installCr
 | `setEnabled/isEnabled` | 全仓库无调用方，死代码，删 |
 | `fileCrash(String, Throwable)`（EmulatorApplication 一处） | 改调 common `fileCrash(Thread, Throwable)` |
 
-同步方式：EmulatorApplication 调 common `init(ctx)` + `setTag("NokiaDesktop")` 保持 logcat TAG 不变；600+ 调用点 `d(sub,msg)` 与 common `d(tag,msg)` 形参兼容，纯机械换 import；桌面 `log_file_enabled` 设置项保留、内部代理到 common 分级控制（`nokia_desktop_settings` 的 key 不变）。
+同步方式：EmulatorApplication 调 common `init(ctx)` + `setTag("KeydroidxDesktop")` 保持 logcat TAG 不变；600+ 调用点 `d(sub,msg)` 与 common `d(tag,msg)` 形参兼容，纯机械换 import；桌面 `log_file_enabled` 设置项保留、内部代理到 common 分级控制（`nokia_desktop_settings` 的 key 不变）。
 
 ### D7 feedback 反馈 —— ✅ 已决：直接接入 ⚠️ 非收敛项
 
@@ -149,7 +149,7 @@ common 版是后出的重构版、能力超集（v 级/分级持久化/installCr
   - `EmulatorApplication` 在 `KeydroidxLog.init(this)` 后用 `KeydroidxSettingsStorage.isFileLogEnabled()` 覆盖 common 初始化出的 `sFileMinLevel`。
   - `KeydroidxSettingsStorage.setFileLogEnabled()` 双写：写桌面 SP 后调用 `KeydroidxLog.setDetailedLogEnabled()`，让 common SP 同步，保证两端取值一致。
 - common `KeydroidxLog.init` 在 `Application.attachBaseContext()` 阶段会因 `getApplicationContext()` 为 null 而 NPE，已修复 common（回退到传入 Context + 加保护）。
-- 标签语义变化：桌面原 `[sub] msg` 统一由 logcat tag 承载，即原 sub 字符串成为 common 的 tag；日志文件不再含统一 `NokiaDesktop` tag。adb 过滤改为 `-s Desktop:* KeyBinding:*` 等组合。
+- 标签语义变化：桌面原 `[sub] msg` 统一由 logcat tag 承载，即原 sub 字符串成为 common 的 tag；日志文件不再含统一 `KeydroidxDesktop` tag。adb 过滤改为 `-s Desktop:* KeyBinding:*` 等组合。
 走查：日志落盘、7 天轮转、debug/release 默认级别、设置页日志开关、崩溃 CRASH 记录、:midlet 进程是否也记录（本阶段仍保持仅主进程）。
 
 **2.6 KeydroidxTheme**（26 文件，含 J2ME 层 3 处）— 已完成
@@ -179,7 +179,7 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 
 **~~待做（第 2 步）~~ — ❌ 已评估取消（2026-08-29）**：
 5. ~~桌面三个页面基类**保留**（240dp/壁纸/isDirectionEnabled 等桌面语义），把 `(KeydroidxDesktopActivity) requireActivity()` 强转改为宿主接口调用。~~
-   **取消理由**：按「消除两套重复 UI」的动机逐条审视——桌面页面在 common 中**没有对应的另一份**，本身不构成"两套"，改强转不产生任何收敛收益；页面所依赖的能力（`openFragment`/`getScale`/`getMidPanelHeight` 等）全部是桌面专有，即便抽象成 `NokiaDesktopHost extends KeydroidxPageHost` 也只能是桌面接口，页面依然搬不进 common（即所谓"下沉"），接口化收益（可测性/解耦）在本工程无单测、无第二宿主的现状下为零。约 90 处强转属于「页面本来就该依赖桌面宿主」的正常代码，保留原样。
+   **取消理由**：按「消除两套重复 UI」的动机逐条审视——桌面页面在 common 中**没有对应的另一份**，本身不构成"两套"，改强转不产生任何收敛收益；页面所依赖的能力（`openFragment`/`getScale`/`getMidPanelHeight` 等）全部是桌面专有，即便抽象成 `KeydroidxDesktopHost extends KeydroidxPageHost` 也只能是桌面接口，页面依然搬不进 common（即所谓"下沉"），接口化收益（可测性/解耦）在本工程无单测、无第二宿主的现状下为零。约 90 处强转属于「页面本来就该依赖桌面宿主」的正常代码，保留原样。
 
 **阶段 3 走查（已完成，2026-08-29 全页面回归）**：功能表/百宝箱/桌面设置 6 组及子页（外观与显示、字体选择、主题设置、按键绑定、桌面内容各子页、系统与权限、高级设置、关于）+ 通用选项弹窗逐一进入/返回，底栏三栏文案逐页核对正确，零崩溃；主题列表显示桌面命名（common 调色板已对齐）。锁屏键、录制态按键捕获、Shizuku 页面状态上报未覆盖（需真机手动验证）。
 

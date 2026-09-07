@@ -72,7 +72,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		super.onCreate(savedInstanceState);
 		sInstance = this;
 		setContentView(R.layout.activity_nokia);
-		setupNokiaUi();
+		setupKeydroidxUi();
 		findViewById(R.id.midPanel).setVisibility(View.VISIBLE);
 
 		// 底部软键触摸点击：等效于对应物理软键（修复「桌面设置」等页触摸返回无效）

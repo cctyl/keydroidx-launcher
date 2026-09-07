@@ -364,7 +364,7 @@ import ru.woesss.j2me.installer.InstallerDialog;
  * 4. 不改动 AppInstaller 和 InstallerDialog 的任何逻辑
  */
 public class KeydroidxInstallerDialog extends DialogFragment {
-    private static final String TAG = "NokiaInstaller";
+    private static final String TAG = "KeydroidxInstaller";
     private static final String ARG_URI = "uri";
 
     // UI 状态
