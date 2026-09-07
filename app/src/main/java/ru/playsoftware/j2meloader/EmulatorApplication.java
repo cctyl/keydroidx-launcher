@@ -100,8 +100,7 @@ public class EmulatorApplication extends Application {
 			// 意见反馈组件：仅主进程需要。logDir 传 null → 复用 KeydroidxLog 的默认日志目录，
 			// 保证「附带运行日志」抓到的就是我们实际落盘的那份。
 			KeydroidxFeedback.init(new KeydroidxFeedbackConfig(
-					BuildConfig.FEEDBACK_UPLOAD_URL,
-					BuildConfig.FEEDBACK_INSTALL_URL,
+					BuildConfig.FEEDBACK_URL,
 					BuildConfig.FEEDBACK_SECRET_KEY,
 					"KeydroidX-Launcher",
 					BuildConfig.VERSION_NAME,
