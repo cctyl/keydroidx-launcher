@@ -3,6 +3,7 @@ package ru.playsoftware.j2meloader.nokia;
 import android.app.Dialog;
 import android.os.Bundle;
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxDialogFocus;
 import android.view.Gravity;
@@ -124,7 +125,10 @@ public class KeydroidxUninstallDialog extends DialogFragment {
 		});
 
 		// Android 12+：Dialog 窗口首个导航键会被触摸模式吞掉，show 后强制退出该状态
-		dialog.setOnShowListener(d -> KeydroidxDialogFocus.forceNonTouchMode(dialog));
+		dialog.setOnShowListener(d -> {
+			KeydroidxFontManager.applyToViewTree(dialog.getWindow().getDecorView());
+			KeydroidxDialogFocus.forceNonTouchMode(dialog);
+		});
 
 		return dialog;
 	}

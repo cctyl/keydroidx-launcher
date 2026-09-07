@@ -30,6 +30,7 @@ import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxDialogFocus;
 import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
@@ -131,7 +132,10 @@ public class KeydroidxInstallerDialog extends DialogFragment {
 		if (bottomBar != null) bottomBar.setBackground(KeydroidxTheme.createSoftKeyDrawable(theme));
 
 		// Android 12+：Dialog 窗口首个导航键会被触摸模式吞掉，show 后强制退出该状态
-		dialog.setOnShowListener(d -> KeydroidxDialogFocus.forceNonTouchMode(dialog));
+		dialog.setOnShowListener(d -> {
+			KeydroidxFontManager.applyToViewTree(dialog.getWindow().getDecorView());
+			KeydroidxDialogFocus.forceNonTouchMode(dialog);
+		});
 
 		return dialog;
 	}

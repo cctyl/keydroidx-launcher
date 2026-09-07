@@ -118,6 +118,7 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
 **模拟器核心 `org.microemu`。** MicroEmu Java ME 模拟器的 fork，负责类加载、MIDlet 生命周期与事件循环。`javax.microedition.shell.MicroActivity`（连同 `MidletThread`/`MidletSystem`）才是真正启动并驱动一个 MIDlet 的东西。
 
 **双进程隔离。** `MainActivity`（原 J2ME-Loader 启动器、文件选择器、应用列表）运行在默认进程中 —— 注意它 **已不再是应用的主界面**；真正的 Home/桌面入口是 `KeydroidxDesktopActivity`（见开发重心与入口说明）。游戏本身通过 `MicroActivity` 运行在独立的 `:midlet` 进程中（`android:process=":midlet"`，见 `AndroidManifest.xml`），因此崩溃的 MIDlet 不会拖垮宿主应用。`com.nokia.mid.ui.NotificationBroadcastReceiver` 也处在 `:midlet` 进程中。
+> ⚠️ **多进程避坑注意**：`:midlet` 子进程拥有独立的 JVM 内存空间，`KeydroidxFontManager.sFontScale` 静态变量不会跨进程自动同步。子进程必须在 `EmulatorApplication.onCreate()` 与 `MicroActivity.attachBaseContext()` 中主动从 `KeydroidxSettingsStorage` 读取 `fontScale` 与 `fontId` 并注入，同时锁定 `Configuration.fontScale = 1.0f`。
 
 **基于 NDK 的原生 3D。** `app/src/main/cpp` 通过 ndkBuild（`Android.mk`）构建两个共享库：`javam3g`（基于 OpenGL ES 1.1 的 Mascot Capsule 3D `m3g`，提供 `javax.microedition.m3g`）与 `micro3d`（Micro3D V3 引擎绑定）。正是这段原生代码使得工程固定使用较旧的 NDK 22.1.7171670，并且 Gradle 需要安装 NDK。
 
@@ -128,7 +129,7 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
 - **Shell / 中枢层**：`KeydroidxBaseActivity`（240dp 设计基准 + `scaleMidContent`/`scalePanelContent` 整体缩放、density 修正、`applyBottomText` 动态字号）与 `KeydroidxDesktopActivity`（按键分发 `dispatchKeyEvent`、DOWN/UP 配对 `lastHandledDownKeyCode`、`refreshPageBar()` 页面装配、暴露 `getKeyBinding()`/`getScale()`/`getMidPanelHeight()`）。
 - **页面契约层**：`KeydroidxPage`（extends `KeydroidxFocusHost`）提供 `getPageTitle()`/`getSoftLeftText()`/`getSoftRightText()`，由 Activity 声明式装配底部三栏；各页面 Fragment（功能表、百宝箱、桌面设置、组件向导等）实现它并调用 `host.refreshPageBar()`。
 - **按键语义层**：`KeydroidxKeyBinding` 把 keyCode 解析成语义动作（`ACTION_SOFT_LEFT`/`RIGHT`/`SELECT`/`LEFT`/`RIGHT`），弹窗必须自己接入（Dialog 是独立 Window，Activity 的 dispatch 对弹窗无效），禁止写死 keyCode。
-- **通用弹窗层**：`KeydroidxOptionsDialog`（唯一通用「选项/菜单列表」弹窗，`OptionItem` 模型 + `setItems()` 刷新），复用 `dialog_keydroidx_widget_options.xml`；其余安装/卸载等专用弹窗不得给软键加高亮/焦点。
+- **通用弹窗层**：`KeydroidxOptionsDialog`（唯一通用「选项/菜单列表」弹窗，`OptionItem` 模型 + `setItems()` 刷新），复用 `dialog_keydroidx_widget_options.xml`；遵循排版规范（标题 13sp `keydroidx_dialog_title_text`，选项 11sp `keydroidx_dialog_body_text`）；其余安装/卸载等专用弹窗不得给软键加高亮/焦点，且必须在 `onShow` 中调用 `KeydroidxFontManager.applyToViewTree()` 渲染点阵字体与缩放。
 - **工具与系统信息层**：`KeydroidxDimens.dp()`（唯一尺寸换算入口，禁止裸写 px/density）、`KeydroidxDashedLineDrawable`（点线分隔线标准实现）、`StatusBarController`（顶栏信号/WiFi/电量/时间，`SubscriptionManager` 需 `SDK_INT>=22` 守卫）、`KeydroidxLockScreen`（设备管理员锁屏，`ADD_DEVICE_ADMIN` 不加 NEW_TASK）。
 - **布局约束**：Fragment 根布局**宽度固定 240dp**、高度 `match_parent`（或 ≤panelH），网格行数走 `getMidPanelHeight()` 实测反推 + `view.post` 延迟到布局完成，scale 一律走 `getScale()` 单一来源。
 
