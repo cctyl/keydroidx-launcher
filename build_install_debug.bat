@@ -5,7 +5,7 @@ REM ============================================================
 REM  One-click: build openDebug APK, then install to device(s)
 REM  via adb.  install_debug.py reads APK directly from the
 REM  build output directory -- no stale /dist cache involved.
-REM  After install, NokiaDesktopActivity is launched on every
+REM  After install, KeydroidxDesktopActivity is launched on every
 REM  targeted device.
 REM
 REM  Usage:
@@ -14,7 +14,7 @@ REM    build_install_debug.bat <serial>   (build + install + launch only on give
 REM ============================================================
 
 set "ROOT=%~dp0"
-set "COMPONENT=io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity"
+set "COMPONENT=io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity"
 
 echo [1/4] Building openDebug APK ...
 call "%ROOT%gradlew.bat" assembleOpenDebug
@@ -41,7 +41,7 @@ if not "%RC%"=="0" (
     exit /b %RC%
 )
 
-echo [3/4] Launching NokiaDesktopActivity on device(s) ...
+echo [3/4] Launching KeydroidxDesktopActivity on device(s) ...
 if not "%~1"=="" (
     echo   - %~1
     adb -s "%~1" shell am start -n %COMPONENT%
