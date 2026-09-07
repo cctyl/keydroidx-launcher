@@ -185,14 +185,14 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 			// 1. 字体图标/文字预览
 			TextView tvIcon = new TextView(requireContext());
 			tvIcon.setText("Aa");
-			tvIcon.setTextSize(16);
+			KeydroidxFontManager.textSize(tvIcon, 13);
 			tvIcon.setTextColor(currentTheme.accentColor);
 			Typeface sampleTf = KeydroidxFontManager.loadTypeface(requireContext(), item.id);
 			if (sampleTf != null) {
 				tvIcon.setTypeface(sampleTf);
 			}
 			LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(
-					KeydroidxDimens.dp(getResources(), 32), ViewGroup.LayoutParams.WRAP_CONTENT
+					KeydroidxDimens.dp(getResources(), 28), ViewGroup.LayoutParams.WRAP_CONTENT
 			);
 			tvIcon.setLayoutParams(iconLp);
 			tvIcon.setGravity(Gravity.CENTER);
@@ -208,7 +208,7 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 			TextView tvName = new TextView(requireContext());
 			tvName.setText(item.name);
 			tvName.setTextColor(Color.WHITE);
-			tvName.setTextSize(14);
+			KeydroidxFontManager.textSize(tvName, 12);
 			tvName.setSingleLine(true);
 			tvName.setEllipsize(TextUtils.TruncateAt.END);
 			if (sampleTf != null) {
@@ -219,7 +219,7 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 			TextView tvDesc = new TextView(requireContext());
 			tvDesc.setText(item.description);
 			tvDesc.setTextColor(0xAAFFFFFF);
-			tvDesc.setTextSize(11);
+			KeydroidxFontManager.textSize(tvDesc, 9);
 			tvDesc.setSingleLine(true);
 			tvDesc.setEllipsize(TextUtils.TruncateAt.END);
 			infoLayout.addView(tvDesc);

@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -120,7 +121,7 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 
 	private void updatePreview(float scale) {
 		if (tvPreviewText != null) {
-			tvPreviewText.setTextSize(13 * scale);
+			tvPreviewText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12 * scale);
 		}
 	}
 

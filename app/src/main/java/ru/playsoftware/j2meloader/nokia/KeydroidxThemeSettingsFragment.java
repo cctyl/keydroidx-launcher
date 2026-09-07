@@ -1,5 +1,6 @@
 package ru.playsoftware.j2meloader.nokia;
 
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.github.cctyl.nokia.common.ui.KeydroidxIcons;
 
 import android.graphics.Color;
@@ -151,7 +152,7 @@ public class KeydroidxThemeSettingsFragment extends KeydroidxListPageFragment {
 			TextView tv = new TextView(requireContext());
 			tv.setText(item.name);
 			tv.setTextColor(Color.WHITE);
-			tv.setTextSize(14);
+			KeydroidxFontManager.textSize(tv, 12);
 			LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
 			tv.setLayoutParams(tvLp);
 			row.addView(tv);

@@ -180,7 +180,7 @@ public class KeydroidxQuickToggleSettingsFragment extends KeydroidxPageFragment 
 			// 3. 开关名称
 			TextView tvName = new TextView(getContext());
 			tvName.setText(item.name);
-			tvName.setTextSize(13);
+			KeydroidxFontManager.textSize(tvName, 12);
 			tvName.setTextColor(0xFFFFFFFF);
 			LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
 			tvName.setLayoutParams(nameLp);
@@ -190,7 +190,7 @@ public class KeydroidxQuickToggleSettingsFragment extends KeydroidxPageFragment 
 			if (mode == MODE_SORT && lifted && liftedIndex == i) {
 				TextView tvLifted = new TextView(getContext());
 				tvLifted.setText("已拎起");
-				tvLifted.setTextSize(11);
+				KeydroidxFontManager.textSize(tvLifted, 9);
 				tvLifted.setTextColor(0xFF00E5FF);
 				row.addView(tvLifted);
 			}
