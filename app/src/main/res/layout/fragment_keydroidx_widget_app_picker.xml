@@ -22,7 +22,7 @@
             android:layout_marginTop="4dp"
             android:text="选择应用"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="@dimen/keydroidx_font_title"
             android:textStyle="bold" />
 
         <TextView
@@ -33,7 +33,7 @@
             android:layout_marginTop="4dp"
             android:text="1/1"
             android:textColor="#AAAAAA"
-            android:textSize="11sp" />
+            android:textSize="@dimen/keydroidx_font_small_title" />
     </LinearLayout>
 
     <!-- 搜索框 -->
@@ -55,7 +55,7 @@
         android:singleLine="true"
         android:textColor="#FFFFFF"
         android:textColorHint="#88FFFFFF"
-        android:textSize="11sp" />
+        android:textSize="@dimen/keydroidx_font_small_title" />
 
     <!-- 匹配结果计数：无搜索词时隐藏（保留占位） -->
     <TextView
@@ -67,7 +67,7 @@
         android:visibility="invisible"
         android:text=""
         android:textColor="#AAAAAA"
-        android:textSize="10sp" />
+        android:textSize="@dimen/keydroidx_font_caption" />
 
     <!-- 宫格容器：行由代码动态填充 -->
     <LinearLayout
@@ -89,5 +89,5 @@
         android:paddingTop="20dp"
         android:text=""
         android:textColor="#AAAAAA"
-        android:textSize="12sp" />
+        android:textSize="@dimen/keydroidx_font_body" />
 </LinearLayout>

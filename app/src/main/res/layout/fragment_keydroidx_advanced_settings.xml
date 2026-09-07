@@ -17,7 +17,7 @@
         android:paddingBottom="2dp"
         android:text="本页面的功能均需要mini_shizuku支持"
         android:textColor="#9FB3D1"
-        android:textSize="11sp" />
+        android:textSize="@dimen/keydroidx_font_small_title" />
 
     <ScrollView
         android:id="@+id/settingsScroll"

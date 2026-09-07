@@ -40,7 +40,7 @@
                     android:layout_height="wrap_content"
                     android:text="1"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/keydroidx_font_caption" />
 
                 <ImageView
                     android:id="@+id/ivSignal1"
@@ -65,7 +65,7 @@
                     android:layout_height="wrap_content"
                     android:text="2"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp" />
+                    android:textSize="@dimen/keydroidx_font_caption" />
 
                 <ImageView
                     android:id="@+id/ivSignal2"
@@ -127,7 +127,7 @@
             android:layout_height="wrap_content"
             android:text="09:55"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="@dimen/keydroidx_font_title"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -149,7 +149,7 @@
             android:layout_height="wrap_content"
             android:text=""
             android:textColor="#FFFFFF"
-            android:textSize="10sp" />
+            android:textSize="@dimen/keydroidx_font_caption" />
 
         <TextView
             android:id="@+id/tvCarrier2"
@@ -158,6 +158,6 @@
             android:layout_marginStart="10dp"
             android:text=""
             android:textColor="#FFFFFF"
-            android:textSize="10sp" />
+            android:textSize="@dimen/keydroidx_font_caption" />
     </LinearLayout>
 </LinearLayout>

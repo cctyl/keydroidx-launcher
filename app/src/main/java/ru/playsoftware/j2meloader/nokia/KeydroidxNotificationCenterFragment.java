@@ -214,7 +214,7 @@ public class KeydroidxNotificationCenterFragment extends KeydroidxListPageFragme
 		tvApp.setTextColor(0xFF9DB4E0);
 		tvApp.setSingleLine(true);
 		tvApp.setEllipsize(android.text.TextUtils.TruncateAt.END);
-		KeydroidxFontManager.textSize(tvApp, 10);
+		KeydroidxFontManager.textSize(tvApp, 9);
 		line1.addView(tvApp);
 
 		TextView tvTime = new TextView(requireContext());
@@ -246,7 +246,7 @@ public class KeydroidxNotificationCenterFragment extends KeydroidxListPageFragme
 			tvText.setTextColor(0xFFB8C8EA);
 			tvText.setSingleLine(true);
 			tvText.setEllipsize(android.text.TextUtils.TruncateAt.END);
-			KeydroidxFontManager.textSize(tvText, 10);
+			KeydroidxFontManager.textSize(tvText, 9);
 			body.addView(tvText);
 		}
 		row.addView(body);

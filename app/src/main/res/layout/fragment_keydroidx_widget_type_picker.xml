@@ -15,7 +15,7 @@
         android:layout_marginTop="4dp"
         android:text="选择组件类型"
         android:textColor="#FFFFFF"
-        android:textSize="13sp"
+        android:textSize="@dimen/keydroidx_font_title"
         android:textStyle="bold" />
 
     <ScrollView

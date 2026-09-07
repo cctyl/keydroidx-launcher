@@ -16,7 +16,7 @@
         android:layout_marginTop="4dp"
         android:text="输入名称"
         android:textColor="#FFFFFF"
-        android:textSize="13sp"
+        android:textSize="@dimen/keydroidx_font_title"
         android:textStyle="bold" />
 
     <!-- 表单区域 -->
@@ -36,7 +36,7 @@
             android:layout_marginBottom="2dp"
             android:text="显示名称"
             android:textColor="#AAAAAA"
-            android:textSize="10sp" />
+            android:textSize="@dimen/keydroidx_font_caption" />
 
         <!-- 名称输入框：三态（焦点态/编辑态/非焦点态）由代码管理 -->
         <EditText
@@ -57,7 +57,7 @@
             android:paddingBottom="6dp"
             android:textColor="#FFFFFF"
             android:textColorHint="#88FFFFFF"
-            android:textSize="11sp" />
+            android:textSize="@dimen/keydroidx_font_small_title" />
     </LinearLayout>
 
     <!-- 保存按钮区域 -->
@@ -77,7 +77,7 @@
             android:paddingBottom="6dp"
             android:text="保存"
             android:textColor="#2196F3"
-            android:textSize="12sp"
+            android:textSize="@dimen/keydroidx_font_body"
             android:clickable="true" />
     </FrameLayout>
 </LinearLayout>

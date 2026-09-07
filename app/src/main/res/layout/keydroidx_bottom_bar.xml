@@ -27,7 +27,7 @@
             android:singleLine="true"
             android:ellipsize="end"
             android:textColor="#64b5f6"
-            android:textSize="11sp" />
+            android:textSize="@dimen/keydroidx_font_small_title" />
 
         <TextView
             android:id="@+id/bottomCenter"
@@ -38,7 +38,7 @@
             android:singleLine="true"
             android:ellipsize="middle"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="@dimen/keydroidx_font_body"
             android:textStyle="bold" />
 
         <TextView
@@ -50,6 +50,6 @@
             android:singleLine="true"
             android:ellipsize="end"
             android:textColor="#64b5f6"
-            android:textSize="11sp" />
+            android:textSize="@dimen/keydroidx_font_small_title" />
     </LinearLayout>
 </LinearLayout>

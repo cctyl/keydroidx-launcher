@@ -551,7 +551,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				hint.setGravity(Gravity.CENTER);
 				hint.setText("（无快捷应用）");
 				hint.setTextColor(0xFF888888);
-				KeydroidxFontManager.textSize(hint, 10);
+				KeydroidxFontManager.textSize(hint, 9);
 				container.addView(hint);
 			}
 		} else {
@@ -701,7 +701,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					0, 0);
 			hint.setText("无更多备忘");
 			hint.setTextColor(0xFF888888);
-			KeydroidxFontManager.textSize(hint, 10);
+			KeydroidxFontManager.textSize(hint, 9);
 			notifArea.addView(hint);
 			KeydroidxLog.i("Desktop", "组件区为空");
 		} else {
@@ -1507,7 +1507,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		infoTv.setLayoutParams(new LinearLayout.LayoutParams(
 				LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 		infoTv.setTextColor(0xFFAAAAAA);
-		KeydroidxFontManager.textSize(infoTv, 10);
+		KeydroidxFontManager.textSize(infoTv, 9);
 		infoTv.setGravity(Gravity.END);
 		infoTv.setSingleLine(true);
 		infoTv.setText(getWidgetInfoText(item));

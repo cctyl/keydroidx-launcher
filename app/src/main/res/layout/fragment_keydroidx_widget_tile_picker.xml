@@ -29,7 +29,7 @@
         android:gravity="center"
         android:text="未找到可用的快捷开关"
         android:textColor="#888888"
-        android:textSize="12sp"
+        android:textSize="@dimen/keydroidx_font_body"
         android:visibility="gone" />
 
 </LinearLayout>

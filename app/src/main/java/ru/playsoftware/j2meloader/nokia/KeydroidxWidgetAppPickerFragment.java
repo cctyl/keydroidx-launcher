@@ -568,7 +568,7 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 					// 右上角 📌 角标（仅当前编辑项）
 					TextView badge = new TextView(requireContext());
 					badge.setText("📌");
-					KeydroidxFontManager.textSize(badge, 10);
+					KeydroidxFontManager.textSize(badge, 7);
 					badge.setTextColor(0xFFFFFFFF);
 					FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
 							FrameLayout.LayoutParams.WRAP_CONTENT,

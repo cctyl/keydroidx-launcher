@@ -16,7 +16,7 @@
         android:layout_marginTop="4dp"
         android:text="已选 0 / 15 项"
         android:textColor="#64b5f6"
-        android:textSize="10sp" />
+        android:textSize="@dimen/keydroidx_font_caption" />
 
     <ScrollView
         android:id="@+id/widgetScroll"

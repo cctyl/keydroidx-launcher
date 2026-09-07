@@ -229,7 +229,7 @@ public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment
 			tvLabel.setLayoutParams(lpText);
 			tvLabel.setText(info.getDisplayTitle());
 			tvLabel.setTextColor(0xFFFFFFFF);
-			KeydroidxFontManager.textSize(tvLabel, 13);
+			KeydroidxFontManager.textSize(tvLabel, 12);
 			tvLabel.setSingleLine(true);
 			tvLabel.setEllipsize(TextUtils.TruncateAt.END);
 			row.addView(tvLabel);

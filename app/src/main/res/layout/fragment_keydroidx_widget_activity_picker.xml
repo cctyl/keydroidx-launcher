@@ -22,7 +22,7 @@
             android:layout_marginTop="4dp"
             android:text="选择Activity"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="@dimen/keydroidx_font_title"
             android:textStyle="bold" />
 
         <TextView
@@ -33,7 +33,7 @@
             android:layout_marginTop="4dp"
             android:text="1/1"
             android:textColor="#AAAAAA"
-            android:textSize="11sp" />
+            android:textSize="@dimen/keydroidx_font_small_title" />
     </LinearLayout>
 
     <!-- 列表容器：行由代码动态构建 -->
@@ -64,5 +64,5 @@
         android:paddingTop="20dp"
         android:text="该应用没有可用的Activity"
         android:textColor="#AAAAAA"
-        android:textSize="12sp" />
+        android:textSize="@dimen/keydroidx_font_body" />
 </LinearLayout>

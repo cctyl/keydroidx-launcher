@@ -23,7 +23,7 @@
             android:layout_weight="1"
             android:text="按键绑定向导"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="@dimen/keydroidx_font_title"
             android:textStyle="bold" />
 
         <TextView
@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"
             android:text=""
             android:textColor="#64b5f6"
-            android:textSize="9sp" />
+            android:textSize="@dimen/keydroidx_font_caption" />
     </LinearLayout>
 
     <!-- 分隔线 -->
@@ -63,7 +63,7 @@
                 android:gravity="center"
                 android:text="欢迎使用 KeydroidX 原键桌面"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="@dimen/keydroidx_font_body"
                 android:textStyle="bold" />
 
             <TextView
@@ -73,7 +73,7 @@
                 android:gravity="center"
                 android:text="是否需要绑定实体按键？\n（绑定后可完全用方向键操作）"
                 android:textColor="#9fb3d1"
-                android:textSize="9sp" />
+                android:textSize="@dimen/keydroidx_font_caption" />
 
             <LinearLayout
                 android:id="@+id/introBind"
@@ -90,7 +90,7 @@
                     android:layout_height="wrap_content"
                     android:text="立即绑定"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp"
+                    android:textSize="@dimen/keydroidx_font_body"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -108,7 +108,7 @@
                     android:layout_height="wrap_content"
                     android:text="跳过，稍后设置"
                     android:textColor="#9fb3d1"
-                    android:textSize="12sp" />
+                    android:textSize="@dimen/keydroidx_font_body" />
             </LinearLayout>
         </LinearLayout>
 
@@ -129,7 +129,7 @@
                 android:layout_marginBottom="12dp"
                 android:text="第 1 / 7 项"
                 android:textColor="#64b5f6"
-                android:textSize="10sp"
+                android:textSize="@dimen/keydroidx_font_caption"
                 android:textStyle="bold" />
 
             <TextView
@@ -139,7 +139,7 @@
                 android:gravity="center"
                 android:text="请按下『确定』键"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="@dimen/keydroidx_font_title"
                 android:textStyle="bold" />
 
             <TextView
@@ -149,7 +149,7 @@
                 android:gravity="center"
                 android:text="按下对应实体键即完成绑定"
                 android:textColor="#9fb3d1"
-                android:textSize="9sp" />
+                android:textSize="@dimen/keydroidx_font_caption" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -158,7 +158,7 @@
                 android:gravity="center"
                 android:text="（直接按下实体键即可绑定）"
                 android:textColor="#9fb3d1"
-                android:textSize="9sp" />
+                android:textSize="@dimen/keydroidx_font_caption" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -167,7 +167,7 @@
                 android:gravity="center"
                 android:text="（不想绑定可点下方『跳过此项』）"
                 android:textColor="#9fb3d1"
-                android:textSize="9sp" />
+                android:textSize="@dimen/keydroidx_font_caption" />
 
             <TextView
                 android:id="@+id/recordSkip"
@@ -177,7 +177,7 @@
                 android:gravity="center"
                 android:text="跳过此项"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="@dimen/keydroidx_font_body"
                 android:textStyle="bold"
                 android:background="@drawable/bg_keydroidx_selected_dark"
                 android:paddingStart="18dp"
@@ -211,7 +211,7 @@
                     android:gravity="center"
                     android:text="设置完成"
                     android:textColor="#64b5f6"
-                    android:textSize="14sp"
+                    android:textSize="@dimen/keydroidx_font_title"
                     android:textStyle="bold" />
 
                 <TextView
@@ -222,7 +222,7 @@
                     android:lineSpacingMultiplier="1.25"
                     android:text="许多高级功能都需要开启 mini_shizuku 的支持，\n例如：挂机键拦截、后台管理、快捷开关等。\n\n你可以在「桌面设置」→「高级设置」中找到它。"
                     android:textColor="#E0E0E0"
-                    android:textSize="10sp" />
+                    android:textSize="@dimen/keydroidx_font_caption" />
 
                 <TextView
                     android:id="@+id/doneBtn"
@@ -232,7 +232,7 @@
                     android:gravity="center"
                     android:text="进入桌面"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp"
+                    android:textSize="@dimen/keydroidx_font_body"
                     android:textStyle="bold"
                     android:background="@drawable/bg_keydroidx_selected_dark"
                     android:paddingStart="22dp"

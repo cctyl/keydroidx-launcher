@@ -24,7 +24,7 @@
             android:layout_height="wrap_content"
             android:text="方向键选择，确认键录制"
             android:textColor="#9fb3d1"
-            android:textSize="10sp" />
+            android:textSize="@dimen/keydroidx_font_caption" />
     </LinearLayout>
 
     <!-- 分隔线 -->
@@ -74,7 +74,7 @@
             android:layout_height="wrap_content"
             android:text=""
             android:textColor="#64b5f6"
-            android:textSize="11sp"
+            android:textSize="@dimen/keydroidx_font_small_title"
             android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

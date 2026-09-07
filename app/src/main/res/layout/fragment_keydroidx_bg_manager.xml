@@ -29,7 +29,7 @@
                 android:layout_height="wrap_content"
                 android:text="运行"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="@dimen/keydroidx_font_body"
                 android:textStyle="bold" />
 
             <View
@@ -53,7 +53,7 @@
                 android:layout_height="wrap_content"
                 android:text="受保护"
                 android:textColor="#8A93A5"
-                android:textSize="12sp" />
+                android:textSize="@dimen/keydroidx_font_body" />
 
             <View
                 android:id="@+id/tabProtUnderline"
@@ -73,7 +73,7 @@
         android:layout_marginStart="10dp"
         android:layout_marginTop="3dp"
         android:textColor="#8A93A5"
-        android:textSize="9sp" />
+        android:textSize="@dimen/keydroidx_font_caption" />
 
     <!-- 任务列表（高度由代码约束，底部正好落在可视区底边） -->
     <ScrollView

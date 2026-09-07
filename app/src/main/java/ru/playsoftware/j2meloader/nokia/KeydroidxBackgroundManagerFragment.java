@@ -181,7 +181,7 @@ public class KeydroidxBackgroundManagerFragment extends KeydroidxPageFragment {
 				empty.setText(tabProtected ? "暂无保护的应用" : "没有可清理的后台应用");
 			}
 			empty.setTextColor(0xFF8A93A5);
-			KeydroidxFontManager.textSize(empty, 10);
+			KeydroidxFontManager.textSize(empty, 9);
 			listLayout.addView(empty);
 			clearHighlight();
 			focusIndex = -1;

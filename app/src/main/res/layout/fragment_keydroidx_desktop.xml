@@ -54,7 +54,7 @@
         android:paddingEnd="6dp"
         android:paddingBottom="2dp"
         android:textColor="#FFFFFF"
-        android:textSize="10sp"
+        android:textSize="@dimen/keydroidx_font_caption"
         android:visibility="gone" />
 
     <!-- 快捷栏与通知区之间的点线分割线（代码覆盖背景为 KeydroidxDashedLineDrawable 点阵） -->
@@ -99,7 +99,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#B8C8EA"
-            android:textSize="10sp" />
+            android:textSize="@dimen/keydroidx_font_caption" />
 
         <TextView
             android:id="@+id/notifBarBadge"
@@ -110,7 +110,7 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:textColor="#FFFFFF"
-            android:textSize="9sp"
+            android:textSize="@dimen/keydroidx_font_caption"
             android:visibility="gone" />
     </LinearLayout>
 

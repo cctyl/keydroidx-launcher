@@ -88,7 +88,7 @@ public class ShizukuFragment extends KeydroidxListPageFragment {
 			TextView arrow = new TextView(requireContext());
 			arrow.setText(">");
 			arrow.setTextColor(0xFFAAAAAA);
-			KeydroidxFontManager.textSize(arrow, 14);
+			KeydroidxFontManager.textSize(arrow, 13);
 			row.addView(arrow);
 
 			final int idx = i;

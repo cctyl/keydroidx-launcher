@@ -17,7 +17,7 @@
         android:layout_marginTop="4dp"
         android:text="通知中心"
         android:textColor="#FFFFFF"
-        android:textSize="13sp"
+        android:textSize="@dimen/keydroidx_font_title"
         android:textStyle="bold" />
 
     <!-- 状态提示条：未授权时显示说明 + 引导，读取中短暂显示；正常态隐藏 -->
@@ -32,7 +32,7 @@
         android:ellipsize="end"
         android:maxLines="2"
         android:textColor="#9DB4E0"
-        android:textSize="10sp"
+        android:textSize="@dimen/keydroidx_font_caption"
         android:visibility="gone" />
 
     <ScrollView
@@ -67,7 +67,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#7F96C4"
-            android:textSize="26sp" />
+            android:textSize="@dimen/keydroidx_font_display" />
 
         <TextView
             android:id="@+id/notifCenterEmptyTitle"
@@ -76,7 +76,7 @@
             android:layout_marginTop="6dp"
             android:text="没有通知"
             android:textColor="#FFFFFF"
-            android:textSize="12sp" />
+            android:textSize="@dimen/keydroidx_font_body" />
 
         <TextView
             android:id="@+id/notifCenterEmptyText"
@@ -85,6 +85,6 @@
             android:layout_marginTop="2dp"
             android:text="新通知会显示在这里"
             android:textColor="#7F96C4"
-            android:textSize="10sp" />
+            android:textSize="@dimen/keydroidx_font_caption" />
     </LinearLayout>
 </RelativeLayout>

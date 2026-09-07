@@ -16,7 +16,7 @@
         android:layout_marginTop="4dp"
         android:text="已选 0 / 0 项"
         android:textColor="#64b5f6"
-        android:textSize="10sp" />
+        android:textSize="@dimen/keydroidx_font_caption" />
 
     <TextView
         android:id="@+id/shortcutTitle"
@@ -28,7 +28,7 @@
         android:layout_marginTop="4dp"
         android:text="按确定键选择/取消"
         android:textColor="#9fb3d1"
-        android:textSize="9sp" />
+        android:textSize="@dimen/keydroidx_font_caption" />
 
     <ScrollView
         android:id="@+id/appScroll"

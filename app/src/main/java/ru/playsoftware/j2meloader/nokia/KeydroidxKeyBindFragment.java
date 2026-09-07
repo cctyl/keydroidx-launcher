@@ -133,7 +133,7 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 			tvKey.setText("未绑定");
 			tvKey.setTextColor(0xFFFF8A80);
 		}
-		KeydroidxFontManager.textSize(tvKey, 10);
+		KeydroidxFontManager.textSize(tvKey, 9);
 		row.addView(tvKey);
 
 		// 录制提示箭头
@@ -280,7 +280,7 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 		tvInfo.setText(KeydroidxKeyBinding.getActionName(confirmOccupied) + " → "
 				+ KeydroidxKeyBinding.keyName(confirmKeycode));
 		tvInfo.setTextColor(0xFFE0E0E0);
-		KeydroidxFontManager.textSize(tvInfo, 10);
+		KeydroidxFontManager.textSize(tvInfo, 9);
 		recordStatusBar.addView(tvInfo);
 
 		// 取消

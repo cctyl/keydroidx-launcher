@@ -15,7 +15,7 @@
         android:layout_marginTop="6dp"
         android:text="自定义字体倍率"
         android:textColor="#FFFFFF"
-        android:textSize="13sp"
+        android:textSize="@dimen/keydroidx_font_title"
         android:textStyle="bold" />
 
     <TextView
@@ -27,7 +27,7 @@
         android:layout_marginEnd="8dp"
         android:text="请输入字体倍率（例如 1.0 代表 100%，1.5 代表 150%，范围 0.5 ~ 3.0）："
         android:textColor="#AAAAAA"
-        android:textSize="11sp" />
+        android:textSize="@dimen/keydroidx_font_small_title" />
 
     <EditText
         android:id="@+id/etCustomScale"
@@ -50,7 +50,7 @@
         android:singleLine="true"
         android:textColor="#FFFFFF"
         android:textColorHint="#88FFFFFF"
-        android:textSize="14sp" />
+        android:textSize="@dimen/keydroidx_font_body" />
 
     <TextView
         android:id="@+id/tvPreviewText"
@@ -61,6 +61,6 @@
         android:layout_marginTop="12dp"
         android:text="预览效果：KeydroidX 原键复古像素字体"
         android:textColor="#FFFFFF"
-        android:textSize="13sp" />
+        android:textSize="@dimen/keydroidx_font_title" />
 
 </LinearLayout>

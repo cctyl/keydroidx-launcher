@@ -184,7 +184,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 					LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 			tvArrow.setText(">");
 			tvArrow.setTextColor(0xFFAAAAAA);
-			KeydroidxFontManager.textSize(tvArrow, 14);
+			KeydroidxFontManager.textSize(tvArrow, 13);
 			row.addView(tvArrow);
 
 			final int index = i;

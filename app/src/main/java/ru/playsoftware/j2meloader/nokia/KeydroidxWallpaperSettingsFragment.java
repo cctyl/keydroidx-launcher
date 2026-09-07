@@ -143,7 +143,7 @@ public class KeydroidxWallpaperSettingsFragment extends KeydroidxListPageFragmen
 				: "当前：主题背景（未设置自定义壁纸）");
 		tvStatus.setTextColor(0xFFB0BEC5);
 		tvStatus.setPadding(dp(10), dp(6), dp(10), dp(10));
-		KeydroidxFontManager.textSize(tvStatus, 10);
+		KeydroidxFontManager.textSize(tvStatus, 9);
 		container.addView(tvStatus);
 
 		String[] icons = {
@@ -203,7 +203,7 @@ public class KeydroidxWallpaperSettingsFragment extends KeydroidxListPageFragmen
 				ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		tvArrow.setText(">");
 		tvArrow.setTextColor(0xFFAAAAAA);
-		KeydroidxFontManager.textSize(tvArrow, 14);
+		KeydroidxFontManager.textSize(tvArrow, 13);
 		row.addView(tvArrow);
 
 		return row;
