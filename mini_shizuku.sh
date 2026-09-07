@@ -28,17 +28,48 @@ ps | grep 'app_process' | grep -v grep | while read -r line; do
     [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null
 done
 
-# 自动定位包名：优先正式版，其次调试版
+# 优先使用作为参数传入的包名（或脚本所在路径推导），其次按安装顺序定位
+TARGET_PKG="$1"
+
 PACKAGE=""
 path=""
-for p in io.github.cctyl.nokia io.github.cctyl.nokia.debug; do
-    path=$(pm path "$p")
+
+if [ -n "$TARGET_PKG" ]; then
+    path=$(pm path "$TARGET_PKG")
     path=${path#package:}
     if [ -n "$path" ]; then
-        PACKAGE="$p"
-        break
+        PACKAGE="$TARGET_PKG"
     fi
-done
+fi
+
+if [ -z "$PACKAGE" ]; then
+    # 未指定或指定包名无效时，尝试从脚本自身所在路径猜测（如 /sdcard/Android/data/<pkg>/files/mini_shizuku.sh）
+    script_dir=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
+    case "$script_dir" in
+        */Android/data/*)
+            guessed_pkg=$(echo "$script_dir" | sed -e 's#.*/Android/data/##' -e 's#/.*##')
+            if [ -n "$guessed_pkg" ]; then
+                path=$(pm path "$guessed_pkg")
+                path=${path#package:}
+                if [ -n "$path" ]; then
+                    PACKAGE="$guessed_pkg"
+                fi
+            fi
+            ;;
+    esac
+fi
+
+if [ -z "$PACKAGE" ]; then
+    # 回退：优先当前运行中的包名，其次按列表寻找
+    for p in io.github.cctyl.nokia.debug io.github.cctyl.nokia; do
+        path=$(pm path "$p")
+        path=${path#package:}
+        if [ -n "$path" ]; then
+            PACKAGE="$p"
+            break
+        fi
+    done
+fi
 
 if [ -z "$PACKAGE" ]; then
     echo "MiniShizuku: 未找到应用，请先安装 KeydroidXLauncher"
