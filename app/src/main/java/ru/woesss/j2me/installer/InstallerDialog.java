@@ -44,7 +44,7 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.applist.AppItem;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 import ru.playsoftware.j2meloader.applist.AppListModel;
 import ru.playsoftware.j2meloader.appsdb.AppRepository;
 import ru.playsoftware.j2meloader.config.Config;
@@ -159,7 +159,7 @@ public class InstallerDialog extends DialogFragment {
 
 	private void setupKeyListener() {
 		// 接入用户自定义按键映射，与桌面行为 100% 一致（禁止写死 keyCode）
-		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		KeydroidxKeyBinding keyBinding = new KeydroidxKeyBinding(requireContext());
 		mDialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
 				event,
 				() -> { if (btnClose != null && btnClose.getVisibility() == View.VISIBLE) btnClose.performClick(); }, // 左软键 -> 取消/关闭

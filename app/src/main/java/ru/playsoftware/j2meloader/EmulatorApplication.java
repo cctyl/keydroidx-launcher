@@ -43,14 +43,14 @@ import java.util.Arrays;
 
 import javax.microedition.util.ContextHolder;
 
-import io.github.cctyl.nokia.common.feedback.NokiaFeedback;
-import io.github.cctyl.nokia.common.feedback.NokiaFeedbackConfig;
-import io.github.cctyl.nokia.common.feedback.NokiaInstall;
-import io.github.cctyl.nokia.common.log.NokiaLog;
-import io.github.cctyl.nokia.common.ui.NokiaTheme;
+import io.github.cctyl.nokia.common.feedback.KeydroidxFeedback;
+import io.github.cctyl.nokia.common.feedback.KeydroidxFeedbackConfig;
+import io.github.cctyl.nokia.common.feedback.KeydroidxInstall;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
+import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
 import ru.playsoftware.j2meloader.nokia.LauncherThemeProvider;
 import ru.playsoftware.mini_shizuku.Shizuku;
-import ru.playsoftware.j2meloader.nokia.NokiaSettingsStorage;
+import ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage;
 import ru.playsoftware.j2meloader.util.Constants;
 
 public class EmulatorApplication extends Application {
@@ -77,7 +77,7 @@ public class EmulatorApplication extends Application {
 		ContextHolder.setApplication(this);
 
 		// 向 common 注入桌面主题提供者（主进程与 :midlet 进程都需要，J2ME 层换用 common 主题后依赖此注入）
-		NokiaTheme.setThemeProvider(new LauncherThemeProvider());
+		KeydroidxTheme.setThemeProvider(new LauncherThemeProvider());
 
 		// 主题与向量图设置必须早期同步完成（毫秒级，直接决定首帧主题），不能延迟
 		SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
@@ -92,14 +92,14 @@ public class EmulatorApplication extends Application {
 			Shizuku.init(this);
 			// 文件日志 + 崩溃堆栈落盘：尽早初始化，覆盖冷启动阶段的崩溃。
 			// 日志实现统一走 common；目录按生态约定为 <外存>/files/log。
-			NokiaLog.init(this);
+			KeydroidxLog.init(this);
 			// 桌面设置「日志记录」优先：该开关原存在 nokia_desktop_settings，
 			// 为兼容老用户继续以它为准，覆盖 common 初始化时的取值。
-			NokiaLog.setFileMinLevel(NokiaSettingsStorage.isFileLogEnabled(this)
+			KeydroidxLog.setFileMinLevel(KeydroidxSettingsStorage.isFileLogEnabled(this)
 					? Log.DEBUG : Log.ERROR);
-			// 意见反馈组件：仅主进程需要。logDir 传 null → 复用 NokiaLog 的默认日志目录，
+			// 意见反馈组件：仅主进程需要。logDir 传 null → 复用 KeydroidxLog 的默认日志目录，
 			// 保证「附带运行日志」抓到的就是我们实际落盘的那份。
-			NokiaFeedback.init(new NokiaFeedbackConfig(
+			KeydroidxFeedback.init(new KeydroidxFeedbackConfig(
 					BuildConfig.FEEDBACK_UPLOAD_URL,
 					BuildConfig.FEEDBACK_INSTALL_URL,
 					BuildConfig.FEEDBACK_SECRET_KEY,
@@ -107,7 +107,7 @@ public class EmulatorApplication extends Application {
 					BuildConfig.VERSION_NAME,
 					null));
 			// 首次安装 / 版本升级时自动上报一次设备信息（后台、幂等、静默）
-			NokiaInstall.reportOnce(this);
+			KeydroidxInstall.reportOnce(this);
 			installCrashHandler();
 			new Handler(Looper.getMainLooper()).postDelayed(this::initAcra, 2000);
 		} else {
@@ -153,7 +153,7 @@ public class EmulatorApplication extends Application {
 		try {
 			final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
 			Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-				NokiaLog.fileCrash(thread, throwable);
+				KeydroidxLog.fileCrash(thread, throwable);
 				if (prev != null) {
 					prev.uncaughtException(thread, throwable);
 				} else {

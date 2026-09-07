@@ -29,7 +29,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import ru.playsoftware.j2meloader.R;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 
 public class InfoDialogFragment extends DialogFragment {
 	@NonNull
@@ -49,7 +49,7 @@ public class InfoDialogFragment extends DialogFragment {
 				.setIcon(R.mipmap.ic_launcher)
 				.setView(tv);
 		Dialog dialog = builder.create();
-		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		KeydroidxKeyBinding keyBinding = new KeydroidxKeyBinding(requireContext());
 		dialog.setOnKeyListener((d, keyCode, event) ->
 				keyBinding.dispatchDialogKey(event, this::dismiss, this::dismiss, this::dismiss, true));
 		return dialog;

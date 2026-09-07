@@ -27,7 +27,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
-import io.github.cctyl.nokia.common.ui.NokiaBatteryDrawable;
+import io.github.cctyl.nokia.common.ui.KeydroidxBatteryDrawable;
 import ru.playsoftware.j2meloader.R;
 
 import java.util.List;
@@ -47,12 +47,12 @@ import ru.playsoftware.j2meloader.R;
  * 自动重新注册信号监听，避免 SIM2 永远读不到信号。
  */
 public class StatusBarController {
-	private static final String TAG = "NokiaSB";
+	private static final String TAG = "KeydroidxSB";
 	private static final int REQ_PHONE_STATE = 1001;
 
-	private final NokiaBaseActivity activity;
+	private final KeydroidxBaseActivity activity;
 	private ImageView ivSignal1, ivSignal2, ivWifi, ivBluetooth, ivAirplane, ivBattery;
-	private NokiaBatteryDrawable batteryDrawable;
+	private KeydroidxBatteryDrawable batteryDrawable;
 	private LinearLayout sim1Container, sim2Container;
 	private TextView tvCarrier1, tvCarrier2;
 	private View simCarrierContainer;
@@ -114,7 +114,7 @@ public class StatusBarController {
 		}
 	};
 
-	public StatusBarController(NokiaBaseActivity activity) {
+	public StatusBarController(KeydroidxBaseActivity activity) {
 		this.activity = activity;
 	}
 
@@ -538,7 +538,7 @@ public class StatusBarController {
 				|| status == android.os.BatteryManager.BATTERY_STATUS_FULL;
 
 		if (batteryDrawable == null) {
-			batteryDrawable = new NokiaBatteryDrawable(ivBattery.getContext());
+			batteryDrawable = new KeydroidxBatteryDrawable(ivBattery.getContext());
 			ivBattery.setImageDrawable(batteryDrawable);
 		}
 		batteryDrawable.setBatteryState(pct, isCharging);

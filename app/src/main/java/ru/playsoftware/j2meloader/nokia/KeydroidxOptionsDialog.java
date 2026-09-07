@@ -1,0 +1,414 @@
+package ru.playsoftware.j2meloader.nokia;
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
+
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
+import io.github.cctyl.nokia.common.model.KeyResolver;
+import io.github.cctyl.nokia.common.ui.KeydroidxIcons;
+
+import android.app.Dialog;
+import android.os.Bundle;
+import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
+import io.github.cctyl.nokia.common.ui.focus.KeydroidxDialogFocus;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.FragmentManager;
+
+import io.github.cctyl.nokia.common.util.KeydroidxDimens;
+import java.util.ArrayList;
+import java.util.List;
+
+import ru.playsoftware.j2meloader.R;
+
+/**
+ * 诺基亚风格通用「选项」弹窗（完整版）。
+ * <p>
+ * 收敛了原各自独立的「应用选项」「桌面组件选项」「删除子菜单」三个弹窗：
+ * <ul>
+ *   <li>数据模型 {@link OptionItem}：图标 + 文案 + 是否可用 + 是否点击后不关闭 + 点击动作；</li>
+ *   <li>静态入口 {@link #show(FragmentManager, String, List)} 打开，返回实例以便调用 {@link #setItems(List)} 动态刷新；</li>
+ *   <li>{@code keepOpen=true} 的项点击后不关闭弹窗，由宿主更新数据后调用 {@link #setItems(List)} 重建列表并刷新文案（全选/取消全选场景）；</li>
+ *   <li>禁用项（{@code enabled=false}）灰显，方向键自动跳过；</li>
+ *   <li>统一窗口配置（底部锚定、透明背景）、行高亮（{@code bg_nokia_selected_dark}）、
+ *       {@code forceNonTouchMode} 与按键分发。</li>
+ * </ul>
+ * <p>
+ * 按键规范：弹窗是独立 Window，自行接入 {@link KeydroidxKeyBinding}（禁止写死 keyCode）；
+ * 返回键由弹窗单独处理；底部软键栏只显示文字标签，无高亮/焦点逻辑。
+ */
+public class KeydroidxOptionsDialog extends DialogFragment {
+	private static final String TAG = "KeydroidxOptions";
+	private static final String ARG_TITLE = "title";
+
+	/**
+	 * 弹窗选项数据模型。
+	 */
+	public static class OptionItem {
+		/** 图标资源 id，0 表示无图标。 */
+		public final int icon;
+		/** Material Icons 矢量图标 Unicode 编码，null 表示无。 */
+		public final String iconUnicode;
+		/** 文案（{@link #setItems(List)} 后可整体替换刷新）。 */
+		public final String label;
+		/** false=灰色不可选，方向键自动跳过。 */
+		public final boolean enabled;
+		/** true=点击后不关闭弹窗（用于全选/取消全选后刷新文案）。 */
+		public final boolean keepOpen;
+		/** 点击动作。 */
+		public final Runnable action;
+
+		public OptionItem(int icon, String label, boolean enabled, boolean keepOpen, Runnable action) {
+			this(icon, null, label, enabled, keepOpen, action);
+		}
+
+		public OptionItem(String iconUnicode, String label, boolean enabled, boolean keepOpen, Runnable action) {
+			this(0, iconUnicode, label, enabled, keepOpen, action);
+		}
+
+		public OptionItem(int icon, String iconUnicode, String label, boolean enabled, boolean keepOpen, Runnable action) {
+			this.icon = icon;
+			this.iconUnicode = iconUnicode;
+			this.label = label;
+			this.enabled = enabled;
+			this.keepOpen = keepOpen;
+			this.action = action;
+		}
+	}
+
+	private String title = "";
+	private List<OptionItem> items = new ArrayList<>();
+	private LinearLayout listContainer;
+	private LinearLayout[] optionRows;
+	private int focusIndex = -1;
+	/** 键码表注入模式（:midlet 进程等非 KeydroidxDesktopActivity 宿主）；null=宿主 keyBinding 模式 */
+	private int[] overrideKeyCodes;
+	/** 用户未选中任何选项就关闭弹窗（返回键 / 右软键 / 挂机键）时的回调，仅触发一次。 */
+	private Runnable onDismissAction;
+
+	/**
+	 * 静态入口：创建并显示选项弹窗，返回实例以便后续 {@link #setItems(List)} 刷新。
+	 */
+	public static KeydroidxOptionsDialog show(@NonNull FragmentManager fm, String title,
+										  @NonNull List<OptionItem> items) {
+		KeydroidxOptionsDialog dialog = new KeydroidxOptionsDialog();
+		Bundle args = new Bundle();
+		args.putString(ARG_TITLE, title);
+		dialog.setArguments(args);
+		dialog.setItemsInternal(items);
+		dialog.show(fm, "KeydroidxOptions");
+		return dialog;
+	}
+
+	/**
+	 * 静态入口（键码表注入模式）：供宿主不是 KeydroidxDesktopActivity 的场景使用，
+	 * 如 :midlet 进程内 MicroActivity 的挂机三菜单。按键按注入的键码表解析
+	 * （{@link KeydroidxKeyBinding#resolveAction(int[], KeyEvent)}），不依赖宿主 keyBinding。
+	 */
+	public static KeydroidxOptionsDialog show(@NonNull FragmentManager fm, String title,
+										  @NonNull List<OptionItem> items, int[] keyCodes) {
+		KeydroidxOptionsDialog dialog = new KeydroidxOptionsDialog();
+		Bundle args = new Bundle();
+		args.putString(ARG_TITLE, title);
+		dialog.setArguments(args);
+		dialog.setItemsInternal(items);
+		dialog.overrideKeyCodes = keyCodes;
+		dialog.show(fm, "KeydroidxOptions");
+		return dialog;
+	}
+
+	/**
+	 * 设置「未选任何选项就关闭」的回调（返回键 / 右软键 / 挂机键关闭时触发）。
+	 * <p>用于调用方必须接续后续流程的场景：选项回调只在用户真正选中某项时执行，
+	 * 用户按返回键关闭弹窗则整条链断掉（向导后跳转权限自检就曾因此被跳过）。
+	 * 选中任意选项后走 {@link #trigger(int)}，不会触发本回调。
+	 *
+	 * @return 自身，便于 show(...) 后链式调用
+	 */
+	public KeydroidxOptionsDialog setOnDismissAction(Runnable action) {
+		this.onDismissAction = action;
+		return this;
+	}
+
+	/**
+	 * 关闭弹窗并执行「未选任何选项」回调。
+	 * <p>与 {@link #trigger(int)} 保持一致的时序：先跑回调（可能发起 Fragment 事务），
+	 * 再 dismiss，避免两个事务顺序颠倒导致面板错乱。
+	 */
+	private void dismissWithCancelAction() {
+		if (onDismissAction != null) {
+			Runnable action = onDismissAction;
+			onDismissAction = null;   // 只触发一次，避免重复接续
+			KeydroidxLog.i(TAG, "未选择任何选项即关闭，执行取消回调");
+			action.run();
+		}
+		dismiss();
+	}
+
+	/**
+	 * 动态刷新整个选项列表（全选/取消全选后更新文案与可用状态）。
+	 * 重建列表容器并修正焦点（跳过禁用项），不重新膨胀整个布局。
+	 */
+	public void setItems(@NonNull List<OptionItem> newItems) {
+		setItemsInternal(newItems);
+		rebuildList();
+	}
+
+	private void setItemsInternal(@NonNull List<OptionItem> newItems) {
+		items = new ArrayList<>(newItems);
+	}
+
+	@NonNull
+	@Override
+	public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
+		Bundle args = getArguments();
+		if (args != null) {
+			title = args.getString(ARG_TITLE, "");
+		}
+		KeydroidxLog.i(TAG, "onCreateDialog: 创建通用选项弹窗，title=" + title + " options=" + items.size());
+
+		Dialog dialog = new Dialog(requireActivity());
+		dialog.setContentView(R.layout.dialog_nokia_widget_options);
+		dialog.setCancelable(false);
+		dialog.setCanceledOnTouchOutside(false);
+		if (dialog.getWindow() != null) {
+			dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+					ViewGroup.LayoutParams.WRAP_CONTENT);
+			dialog.getWindow().setGravity(Gravity.BOTTOM);
+			dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+		}
+
+
+		TextView titleView = dialog.findViewById(R.id.widgetOptionsTitle);
+		if (titleView != null) {
+			titleView.setText(title);
+			KeydroidxFontManager.textSize(titleView, 11);
+		}
+
+		// 应用当前主题配色到选项弹窗的标题栏与底栏
+		android.view.View titleBar = dialog.findViewById(R.id.widgetOptionsTitleBar);
+		android.view.View bottomBar = dialog.findViewById(R.id.widgetOptionsBottomBar);
+		KeydroidxTheme.ThemeDef currentTheme = KeydroidxTheme.getCurrentTheme(requireContext());
+		if (titleBar != null) {
+			titleBar.setBackground(KeydroidxTheme.createSoftKeyDrawable(currentTheme));
+		}
+		if (bottomBar != null) {
+			bottomBar.setBackground(KeydroidxTheme.createSoftKeyDrawable(currentTheme));
+		}
+
+
+		listContainer = dialog.findViewById(R.id.widgetOptionsList);
+		if (listContainer != null) {
+			listContainer.setBackground(KeydroidxTheme.createDialogBodyDrawable(currentTheme));
+		}
+		rebuildList();
+
+		// 接入用户自定义按键映射（禁止写死 keyCode）
+		dialog.setOnKeyListener((d, keyCode, event) -> {
+			if (event.getAction() != KeyEvent.ACTION_DOWN) {
+				return true; // 消费抬起事件
+			}
+			// 长按连发过滤：弹窗是独立 Window，Activity 层的连发过滤对它无效，需自行拦截。
+			// 否则按住左软键会连续 trigger 当前选项——实测把「冻结 / 解冻」反复执行。
+			// 上 / 下方向键放行：列表内连续移动焦点是预期行为。
+			if (event.getRepeatCount() > 0) {
+				int repeatAction = resolveActionSafe(event);
+				if (repeatAction != KeydroidxKeyBinding.ACTION_UP
+						&& repeatAction != KeydroidxKeyBinding.ACTION_DOWN) {
+					KeydroidxLog.d(TAG, "吞掉长按连发 " + KeydroidxKeyBinding.keyName(keyCode)
+							+ " repeat=" + event.getRepeatCount());
+					return true;
+				}
+			}
+			// 返回键由弹窗自己处理（KeydroidxKeyBinding 不管 BACK）
+			if (keyCode == KeyEvent.KEYCODE_BACK) {
+				KeydroidxLog.i(TAG, "返回键：关闭选项弹窗");
+				dismissWithCancelAction();
+				return true;
+			}
+			int action = resolveActionSafe(event);
+			switch (action) {
+				case KeydroidxKeyBinding.ACTION_UP:
+					moveFocus(-1);
+					return true;
+				case KeydroidxKeyBinding.ACTION_DOWN:
+					moveFocus(1);
+					return true;
+				case KeydroidxKeyBinding.ACTION_SELECT:
+				case KeydroidxKeyBinding.ACTION_SOFT_LEFT:
+					// 左软键（选择）等同确认键：执行当前选项
+					trigger(focusIndex);
+					return true;
+				case KeydroidxKeyBinding.ACTION_HANGUP:
+				case KeydroidxKeyBinding.ACTION_SOFT_RIGHT:
+					KeydroidxLog.i(TAG, "右软键/挂机键：关闭选项弹窗");
+					dismissWithCancelAction();
+					return true;
+				case KeydroidxKeyBinding.ACTION_LEFT:
+				case KeydroidxKeyBinding.ACTION_RIGHT:
+					return true; // 菜单为纵向列表，左右无效果
+				default:
+					return false;
+			}
+		});
+
+		// 默认焦点在第一个可用选项
+		setFocus(firstEnabledIndex());
+
+		// 统一应用全局字体
+		if (dialog.getWindow() != null && dialog.getWindow().getDecorView() != null) {
+			KeydroidxFontManager.applyFontToViewHierarchy(dialog.getWindow().getDecorView());
+		}
+
+		// Android 12+：Dialog 窗口首个导航键会被触摸模式吞掉，show 后强制退出该状态
+		dialog.setOnShowListener(d -> KeydroidxDialogFocus.forceNonTouchMode(dialog));
+
+		return dialog;
+	}
+
+	/** 重建列表容器（onCreateDialog 首次构建 / setItems 动态刷新共用）。 */
+	private void rebuildList() {
+		if (listContainer == null) return;
+		listContainer.removeAllViews();
+		optionRows = new LinearLayout[items.size()];
+		for (int i = 0; i < items.size(); i++) {
+			final OptionItem item = items.get(i);
+			LinearLayout row = new LinearLayout(requireContext());
+			row.setOrientation(LinearLayout.HORIZONTAL);
+			row.setGravity(Gravity.CENTER_VERTICAL);
+			row.setLayoutParams(new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT, KeydroidxDimens.dp(getResources(), 32)));
+			row.setPadding(KeydroidxDimens.dp(getResources(), 12), 0, KeydroidxDimens.dp(getResources(), 12), 0);
+
+			boolean hasIcon = false;
+			if (item.iconUnicode != null && !item.iconUnicode.isEmpty()) {
+				ImageView iv = new ImageView(requireContext());
+				iv.setLayoutParams(new LinearLayout.LayoutParams(KeydroidxDimens.dp(getResources(), 18), KeydroidxDimens.dp(getResources(), 18)));
+				iv.setImageDrawable(KeydroidxIcons.get(requireContext(), item.iconUnicode, item.enabled ? 0xFFFFFFFF : 0xFF666666, 22));
+				row.addView(iv);
+				hasIcon = true;
+			} else if (item.icon != 0) {
+				ImageView iv = new ImageView(requireContext());
+				iv.setLayoutParams(new LinearLayout.LayoutParams(KeydroidxDimens.dp(getResources(), 18), KeydroidxDimens.dp(getResources(), 18)));
+				try {
+					iv.setImageResource(item.icon);
+				} catch (Exception ignored) {}
+				if (!item.enabled) {
+					iv.setAlpha(0.5f);
+				}
+				row.addView(iv);
+				hasIcon = true;
+			}
+
+			TextView tv = new TextView(requireContext());
+			tv.setLayoutParams(new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+			if (hasIcon) {
+				tv.setPadding(KeydroidxDimens.dp(getResources(), 10), 0, 0, 0);
+			}
+			tv.setText(item.label);
+			KeydroidxFontManager.textSize(tv, 10);
+			tv.setSingleLine(true);
+			tv.setTextColor(item.enabled ? 0xFFFFFFFF : 0xFF666666);
+			row.addView(tv);
+
+			if (item.enabled) {
+				final int idx = i;
+				row.setClickable(true);
+				row.setOnClickListener(v -> {
+					setFocus(idx);
+					trigger(idx);
+				});
+			}
+			listContainer.addView(row);
+			optionRows[i] = row;
+		}
+		// 刷新后修正焦点：若当前焦点失效（禁用/越界）则回到第一个可用项
+		if (focusIndex < 0 || focusIndex >= items.size()
+				|| !items.get(focusIndex).enabled) {
+			setFocus(firstEnabledIndex());
+		} else {
+			// 焦点有效但行对象已重建，重刷高亮
+			applyFocus(focusIndex);
+		}
+	}
+
+	/**
+	 * 按键解析（安全版）：
+	 * <ul>
+	 *   <li>键码表注入模式（:midlet 进程宿主）→ 静态查表解析；</li>
+	 *   <li>宿主为 KeydroidxDesktopActivity → 宿主 keyBinding 实例解析；</li>
+	 *   <li>其余（注入表因进程重建丢失等极端场景）→ 返回 -1，仅 BACK/触屏可用，不崩溃。</li>
+	 * </ul>
+	 */
+	private int resolveActionSafe(KeyEvent event) {
+		if (overrideKeyCodes != null) {
+			return KeydroidxKeyBinding.resolveAction(overrideKeyCodes, event);
+		}
+		androidx.fragment.app.FragmentActivity host = requireActivity();
+		// 宿主实现 common KeyResolver（桌面已在 KeydroidxDesktopActivity 实现），优先走统一契约
+		if (host instanceof KeyResolver) {
+				return ((KeyResolver) host).resolveAction(event);
+		}
+		return -1;
+}
+
+	private void moveFocus(int step) {
+		if (items.isEmpty()) return;
+		int count = items.size();
+		int next = (focusIndex + step + count) % count;
+		int loopGuard = 0;
+		while (loopGuard < count && !items.get(next).enabled) {
+			next = (next + step + count) % count;
+			loopGuard++;
+		}
+		if (next >= 0 && next < count && items.get(next).enabled) {
+			setFocus(next);
+		}
+	}
+
+	private int firstEnabledIndex() {
+		for (int i = 0; i < items.size(); i++) {
+			if (items.get(i).enabled) return i;
+		}
+		return items.isEmpty() ? -1 : 0;
+	}
+
+	private void setFocus(int index) {
+		focusIndex = index;
+		applyFocus(index);
+	}
+
+	private void applyFocus(int index) {
+		if (optionRows == null) return;
+		for (int i = 0; i < optionRows.length; i++) {
+			if (optionRows[i] == null) continue;
+			boolean selected = (i == index) && items.get(i).enabled;
+			if (selected) {
+				optionRows[i].setBackground(KeydroidxTheme.createSelectionDrawable(requireContext(), 4));
+			} else {
+				optionRows[i].setBackground(null);
+			}
+		}
+	}
+
+	private void trigger(int index) {
+		if (index < 0 || index >= items.size()) return;
+		OptionItem item = items.get(index);
+		if (!item.enabled) return;
+		KeydroidxLog.i(TAG, "执行选项: " + index + " (" + item.label + ") keepOpen=" + item.keepOpen);
+		if (item.action != null) {
+			item.action.run();
+		}
+		if (!item.keepOpen) {
+			dismiss();
+		}
+	}
+
+}

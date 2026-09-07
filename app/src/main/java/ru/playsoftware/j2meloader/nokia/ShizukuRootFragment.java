@@ -1,5 +1,5 @@
 package ru.playsoftware.j2meloader.nokia;
-import io.github.cctyl.nokia.common.ui.NokiaFontManager;
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 
 import android.os.Build;
 import android.os.Bundle;
@@ -12,9 +12,9 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import io.github.cctyl.nokia.common.log.NokiaLog;
-import io.github.cctyl.nokia.common.ui.focus.NokiaFocusHost;
-import io.github.cctyl.nokia.common.util.NokiaDimens;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
+import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
+import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -38,7 +38,7 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  * <p>
  * 页面结构：状态行（root 权限可用性 + 服务在线状态）+ 操作列表（root 激活 / 刷新状态）。
  */
-public class ShizukuRootFragment extends NokiaListPageFragment {
+public class ShizukuRootFragment extends KeydroidxListPageFragment {
 
 	private static final String[] ACTION_NAMES = {
 			"root 激活",
@@ -78,9 +78,9 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 36)));
-			row.setPadding(NokiaDimens.dp(getResources(), 12), 0,
-					NokiaDimens.dp(getResources(), 12), 0);
+					LinearLayout.LayoutParams.MATCH_PARENT, KeydroidxDimens.dp(getResources(), 36)));
+			row.setPadding(KeydroidxDimens.dp(getResources(), 12), 0,
+					KeydroidxDimens.dp(getResources(), 12), 0);
 			row.setClickable(true);
 
 			TextView tv = new TextView(requireContext());
@@ -88,13 +88,13 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tv.setText(ACTION_NAMES[i]);
 			tv.setTextColor(0xFFFFFFFF);
-			NokiaFontManager.textSize(tv, 12);
+			KeydroidxFontManager.textSize(tv, 12);
 			row.addView(tv);
 
 			TextView arrow = new TextView(requireContext());
 			arrow.setText(">");
 			arrow.setTextColor(0xFFAAAAAA);
-			NokiaFontManager.textSize(arrow, 14);
+			KeydroidxFontManager.textSize(arrow, 14);
 			row.addView(arrow);
 
 			final int idx = i;
@@ -149,7 +149,7 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 	 * root 启动脚本会先 kill 旧 app_process，因此服务会短暂离线后由新 root 进程接管。
 	 */
 	private void activateRoot() {
-		NokiaLog.i("ShizukuRoot", "开始 root 激活");
+		KeydroidxLog.i("ShizukuRoot", "开始 root 激活");
 		if (statusText != null) {
 			statusText.setText("正在通过 root 激活...");
 		}
@@ -161,7 +161,7 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 				//    （Builder 默认超时 20s），用户在弹窗中允许后才继续。
 				boolean execOk = startServerAsRoot();
 				if (!execOk) {
-					NokiaLog.e("ShizukuRoot", "root 激活失败：无 root 或 su 授权被拒");
+					KeydroidxLog.e("ShizukuRoot", "root 激活失败：无 root 或 su 授权被拒");
 					mainHandler.post(new Runnable() {
 						@Override
 						public void run() {
@@ -189,14 +189,14 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 					}
 				}
 				final boolean ok = online;
-				// On failure, reuse the root shell to dump diagnostics into NokiaLog.
+				// On failure, reuse the root shell to dump diagnostics into KeydroidxLog.
 				// app_process is backgrounded with &, so exit code 0 only means the root
 				// shell dispatched the command - not that the server actually came up.
 				// The real failure reason lives in minishizuku.log / logcat MiniShizuku.
 				if (!ok) {
 					collectActivationDiagnostics();
 				}
-				NokiaLog.i("ShizukuRoot", "root 激活结果: online=" + online + " execOk=true");
+				KeydroidxLog.i("ShizukuRoot", "root 激活结果: online=" + online + " execOk=true");
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
@@ -227,16 +227,16 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 	private Boolean isRootAvailable() {
 		if (Build.VERSION.SDK_INT < 19) {
 			// libsu core 要求 API 19+，低版本直接判定不可用
-			NokiaLog.w("ShizukuRoot", "root 检测跳过: SDK " + Build.VERSION.SDK_INT + " < 19");
+			KeydroidxLog.w("ShizukuRoot", "root 检测跳过: SDK " + Build.VERSION.SDK_INT + " < 19");
 			return Boolean.FALSE;
 		}
 		try {
 			Boolean granted = Shell.isAppGrantedRoot();
-			NokiaLog.i("ShizukuRoot", "root 检测(状态): "
+			KeydroidxLog.i("ShizukuRoot", "root 检测(状态): "
 					+ (granted == null ? "待授权" : granted));
 			return granted;
 		} catch (Exception e) {
-			NokiaLog.w("ShizukuRoot", "root 检测异常: " + e.getMessage());
+			KeydroidxLog.w("ShizukuRoot", "root 检测异常: " + e.getMessage());
 			return Boolean.FALSE;
 		}
 	}
@@ -253,7 +253,7 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 		}
 		// 缓存的是 non-root shell：关闭使其状态置 UNKNOWN，MainShell.getCached() 会丢弃，
 		// 下次 get() 重新按 su → sh 顺序构建。
-		NokiaLog.w("ShizukuRoot", "main shell 非 root，尝试重建以获取 root 权限");
+		KeydroidxLog.w("ShizukuRoot", "main shell 非 root，尝试重建以获取 root 权限");
 		try {
 			shell.waitAndClose(1, java.util.concurrent.TimeUnit.SECONDS);
 		} catch (Exception ignored) {
@@ -263,7 +263,7 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 		if (rebuilt != null && rebuilt.isRoot()) {
 			return rebuilt;
 		}
-		NokiaLog.w("ShizukuRoot", "重建后仍非 root：无 root 或 su 授权被拒绝");
+		KeydroidxLog.w("ShizukuRoot", "重建后仍非 root：无 root 或 su 授权被拒绝");
 		return null;
 	}
 
@@ -278,7 +278,7 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 	private boolean startServerAsRoot() {
 		try {
 			if (Build.VERSION.SDK_INT < 19) {
-				NokiaLog.w("ShizukuRoot", "root 启动跳过: SDK < 19");
+				KeydroidxLog.w("ShizukuRoot", "root 启动跳过: SDK < 19");
 				return false;
 			}
 			// 关键：必须拿到 root shell。直接 Shell.cmd() 会复用被缓存的 non-root shell
@@ -286,7 +286,7 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 			// 关闭 non-root 缓存并重建 root shell。
 			Shell rootShell = ensureRootShell();
 			if (rootShell == null) {
-				NokiaLog.e("ShizukuRoot", "root 启动失败: 无法获得 root shell");
+				KeydroidxLog.e("ShizukuRoot", "root 启动失败: 无法获得 root shell");
 				return false;
 			}
 			String apk = requireContext().getApplicationInfo().sourceDir;
@@ -305,20 +305,20 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 					+ "app_process -Djava.class.path='" + apk + "' -Dapp.package='" + pkg
 					+ "' /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess"
 					+ " >> \"$LOG\" 2>&1 &";
-			NokiaLog.i("ShizukuRoot", "执行 root 启动: " + script);
+			KeydroidxLog.i("ShizukuRoot", "执行 root 启动: " + script);
 			// 在 root shell 上执行脚本（复用同一持久 root shell，与 su -c 等价）
 			Shell.Result r = rootShell.newJob().add(script).exec();
-			NokiaLog.i("ShizukuRoot", "root 启动服务端退出码: " + r.getCode());
+			KeydroidxLog.i("ShizukuRoot", "root 启动服务端退出码: " + r.getCode());
 			return r.isSuccess();
 		} catch (Exception e) {
-			NokiaLog.e("ShizukuRoot", "root 启动服务端异常", e);
+			KeydroidxLog.e("ShizukuRoot", "root 启动服务端异常", e);
 			return false;
 		}
 	}
 
 	/**
 	 * On activation failure, collect diagnostics via the already-acquired root shell and
-	 * write them into {@link NokiaLog}, so 'root command ran but server never came online'
+	 * write them into {@link KeydroidxLog}, so 'root command ran but server never came online'
 	 * cases are self-documenting (user just sends back the app log).
 	 *
 	 * <ul>
@@ -335,7 +335,7 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 		try {
 			Shell rootShell = ensureRootShell();
 			if (rootShell == null) {
-				NokiaLog.w("ShizukuRoot", "diagnostics skipped: no root shell");
+				KeydroidxLog.w("ShizukuRoot", "diagnostics skipped: no root shell");
 				return;
 			}
 			String diag = "echo '=== getenforce ==='; getenforce 2>&1; "
@@ -351,25 +351,25 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 			for (String l : r.getOut()) {
 				sb.append(l).append('\n');
 			}
-			NokiaLog.e("ShizukuRoot", "root activation failure diagnostics (exit " + r.getCode() + "):\n" + sb.toString());
-			// 保险起见多一步：把整个 minishizuku.log 原样复制到 NokiaLog 日志目录，
+			KeydroidxLog.e("ShizukuRoot", "root activation failure diagnostics (exit " + r.getCode() + "):\n" + sb.toString());
+			// 保险起见多一步：把整个 minishizuku.log 原样复制到 KeydroidxLog 日志目录，
 			// 保留完整原始文件（内联 tail 只截了 80 行），方便事后排查 / 寄回。
 			copyMinishizukuLog(rootShell);
 		} catch (Exception e) {
-			NokiaLog.e("ShizukuRoot", "collect diagnostics failed", e);
+			KeydroidxLog.e("ShizukuRoot", "collect diagnostics failed", e);
 		}
 	}
 
 	/**
-	 * 通过 root shell 把 {@code /data/local/tmp/minishizuku.log} 复制到 {@link NokiaLog}
+	 * 通过 root shell 把 {@code /data/local/tmp/minishizuku.log} 复制到 {@link KeydroidxLog}
  * 日志目录下，文件名带时间戳。app 自身 uid 无权读 /data/local/tmp，必须经 root；
  * 目标目录是 app 私有外存（/sdcard/Android/data/&lt;pkg&gt;/files/log），root 可写，
 	 * 复制后用户/我们可直接取走完整原始日志。
 	 */
 	private void copyMinishizukuLog(Shell rootShell) {
-		File logDir = NokiaLog.getLogDir();
+		File logDir = KeydroidxLog.getLogDir();
 		if (logDir == null) {
-			NokiaLog.w("ShizukuRoot", "copy minishizuku.log skipped: NokiaLog dir not initialized");
+			KeydroidxLog.w("ShizukuRoot", "copy minishizuku.log skipped: KeydroidxLog dir not initialized");
 			return;
 		}
 		String name = "minishizuku_"
@@ -385,14 +385,14 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 			for (String l : r.getOut()) {
 				sb.append(l).append('\n');
 			}
-			NokiaLog.i("ShizukuRoot", "copied minishizuku.log -> " + target.getAbsolutePath()
+			KeydroidxLog.i("ShizukuRoot", "copied minishizuku.log -> " + target.getAbsolutePath()
 					+ " (exit " + r.getCode() + ") " + sb.toString().trim());
 		} catch (Exception e) {
-			NokiaLog.e("ShizukuRoot", "copy minishizuku.log failed", e);
+			KeydroidxLog.e("ShizukuRoot", "copy minishizuku.log failed", e);
 		}
 	}
 
-	// ---- NokiaFocusHost ----
+	// ---- KeydroidxFocusHost ----
 
 
 	@Override
@@ -405,11 +405,11 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 	private void onAction(int index) {
 		switch (index) {
 			case 0:
-				NokiaLog.i("ShizukuRoot", "点击 root 激活");
+				KeydroidxLog.i("ShizukuRoot", "点击 root 激活");
 				activateRoot();
 				break;
 			case 1:
-				NokiaLog.i("ShizukuRoot", "点击刷新状态");
+				KeydroidxLog.i("ShizukuRoot", "点击刷新状态");
 				refreshStatus();
 				break;
 			default:
@@ -424,17 +424,17 @@ public class ShizukuRootFragment extends NokiaListPageFragment {
 
 	@Override
 	public boolean onSoftRight() {
-		((NokiaDesktopActivity) requireActivity()).exitCurrent();
+		((KeydroidxDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
 
 	@Override
 	public boolean onBack() {
-		((NokiaDesktopActivity) requireActivity()).exitCurrent();
+		((KeydroidxDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
 
-	// ---- NokiaPage ----
+	// ---- KeydroidxPage ----
 
 	@Override
 	public String getPageTitle() {

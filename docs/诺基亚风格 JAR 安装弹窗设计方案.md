@@ -35,7 +35,7 @@
 |---|---|---|
 | `AppInstaller` | `ru.woesss.j2me.installer` | 安装核心逻辑：加载信息、下载、转换 DEX、写入文件系统 |
 | `InstallerDialog` | `ru.woesss.j2me.installer` | J2ME-Loader 原有安装弹窗：处理所有安装状态分支 |
-| `NokiaBoxFragment` | `ru.playsoftware.j2meloader.nokia` | 原键桌面"应用程序"页面，包含"安装"入口 |
+| `KeydroidxBoxFragment` | `ru.playsoftware.j2meloader.nokia` | 原键桌面"应用程序"页面，包含"安装"入口 |
 
 ### 2.2 AppInstaller 状态码
 
@@ -52,7 +52,7 @@ static final int STATUS_SUCCESS   =  5;  // 安装成功
 ### 2.3 原有安装流程
 
 ```
-NokiaBoxFragment.onPickFileResult(uri)
+KeydroidxBoxFragment.onPickFileResult(uri)
     └── InstallerDialog.newInstance(uri).show(...)
         └── onStart()
             └── installApp(path, uri)
@@ -81,13 +81,13 @@ NokiaBoxFragment.onPickFileResult(uri)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    NokiaBoxFragment                          │
+│                    KeydroidxBoxFragment                          │
 │                      (安装入口)                               │
 └─────────────────────────┬───────────────────────────────────┘
                           │ onPickFileResult(uri)
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              NokiaInstallerDialog (新建)                     │
+│              KeydroidxInstallerDialog (新建)                     │
 │                 诺基亚风格安装弹窗                             │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │ 主路径：STATUS_NEW → 直接安装 → 显示进度 → 显示结果  │   │
@@ -141,7 +141,7 @@ NokiaBoxFragment.onPickFileResult(uri)
        │ 返回 uri                   │
        ▼                            ▼
 ┌─────────────────────────────────────────┐
-│     NokiaInstallerDialog 显示           │
+│     KeydroidxInstallerDialog 显示           │
 │     标题：安装                           │
 │     内容：进度条 + "正在加载..."          │
 │     软键：左=取消  右=(空)               │
@@ -218,7 +218,7 @@ NokiaBoxFragment.onPickFileResult(uri)
 #### 4.2.1 回退流程
 
 ```
-NokiaInstallerDialog 检测到非 STATUS_NEW 状态
+KeydroidxInstallerDialog 检测到非 STATUS_NEW 状态
               │
               ▼
     ┌─────────────────┐
@@ -238,7 +238,7 @@ NokiaInstallerDialog 检测到非 STATUS_NEW 状态
 **场景 A：版本冲突（STATUS_EQUAL/OLDEST/NEWEST）**
 
 ```
-NokiaInstallerDialog
+KeydroidxInstallerDialog
     └── loadInfo() 返回 STATUS_EQUAL
         ├── 关闭自身
         └── InstallerDialog.newInstance(uri).show()
@@ -250,7 +250,7 @@ NokiaInstallerDialog
 **场景 B：JAD/JAR 不匹配（STATUS_UNMATCHED）**
 
 ```
-NokiaInstallerDialog
+KeydroidxInstallerDialog
     └── loadInfo() 返回 STATUS_UNMATCHED
         ├── 关闭自身
         └── InstallerDialog.newInstance(uri).show()
@@ -260,7 +260,7 @@ NokiaInstallerDialog
 **场景 C：需要选择 JAR（STATUS_NEED_JAD）**
 
 ```
-NokiaInstallerDialog
+KeydroidxInstallerDialog
     └── loadInfo() 返回 STATUS_NEED_JAD
         ├── 关闭自身
         └── InstallerDialog.newInstance(uri).show()
@@ -301,14 +301,14 @@ Single.create(installer::install)
 
 | 文件 | 类型 | 说明 |
 |---|---|---|
-| `NokiaInstallerDialog.java` | Java | 诺基亚风格安装弹窗（进度+结果） |
+| `KeydroidxInstallerDialog.java` | Java | 诺基亚风格安装弹窗（进度+结果） |
 | `dialog_nokia_installer.xml` | Layout | 安装弹窗布局 |
 
 #### 5.1.2 修改文件
 
 | 文件 | 修改内容 |
 |---|---|
-| `NokiaBoxFragment.java` | `onPickFileResult()` 中替换 `InstallerDialog` 为 `NokiaInstallerDialog` |
+| `KeydroidxBoxFragment.java` | `onPickFileResult()` 中替换 `InstallerDialog` 为 `KeydroidxInstallerDialog` |
 
 #### 5.1.3 不动文件
 
@@ -320,7 +320,7 @@ Single.create(installer::install)
 
 ---
 
-### 5.2 NokiaInstallerDialog 完整代码
+### 5.2 KeydroidxInstallerDialog 完整代码
 
 ```java
 package ru.playsoftware.j2meloader.nokia;
@@ -363,7 +363,7 @@ import ru.woesss.j2me.installer.InstallerDialog;
  * 3. UI 完全复用诺基亚风格：蓝渐变标题栏、深色内容区、软键栏、方向键导航
  * 4. 不改动 AppInstaller 和 InstallerDialog 的任何逻辑
  */
-public class NokiaInstallerDialog extends DialogFragment {
+public class KeydroidxInstallerDialog extends DialogFragment {
     private static final String TAG = "NokiaInstaller";
     private static final String ARG_URI = "uri";
 
@@ -399,8 +399,8 @@ public class NokiaInstallerDialog extends DialogFragment {
     // 焦点（结果状态下左右软键切换）
     private int focusIndex = 0; // 0 = 左软键，1 = 右软键
 
-    public static NokiaInstallerDialog newInstance(Uri uri) {
-        NokiaInstallerDialog dialog = new NokiaInstallerDialog();
+    public static KeydroidxInstallerDialog newInstance(Uri uri) {
+        KeydroidxInstallerDialog dialog = new KeydroidxInstallerDialog();
         Bundle args = new Bundle();
         args.putParcelable(ARG_URI, uri);
         dialog.setArguments(args);
@@ -556,7 +556,7 @@ public class NokiaInstallerDialog extends DialogFragment {
     }
 
     private void cancelInstall() {
-        NokiaLog.i(TAG, "用户取消安装");
+        KeydroidxLog.i(TAG, "用户取消安装");
         compositeDisposable.dispose();
         if (installer != null) {
             installer.deleteTemp();
@@ -588,7 +588,7 @@ public class NokiaInstallerDialog extends DialogFragment {
     private void trigger(int index) {
         if (index == 0 && installedApp != null) {
             // 打开
-            NokiaLog.i(TAG, "打开应用: " + installedApp.getTitle());
+            KeydroidxLog.i(TAG, "打开应用: " + installedApp.getTitle());
             Config.startApp(requireContext(), installedApp.getTitle(),
                     installedApp.getPathExt(), false);
         }
@@ -601,7 +601,7 @@ public class NokiaInstallerDialog extends DialogFragment {
     // ============================
 
     private void startLoadInfo() {
-        NokiaLog.i(TAG, "开始加载安装信息: " + uri);
+        KeydroidxLog.i(TAG, "开始加载安装信息: " + uri);
         installer = new AppInstaller(null, uri, requireActivity().getApplication(), appRepository);
 
         Disposable disposable = Single.create(installer::loadInfo)
@@ -612,14 +612,14 @@ public class NokiaInstallerDialog extends DialogFragment {
     }
 
     private void onLoadInfoResult(Integer status) {
-        NokiaLog.i(TAG, "loadInfo 返回状态: " + status);
+        KeydroidxLog.i(TAG, "loadInfo 返回状态: " + status);
 
         if (status == AppInstaller.STATUS_NEW) {
             // ✅ 主路径：直接安装
             startInstall();
         } else {
             // ❌ 分支路径：回退到原有 InstallerDialog
-            NokiaLog.i(TAG, "非主路径状态，回退到 InstallerDialog: " + status);
+            KeydroidxLog.i(TAG, "非主路径状态，回退到 InstallerDialog: " + status);
             fallbackToOriginalDialog();
         }
     }
@@ -636,7 +636,7 @@ public class NokiaInstallerDialog extends DialogFragment {
     }
 
     private void onInstallResult(Integer status) {
-        NokiaLog.i(TAG, "install 返回状态: " + status);
+        KeydroidxLog.i(TAG, "install 返回状态: " + status);
 
         if (status == AppInstaller.STATUS_SUCCESS) {
             installedApp = installer.getExistsApp();
@@ -650,7 +650,7 @@ public class NokiaInstallerDialog extends DialogFragment {
     }
 
     private void onError(Throwable e) {
-        NokiaLog.e(TAG, "安装错误", e);
+        KeydroidxLog.e(TAG, "安装错误", e);
         errorMessage = e.getMessage();
         if (errorMessage == null || errorMessage.isEmpty()) {
             errorMessage = "未知错误";
@@ -914,19 +914,19 @@ public class NokiaInstallerDialog extends DialogFragment {
 
 ---
 
-### 5.4 NokiaBoxFragment 修改点
+### 5.4 KeydroidxBoxFragment 修改点
 
 ```java
-// 文件：app/src/main/java/ru/playsoftware/j2meloader/nokia/NokiaBoxFragment.java
+// 文件：app/src/main/java/ru/playsoftware/j2meloader/nokia/KeydroidxBoxFragment.java
 
 // 修改方法：onPickFileResult(Uri uri)
 
 private void onPickFileResult(android.net.Uri uri) {
     if (uri == null) {
-        NokiaLog.i("Box", "文件选择器返回 null（用户取消）");
+        KeydroidxLog.i("Box", "文件选择器返回 null（用户取消）");
         return;
     }
-    NokiaLog.i("Box", "文件选择器返回: " + uri);
+    KeydroidxLog.i("Box", "文件选择器返回: " + uri);
     preferences.edit()
             .putString(Constants.PREF_LAST_PATH, FilteredFilePickerFragment.getLastPath())
             .apply();
@@ -935,7 +935,7 @@ private void onPickFileResult(android.net.Uri uri) {
     // InstallerDialog.newInstance(uri).show(getChildFragmentManager(), "installer");
 
     // ===== 修改后 =====
-    NokiaInstallerDialog.newInstance(uri).show(getChildFragmentManager(), "nokia_installer");
+    KeydroidxInstallerDialog.newInstance(uri).show(getChildFragmentManager(), "nokia_installer");
 }
 ```
 
@@ -946,7 +946,7 @@ private void onPickFileResult(android.net.Uri uri) {
 ### 6.1 主路径：全新安装成功
 
 ```
-用户    NokiaBoxFragment    NokiaInstallerDialog    AppInstaller    InstallerDialog
+用户    KeydroidxBoxFragment    KeydroidxInstallerDialog    AppInstaller    InstallerDialog
  │            │                    │                    │                │
  │──选jar────►│                    │                    │                │
  │            │───uri─────────────►│                    │                │
@@ -971,7 +971,7 @@ private void onPickFileResult(android.net.Uri uri) {
 ### 6.2 分支路径：版本冲突回退
 
 ```
-用户    NokiaBoxFragment    NokiaInstallerDialog    AppInstaller    InstallerDialog
+用户    KeydroidxBoxFragment    KeydroidxInstallerDialog    AppInstaller    InstallerDialog
  │            │                    │                    │                │
  │──选jar────►│                    │                    │                │
  │            │───uri─────────────►│                    │                │
@@ -1040,8 +1040,8 @@ private void onPickFileResult(android.net.Uri uri) {
 |---|---|
 | `AppInstaller.java` | `app/src/main/java/ru/woesss/j2me/installer/AppInstaller.java` |
 | `InstallerDialog.java` | `app/src/main/java/ru/woesss/j2me/installer/InstallerDialog.java` |
-| `NokiaBoxFragment.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/NokiaBoxFragment.java` |
-| `NokiaUninstallDialog.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/NokiaUninstallDialog.java` |
+| `KeydroidxBoxFragment.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/KeydroidxBoxFragment.java` |
+| `KeydroidxUninstallDialog.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/KeydroidxUninstallDialog.java` |
 | `dialog_installer.xml` | `app/src/main/res/layout/dialog_installer.xml` |
 | `dialog_nokia_uninstall.xml` | `app/src/main/res/layout/dialog_nokia_uninstall.xml` |
 

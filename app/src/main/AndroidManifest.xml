@@ -160,7 +160,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".nokia.NokiaDesktopActivity"
+            android:name=".nokia.KeydroidxDesktopActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:excludeFromRecents="true"
             android:exported="true"
@@ -233,7 +233,7 @@
         <!-- jar 挂机保活前台服务（:midlet 进程，仅挂机期间常驻通知，点击回 jar 续跑）。
              API 34+ 要求前台服务声明类型，specialUse + 子类型说明。 -->
         <service
-            android:name=".nokia.NokiaMidletKeepAliveService"
+            android:name=".nokia.KeydroidxMidletKeepAliveService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
             android:process=":midlet">
@@ -249,7 +249,7 @@
              在 onStop（息屏/离开前台）时启动会砸进窗口焦点切换的敏感窗口，
              曾引发「Application does not have a focused window」ANR。 -->
         <service
-            android:name=".nokia.NokiaDesktopKeepAliveService"
+            android:name=".nokia.KeydroidxDesktopKeepAliveService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
@@ -259,7 +259,7 @@
 
         <!-- 挂机 jar 清除通道（后台管理组件显式广播 → :midlet 进程内优雅销毁） -->
         <receiver
-            android:name=".nokia.NokiaMidletControlReceiver"
+            android:name=".nokia.KeydroidxMidletControlReceiver"
             android:exported="false"
             android:process=":midlet" />
 
@@ -268,7 +268,7 @@
              避免用 ContentProvider 查询把音乐 App 进程冷启动起来（会把主线程阻塞 1s 以上）。
              未授权时音乐组件自动回退到异步查询 Provider，不影响功能。 -->
         <service
-            android:name=".nokia.NokiaNotificationListenerService"
+            android:name=".nokia.KeydroidxNotificationListenerService"
             android:exported="true"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
@@ -278,7 +278,7 @@
 
         <!-- 设备管理员：仅用于桌面「锁屏」一键锁屏息屏 -->
         <receiver
-            android:name=".nokia.NokiaDeviceAdminReceiver"
+            android:name=".nokia.KeydroidxDeviceAdminReceiver"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
             android:exported="true">
             <meta-data
@@ -291,7 +291,7 @@
 
         <!-- 原键桌面按键配置对外 Provider（供生态独立 App 只读获取物理按键映射） -->
         <provider
-            android:name=".nokia.NokiaKeyProvider"
+            android:name=".nokia.KeydroidxKeyProvider"
             android:authorities="${applicationId}.keyprovider"
             android:exported="true" />
 
@@ -299,14 +299,14 @@
              外部同签名应用与本 app 自身经此获取 K，再走 TCP 10500 发 <K>|<命令>；
              app_process server 经此拉取 K 做校验。authority 形如 ${applicationId}.shizuku。 -->
         <provider
-            android:name=".nokia.NokiaShizukuProvider"
+            android:name=".nokia.KeydroidxShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:exported="true" />
 
 
         <!-- 锁屏广播接收器：供 native 拦截器通过 am broadcast 触发 Device Admin 锁屏 -->
         <receiver
-            android:name=".nokia.NokiaLockReceiver"
+            android:name=".nokia.KeydroidxLockReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="ru.playsoftware.j2meloader.nokia.LOCK_SCREEN" />

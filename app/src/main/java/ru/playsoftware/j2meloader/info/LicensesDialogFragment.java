@@ -28,7 +28,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.text.HtmlCompat;
 import androidx.fragment.app.DialogFragment;
 import ru.playsoftware.j2meloader.R;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 
 public class LicensesDialogFragment extends DialogFragment {
 	@NonNull
@@ -41,7 +41,7 @@ public class LicensesDialogFragment extends DialogFragment {
 				.setIcon(R.mipmap.ic_launcher)
 				.setMessage(message);
 		Dialog dialog = builder.create();
-		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		KeydroidxKeyBinding keyBinding = new KeydroidxKeyBinding(requireContext());
 		dialog.setOnKeyListener((d, keyCode, event) ->
 				keyBinding.dispatchDialogKey(event, this::dismiss, this::dismiss, this::dismiss, true));
 		return dialog;

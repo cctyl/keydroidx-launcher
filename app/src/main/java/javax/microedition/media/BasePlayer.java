@@ -151,7 +151,7 @@ public class BasePlayer implements Player, VolumeControl, PanControl {
 		prefetch();
 
 		if (state == PREFETCHED) {
-			javax.microedition.shell.NokiaBgEcoEngine.onAudioStarted();
+			javax.microedition.shell.KeydroidxBgEcoEngine.onAudioStarted();
 			doStart();
 
 			state = STARTED;
@@ -163,7 +163,7 @@ public class BasePlayer implements Player, VolumeControl, PanControl {
 	public synchronized void stop() {
 		checkClosed();
 		if (state == STARTED) {
-			javax.microedition.shell.NokiaBgEcoEngine.onAudioStopped();
+			javax.microedition.shell.KeydroidxBgEcoEngine.onAudioStopped();
 			doStop();
 
 			state = PREFETCHED;

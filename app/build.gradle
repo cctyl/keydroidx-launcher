@@ -9,7 +9,7 @@ def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
-def feedbackUrl = localProperties.getProperty('FEEDBACK_UPLOAD_URL', 'http://127.0.0.1:9421/upload')
+def feedbackUrl = localProperties.getProperty('FEEDBACK_UPLOAD_URL', 'http://127.0.0.1/upload')
 def installUrl = localProperties.getProperty('FEEDBACK_INSTALL_URL', '')
 def feedbackKey = localProperties.getProperty('FEEDBACK_SECRET_KEY', '')
 
@@ -206,7 +206,7 @@ dependencies {
     implementation 'androidx.multidex:multidex:2.0.1'
 
     // KeydroidX 生态基础库（联调期由 settings.gradle 的 includeBuild 以源码替换，见 docs/接入nokia-common实施计划.md）
-    implementation 'io.github.cctyl.nokia:nokia-common:1.0.0'
+    implementation 'io.github.cctyl.nokia:keydroidx-common:1.0.0'
 
     // Networking && APIs
     implementation 'com.android.volley:volley:1.2.1'

@@ -16,17 +16,17 @@
 7. **按键音**：按下物理按键时播放提示音。
 8. **可配置**：提供桌面设置入口 + 复用 J2ME-Loader 设置入口；快捷栏可编辑。
 
-**开发重心（重要）**：本仓库的主界面是**原键桌面 `NokiaDesktopActivity`**（`ru.playsoftware.j2meloader.nokia.*`），**不是 J2ME-Loader 的 `MainActivity`**——切勿把 `MainActivity` 当作主界面。
+**开发重心（重要）**：本仓库的主界面是**原键桌面 `KeydroidxDesktopActivity`**（`ru.playsoftware.j2meloader.nokia.*`），**不是 J2ME-Loader 的 `MainActivity`**——切勿把 `MainActivity` 当作主界面。
 
-- 入口：`NokiaDesktopActivity` 在 `AndroidManifest.xml` 声明了 `LAUNCHER` + `HOME` + `DEFAULT`，应用图标和按 Home 键都进入它。
+- 入口：`KeydroidxDesktopActivity` 在 `AndroidManifest.xml` 声明了 `LAUNCHER` + `HOME` + `DEFAULT`，应用图标和按 Home 键都进入它。
 - 旧 `MainActivity` 只是 J2ME-Loader 自带的启动器/文件选择器/应用列表界面，现在仅作为「百宝箱」启动 JAR、复用设置入口的底层壳，**不是主界面、不是开发重点**。
-- 调试、截图、功能验证一律针对 `NokiaDesktopActivity`（启动命令见「调试与安装」）；新增功能、改 UI 优先在 `app/src/main/java/ru/playsoftware/j2meloader/nokia/` 目录下进行。
+- 调试、截图、功能验证一律针对 `KeydroidxDesktopActivity`（启动命令见「调试与安装」）；新增功能、改 UI 优先在 `app/src/main/java/ru/playsoftware/j2meloader/nokia/` 目录下进行。
 
 
 ## 界面简介
 
 - 桌面
-NokiaDesktopActivity， 就是按下HOME返回的界面，这里展示一些信息，和一些快捷入口
+KeydroidxDesktopActivity， 就是按下HOME返回的界面，这里展示一些信息，和一些快捷入口
 
 - 功能表
 从桌面按下左键进入功能表，功能表里就是各种应用，和设置
@@ -43,8 +43,8 @@ NokiaDesktopActivity， 就是按下HOME返回的界面，这里展示一些信�
 
 `docs/` 目录下有文档
 
-- **详细开发规范（必读）**：`docs/NOKIA_DEVELOPMENT_RULES.md` —— 按键处理、DOWN/UP 配对、软键栏、底部菜单栏、选项弹窗、Android 4.4 兼容、双分辨率适配、设备说明等**硬性规则**全文。
-- **排版与字号规范（唯一事实源）**：`../../keydroidx-core/docs/11-typography-and-font-spec.md` —— 6 级 `@dimen/nokia_font_*` 语义 Token 标准体系。
+- **详细开发规范（必读）**：`../keydroidx-core/docs/NOKIA_DEVELOPMENT_RULES.md` —— 按键处理、DOWN/UP 配对、软键栏、底部菜单栏、选项弹窗、Android 4.4 兼容、双分辨率适配等**硬性规则**全文（2026-09 起全生态仅此一份）。
+- **排版与字号规范（唯一事实源）**：`../keydroidx-core/docs/spec/typography-and-font-spec.md` —— 6 级 `@dimen/nokia_font_*` 语义 Token 标准体系。
 
 
 
@@ -56,7 +56,7 @@ NokiaDesktopActivity， 就是按下HOME返回的界面，这里展示一些信�
 调试方面，使用adb截图理解，再使用adb 模拟点击来操作。常用调试命令（多设备一律加 `-s <serial>` 指定目标，避免误装到别的设备）：
 
 # 直接启动原键桌面（跳过 HOME）
-adb shell am start -n io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity
+adb shell am start -n io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity
 
 
 ## 常用命令
@@ -117,19 +117,19 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
 
 **模拟器核心 `org.microemu`。** MicroEmu Java ME 模拟器的 fork，负责类加载、MIDlet 生命周期与事件循环。`javax.microedition.shell.MicroActivity`（连同 `MidletThread`/`MidletSystem`）才是真正启动并驱动一个 MIDlet 的东西。
 
-**双进程隔离。** `MainActivity`（原 J2ME-Loader 启动器、文件选择器、应用列表）运行在默认进程中 —— 注意它 **已不再是应用的主界面**；真正的 Home/桌面入口是 `NokiaDesktopActivity`（见开发重心与入口说明）。游戏本身通过 `MicroActivity` 运行在独立的 `:midlet` 进程中（`android:process=":midlet"`，见 `AndroidManifest.xml`），因此崩溃的 MIDlet 不会拖垮宿主应用。`com.nokia.mid.ui.NotificationBroadcastReceiver` 也处在 `:midlet` 进程中。
+**双进程隔离。** `MainActivity`（原 J2ME-Loader 启动器、文件选择器、应用列表）运行在默认进程中 —— 注意它 **已不再是应用的主界面**；真正的 Home/桌面入口是 `KeydroidxDesktopActivity`（见开发重心与入口说明）。游戏本身通过 `MicroActivity` 运行在独立的 `:midlet` 进程中（`android:process=":midlet"`，见 `AndroidManifest.xml`），因此崩溃的 MIDlet 不会拖垮宿主应用。`com.nokia.mid.ui.NotificationBroadcastReceiver` 也处在 `:midlet` 进程中。
 
 **基于 NDK 的原生 3D。** `app/src/main/cpp` 通过 ndkBuild（`Android.mk`）构建两个共享库：`javam3g`（基于 OpenGL ES 1.1 的 Mascot Capsule 3D `m3g`，提供 `javax.microedition.m3g`）与 `micro3d`（Micro3D V3 引擎绑定）。正是这段原生代码使得工程固定使用较旧的 NDK 22.1.7171670，并且 Gradle 需要安装 NDK。
 
-**`ru.playsoftware.j2meloader` 中的应用外壳。** 安卓侧的 UI 与服务：`MainActivity`（遗留的 J2ME-Loader 启动器，已不再是主界面）、`NokiaDesktopActivity`（真正的 Home/桌面 —— 当前开发重点）、`ConfigActivity`、`SettingsActivity`、`KeyMapperActivity`、Room 数据库（按应用配置）、文件选择器以及 `storage.DocumentProvider`。原键桌面代码位于 `ru.playsoftware.j2meloader.nokia.*` 之下。`com.*`/`mmpp.*` 持有诺基亚 UI 扩展（`com.nokia.mid.ui`）与 Mascot Capsule 辅助类。
+**`ru.playsoftware.j2meloader` 中的应用外壳。** 安卓侧的 UI 与服务：`MainActivity`（遗留的 J2ME-Loader 启动器，已不再是主界面）、`KeydroidxDesktopActivity`（真正的 Home/桌面 —— 当前开发重点）、`ConfigActivity`、`SettingsActivity`、`KeyMapperActivity`、Room 数据库（按应用配置）、文件选择器以及 `storage.DocumentProvider`。原键桌面代码位于 `ru.playsoftware.j2meloader.nokia.*` 之下。`com.*`/`mmpp.*` 持有诺基亚 UI 扩展（`com.nokia.mid.ui`）与 Mascot Capsule 辅助类。
 
 **原键桌面内部（`ru.playsoftware.j2meloader.nokia.*`）—— 这是主要的开发面。** 在触碰任何 UI 之前需要理解的高层分层：
 
-- **Shell / 中枢层**：`NokiaBaseActivity`（240dp 设计基准 + `scaleMidContent`/`scalePanelContent` 整体缩放、density 修正、`applyBottomText` 动态字号）与 `NokiaDesktopActivity`（按键分发 `dispatchKeyEvent`、DOWN/UP 配对 `lastHandledDownKeyCode`、`refreshPageBar()` 页面装配、暴露 `getKeyBinding()`/`getScale()`/`getMidPanelHeight()`）。
-- **页面契约层**：`NokiaPage`（extends `NokiaFocusHost`）提供 `getPageTitle()`/`getSoftLeftText()`/`getSoftRightText()`，由 Activity 声明式装配底部三栏；各页面 Fragment（功能表、百宝箱、桌面设置、组件向导等）实现它并调用 `host.refreshPageBar()`。
-- **按键语义层**：`NokiaKeyBinding` 把 keyCode 解析成语义动作（`ACTION_SOFT_LEFT`/`RIGHT`/`SELECT`/`LEFT`/`RIGHT`），弹窗必须自己接入（Dialog 是独立 Window，Activity 的 dispatch 对弹窗无效），禁止写死 keyCode。
-- **通用弹窗层**：`NokiaOptionsDialog`（唯一通用「选项/菜单列表」弹窗，`OptionItem` 模型 + `setItems()` 刷新），复用 `dialog_nokia_widget_options.xml`；其余安装/卸载等专用弹窗不得给软键加高亮/焦点。
-- **工具与系统信息层**：`NokiaDimens.dp()`（唯一尺寸换算入口，禁止裸写 px/density）、`NokiaDashedLineDrawable`（点线分隔线标准实现）、`StatusBarController`（顶栏信号/WiFi/电量/时间，`SubscriptionManager` 需 `SDK_INT>=22` 守卫）、`NokiaLockScreen`（设备管理员锁屏，`ADD_DEVICE_ADMIN` 不加 NEW_TASK）。
+- **Shell / 中枢层**：`KeydroidxBaseActivity`（240dp 设计基准 + `scaleMidContent`/`scalePanelContent` 整体缩放、density 修正、`applyBottomText` 动态字号）与 `KeydroidxDesktopActivity`（按键分发 `dispatchKeyEvent`、DOWN/UP 配对 `lastHandledDownKeyCode`、`refreshPageBar()` 页面装配、暴露 `getKeyBinding()`/`getScale()`/`getMidPanelHeight()`）。
+- **页面契约层**：`KeydroidxPage`（extends `KeydroidxFocusHost`）提供 `getPageTitle()`/`getSoftLeftText()`/`getSoftRightText()`，由 Activity 声明式装配底部三栏；各页面 Fragment（功能表、百宝箱、桌面设置、组件向导等）实现它并调用 `host.refreshPageBar()`。
+- **按键语义层**：`KeydroidxKeyBinding` 把 keyCode 解析成语义动作（`ACTION_SOFT_LEFT`/`RIGHT`/`SELECT`/`LEFT`/`RIGHT`），弹窗必须自己接入（Dialog 是独立 Window，Activity 的 dispatch 对弹窗无效），禁止写死 keyCode。
+- **通用弹窗层**：`KeydroidxOptionsDialog`（唯一通用「选项/菜单列表」弹窗，`OptionItem` 模型 + `setItems()` 刷新），复用 `dialog_nokia_widget_options.xml`；其余安装/卸载等专用弹窗不得给软键加高亮/焦点。
+- **工具与系统信息层**：`KeydroidxDimens.dp()`（唯一尺寸换算入口，禁止裸写 px/density）、`KeydroidxDashedLineDrawable`（点线分隔线标准实现）、`StatusBarController`（顶栏信号/WiFi/电量/时间，`SubscriptionManager` 需 `SDK_INT>=22` 守卫）、`KeydroidxLockScreen`（设备管理员锁屏，`ADD_DEVICE_ADMIN` 不加 NEW_TASK）。
 - **布局约束**：Fragment 根布局**宽度固定 240dp**、高度 `match_parent`（或 ≤panelH），网格行数走 `getMidPanelHeight()` 实测反推 + `view.post` 延迟到布局完成，scale 一律走 `getScale()` 单一来源。
 
 **Product flavors（`app/build.gradle`）。** `play`/`open`/`fdroid`/`dev` 都是完整模拟器（`FULL_EMULATOR=true`），区别仅在分发渠道、`versionNameSuffix` 与 proguard 文件；`open` 是非 Play 构建，也是本地开发应使用的一个。`midlet` 特殊：`FULL_EMULATOR=false`，它不构建模拟器，而是从 J2ME 应用的源码（读取自 `src/midlet/resources/MIDLET-META-INF/MANIFEST.MF`）构建一个独立的 Android APK。`dev` 在配置期调用 `generateVersionCode()`（git rev-list）—— 非 git 工作副本会回退到 version code 1（已在 `app/build.gradle` 中打补丁）。
@@ -138,27 +138,27 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
 
 
 
-## 统一日志规范（强制使用 NokiaLog）
+## 统一日志规范（强制使用 KeydroidxLog）
 
-为了配合生态统一日志收集与意见反馈（`NokiaFeedbackActivity`），**本项目禁止直接使用原生 `android.util.Log` 或引入第三方日志库，必须强制统一使用 `keydroidx-core` 提供的 `NokiaLog`**。
+为了配合生态统一日志收集与意见反馈（`KeydroidxFeedbackActivity`），**本项目禁止直接使用原生 `android.util.Log` 或引入第三方日志库，必须强制统一使用 `keydroidx-core` 提供的 `KeydroidxLog`**。
 
 ### 8.1 接入与使用规范
 1. **Application 初始化**：
    ```kotlin
-   NokiaLog.setTag("KeydroidX-Music")
-   NokiaLog.init(this) // 自动读取详细日志开关决定落盘级别
-   NokiaLog.installCrashHandler(this) // 崩溃自动抓取瞬时落盘
+   KeydroidxLog.setTag("KeydroidX-Music")
+   KeydroidxLog.init(this) // 自动读取详细日志开关决定落盘级别
+   KeydroidxLog.installCrashHandler(this) // 崩溃自动抓取瞬时落盘
    ```
 2. **业务代码打印（零成本桥接）**：
    - 在 Kotlin 文件头部添加别名导入，现有 `Log.d/i/w/e` 代码无需改动即可自动享受分级过滤与落盘：
      ```kotlin
      import io.github.cctyl.keydroidx.music.util.NLog as Log
      ```
-   - 或直接调用：`NokiaLog.d("Tag", "msg")`、`NokiaLog.e("Tag", "msg", throwable)`。
+   - 或直接调用：`KeydroidxLog.d("Tag", "msg")`、`KeydroidxLog.e("Tag", "msg", throwable)`。
 3. **日志分级与持久化开关**：
    - **详细日志关闭（默认/Release）**：仅记录 `ERROR` 与 `FATAL` 崩溃堆栈，零文件 I/O 损耗。
    - **详细日志开启（Debug/排查）**：记录所有 `DEBUG`、`INFO`、`WARN` 业务日志。
-   - 主界面/设置页选项菜单必须提供「详细日志：开/关」切换项（调用 `NokiaLog.setDetailedLogEnabled`）。
+   - 主界面/设置页选项菜单必须提供「详细日志：开/关」切换项（调用 `KeydroidxLog.setDetailedLogEnabled`）。
 4. **日志落盘约定**：
-   - 统一输出至 `/sdcard/Android/data/<包名>/log/yyyyMMdd.log`，按天自动轮转，保留 7 天。
+   - 统一输出至 `/sdcard/Android/data/<包名>/files/log/yyyyMMdd.log`，按天自动轮转，保留 7 天。
 

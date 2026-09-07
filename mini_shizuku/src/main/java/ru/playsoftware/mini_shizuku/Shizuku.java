@@ -11,7 +11,7 @@ import io.github.cctyl.nokia.shizuku.MiniShizuku;
  * 权限通道。服务端由用户在电脑上通过 adb 以 shell 身份拉起，客户端经本门面检测状态并执行命令。
  * <p>
  * 自 v3 起：传输仍为 TCP 10500，但每条命令前缀密钥 K（{@code <K>|<inner>}），K 由
- * {@code NokiaShizukuProvider} 按签名派发；底层 client 与第三方 SDK 共用
+ * {@code KeydroidxShizukuProvider} 按签名派发；底层 client 与第三方 SDK 共用
  * {@link MiniShizuku}（core 模块），本门面在其上封装 launcher 专属的拦截器/页面状态命令。
  * <p>
  * 主 app 一律通过本门面调用，不直接接触底层 client/server 类。
@@ -72,7 +72,7 @@ public final class Shizuku {
      * 拦截器状态机需要此信息来决定：亮屏+诺基亚时，主界面→锁屏，子页面→回桌面。
      * 服务端通过 JNI 更新 native 全局变量；服务离线时静默失败（不影响 UI）。
      *
-     * @param isMain true=主界面（待机屏 NokiaDesktopFragment），false=子页面
+     * @param isMain true=主界面（待机屏 KeydroidxDesktopFragment），false=子页面
      * @return 命令是否成功发送。
      */
     public static boolean setPageState(boolean isMain) {

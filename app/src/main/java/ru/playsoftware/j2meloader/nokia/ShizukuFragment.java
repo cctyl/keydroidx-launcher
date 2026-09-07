@@ -1,5 +1,5 @@
 package ru.playsoftware.j2meloader.nokia;
-import io.github.cctyl.nokia.common.ui.NokiaFontManager;
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,9 +14,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import io.github.cctyl.nokia.common.log.NokiaLog;
-import io.github.cctyl.nokia.common.ui.focus.NokiaFocusHost;
-import io.github.cctyl.nokia.common.util.NokiaDimens;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
+import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
+import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
@@ -33,9 +33,9 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  *     <li>左软键「刷新」：重新检测服务在线状态；右软键「返回」：返回上一层。</li>
  * </ul>
  * <p>
- * 电源键拦截开关已移至「高级设置」（{@link NokiaAdvancedSettingsFragment}）。
+ * 电源键拦截开关已移至「高级设置」（{@link KeydroidxAdvancedSettingsFragment}）。
  */
-public class ShizukuFragment extends NokiaListPageFragment {
+public class ShizukuFragment extends KeydroidxListPageFragment {
 
 	private TextView statusText;
 	private LinearLayout actionList;
@@ -73,8 +73,8 @@ public class ShizukuFragment extends NokiaListPageFragment {
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					LinearLayout.LayoutParams.MATCH_PARENT, NokiaDimens.dp(getResources(), 36)));
-			row.setPadding(NokiaDimens.dp(getResources(), 12), 0, NokiaDimens.dp(getResources(), 12), 0);
+					LinearLayout.LayoutParams.MATCH_PARENT, KeydroidxDimens.dp(getResources(), 36)));
+			row.setPadding(KeydroidxDimens.dp(getResources(), 12), 0, KeydroidxDimens.dp(getResources(), 12), 0);
 			row.setClickable(true);
 
 			TextView tv = new TextView(requireContext());
@@ -82,13 +82,13 @@ public class ShizukuFragment extends NokiaListPageFragment {
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 			tv.setText(ACTION_NAMES[i]);
 			tv.setTextColor(0xFFFFFFFF);
-			NokiaFontManager.textSize(tv, 12);
+			KeydroidxFontManager.textSize(tv, 12);
 			row.addView(tv);
 
 			TextView arrow = new TextView(requireContext());
 			arrow.setText(">");
 			arrow.setTextColor(0xFFAAAAAA);
-			NokiaFontManager.textSize(arrow, 14);
+			KeydroidxFontManager.textSize(arrow, 14);
 			row.addView(arrow);
 
 			final int idx = i;
@@ -130,19 +130,19 @@ public class ShizukuFragment extends NokiaListPageFragment {
 		if (index < 0 || index >= ACTION_NAMES.length) return;
 		switch (index) {
 			case 0:
-				NokiaLog.i("Shizuku", "进入 adb 激活说明页");
-				((NokiaDesktopActivity) requireActivity()).openFragment(new ShizukuAdbFragment());
+				KeydroidxLog.i("Shizuku", "进入 adb 激活说明页");
+				((KeydroidxDesktopActivity) requireActivity()).openFragment(new ShizukuAdbFragment());
 				break;
 			case 1:
-				NokiaLog.i("Shizuku", "进入 root 激活页（占位）");
-				((NokiaDesktopActivity) requireActivity()).openFragment(new ShizukuRootFragment());
+				KeydroidxLog.i("Shizuku", "进入 root 激活页（占位）");
+				((KeydroidxDesktopActivity) requireActivity()).openFragment(new ShizukuRootFragment());
 				break;
 			default:
 				break;
 		}
 	}
 
-	// ---- NokiaFocusHost ----
+	// ---- KeydroidxFocusHost ----
 
 	@Override
 	public boolean onSelect() {
@@ -162,17 +162,17 @@ public class ShizukuFragment extends NokiaListPageFragment {
 
 	@Override
 	public boolean onSoftRight() {
-		((NokiaDesktopActivity) requireActivity()).exitCurrent();
+		((KeydroidxDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
 
 	@Override
 	public boolean onBack() {
-		((NokiaDesktopActivity) requireActivity()).exitCurrent();
+		((KeydroidxDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
 
-	// ---- NokiaPage ----
+	// ---- KeydroidxPage ----
 
 	@Override
 	public String getPageTitle() {

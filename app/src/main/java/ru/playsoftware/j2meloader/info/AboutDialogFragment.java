@@ -31,7 +31,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import ru.playsoftware.j2meloader.BuildConfig;
 import ru.playsoftware.j2meloader.R;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 
 public class AboutDialogFragment extends DialogFragment {
 	@NonNull
@@ -78,7 +78,7 @@ public class AboutDialogFragment extends DialogFragment {
 		// positive = "许可"(R.string.licenses，靠右)，neutral = "更多"(R.string.more，靠左)
 		Button btnLicenses = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
 		Button btnMore = dialog.getButton(DialogInterface.BUTTON_NEUTRAL);
-		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		KeydroidxKeyBinding keyBinding = new KeydroidxKeyBinding(requireContext());
 		dialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
 				event,
 				() -> { if (btnMore != null) btnMore.performClick(); },       // 左软键 -> 更多

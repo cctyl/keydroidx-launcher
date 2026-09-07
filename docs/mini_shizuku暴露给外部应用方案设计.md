@@ -4,7 +4,7 @@
 
 `mini_shizuku` 是本 Launcher 自带的轻量级 Shell 进程执行组件，运行在 Android 的 `shell` (UID 2000) 权限下。
 本方案目标：
-1. 将客户端调用封装为通用 SDK（`keydroidx-core:nokia-mini-shizuku` 模块），供外部生态应用集成。
+1. 将客户端调用封装为通用 SDK（`keydroidx-core:keydroidx-mini-shizuku` 模块），供外部生态应用集成。
 2. **严格鉴权**：只有与 Launcher 拥有**完全相同签名**的应用，才能通过 SDK 执行 Shell 命令；防止设备上的恶意/第三方应用提权。
 3. **兼容性**：在 Android 4.4 到最新版本均可稳定运行。
 
@@ -18,7 +18,7 @@
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │ 1. 密钥生成阶段                                                        │
-│    Launcher 启动时，NokiaShizukuKeyHolder 在进程内存中通过              │
+│    Launcher 启动时，KeydroidxShizukuKeyHolder 在进程内存中通过              │
 │    SecureRandom 懒加载生成 32 字节（64 位十六进制）的高强度随机密钥 K   │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
@@ -30,9 +30,9 @@
 │ ① 外部应用调用 MiniShizuku.exec(...)  │ │ ① Server (UID 2000) 收到带 K 命令，   │
 │ ② SDK 自动通过 ContentResolver 调用： │ │   发现本地未缓存 K                    │
 │    content://<host>.shizuku/getKey    │ │ ② Server 执行 shell 命令：            │
-│ ③ Launcher 的 NokiaShizukuProvider:   │ │    content call --uri content://...   │
+│ ③ Launcher 的 KeydroidxShizukuProvider:   │ │    content call --uri content://...   │
 │    - 通过 Binder.getCallingUid() 取   │ │    --method getServerKey              │
-│      调用方 UID                       │ │ ③ Launcher 的 NokiaShizukuProvider:   │
+│      调用方 UID                       │ │ ③ Launcher 的 KeydroidxShizukuProvider:   │
 │    - PackageManager 反查调用方签名    │ │    - 校验调用者 UID == 2000 (shell)   │
 │    - 与 Launcher 自身签名逐字节比对   │ │    - 验证通过，返回真实密钥 K          │
 │    - 【同签名】：返回密钥 K           │ │ ④ Server 解析输出并在内存中缓存 K    │
@@ -59,12 +59,12 @@
 
 1. **为什么恶意应用无法伪造密钥？**
    - 密钥 K 在内存随机生成，不存磁盘文件，不写死在任何代码里。
-   - 外部应用想拿到 K，唯一途径是调用 Launcher 的 `NokiaShizukuProvider.getKey`。
+   - 外部应用想拿到 K，唯一途径是调用 Launcher 的 `KeydroidxShizukuProvider.getKey`。
    - Provider 使用 Android 底层 Binder 内核维护的 `Binder.getCallingUid()` 确定调用者真实 UID，再通过系统 `PackageManager` 验证签名。调用者无法伪造自己的 UID 或签名。
 2. **为什么 Server 端可以用 `content call` 获取真实 K？**
    - Server 是通过 `app_process` 启动的守护进程，运行在 UID 2000（shell）。
    - Android 系统自带的 `content` CLI 工具运行身份就是 shell。
-   - `NokiaShizukuProvider.getServerKey` 仅对特权 UID（2000 / 1000 / 0）放行，第三方普通应用调用此方法一律返回 null，杜绝了普通应用冒充 Server 读取真实 K 的可能。
+   - `KeydroidxShizukuProvider.getServerKey` 仅对特权 UID（2000 / 1000 / 0）放行，第三方普通应用调用此方法一律返回 null，杜绝了普通应用冒充 Server 读取真实 K 的可能。
 3. **Launcher 进程重启后的自愈机制**：
    - 若 Launcher 意外被杀后重启，会生成新的 K。
    - 客户端（Launcher 或第三方）重新调用时会向 Provider 拉取新 K 并发送。

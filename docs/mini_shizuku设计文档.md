@@ -19,7 +19,7 @@
 - **服务端**：现有 `mini_shizuku` 模块（app_process 以 shell/UID 2000 身份运行），复用 `AdbProcess → SocketService → MsgProcess → ShellUtil` 链路
 - **客户端**：扩展现有 `ShizukuClient`（TCP 127.0.0.1:10500），补充带输出回显的执行方法
 - **进程隔离**：保持 `:mini_shizuku` 作为独立 Gradle 库模块，服务端在独立 app_process 进程运行，崩溃不影响主 app
-- **UI**：原键桌面现有 Fragment 模式（`NokiaPage` + `NokiaFocusHost`），复用 `NokiaOptionsDialog`、`NokiaSettingsStorage`、`NokiaDimens.dp()`
+- **UI**：原键桌面现有 Fragment 模式（`KeydroidxPage` + `KeydroidxFocusHost`），复用 `KeydroidxOptionsDialog`、`KeydroidxSettingsStorage`、`KeydroidxDimens.dp()`
 
 ## 实现方案
 
@@ -38,7 +38,7 @@
 ```mermaid
 flowchart LR
     subgraph 主app进程
-        SettingsPage[Shizuku设置页<br/>NokiaPage Fragment] -->|NokiaKeyBinding按键| Facade[Shizuku门面<br/>版本分流]
+        SettingsPage[Shizuku设置页<br/>KeydroidxPage Fragment] -->|KeydroidxKeyBinding按键| Facade[Shizuku门面<br/>版本分流]
         Facade -->|API>=24 占位| Future[官方Shizuku预留]
         Facade -->|API<24| Client[ShizukuClient<br/>TCP 127.0.0.1:10500]
     end
@@ -60,7 +60,7 @@ flowchart LR
 ## 实施注意（防止回归）
 
 - **版本守卫**：项目 `MIN_SDK=14`，新增代码严禁出现无守卫的高版本 API；版本判断一律 `Build.VERSION.SDK_INT >= 24` 形式。
-- **遵守原键桌面规范**：新 Fragment 根布局宽固定 240dp、高度 match_parent；尺寸换算走 `NokiaDimens.dp()`；scale 走 `host.getScale()`；按键走 `NokiaKeyBinding` 语义动作（不能写死 keyCode）。
+- **遵守原键桌面规范**：新 Fragment 根布局宽固定 240dp、高度 match_parent；尺寸换算走 `KeydroidxDimens.dp()`；scale 走 `host.getScale()`；按键走 `KeydroidxKeyBinding` 语义动作（不能写死 keyCode）。
 - **lint 约束**：`app/build.gradle` 已 `disable 'NewApi'` 等，但 mini_shizuku 模块的 lint 配置需确认，新增代码保持与现有风格一致。
 - **不要改动 J2ME 兼容层**：本次改动仅在 `mini_shizuku` 模块和诺基亚包 `ru.playsoftware.j2meloader.nokia` 下，不影响 `javax.microedition.*`。
 - **启动脚本保持**：`app/src/debug/assets/demon.sh` 与 `app/src/release/assets/demon.sh` 已存在且正确，无需改动；设置页展示的命令从这两个脚本内容派生。
@@ -83,10 +83,10 @@ mini_shizuku/src/main/java/ru/playsoftware/mini_shizuku/
                                      #   (输出, 退出码)，供 MsgProcess 回写；保留 execute 兼容
 
 app/src/main/java/ru/playsoftware/j2meloader/nokia/
-├── NokiaDesktopSettingsFragment.java # [MODIFY] ITEM_ICONS/ITEM_NAMES 新增"Shizuku 服务"项，
+├── KeydroidxDesktopSettingsFragment.java # [MODIFY] ITEM_ICONS/ITEM_NAMES 新增"Shizuku 服务"项，
 │                                     #   getItemDisplayName() 动态显示在线/离线状态，
 │                                     #   onSelect() switch 打开 ShizukuFragment
-└── ShizukuFragment.java              # [NEW] 实现 NokiaPage+NokiaFocusHost（8 方法）：
+└── ShizukuFragment.java              # [NEW] 实现 KeydroidxPage+KeydroidxFocusHost（8 方法）：
                                      #   展示服务状态、adb 启动命令（区分 debug/release）、
                                      #   复制命令、测试连通、执行简单测试命令
 

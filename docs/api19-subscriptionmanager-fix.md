@@ -4,14 +4,14 @@
 > 关联计划：`docs/vector-drawable-api19-fix.md`（矢量图崩溃已修复并通过构建验证）
 
 ## 一、故障现象（修复矢量图后的第二个崩溃）
-修复矢量图并重新安装后，`NokiaDesktopActivity` 能完成布局膨胀，但在 `onResume` 阶段再次崩溃：
+修复矢量图并重新安装后，`KeydroidxDesktopActivity` 能完成布局膨胀，但在 `onResume` 阶段再次崩溃：
 
 ```
 E/AndroidRuntime: FATAL EXCEPTION: main
   Process: io.github.cctyl.nokia.debug, PID: 7141
   java.lang.NoClassDefFoundError: android.telephony.SubscriptionManager
     at ru.playsoftware.j2meloader.nokia.StatusBarController.start(StatusBarController.java:126)
-    at ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity.onResume(NokiaDesktopActivity.java:85)
+    at ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity.onResume(KeydroidxDesktopActivity.java:85)
 ```
 
 ## 二、根因
@@ -45,7 +45,7 @@ if (Build.VERSION.SDK_INT >= 22) {
 
 ## 五、验证方式（迭代式）
 1. 修改后重新 `assembleOpenDebug -x lint` 构建并 `adb -s 4a24ecf install -r`。
-2. 启动 `NokiaDesktopActivity`，抓取 logcat，确认：
+2. 启动 `KeydroidxDesktopActivity`，抓取 logcat，确认：
    - 不再出现 `NoClassDefFoundError: android.telephony.SubscriptionManager`；
    - 不再出现 `invalid drawable tag vector` / `InflateException`。
 3. 若仍崩溃，以设备真实崩溃栈为准，继续“修一处→构建→安装→实测”的迭代，直至桌面在 4.4 上稳定进入。
@@ -54,8 +54,8 @@ if (Build.VERSION.SDK_INT >= 22) {
 
 ## 六、验证结果（2026-07-30，设备 4a24ecf / SDK 19）
 - 重新 `assembleOpenDebug -x lint` 构建成功，`adb -s 4a24ecf install -r` 安装成功。
-- 启动 `NokiaDesktopActivity`，logcat 确认：
-  - `I/ActivityManager: Displayed ... NokiaDesktopActivity` —— **Activity 正常显示**（首次安装 MultiDex 解压约 20s，属正常）。
+- 启动 `KeydroidxDesktopActivity`，logcat 确认：
+  - `I/ActivityManager: Displayed ... KeydroidxDesktopActivity` —— **Activity 正常显示**（首次安装 MultiDex 解压约 20s，属正常）。
   - `I/NokiaDesktop: [Desktop] 首次启动：进入按键绑定向导` —— 桌面逻辑已跑起来。
   - `D/NokiaSB: registerSignalListeners fallback: probe subIds (both SIMs)` + `onSignalStrengthsChanged slot=0 level=0` —— 顶栏信号走 API 19 单卡降级路径，正常工作。
   - 原 `NoClassDefFoundError: android.telephony.SubscriptionManager` 已消失。

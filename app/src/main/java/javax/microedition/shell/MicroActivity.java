@@ -88,10 +88,10 @@ import javax.microedition.util.ContextHolder;
 import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
 import ru.playsoftware.j2meloader.BuildConfig;
-import ru.playsoftware.j2meloader.nokia.NokiaDesktopActivity;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
-import ru.playsoftware.j2meloader.nokia.NokiaMidletKeepAliveService;
-import ru.playsoftware.j2meloader.nokia.NokiaOptionsDialog;
+import ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxMidletKeepAliveService;
+import ru.playsoftware.j2meloader.nokia.KeydroidxOptionsDialog;
 import ru.playsoftware.j2meloader.util.MidletStateStore;
 import ru.playsoftware.mini_shizuku.Shizuku;
 import ru.playsoftware.j2meloader.R;
@@ -115,7 +115,7 @@ public class MicroActivity extends AppCompatActivity {
 	private InputMethodManager inputMethodManager;
 	private int menuKey;
 	private String appPath;
-	/** 诺基亚键码表（9 元素，索引=NokiaKeyBinding 动作；Intent extra 优先，SP 兜底） */
+	/** 诺基亚键码表（9 元素，索引=KeydroidxKeyBinding 动作；Intent extra 优先，SP 兜底） */
 	private int[] nokiaKeyCodes;
 
 	public ActivityMicroBinding binding;
@@ -271,8 +271,8 @@ public class MicroActivity extends AppCompatActivity {
 	/** 读取键码表：Intent extra 优先（桌面传最新绑定），缺省回退 SP（新进程首读必为最新）。 */
 	private void loadKeyCodes(Intent intent) {
 		int[] extra = intent != null ? intent.getIntArrayExtra(Constants.KEY_KEYCODES) : null;
-		if (extra == null || extra.length != NokiaKeyBinding.ACTION_COUNT) {
-			extra = NokiaKeyBinding.loadKeyCodes(this);
+		if (extra == null || extra.length != KeydroidxKeyBinding.ACTION_COUNT) {
+			extra = KeydroidxKeyBinding.loadKeyCodes(this);
 		}
 		nokiaKeyCodes = extra;
 	}
@@ -312,9 +312,9 @@ public class MicroActivity extends AppCompatActivity {
 	public void onResume() {
 		super.onResume();
 		visible = true;
-		NokiaBgEcoEngine.onForegroundResumed();
+		KeydroidxBgEcoEngine.onForegroundResumed();
 		MidletThread.resumeApp();
-		NokiaMidletKeepAliveService.stop(this);
+		KeydroidxMidletKeepAliveService.stop(this);
 		reportMidletForeground();
 	}
 
@@ -332,8 +332,8 @@ public class MicroActivity extends AppCompatActivity {
 		// 挂机保活：Activity 不可见且 MIDlet 仍在运行（覆盖绿键/红键/Home 全部离开路径；
 		// 绿键「后台运行」路径已在动作内先行启动，此处幂等）
 		if (MidletThread.hasInstance() && MidletThread.getRunningAppPath() != null) {
-			NokiaBgEcoEngine.onBackgroundStarted();
-			NokiaMidletKeepAliveService.start(this, appName,
+			KeydroidxBgEcoEngine.onBackgroundStarted();
+			KeydroidxMidletKeepAliveService.start(this, appName,
 					MidletThread.getRunningAppPath(), nokiaKeyCodes);
 		}
 	}
@@ -503,16 +503,16 @@ public class MicroActivity extends AppCompatActivity {
 		alertBuilder.create().show();
 	}
 
-	/** 弹出挂机三菜单（绿键）：继续 / 退出 / 后台运行。复用 NokiaOptionsDialog（键码表注入模式）。 */
+	/** 弹出挂机三菜单（绿键）：继续 / 退出 / 后台运行。复用 KeydroidxOptionsDialog（键码表注入模式）。 */
 	private void showHangupMenu() {
-		java.util.List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_media_play,
+		java.util.List<KeydroidxOptionsDialog.OptionItem> items = new ArrayList<>();
+		items.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_media_play,
 				"继续", true, false, null)); // 仅关闭弹窗继续运行
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_close_clear_cancel,
+		items.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_close_clear_cancel,
 				"退出", true, false, this::exitMidlet));
-		items.add(new NokiaOptionsDialog.OptionItem(android.R.drawable.ic_menu_more,
+		items.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_more,
 				"后台运行", true, false, this::runInBackground));
-		NokiaOptionsDialog.show(getSupportFragmentManager(), appName, items, nokiaKeyCodes);
+		KeydroidxOptionsDialog.show(getSupportFragmentManager(), appName, items, nokiaKeyCodes);
 	}
 
 	/** 三菜单「退出」：先 finish 立即回桌面（用户不必看到 END 键过渡画面），销毁在后台完成。 */
@@ -530,18 +530,18 @@ public class MicroActivity extends AppCompatActivity {
 		hideSoftInput();
 		// 挂机动作发生时 Activity 仍前台：立即起保活通知（规避 Android 12+ 后台 FGS 限制）
 		if (MidletThread.hasInstance() && MidletThread.getRunningAppPath() != null) {
-			NokiaBgEcoEngine.onBackgroundStarted();
-			NokiaMidletKeepAliveService.start(this, appName,
+			KeydroidxBgEcoEngine.onBackgroundStarted();
+			KeydroidxMidletKeepAliveService.start(this, appName,
 					MidletThread.getRunningAppPath(), nokiaKeyCodes);
 		}
-		ru.playsoftware.j2meloader.nokia.NokiaLauncherUtils.navigateToHome(this);
+		ru.playsoftware.j2meloader.nokia.KeydroidxLauncherUtils.navigateToHome(this);
 	}
 
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
 		// 1. 挂机菜单键（绿键）拦截
 		int hangupKey = nokiaKeyCodes == null ? KeyEvent.KEYCODE_UNKNOWN
-				: nokiaKeyCodes[NokiaKeyBinding.ACTION_HANGUP];
+				: nokiaKeyCodes[KeydroidxKeyBinding.ACTION_HANGUP];
 		if (hangupKey != KeyEvent.KEYCODE_UNKNOWN && event.getKeyCode() == hangupKey) {
 			if (event.getAction() == KeyEvent.ACTION_UP
 					&& (event.getFlags() & KeyEvent.FLAG_CANCELED) == 0
@@ -572,7 +572,7 @@ public class MicroActivity extends AppCompatActivity {
 	 * 在 Screen（TextBox/Form/List/Alert）中，将诺基亚按键映射到底部软键栏操作。
 	 * 左软键 → 打开「操作/菜单」；右软键 → 清除/返回；方向键/确认键 → 菜单导航。
 	 * <p>
-	 * 采用 DOWN/UP 配对：DOWN 时用 {@link NokiaKeyBinding#resolveAction(int[], KeyEvent)}
+	 * 采用 DOWN/UP 配对：DOWN 时用 {@link KeydroidxKeyBinding#resolveAction(int[], KeyEvent)}
 	 * 解析动作并记录，UP 时按记录执行。绝不依赖 menuKey/keyCode 做 UP 期二次判断，
 	 * 避免 menuKey 默认值（KEYCODE_BACK）与右软键冲突导致误触发左软键。
 	 */
@@ -585,23 +585,23 @@ public class MicroActivity extends AppCompatActivity {
 
 		if (event.getAction() == KeyEvent.ACTION_DOWN) {
 			// DOWN：用键码表解析动作（此时 resolveAction 才有效）
-			int action = NokiaKeyBinding.resolveAction(nokiaKeyCodes, event);
+			int action = KeydroidxKeyBinding.resolveAction(nokiaKeyCodes, event);
 			// 注意：方向键（上/下/左/右）在 Screen（特别是编辑框 TextBox）内不能作为页面软键动作拦截，
 			// 必须放行给 EditText 移动光标和多行滚动！
-			if (action >= 0 && action != NokiaKeyBinding.ACTION_LEFT
-					&& action != NokiaKeyBinding.ACTION_RIGHT
-					&& action != NokiaKeyBinding.ACTION_UP
-					&& action != NokiaKeyBinding.ACTION_DOWN) {
+			if (action >= 0 && action != KeydroidxKeyBinding.ACTION_LEFT
+					&& action != KeydroidxKeyBinding.ACTION_RIGHT
+					&& action != KeydroidxKeyBinding.ACTION_UP
+					&& action != KeydroidxKeyBinding.ACTION_DOWN) {
 				pendingScreenAction = action;
 				return true;
 			}
 			// 键码表未命中（如默认方案未绑定的键）：用标准兜底
 			if (keyCode == KeyEvent.KEYCODE_BACK) {
-				pendingScreenAction = NokiaKeyBinding.ACTION_SOFT_RIGHT;
+				pendingScreenAction = KeydroidxKeyBinding.ACTION_SOFT_RIGHT;
 				return true;
 			}
 			if (keyCode == KeyEvent.KEYCODE_MENU) {
-				pendingScreenAction = NokiaKeyBinding.ACTION_SOFT_LEFT;
+				pendingScreenAction = KeydroidxKeyBinding.ACTION_SOFT_LEFT;
 				return true;
 			}
 			// 方向键/数字键等交给系统（编辑框光标、输入、菜单 ListView 导航）
@@ -615,7 +615,7 @@ public class MicroActivity extends AppCompatActivity {
 				return act >= 0;
 			}
 			switch (act) {
-				case NokiaKeyBinding.ACTION_SOFT_LEFT: {
+				case KeydroidxKeyBinding.ACTION_SOFT_LEFT: {
 					if (softBar.isMenuShowing()) {
 						return true;
 					}
@@ -627,7 +627,7 @@ public class MicroActivity extends AppCompatActivity {
 					}
 					return true;
 				}
-				case NokiaKeyBinding.ACTION_SOFT_RIGHT: {
+				case KeydroidxKeyBinding.ACTION_SOFT_RIGHT: {
 					if (softBar.isMenuShowing()) {
 						softBar.closeMenu();
 						return true;
@@ -641,7 +641,7 @@ public class MicroActivity extends AppCompatActivity {
 					}
 					return true;
 				}
-				case NokiaKeyBinding.ACTION_SELECT: {
+				case KeydroidxKeyBinding.ACTION_SELECT: {
 					if (softBar.isMenuShowing()) {
 						return true;
 					}

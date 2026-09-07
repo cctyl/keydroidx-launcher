@@ -42,10 +42,10 @@ import android.widget.TextView;
 
 import androidx.appcompat.widget.AppCompatEditText;
 
-import io.github.cctyl.nokia.common.util.NokiaDimens;
+import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 
 import javax.microedition.lcdui.event.SimpleEvent;
-import io.github.cctyl.nokia.common.ui.NokiaFontManager;
+import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 
 class TextFieldImpl {
 	private EditText textview;
@@ -248,14 +248,14 @@ class TextFieldImpl {
 				// Form 内部 TextField：卡片样式
 				GradientDrawable bg = new GradientDrawable();
 				bg.setColor(Color.WHITE);
-				bg.setStroke(NokiaDimens.dp(res, 1), 0xFFCCD2DB);
-				bg.setCornerRadius(NokiaDimens.dpF(res, 3));
+				bg.setStroke(KeydroidxDimens.dp(res, 1), 0xFFCCD2DB);
+				bg.setCornerRadius(KeydroidxDimens.dpF(res, 3));
 				textview.setBackground(bg);
-				int pad = NokiaDimens.dp(res, 6);
+				int pad = KeydroidxDimens.dp(res, 6);
 				textview.setPadding(pad, pad, pad, pad);
 				textview.setTextColor(0xFF1F2937);
 				textview.setHintTextColor(0xFF8A95A5);
-				NokiaFontManager.textSize(textview, 13);
+				KeydroidxFontManager.textSize(textview, 13);
 				textview.setOnFocusChangeListener((v, hasFocus) -> {
 					if (!hasFocus) item.notifyStateChanged();
 				});
@@ -283,15 +283,15 @@ class TextFieldImpl {
 			screenContainer.setBackgroundColor(0x00000000); // 100% 透明，完全透出底下 Screen 的主题壁纸
 
 			String title = (ownerTextBox != null) ? ownerTextBox.getTitle() : null;
-			io.github.cctyl.nokia.common.ui.NokiaTheme.ThemeDef currentTheme = io.github.cctyl.nokia.common.ui.NokiaTheme.getCurrentTheme(context);
+			io.github.cctyl.nokia.common.ui.KeydroidxTheme.ThemeDef currentTheme = io.github.cctyl.nokia.common.ui.KeydroidxTheme.getCurrentTheme(context);
 
 			// 1. 顶部标题与字数栏 (32dp 高度，半透明暗色底，与 HTML .editor-header 一致)
 			LinearLayout header = new LinearLayout(context);
 			header.setOrientation(LinearLayout.HORIZONTAL);
 			header.setGravity(Gravity.CENTER_VERTICAL);
 			header.setBackgroundColor(0x40000000); // 25% 半透明暗黑中性底，不含任何死板杂色
-			int headerH = NokiaDimens.dp(res, 32);
-			int headerPadH = NokiaDimens.dp(res, 12);
+			int headerH = KeydroidxDimens.dp(res, 32);
+			int headerPadH = KeydroidxDimens.dp(res, 12);
 			header.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, headerH));
 			header.setPadding(headerPadH, 0, headerPadH, 0);
 
@@ -301,7 +301,7 @@ class TextFieldImpl {
 			titleTv.setEllipsize(TextUtils.TruncateAt.END);
 			titleTv.setTextColor(0xFFFFFFFF);
 			titleTv.setTypeface(Typeface.DEFAULT_BOLD);
-			NokiaFontManager.textSize(titleTv, 13);
+			KeydroidxFontManager.textSize(titleTv, 13);
 			if (title != null && !title.trim().isEmpty()) {
 				titleTv.setText(title);
 			}
@@ -311,14 +311,14 @@ class TextFieldImpl {
 			counterTextView = new TextView(context);
 			GradientDrawable counterBg = new GradientDrawable();
 			counterBg.setColor(0x2EFFFFFF); // 18% 半透明白底
-			counterBg.setCornerRadius(NokiaDimens.dpF(res, 8));
+			counterBg.setCornerRadius(KeydroidxDimens.dpF(res, 8));
 			counterTextView.setBackground(counterBg);
-			int cPadH = NokiaDimens.dp(res, 8);
-			int cPadV = NokiaDimens.dp(res, 2);
+			int cPadH = KeydroidxDimens.dp(res, 8);
+			int cPadV = KeydroidxDimens.dp(res, 2);
 			counterTextView.setPadding(cPadH, cPadV, cPadH, cPadV);
 			counterTextView.setTextColor(currentTheme.accentColor);
 			counterTextView.setTypeface(Typeface.DEFAULT_BOLD);
-			NokiaFontManager.textSize(counterTextView, 11);
+			KeydroidxFontManager.textSize(counterTextView, 11);
 			updateCounter();
 			header.addView(counterTextView);
 
@@ -335,24 +335,24 @@ class TextFieldImpl {
 			LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
 					ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f);
 			bodyContainer.setLayoutParams(bodyLp);
-			int padH = NokiaDimens.dp(res, 12);
-			int padV = NokiaDimens.dp(res, 10);
+			int padH = KeydroidxDimens.dp(res, 12);
+			int padV = KeydroidxDimens.dp(res, 10);
 			bodyContainer.setPadding(padH, padV, padH, padV);
 
 			EditText et = getView(context, null);
 			GradientDrawable cardBg = new GradientDrawable();
 			cardBg.setColor(0x59000000); // 35% 半透明暗黑水晶底，完美透出背景壁纸
-			cardBg.setCornerRadius(NokiaDimens.dpF(res, 8)); // 8dp 水晶圆角
-			cardBg.setStroke(NokiaDimens.dp(res, 1), (currentTheme.accentColor & 0x00FFFFFF) | 0x66000000); // 主题专属微光描边
+			cardBg.setCornerRadius(KeydroidxDimens.dpF(res, 8)); // 8dp 水晶圆角
+			cardBg.setStroke(KeydroidxDimens.dp(res, 1), (currentTheme.accentColor & 0x00FFFFFF) | 0x66000000); // 主题专属微光描边
 			et.setBackground(cardBg);
 
-			int innerPad = NokiaDimens.dp(res, 12);
+			int innerPad = KeydroidxDimens.dp(res, 12);
 			et.setPadding(innerPad, innerPad, innerPad, innerPad);
 			et.setGravity(Gravity.TOP | Gravity.START);
 			et.setTextColor(0xFFFFFFFF);
 			et.setHintTextColor(0xFF94A3B8);
-			NokiaFontManager.textSize(et, 14);
-			et.setLineSpacing(NokiaDimens.dpF(res, 4), 1.0f);
+			KeydroidxFontManager.textSize(et, 14);
+			et.setLineSpacing(KeydroidxDimens.dpF(res, 4), 1.0f);
 
 			FrameLayout.LayoutParams etParams = new FrameLayout.LayoutParams(
 					ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
@@ -362,7 +362,7 @@ class TextFieldImpl {
 			screenContainer.addView(bodyContainer);
 
 			// 全局像素字体适配
-			io.github.cctyl.nokia.common.ui.NokiaFontManager.applyFontToViewHierarchy(screenContainer);
+			io.github.cctyl.nokia.common.ui.KeydroidxFontManager.applyFontToViewHierarchy(screenContainer);
 		}
 		return screenContainer;
 	}

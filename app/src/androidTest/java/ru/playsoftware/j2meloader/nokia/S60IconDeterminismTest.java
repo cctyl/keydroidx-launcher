@@ -21,11 +21,11 @@ import static org.junit.Assert.fail;
 /**
  * S60 图标匹配「确定性」验证测试（跑在真实设备上，与主应用同进程）。
  *
- * <p>数据来源：与功能表 {@code NokiaMenuFragment.loadApps()} 完全一致的方式，
+ * <p>数据来源：与功能表 {@code KeydroidxMenuFragment.loadApps()} 完全一致的方式，
  * 用 PackageManager 枚举设备上所有可启动应用，拿到每个应用的 (包名, 应用名 label)。
  * 这正是用户说的"应用本身就能获取应用列表"。</p>
  *
- * <p>验证逻辑：对每个应用先调用一次 {@link NokiaS60IconMap#getIcon(String, String)} 得到首次结果，
+ * <p>验证逻辑：对每个应用先调用一次 {@link KeydroidxS60IconMap#getIcon(String, String)} 得到首次结果，
  * 再连续调用 100 次，断言每次结果都与首次完全一致（同一应用匹配结果 100% 确定，零随机性）。</p>
  *
  * <p>输出：每个应用的 (包名, label, 匹配到的图标名) 打印到测试输出并导出到
@@ -47,8 +47,8 @@ public class S60IconDeterminismTest {
 		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
 
 		// 构建意图缓存，让三层匹配（精确包名 → label → 意图）全部生效
-		NokiaS60IconMap.loadFromDisk(ctx);
-		NokiaS60IconMap.init(pm);
+		KeydroidxS60IconMap.loadFromDisk(ctx);
+		KeydroidxS60IconMap.init(pm);
 
 		StringBuilder report = new StringBuilder();
 		report.append("包名\t应用名\t匹配图标\n");
@@ -64,12 +64,12 @@ public class S60IconDeterminismTest {
 			total++;
 
 			// ── 先跑一次得出匹配结果 ──
-			int first = NokiaS60IconMap.getIcon(pkg, label);
+			int first = KeydroidxS60IconMap.getIcon(pkg, label);
 			if (first != 0) matched++;
 
 			// ── 再跑 100 次，验证每次结果都与第一次一致 ──
 			for (int i = 0; i < REPEAT; i++) {
-				int cur = NokiaS60IconMap.getIcon(pkg, label);
+				int cur = KeydroidxS60IconMap.getIcon(pkg, label);
 				if (cur != first) {
 					mismatchCount++;
 					fail("确定性验证失败！应用 " + pkg + " (" + label + ") 第 " + (i + 1)

@@ -1,4 +1,4 @@
-# 接入 nokia-common 实施计划
+# 接入 keydroidx-common 实施计划
 
 > **状态**：阶段 0/1/2 已完成；阶段 3 收敛部分完成（第 2 步经评估取消）；阶段 4 待实施
 > **分支**：`feature/common-module`
@@ -10,9 +10,9 @@
 
 ## 一、背景与目标
 
-桌面（keydroidx-launcher）与 `keydroidx-core` 仓库的 `nokia-common` 模块存在大量同职责组件。core 仓库的拆分已完成：`nokia-common`（纯基础库，含主题/日志/字体/图标/尺寸/Drawable/page 体系/dialog/focus/NokiaBaseActivity/feedback 协议层）+ `nokia-key-core`（薄壳，@Deprecated 桥接类 extends common，真正自有的仅 NokiaClient/NokiaKeyBinding/改键向导/Activity 托管壳）。
+桌面（keydroidx-launcher）与 `keydroidx-core` 仓库的 `keydroidx-common` 模块存在大量同职责组件。core 仓库的拆分已完成：`keydroidx-common`（纯基础库，含主题/日志/字体/图标/尺寸/Drawable/page 体系/dialog/focus/KeydroidxBaseActivity/feedback 协议层）+ `keydroidx-key-core`（薄壳，@Deprecated 桥接类 extends common，真正自有的仅 KeydroidxClient/KeydroidxKeyBinding/改键向导/Activity 托管壳）。
 
-目标：launcher 依赖 `nokia-common`（**不依赖 nokia-key-core**），逐步删除桌面 nokia 包下的重复组件，全生态底层代码单一源码。
+目标：launcher 依赖 `keydroidx-common`（**不依赖 keydroidx-key-core**），逐步删除桌面 nokia 包下的重复组件，全生态底层代码单一源码。
 
 红线（全程不变）：SP 文件名与 key（`nokia_desktop_settings`、`nokia_key_bindings`）、keyprovider uri、`ACTION_*` 常量值（0-8）——保老用户配置与独立 App 跨进程协议。
 
@@ -20,9 +20,9 @@
 
 ## 二、调研结论摘要（2026-08-28 实测）
 
-### common 现状（io.github.cctyl.nokia.common.*，坐标 nokia-common:1.0.0）
+### common 现状（io.github.cctyl.nokia.common.*，坐标 keydroidx-common:1.0.0）
 
-- 已含：NokiaTheme（13 字段 ThemeDef 超集 + ThemeProvider 注入）、NokiaLog、NokiaFontManager、NokiaIcons（143 常量，**launcher 版 64 常量的超集**）、NokiaDimens、NokiaBatteryDrawable、NokiaDashedLineDrawable、NokiaBaseActivity（零 Client 依赖，implements NokiaPageHost + KeyResolver）、ui/page/*、ui/dialog/*（NokiaOptionsDialog/NokiaConfirmDialog，Dialog+builder 形态）、ui/focus/*、model/*（NokiaKeyAction/KeyResolver/DefaultKeyResolver）、contract/NokiaProviderContract、feedback/*（HTTP+HMAC-SHA256，KdfbUploader 已废弃）、ui/about/*。
+- 已含：KeydroidxTheme（13 字段 ThemeDef 超集 + ThemeProvider 注入）、KeydroidxLog、KeydroidxFontManager、KeydroidxIcons（143 常量，**launcher 版 64 常量的超集**）、KeydroidxDimens、KeydroidxBatteryDrawable、KeydroidxDashedLineDrawable、KeydroidxBaseActivity（零 Client 依赖，implements KeydroidxPageHost + KeyResolver）、ui/page/*、ui/dialog/*（KeydroidxOptionsDialog/KeydroidxConfirmDialog，Dialog+builder 形态）、ui/focus/*、model/*（KeydroidxKeyAction/KeyResolver/DefaultKeyResolver）、contract/KeydroidxProviderContract、feedback/*（HTTP 签名上传，KdfbUploader 已废弃）、ui/about/*。
 - 发布：已配 maven-publish（`publishReleasePublicationToMavenLocal`）。
 
 ### 与 launcher 的实测分叉点
@@ -30,12 +30,12 @@
 | 项 | 结论 |
 |---|---|
 | 调色板 | common 与 launcher 六套主题**色值不同**（如 classic_blue bg 系列 `0xFF001428` vs `0xFF0D1B3E`）→ 见 D3 |
-| NokiaLog | common 版是重构超集（v 级/分级开关/崩溃捕获）；launcher 版独有 keyName（按键域）、setEnabled/isEnabled（**无调用方，死代码**）、fileCrash(String,Throwable) → 见 D6 |
-| NokiaIcons | common 是 launcher 超集，可直接替换（实施时逐常量核对 unicode 值） |
-| NokiaFontManager | common 缺自定义字体（importFontFromUri/getAvailableFonts/deleteCustomFont/FONT_ID_CUSTOM_PREFIX）→ 见 D5 |
-| NokiaOptionsDialog | 两版 API 完全不同；桌面版有 `show(fm,title,items,int[] keyCodes)` 注入模式，`:midlet` 进程 MicroActivity/AbstractSoftKeysBar 依赖 → 见 D4 |
-| 页面契约 | ACTION_* 常量值 0-8 两边一致；桌面 Fragment 强转 NokiaDesktopActivity，common 走 NokiaPageHost 接口 |
-| NokiaBaseActivity | common 版无 240dp 缩放、SOFT_RIGHT 兜底 finish() → 桌面保留自有版 |
+| KeydroidxLog | common 版是重构超集（v 级/分级开关/崩溃捕获）；launcher 版独有 keyName（按键域）、setEnabled/isEnabled（**无调用方，死代码**）、fileCrash(String,Throwable) → 见 D6 |
+| KeydroidxIcons | common 是 launcher 超集，可直接替换（实施时逐常量核对 unicode 值） |
+| KeydroidxFontManager | common 缺自定义字体（importFontFromUri/getAvailableFonts/deleteCustomFont/FONT_ID_CUSTOM_PREFIX）→ 见 D5 |
+| KeydroidxOptionsDialog | 两版 API 完全不同；桌面版有 `show(fm,title,items,int[] keyCodes)` 注入模式，`:midlet` 进程 MicroActivity/AbstractSoftKeysBar 依赖 → 见 D4 |
+| 页面契约 | ACTION_* 常量值 0-8 两边一致；桌面 Fragment 强转 KeydroidxDesktopActivity，common 走 KeydroidxPageHost 接口 |
+| KeydroidxBaseActivity | common 版无 240dp 缩放、SOFT_RIGHT 兜底 finish() → 桌面保留自有版 |
 | minSdk | core=19，launcher=14 → 见 D1 |
 
 ### nokia 包外引用面（替换时必须同步）
@@ -43,7 +43,7 @@
 - `javax.microedition.lcdui`：Font / Screen / TextFieldImpl / commands.ScreenSoftBar / commands.AbstractSoftKeysBar
 - `javax.microedition.shell.MicroActivity`
 - `ru.playsoftware.j2meloader`：EmulatorApplication、Config/ConfigActivity/各 Dialog、settings.KeyMapperActivity、info 四个 Dialog
-- `ru.woesss.j2me.installer`：InstallerDialog / NokiaInstallerDialog
+- `ru.woesss.j2me.installer`：InstallerDialog / KeydroidxInstallerDialog
 
 ---
 
@@ -57,7 +57,7 @@ launcher `MIN_SDK` 14 → 19。桌面目标设备即 Android 4.4（API 19）；1
 
 ```groovy
 // app/build.gradle（始终不变，与独立 App 接入形态一致）
-implementation 'io.github.cctyl.nokia:nokia-common:1.0.0'
+implementation 'io.github.cctyl.nokia:keydroidx-common:1.0.0'
 
 // settings.gradle（联调期存在，common 稳定后删除）
 includeBuild('../keydroidx-core')
@@ -70,23 +70,23 @@ Gradle 复合构建会自动把同坐标依赖替换为本地源码模块（depe
 
 core 仓库修改 common 六套主题色值对齐桌面现值（桌面是主题的 Provider 宿主与定义方；独立 App 只用 primary/dark/text/card 字段，bg\*/softKey\* 改动不影响它们），发 common 1.0.1，launcher 升依赖版本。
 
-### D4 NokiaOptionsDialog —— ✅ 已决：本期不替换
+### D4 KeydroidxOptionsDialog —— ✅ 已决：本期不替换
 
-桌面保留自有 NokiaOptionsDialog（仅内部逐步换用 common 的 Theme/Font/Log/Dimens）。
-**后续议项（另行立项，属 core 演进）**：在 common 增补"DialogFragment + 键码注入"形态的 OptionsDialog（支持 `show(fm, title, items, int[] keyCodes)`，供 `:midlet` 进程等非 NokiaPageHost 宿主使用），桌面再统一切换。届时需同步替换 javax.microedition 包内的 4 处调用（MicroActivity、AbstractSoftKeysBar 等）。
+桌面保留自有 KeydroidxOptionsDialog（仅内部逐步换用 common 的 Theme/Font/Log/Dimens）。
+**后续议项（另行立项，属 core 演进）**：在 common 增补"DialogFragment + 键码注入"形态的 OptionsDialog（支持 `show(fm, title, items, int[] keyCodes)`，供 `:midlet` 进程等非 KeydroidxPageHost 宿主使用），桌面再统一切换。届时需同步替换 javax.microedition 包内的 4 处调用（MicroActivity、AbstractSoftKeysBar 等）。
 
-### D5 NokiaFontManager 自定义字体 —— ✅ 已决：桌面保留薄封装
+### D5 KeydroidxFontManager 自定义字体 —— ✅ 已决：桌面保留薄封装
 
 自定义字体导入/列表/删除（importFontFromUri/getAvailableFonts/deleteCustomFont/FONT_ID_CUSTOM_PREFIX/FontItem）留在桌面薄封装类中；typeface 加载与视图树应用委托 common `applyToViewTree`；保留 `getGlobalTypeface(ctx)` 门面供 midlet 进程 `javax.microedition.lcdui.Font` 使用。
 **后续议项**：自定义字体能力贡献回 common。
 
-### D6 NokiaLog —— ✅ 已决：选 common 版，launcher 版删除
+### D6 KeydroidxLog —— ✅ 已决：选 common 版，launcher 版删除
 
 common 版是后出的重构版、能力超集（v 级/分级持久化/installCrashHandler/7天轮转/异步写/自定义 TAG）。launcher 版独有项处理：
 
 | launcher 独有 | 处理 |
 |---|---|
-| `keyName(keyCode)`（24 处调用，按键域） | 移到 `NokiaKeyBinding` |
+| `keyName(keyCode)`（24 处调用，按键域） | 移到 `KeydroidxKeyBinding` |
 | `setEnabled/isEnabled` | 全仓库无调用方，死代码，删 |
 | `fileCrash(String, Throwable)`（EmulatorApplication 一处） | 改调 common `fileCrash(Thread, Throwable)` |
 
@@ -96,7 +96,7 @@ common 版是后出的重构版、能力超集（v 级/分级持久化/installCr
 
 > **性质标注**：桌面原本没有反馈功能，本条是**新能力补齐**，与「消除两套重复 UI」的主目标无关（复审时确认：属于用户知情拍板，保留）。
 
-桌面原本无反馈功能，本期接入。密钥从 `keydroidx-music/local.properties` 原样复制 `FEEDBACK_UPLOAD_URL` / `FEEDBACK_SECRET_KEY` 两行到 launcher `local.properties`（已 git 忽略），`app/build.gradle` 注入 BuildConfig，EmulatorApplication `NokiaFeedback.init(config)`。反馈页用 common `NokiaFeedbackFragment`，入口加在设置组页/关于页。
+桌面原本无反馈功能，本期接入。密钥从 `keydroidx-music/local.properties` 原样复制 `FEEDBACK_UPLOAD_URL` / `FEEDBACK_SECRET_KEY` 两行到 launcher `local.properties`（已 git 忽略），`app/build.gradle` 注入 BuildConfig，EmulatorApplication `KeydroidxFeedback.init(config)`。反馈页用 common `KeydroidxFeedbackFragment`，入口加在设置组页/关于页。
 
 ---
 
@@ -119,51 +119,51 @@ common 版是后出的重构版、能力超集（v 级/分级持久化/installCr
 
 1. settings.gradle 加 `includeBuild('../keydroidx-core')`（D2）。
 2. `build.gradle` `MIN_SDK` 14→19（D1）。
-3. `app/build.gradle` 加 `implementation 'io.github.cctyl.nokia:nokia-common:1.0.0'`。
-4. 新增 `nokia/LauncherThemeProvider.java`：实现 common `ThemeProvider`，`getCurrentTheme(Context)` → `new NokiaSettingsStorage(ctx).getTheme()`。
-5. `EmulatorApplication.attachBaseContext` 调 `NokiaTheme.setThemeProvider(new LauncherThemeProvider(this))`。
+3. `app/build.gradle` 加 `implementation 'io.github.cctyl.nokia:keydroidx-common:1.0.0'`。
+4. 新增 `nokia/LauncherThemeProvider.java`：实现 common `ThemeProvider`，`getCurrentTheme(Context)` → `new KeydroidxSettingsStorage(ctx).getTheme()`。
+5. `EmulatorApplication.attachBaseContext` 调 `KeydroidxTheme.setThemeProvider(new LauncherThemeProvider(this))`。
 6. **验证**：编译 + 装机 + 冷启动走查桌面/功能表/设置——零行为变化为合格。
 
 ### 阶段 2：纯工具/绘制类替换（低风险，外观应像素级一致）
 
-**2.1 NokiaDialogFocus**（3 处：NokiaOptionsDialog、NokiaUninstallDialog、NokiaInstallerDialog）
+**2.1 KeydroidxDialogFocus**（3 处：KeydroidxOptionsDialog、KeydroidxUninstallDialog、KeydroidxInstallerDialog）
 换 import、删桌面类。走查：OptionsDialog 弹出后首个方向键不丢（Android 12+ 重点）、卸载弹窗、JAR 安装弹窗。
 
-**2.2 NokiaDashedLineDrawable**（NokiaDesktopFragment 3 处、NokiaQuickToggleSettingsFragment 1 处）
+**2.2 KeydroidxDashedLineDrawable**（KeydroidxDesktopFragment 3 处、KeydroidxQuickToggleSettingsFragment 1 处）
 先 diff 构造参数（桌面版 73 行 vs common 49 行，桌面多配置项需贡献进 common 或保留桌面版）。走查：桌面通知区分隔线、快捷开关设置页分隔线。
 
-**2.3 NokiaBatteryDrawable**（仅 StatusBarController）
+**2.3 KeydroidxBatteryDrawable**（仅 StatusBarController）
 换 import、删桌面类。走查：电量 4 档、充电闪电、低电变红。
 
-**2.4 NokiaIcons**（18 文件）
+**2.4 KeydroidxIcons**（18 文件）
 逐常量核对 unicode 值（抽查 TOGGLE_*、widget 系列）；MaterialIcons ttf 保留 launcher assets 那份（同路径不冲突），后续删重复资源。换 import、删桌面类。
 走查：功能表/widget/快捷开关/弹窗行图标——截图对比（图标字体渲染是视觉回归高发点）。
 
-**2.5 NokiaLog**（约 49 文件 600+ 调用点，含包外文件）
+**2.5 KeydroidxLog**（约 49 文件 600+ 调用点，含包外文件）
 按 D6：日志实现统一采用 common；迁移事项如下：
-- `keyName(int)` 从 NokiaLog 迁入 `NokiaKeyBinding.keyName()`（逻辑归属更合理），6 文件 22 处调用改走 `NokiaKeyBinding.keyName(...)`。
-- 删桌面 `NokiaLog` 类；所有调用文件切到 `io.github.cctyl.nokia.common.log.NokiaLog`。
+- `keyName(int)` 从 KeydroidxLog 迁入 `KeydroidxKeyBinding.keyName()`（逻辑归属更合理），6 文件 22 处调用改走 `KeydroidxKeyBinding.keyName(...)`。
+- 删桌面 `KeydroidxLog` 类；所有调用文件切到 `io.github.cctyl.nokia.common.log.KeydroidxLog`。
 - 旧 API：`setEnabled/isEnabled` 已确认无调用，直接删除；`fileCrash(String, Throwable)` 改为 common 的 `fileCrash(Thread, Throwable)`。
-- 目录按生态约定改为 `<外存>/Android/data/<pkg>/files/log`（旧 `/log` 目录不再清理，历史日志保留）。
+- 目录按生态约定统一为 `<外存>/Android/data/<pkg>/files/log`（迁移前的历史日志不清理，保留）。
 - 桌面「日志记录」开关（`nokia_desktop_settings.log_file_enabled`）继续作为用户级持久源：
-  - `EmulatorApplication` 在 `NokiaLog.init(this)` 后用 `NokiaSettingsStorage.isFileLogEnabled()` 覆盖 common 初始化出的 `sFileMinLevel`。
-  - `NokiaSettingsStorage.setFileLogEnabled()` 双写：写桌面 SP 后调用 `NokiaLog.setDetailedLogEnabled()`，让 common SP 同步，保证两端取值一致。
-- common `NokiaLog.init` 在 `Application.attachBaseContext()` 阶段会因 `getApplicationContext()` 为 null 而 NPE，已修复 common（回退到传入 Context + 加保护）。
+  - `EmulatorApplication` 在 `KeydroidxLog.init(this)` 后用 `KeydroidxSettingsStorage.isFileLogEnabled()` 覆盖 common 初始化出的 `sFileMinLevel`。
+  - `KeydroidxSettingsStorage.setFileLogEnabled()` 双写：写桌面 SP 后调用 `KeydroidxLog.setDetailedLogEnabled()`，让 common SP 同步，保证两端取值一致。
+- common `KeydroidxLog.init` 在 `Application.attachBaseContext()` 阶段会因 `getApplicationContext()` 为 null 而 NPE，已修复 common（回退到传入 Context + 加保护）。
 - 标签语义变化：桌面原 `[sub] msg` 统一由 logcat tag 承载，即原 sub 字符串成为 common 的 tag；日志文件不再含统一 `NokiaDesktop` tag。adb 过滤改为 `-s Desktop:* KeyBinding:*` 等组合。
 走查：日志落盘、7 天轮转、debug/release 默认级别、设置页日志开关、崩溃 CRASH 记录、:midlet 进程是否也记录（本阶段仍保持仅主进程）。
 
-**2.6 NokiaTheme**（26 文件，含 J2ME 层 3 处）— 已完成
+**2.6 KeydroidxTheme**（26 文件，含 J2ME 层 3 处）— 已完成
 前置：D3 调色板对齐（已在 core 完成：6 套主题 7 个桌面字段全部采用桌面值，主题名也用桌面命名）。
-全部 `getSelectedTheme(ctx)` → `getCurrentTheme(ctx)`；`NokiaSettingsStorage.getTheme()` 返回 common ThemeDef；删除桌面 `NokiaTheme.java`。
+全部 `getSelectedTheme(ctx)` → `getCurrentTheme(ctx)`；`KeydroidxSettingsStorage.getTheme()` 返回 common ThemeDef；删除桌面 `KeydroidxTheme.java`。
 common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDrawable` 改为纯色半透明 `focusColor`，`createDialogBodyDrawable` 渐变改为 `bgCenter -> bgEnd`；新增 `getThemes()` 主题清单。
 **风险点已验证**：`:midlet` 进程 ThemeProvider 注入有效（EmulatorApplication 在双进程均注入，实测 midlet 进程 `getCurrentTheme` 返回桌面所选主题）。
 走查：桌面背景渐变像素采样与调色板一致；列表高亮为 focusColor 叠加；**J2ME 画面/软键栏待真机目视确认**（待补）。
 
-**2.7 NokiaDimens + NokiaFontManager** — 已完成（尺寸部分）
-- `NokiaDimens.dp/dpF` 全部改用 common `io.github.cctyl.nokia.common.util.NokiaDimens`（25 文件，含 J2ME TextFieldImpl），删除桌面 `NokiaDimens.java`。
-- `NokiaDimens.textSize(TextView, float)`（51 处）迁入桌面 `NokiaFontManager.textSize()`：它带桌面语义（用户字体缩放 + 应用全局/自定义字体），不适合放进 common；`sUserFontScale` 缓存同步改为 `NokiaFontManager.setUserFontScale()`。
-- 按 D5 桌面 `NokiaFontManager` 保留（自定义字体导入/删除/列举是桌面能力，未贡献回 common）。
-- **暂不做的部分**：common `NokiaFontManager` 的字体/缩放状态未在 EmulatorApplication 初始化、也未在设置变更处双写。原因：当前桌面没有任何代码消费 common 的字体状态，且 common 不认识 `custom_*` 字体 id（会退回内置字体），此时同步会埋下"自定义字体被静默替换"的隐患。**待阶段 3 引入 common 控件（或 D5 把自定义字体能力贡献回 common）时一并处理。**
+**2.7 KeydroidxDimens + KeydroidxFontManager** — 已完成（尺寸部分）
+- `KeydroidxDimens.dp/dpF` 全部改用 common `io.github.cctyl.nokia.common.util.KeydroidxDimens`（25 文件，含 J2ME TextFieldImpl），删除桌面 `KeydroidxDimens.java`。
+- `KeydroidxDimens.textSize(TextView, float)`（51 处）迁入桌面 `KeydroidxFontManager.textSize()`：它带桌面语义（用户字体缩放 + 应用全局/自定义字体），不适合放进 common；`sUserFontScale` 缓存同步改为 `KeydroidxFontManager.setUserFontScale()`。
+- 按 D5 桌面 `KeydroidxFontManager` 保留（自定义字体导入/删除/列举是桌面能力，未贡献回 common）。
+- **暂不做的部分**：common `KeydroidxFontManager` 的字体/缩放状态未在 EmulatorApplication 初始化、也未在设置变更处双写。原因：当前桌面没有任何代码消费 common 的字体状态，且 common 不认识 `custom_*` 字体 id（会退回内置字体），此时同步会埋下"自定义字体被静默替换"的隐患。**待阶段 3 引入 common 控件（或 D5 把自定义字体能力贡献回 common）时一并处理。**
 走查：字体缩放切换后文字尺寸按倍率变化（0.85x/1.0x/1.5x 实测状态栏文字高度 15/19/27px）；**3 套内置字体切换、自定义字体导入/删除、J2ME 文字渲染待真机目视确认**（待补）。
 
 **阶段 2 出口标准**：工具类全部单一来源到 common；真机全功能走查通过；`assembleOpenRelease -x lint` + proguard 装机验证一次。
@@ -172,30 +172,30 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 ### 阶段 3：页面契约体系（中风险，逐层小步）
 
 **已完成（第 1 步）**：
-1. `NokiaDesktopActivity` 实现 common `NokiaPageHost`（refreshPageBar/exitCurrent 签名一致）+ `KeyResolver`（`resolveAction` 委托 NokiaKeyBinding，纯查询不做 reload）。
-2. 桌面 `NokiaFocusHost` 删除，改用 common 同名接口（16 文件）；桌面 `NokiaPage` 改为继承 common `NokiaPage`，中软键给 `default null` 实现；`refreshPageBar` 局部变量改 CharSequence。
-3. `NokiaOptionsDialog` 按键解析改走 `KeyResolver` 契约（不再强转 Activity）。
-4. NokiaBaseActivity/NokiaOptionsDialog 按 D4 保留，仅内部调用已换 common。
+1. `KeydroidxDesktopActivity` 实现 common `KeydroidxPageHost`（refreshPageBar/exitCurrent 签名一致）+ `KeyResolver`（`resolveAction` 委托 KeydroidxKeyBinding，纯查询不做 reload）。
+2. 桌面 `KeydroidxFocusHost` 删除，改用 common 同名接口（16 文件）；桌面 `KeydroidxPage` 改为继承 common `KeydroidxPage`，中软键给 `default null` 实现；`refreshPageBar` 局部变量改 CharSequence。
+3. `KeydroidxOptionsDialog` 按键解析改走 `KeyResolver` 契约（不再强转 Activity）。
+4. KeydroidxBaseActivity/KeydroidxOptionsDialog 按 D4 保留，仅内部调用已换 common。
 
 **~~待做（第 2 步）~~ — ❌ 已评估取消（2026-08-29）**：
-5. ~~桌面三个页面基类**保留**（240dp/壁纸/isDirectionEnabled 等桌面语义），把 `(NokiaDesktopActivity) requireActivity()` 强转改为宿主接口调用。~~
-   **取消理由**：按「消除两套重复 UI」的动机逐条审视——桌面页面在 common 中**没有对应的另一份**，本身不构成"两套"，改强转不产生任何收敛收益；页面所依赖的能力（`openFragment`/`getScale`/`getMidPanelHeight` 等）全部是桌面专有，即便抽象成 `NokiaDesktopHost extends NokiaPageHost` 也只能是桌面接口，页面依然搬不进 common（即所谓"下沉"），接口化收益（可测性/解耦）在本工程无单测、无第二宿主的现状下为零。约 90 处强转属于「页面本来就该依赖桌面宿主」的正常代码，保留原样。
+5. ~~桌面三个页面基类**保留**（240dp/壁纸/isDirectionEnabled 等桌面语义），把 `(KeydroidxDesktopActivity) requireActivity()` 强转改为宿主接口调用。~~
+   **取消理由**：按「消除两套重复 UI」的动机逐条审视——桌面页面在 common 中**没有对应的另一份**，本身不构成"两套"，改强转不产生任何收敛收益；页面所依赖的能力（`openFragment`/`getScale`/`getMidPanelHeight` 等）全部是桌面专有，即便抽象成 `NokiaDesktopHost extends KeydroidxPageHost` 也只能是桌面接口，页面依然搬不进 common（即所谓"下沉"），接口化收益（可测性/解耦）在本工程无单测、无第二宿主的现状下为零。约 90 处强转属于「页面本来就该依赖桌面宿主」的正常代码，保留原样。
 
 **阶段 3 走查（已完成，2026-08-29 全页面回归）**：功能表/百宝箱/桌面设置 6 组及子页（外观与显示、字体选择、主题设置、按键绑定、桌面内容各子页、系统与权限、高级设置、关于）+ 通用选项弹窗逐一进入/返回，底栏三栏文案逐页核对正确，零崩溃；主题列表显示桌面命名（common 调色板已对齐）。锁屏键、录制态按键捕获、Shizuku 页面状态上报未覆盖（需真机手动验证）。
 
 ### 阶段 4：feedback 接入（D7）— 已完成
 
 1. local.properties 复制密钥两行 → app/build.gradle 注入 BuildConfig。✅
-2. EmulatorApplication `NokiaFeedback.init(config)`（主进程；appName=`KeydroidX-Launcher`，logDir=null 复用 NokiaLog 默认目录）。✅
-3. 关于页加「意见反馈」卡片入口，push common `NokiaFeedbackFragment`（挂在 midPanel）；文本输入走 `NokiaTextInputFragment`。✅
+2. EmulatorApplication `KeydroidxFeedback.init(config)`（主进程；appName=`KeydroidX-Launcher`，logDir=null 复用 KeydroidxLog 默认目录）。✅
+3. 关于页加「意见反馈」卡片入口，push common `KeydroidxFeedbackFragment`（挂在 midPanel）；文本输入走 `KeydroidxTextInputFragment`。✅
 4. 为了让 common 页面能在桌面宿主里正常工作，配套改了两处：
-   - `refreshPageBar` 改按 **common `NokiaPage`** 判定（桌面 NokiaPage 继承它，所以桌面页面不受影响），否则 common 页面装配不了底栏；
+   - `refreshPageBar` 改按 **common `KeydroidxPage`** 判定（桌面 KeydroidxPage 继承它，所以桌面页面不受影响），否则 common 页面装配不了底栏；
    - 底栏中键：页面声明了 `getSoftCenterText()` 就用它（common 页面用中键承载「选择/提交」动作），未声明才回退显示页面名（桌面页面一贯行为）。
-   - `NokiaDesktopActivity.finish()` 覆写：有返回栈时改为出栈返回上一层——common 反馈页提交成功后会调 `requireActivity().finish()`，而本 Activity 是 HOME，直接 finish 等于退出桌面。
+   - `KeydroidxDesktopActivity.finish()` 覆写：有返回栈时改为出栈返回上一层——common 反馈页提交成功后会调 `requireActivity().finish()`，而本 Activity 是 HOME，直接 finish 等于退出桌面。
 5. 走查结果（真机，2026-08-29）：
    - 底栏「提交 / 选择 / 返回」，五个功能行齐全（问题类型/联系方式/问题描述/附带运行日志/提交按钮）。
    - 文本输入：进输入页 → 输入 → 按确定回传，值正确回填到对应行。
-   - **日志附件解析正确**：显示「2 个文件 / 240.3KB · 单文件超8MB截断，总量上限约9MB」，证明 logDir=null 复用 NokiaLog 默认目录是对的。
+   - **日志附件解析正确**：显示「2 个文件 / 240.3KB · 单文件超8MB截断，总量上限约9MB」，证明 logDir=null 复用 KeydroidxLog 默认目录是对的。
    - **必填校验顺序正确**：联系方式未填 → 跳转联系方式输入页；类型未选 → 弹类型选择；描述未填 → 跳转描述输入页，均不发网络请求。
    - **真实提交成功**（用户批准）：提交后约 0.3s 返回成功，自动出栈回到关于页（`finish()` 兜底生效，没有退出桌面），无崩溃。
    - 未覆盖：9MB 截断（需造超大日志）、失败重试路径。
@@ -207,15 +207,15 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 - 每个 commit 可独立 revert；阶段 2 每步截图对比基线。
 - **双进程**：涉及 Theme/Font/Log 的改动必须同时验证主进程与 `:midlet` 进程。
 - **API 19 回归**：阶段 2.6/2.7 完成后在 4.4 模拟器跑一轮（4.4 兼容是硬规则）。
-  - ⚠️ **挂账（2026-08-29 复审发现漏项）**：尚未执行。release 构建一直 `-x lint`，编译期拦不住 `>19` API 误用，运行时 `NoSuchMethodError` 风险真实存在（尤其本次 common 新合入的 NokiaLog/NokiaTheme/getThemes 等代码）。需要一台 API 19 模拟器或 4.4 真机验证冷启动 + 主流程。
+  - ⚠️ **挂账（2026-08-29 复审发现漏项）**：尚未执行。release 构建一直 `-x lint`，编译期拦不住 `>19` API 误用，运行时 `NoSuchMethodError` 风险真实存在（尤其本次 common 新合入的 KeydroidxLog/KeydroidxTheme/getThemes 等代码）。需要一台 API 19 模拟器或 4.4 真机验证冷启动 + 主流程。
 - **release 验证**：阶段 2 出口已完成（装机无崩溃、主题渲染正确）。阶段 3 仅收敛接口，改动小，随阶段 4 一起做一次。
 - **兼容红线**：SP 文件名/key、keyprovider uri、ACTION_* 常量值全程不变。
 - **D2 收尾挂账**：common 稳定后删除 settings.gradle 中的 `includeBuild('../keydroidx-core')`，回到 mavenLocal/远程坐标形态。
 
 ## 六、后续议项（本计划不覆盖）
 
-1. **NokiaOptionsDialog 统一**（D4）：common 增补 DialogFragment + 键码注入形态后，桌面统一切换（含 javax.microedition 包内 4 处）。
-2. **NokiaBaseActivity 骨架统一**：桌面 240dp 缩放体系与 common 差异大，暂保留各自实现。
+1. **KeydroidxOptionsDialog 统一**（D4）：common 增补 DialogFragment + 键码注入形态后，桌面统一切换（含 javax.microedition 包内 4 处）。
+2. **KeydroidxBaseActivity 骨架统一**：桌面 240dp 缩放体系与 common 差异大，暂保留各自实现。
 3. **自定义字体能力贡献回 common**（D5）。
 4. **common 调色板对齐后**，独立 App（keydroidx-music 等）升级 common 版本的观感验证。
-5. 桌面 NokiaConfirmDialog 类需求评估（桌面现有 NokiaUninstallDialog 等专用弹窗，不在本期范围）。
+5. 桌面 KeydroidxConfirmDialog 类需求评估（桌面现有 KeydroidxUninstallDialog 等专用弹窗，不在本期范围）。

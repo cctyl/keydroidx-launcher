@@ -32,7 +32,7 @@ import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.config.ShaderInfo.Setting;
 import ru.playsoftware.j2meloader.databinding.DialogShaderTuneBinding;
 import ru.playsoftware.j2meloader.databinding.DialogShaderTuneItemBinding;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 
 public class ShaderTuneDialog extends DialogFragment {
 
@@ -120,7 +120,7 @@ public class ShaderTuneDialog extends DialogFragment {
 			.setTitle(R.string.shader_tuning)
 			.setView(parentBinding.getRoot())
 			.create();
-		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireActivity());
+		KeydroidxKeyBinding keyBinding = new KeydroidxKeyBinding(requireActivity());
 		dialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
 				event,
 				() -> parentBinding.negativeButton.performClick(), // 左软键 -> 关闭

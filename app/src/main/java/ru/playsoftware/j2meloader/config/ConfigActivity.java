@@ -67,7 +67,7 @@ import androidx.core.widget.TextViewCompat;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.base.BaseActivity;
 import ru.playsoftware.j2meloader.databinding.ActivityConfigBinding;
-import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
+import ru.playsoftware.j2meloader.nokia.KeydroidxGlobalProfile;
 import ru.playsoftware.j2meloader.settings.KeyMapperActivity;
 import ru.playsoftware.j2meloader.util.FileUtils;
 import yuku.ambilwarna.AmbilWarnaDialog;
@@ -107,7 +107,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 		Intent intent = getIntent();
 		String action = intent.getAction();
 		isProfile = ACTION_EDIT_PROFILE.equals(action);
-		isGlobalProfile = isProfile && NokiaGlobalProfile.PROFILE_NAME.equals(intent.getDataString());
+		isGlobalProfile = isProfile && KeydroidxGlobalProfile.PROFILE_NAME.equals(intent.getDataString());
 		needShow = isProfile || ACTION_EDIT.equals(action);
 		String path = intent.getDataString();
 		if (path == null) {
@@ -867,7 +867,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 		} else if (id == R.id.show_key_mappings) {
 			Intent i = new Intent(getIntent().getAction(), Uri.parse(configDir.getPath()),
 					this, KeyMapperActivity.class);
-			i.putExtra(NokiaGlobalProfile.EXTRA_GLOBAL_PROFILE, isGlobalProfile);
+			i.putExtra(KeydroidxGlobalProfile.EXTRA_GLOBAL_PROFILE, isGlobalProfile);
 			startActivity(i);
 		}
 	}

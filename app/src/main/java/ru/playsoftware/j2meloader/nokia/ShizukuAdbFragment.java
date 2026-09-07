@@ -12,8 +12,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import io.github.cctyl.nokia.common.log.NokiaLog;
-import io.github.cctyl.nokia.common.ui.focus.NokiaFocusHost;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
+import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -42,9 +42,9 @@ import ru.playsoftware.j2meloader.R;
  *       只需读权限，不依赖执行位；</li>
  *   <li>路径可预期（包名固定），命令可由 app 直接拼出供用户复制。</li>
  * </ul>
- * 继承 {@link NokiaScrollPageFragment}，支持方向键平滑滚动；左软键「复制」把命令写入系统剪贴板；右软键「返回」。
+ * 继承 {@link KeydroidxScrollPageFragment}，支持方向键平滑滚动；左软键「复制」把命令写入系统剪贴板；右软键「返回」。
  */
-public class ShizukuAdbFragment extends NokiaScrollPageFragment {
+public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 
 	/** assets 中的脚本文件名。 */
 	private static final String ASSET_SCRIPT = "mini_shizuku.sh";
@@ -68,7 +68,7 @@ public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 			public void run() {
 				final String cmd = buildCommand(ctx);
 				if (cmd == null) {
-					NokiaLog.e("ShizukuAdb", "释放脚本失败，命令不可用");
+					KeydroidxLog.e("ShizukuAdb", "释放脚本失败，命令不可用");
 					return;
 				}
 				if (tvCommand != null) {
@@ -81,7 +81,7 @@ public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 				}
 			}
 		}, "shizuku-adb-extract").start();
-		NokiaLog.i("ShizukuAdb", "adb 激活说明页初始化完成");
+		KeydroidxLog.i("ShizukuAdb", "adb 激活说明页初始化完成");
 	}
 
 	/**
@@ -106,7 +106,7 @@ public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 	private File extractScript(Context ctx) {
 		File dir = ctx.getExternalFilesDir(null);
 		if (dir == null) {
-			NokiaLog.e("ShizukuAdb", "外存不可用，无法释放脚本");
+			KeydroidxLog.e("ShizukuAdb", "外存不可用，无法释放脚本");
 			return null;
 		}
 		File target = new File(dir, TARGET_SCRIPT_NAME);
@@ -127,11 +127,11 @@ public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 			// "syntax error: unexpected 'do"，导致 mini_shizuku 激活失败。
 			out.write(normalizeLf(bos.toByteArray()));
 			out.flush();
-			NokiaLog.i("ShizukuAdb", "脚本已释放: " + target.getAbsolutePath()
+			KeydroidxLog.i("ShizukuAdb", "脚本已释放: " + target.getAbsolutePath()
 					+ " (" + target.length() + "B)");
 			return target;
 		} catch (IOException e) {
-			NokiaLog.e("ShizukuAdb", "释放脚本失败", e);
+			KeydroidxLog.e("ShizukuAdb", "释放脚本失败", e);
 			return null;
 		} finally {
 			if (in != null) {
@@ -174,17 +174,17 @@ public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 			if (cm != null) {
 				cm.setPrimaryClip(ClipData.newPlainText("mini_shizuku", text));
 				Toast.makeText(requireContext(), "命令已复制", Toast.LENGTH_SHORT).show();
-				NokiaLog.i("ShizukuAdb", "命令已复制到剪贴板");
+				KeydroidxLog.i("ShizukuAdb", "命令已复制到剪贴板");
 			} else {
 				Toast.makeText(requireContext(), "剪贴板不可用", Toast.LENGTH_SHORT).show();
 			}
 		} catch (Exception e) {
-			NokiaLog.e("ShizukuAdb", "复制命令失败", e);
+			KeydroidxLog.e("ShizukuAdb", "复制命令失败", e);
 			Toast.makeText(requireContext(), "复制失败", Toast.LENGTH_SHORT).show();
 		}
 	}
 
-	// ---- NokiaFocusHost ----
+	// ---- KeydroidxFocusHost ----
 
 	@Override
 	public boolean onSoftLeft() {
@@ -192,7 +192,7 @@ public class ShizukuAdbFragment extends NokiaScrollPageFragment {
 		return true;
 	}
 
-	// ---- NokiaPage ----
+	// ---- KeydroidxPage ----
 
 	@Override
 	public String getPageTitle() {

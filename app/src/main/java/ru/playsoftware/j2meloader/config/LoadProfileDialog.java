@@ -40,7 +40,7 @@ import java.util.Collections;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.databinding.DialogLoadProfileBinding;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 
 public class LoadProfileDialog extends DialogFragment {
 	private ArrayList<Profile> profiles;
@@ -115,7 +115,7 @@ public class LoadProfileDialog extends DialogFragment {
 		if (dialog == null) return;
 		Button btnOk = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
 		Button btnCancel = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
-		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		KeydroidxKeyBinding keyBinding = new KeydroidxKeyBinding(requireContext());
 		dialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
 				event,
 				() -> { if (btnCancel != null) btnCancel.performClick(); },  // 左软键 -> 取消

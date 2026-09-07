@@ -11,12 +11,12 @@
 ```
 【添加模式】
 S6 选择组件类型 → 选「Activity快捷」
-  └─ 步骤1：选择应用 (NokiaWidgetAppPickerFragment, mode=ACTIVITY_ADD)
+  └─ 步骤1：选择应用 (KeydroidxWidgetAppPickerFragment, mode=ACTIVITY_ADD)
        │  复用 2 号文档宫格，但确认键行为不同：选中应用 → 进入步骤2
-       └─ 步骤2：选择Activity (NokiaWidgetActivityPickerFragment)
+       └─ 步骤2：选择Activity (KeydroidxWidgetActivityPickerFragment)
             │  纵向列表，列出该应用的 exported Activity
             └─ 确认键选中 → 进入步骤3
-                └─ 步骤3：输入名称 (NokiaWidgetActivityNameFragment)
+                └─ 步骤3：输入名称 (KeydroidxWidgetActivityNameFragment)
                      │  表单页，预填 Activity label，用户可改
                      └─ 左软键保存 → addItem() → 回到 S1
 
@@ -46,7 +46,7 @@ S1 桌面组件设置 → 确认键（光标在 Activity快捷类组件上）
 
 ### 界面
 
-复用 2 号文档的宫格布局（`NokiaWidgetAppPickerFragment`），但通过 Bundle 参数区分：
+复用 2 号文档的宫格布局（`KeydroidxWidgetAppPickerFragment`），但通过 Bundle 参数区分：
 
 ```java
 // 添加 Activity 快捷
@@ -77,7 +77,7 @@ fragment.setArguments(args);
 步骤1 确认键
   │
   ├─ 取出选中应用的 packageName
-  ├─ 创建 NokiaWidgetActivityPickerFragment
+  ├─ 创建 KeydroidxWidgetActivityPickerFragment
   │   args.putString("mode", "ADD")
   │   args.putString("packageName", pkg)
   │   args.putString("appLabel", appLabel)  // 应用名，用于步骤2标题
@@ -176,7 +176,7 @@ Collections.sort(activities, (a, b) -> {
 | 确认键 | 选中该 Activity → 进入步骤3 |
 | 右软键 | 回到步骤1 |
 
-- 每页行数复用 `NokiaBaseActivity` 的分辨率自适应逻辑
+- 每页行数复用 `KeydroidxBaseActivity` 的分辨率自适应逻辑
 - 行高 22~24dp（与桌面组件行高一致）
 
 ### 无搜索框
@@ -300,14 +300,14 @@ Activity 列表不加搜索框。理由：
 |--------|------|---------|
 | 名称为空 | 去除首尾空格后长度 = 0 | 「请输入显示名称」 |
 
-> 校验通过后：去除首尾空格，构造 `NokiaWidgetItem` 并写入存储。
+> 校验通过后：去除首尾空格，构造 `KeydroidxWidgetItem` 并写入存储。
 
 ### 保存数据
 
 ```
 保存
   │
-  ├─ 构造 NokiaWidgetItem:
+  ├─ 构造 KeydroidxWidgetItem:
   │     type = TYPE_ACTIVITY (4)
   │     label = 用户输入的名称
   │     payload = packageName + "/" + className  (序列化为 JSON 或字符串)
@@ -352,7 +352,7 @@ Activity 列表不加搜索框。理由：
   ├─ 接收 packageName, className, activityLabel
   ├─ 预填 activityLabel 到名称字段
   ├─ 焦点定位在名称字段（焦点态）
-  └─ 左软键/保存按钮 → 校验 → 构造 NokiaWidgetItem → 保存 → 回 S1
+  └─ 左软键/保存按钮 → 校验 → 构造 KeydroidxWidgetItem → 保存 → 回 S1
 ```
 
 ---
@@ -443,7 +443,7 @@ startActivity(intent);
 | 确认键 | 选中应用 → 进入步骤2（不添加组件） |
 | 右软键 | 回到 S6（添加模式）/ S1（编辑模式） |
 
-> ⚠️ **按键配对规范（DOWN/UP 成对消费）**：步骤1 确认键进入步骤2、步骤2 确认键进入步骤3 时，若确认键 DOWN 已在 `NokiaDesktopActivity.dispatchKeyEvent` 本层被消费（`return true`），须同步消费对应的 UP（含 REPEAT），禁止只消费 DOWN。否则 DOWN 被吞、UP 穿透到新步骤可点击 View 时，UP 会合成 `performClick()` 触发第二次动作（例：进入步骤2后又自动选中第一项；进入步骤3后又自动激活名称字段）。实现用 `lastHandledDownKeyCode` 记录被本层消费的 keyCode，非 DOWN 分支对相同 keyCode `return true` 吞掉，未消费键 DOWN 路径复位为 `KEYCODE_UNKNOWN`。步骤3 EditText 真正激活后的按键走系统软键盘，不受此约束。
+> ⚠️ **按键配对规范（DOWN/UP 成对消费）**：步骤1 确认键进入步骤2、步骤2 确认键进入步骤3 时，若确认键 DOWN 已在 `KeydroidxDesktopActivity.dispatchKeyEvent` 本层被消费（`return true`），须同步消费对应的 UP（含 REPEAT），禁止只消费 DOWN。否则 DOWN 被吞、UP 穿透到新步骤可点击 View 时，UP 会合成 `performClick()` 触发第二次动作（例：进入步骤2后又自动选中第一项；进入步骤3后又自动激活名称字段）。实现用 `lastHandledDownKeyCode` 记录被本层消费的 keyCode，非 DOWN 分支对相同 keyCode `return true` 吞掉，未消费键 DOWN 路径复位为 `KEYCODE_UNKNOWN`。步骤3 EditText 真正激活后的按键走系统软键盘，不受此约束。
 
 ### 步骤2（纵向列表选 Activity）
 
@@ -471,18 +471,18 @@ startActivity(intent);
 
 | 文件 | 类型 | 说明 |
 |------|------|------|
-| `NokiaWidgetAppPickerFragment.java` | 修改 | 增加 `ACTIVITY_ADD` / `ACTIVITY_EDIT` 模式，确认键不添加而是跳步骤2 |
-| `NokiaWidgetActivityPickerFragment.java` | 新建 | 步骤2：Activity 纵向列表选择 |
-| `NokiaWidgetActivityNameFragment.java` | 新建 | 步骤3：名称输入表单（单字段 + 保存） |
+| `KeydroidxWidgetAppPickerFragment.java` | 修改 | 增加 `ACTIVITY_ADD` / `ACTIVITY_EDIT` 模式，确认键不添加而是跳步骤2 |
+| `KeydroidxWidgetActivityPickerFragment.java` | 新建 | 步骤2：Activity 纵向列表选择 |
+| `KeydroidxWidgetActivityNameFragment.java` | 新建 | 步骤3：名称输入表单（单字段 + 保存） |
 | `fragment_nokia_widget_activity_picker.xml` | 新建 | 步骤2 布局（标题 + 列表容器 + 页码） |
 | `fragment_nokia_widget_activity_name.xml` | 新建 | 步骤3 布局（标题 + 字段 + 保存按钮） |
-| `NokiaWidgetStorage.java` | 已有 | 需提供 `addItem()`、`updateItem(index, item)` 方法 |
+| `KeydroidxWidgetStorage.java` | 已有 | 需提供 `addItem()`、`updateItem(index, item)` 方法 |
 
 ---
 
 ## 十二、数据模型
 
-Activity 快捷组件存储为 `NokiaWidgetItem`：
+Activity 快捷组件存储为 `KeydroidxWidgetItem`：
 
 ```json
 {

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面设置 → 外观与显示 → 自定义字体缩放输入页（NokiaCustomFontScaleFragment）。
+<!-- 桌面设置 → 外观与显示 → 自定义字体缩放输入页（KeydroidxCustomFontScaleFragment）。
      标题说明 + 预估字号提示 + 输入框 + 确认说明。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

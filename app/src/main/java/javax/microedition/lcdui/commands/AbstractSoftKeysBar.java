@@ -36,8 +36,8 @@ import javax.microedition.lcdui.ViewHandler;
 import javax.microedition.util.ContextHolder;
 
 import ru.playsoftware.j2meloader.R;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
-import ru.playsoftware.j2meloader.nokia.NokiaOptionsDialog;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxOptionsDialog;
 
 public abstract class AbstractSoftKeysBar {
 	protected final Displayable target;
@@ -56,7 +56,7 @@ public abstract class AbstractSoftKeysBar {
 		ViewHandler.postEvent(this::onCommandsChanged);
 	}
 
-	/** 呼出诺基亚统一标准选项弹窗（NokiaOptionsDialog）。 */
+	/** 呼出诺基亚统一标准选项弹窗（KeydroidxOptionsDialog）。 */
 	public void showOptionsMenu() {
 		Context context = ContextHolder.getActivity();
 		if (!(context instanceof FragmentActivity)) return;
@@ -72,9 +72,9 @@ public abstract class AbstractSoftKeysBar {
 			}
 		}
 
-		List<NokiaOptionsDialog.OptionItem> items = new ArrayList<>();
+		List<KeydroidxOptionsDialog.OptionItem> items = new ArrayList<>();
 		for (Command cmd : commands) {
-			items.add(new NokiaOptionsDialog.OptionItem(
+			items.add(new KeydroidxOptionsDialog.OptionItem(
 					0,
 					cmd.getAndroidLabel(),
 					true,
@@ -85,7 +85,7 @@ public abstract class AbstractSoftKeysBar {
 
 		// 保底措施：如果是 TextBox 且有输入内容，在左菜单加入「清空输入」选项
 		if (target instanceof TextBox && ((TextBox) target).size() > 0) {
-			items.add(new NokiaOptionsDialog.OptionItem(
+			items.add(new KeydroidxOptionsDialog.OptionItem(
 					0,
 					"清空输入",
 					true,
@@ -96,9 +96,9 @@ public abstract class AbstractSoftKeysBar {
 
 		if (items.isEmpty()) return;
 
-		int[] keyCodes = NokiaKeyBinding.loadKeyCodes(context);
+		int[] keyCodes = KeydroidxKeyBinding.loadKeyCodes(context);
 		String title = context.getString(R.string.cmd_menu);
-		NokiaOptionsDialog.show(fm, title, items, keyCodes);
+		KeydroidxOptionsDialog.show(fm, title, items, keyCodes);
 	}
 
 	protected void onCommandsChanged() {
@@ -156,7 +156,7 @@ public abstract class AbstractSoftKeysBar {
 		Context context = ContextHolder.getActivity();
 		if (context instanceof FragmentActivity) {
 			FragmentManager fm = ((FragmentActivity) context).getSupportFragmentManager();
-			return fm.findFragmentByTag("NokiaOptions") != null;
+			return fm.findFragmentByTag("KeydroidxOptions") != null;
 		}
 		return false;
 	}
@@ -165,7 +165,7 @@ public abstract class AbstractSoftKeysBar {
 		Context context = ContextHolder.getActivity();
 		if (context instanceof FragmentActivity) {
 			FragmentManager fm = ((FragmentActivity) context).getSupportFragmentManager();
-			DialogFragment df = (DialogFragment) fm.findFragmentByTag("NokiaOptions");
+			DialogFragment df = (DialogFragment) fm.findFragmentByTag("KeydroidxOptions");
 			if (df != null) {
 				df.dismiss();
 			}

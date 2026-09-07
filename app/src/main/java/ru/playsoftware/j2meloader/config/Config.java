@@ -33,8 +33,8 @@ import androidx.preference.PreferenceManager;
 
 import ru.playsoftware.j2meloader.BuildConfig;
 import ru.playsoftware.j2meloader.R;
-import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxGlobalProfile;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 
 import static ru.playsoftware.j2meloader.util.Constants.*;
 
@@ -143,7 +143,7 @@ public class Config {
 		}
 		if (!configDir.exists()) {
 			// 新 JAR：自动套用默认（全局）profile 设置，然后直接启动，不再弹设置界面
-			NokiaGlobalProfile.ensureGlobalProfile(context);
+			KeydroidxGlobalProfile.ensureGlobalProfile(context);
 			String defProfile = PreferenceManager.getDefaultSharedPreferences(context)
 					.getString(PREF_DEFAULT_PROFILE, null);
 			if (defProfile != null) {
@@ -167,7 +167,7 @@ public class Config {
 			intent.putExtra(KEY_MIDLET_NAME, name);
 			intent.putExtra(KEY_START_ARGUMENTS, arguments);
 			// 键码表随 intent 传给 :midlet 进程（挂机菜单键/软键识别；extra 缺省时 MicroActivity 回退读 SP）
-			intent.putExtra(KEY_KEYCODES, new NokiaKeyBinding(context).toKeyCodeArray());
+			intent.putExtra(KEY_KEYCODES, new KeydroidxKeyBinding(context).toKeyCodeArray());
 			context.startActivity(intent);
 		} else {
 			// 没有任何兜底配置：仍走设置界面（保持原行为）

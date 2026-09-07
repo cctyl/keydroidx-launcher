@@ -48,14 +48,14 @@ import ru.playsoftware.j2meloader.base.BaseActivity;
 import ru.playsoftware.j2meloader.config.ProfileModel;
 import ru.playsoftware.j2meloader.config.ProfilesManager;
 import ru.playsoftware.j2meloader.databinding.ActivityKeymapperBinding;
-import ru.playsoftware.j2meloader.nokia.NokiaGlobalProfile;
+import ru.playsoftware.j2meloader.nokia.KeydroidxGlobalProfile;
 import ru.playsoftware.j2meloader.util.SparseIntArrayAdapter;
 
 public class KeyMapperActivity extends BaseActivity implements View.OnClickListener {
 	private static final String KEY_SAVE = "KEY_MAP_SAVE";
-	private final boolean isGlobalProfile = NokiaGlobalProfile.isGlobalProfile(getIntent());
+	private final boolean isGlobalProfile = KeydroidxGlobalProfile.isGlobalProfile(getIntent());
 	private final SparseIntArray defaultKeyMap = isGlobalProfile
-			? NokiaGlobalProfile.buildDesktopKeyMappings(this)
+			? KeydroidxGlobalProfile.buildDesktopKeyMappings(this)
 			: KeyMapper.getDefaultKeyMap();
 	private final SparseIntArray idToCanvasKey = new SparseIntArray();
 	private final Rect popupRect = new Rect();

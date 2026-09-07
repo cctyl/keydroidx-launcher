@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 通知中心页：标题 + 状态提示条（未授权/读取中）+ 通知列表 + 空状态。
-     根宽 240dp（由 NokiaPageFragment 统一处理缩放），根高 match_parent。
-     列表项在代码中动态构建（见 NokiaNotificationCenterFragment）。 -->
+     根宽 240dp（由 KeydroidxPageFragment 统一处理缩放），根高 match_parent。
+     列表项在代码中动态构建（见 KeydroidxNotificationCenterFragment）。 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"

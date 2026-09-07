@@ -15,7 +15,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <include layout="@layout/nokia_top_bar" />
+        <include layout="@layout/keydroidx_top_bar" />
 
         <FrameLayout
             android:id="@+id/midPanel"
@@ -24,6 +24,6 @@
             android:layout_weight="1"
             android:visibility="invisible" />
 
-        <include layout="@layout/nokia_bottom_bar" />
+        <include layout="@layout/keydroidx_bottom_bar" />
     </LinearLayout>
 </FrameLayout>

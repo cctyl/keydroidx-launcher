@@ -32,7 +32,7 @@ import java.io.IOException;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.databinding.DialogSaveProfileBinding;
-import ru.playsoftware.j2meloader.nokia.NokiaKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 
 import static ru.playsoftware.j2meloader.util.Constants.KEY_CONFIG_PATH;
 import static ru.playsoftware.j2meloader.util.Constants.PREF_DEFAULT_PROFILE;
@@ -75,7 +75,7 @@ public class SaveProfileDialog extends DialogFragment {
 			}
 			save(name);
 		});
-		NokiaKeyBinding keyBinding = new NokiaKeyBinding(requireContext());
+		KeydroidxKeyBinding keyBinding = new KeydroidxKeyBinding(requireContext());
 		dialog.setOnKeyListener((d, keyCode, event) -> keyBinding.dispatchDialogKey(
 				event,
 				() -> binding.negativeButton.performClick(), // 左软键 -> 取消

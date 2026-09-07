@@ -29,7 +29,7 @@ jar 应用（MIDlet）支持「挂机」：进入 jar 后按**挂机菜单键（
 | 术语 | 含义 | 备注 |
 |---|---|---|
 | **挂机菜单键（绿键）** | 用户可绑定的物理键，默认 `KEYCODE_CALL`（拨号键），**仅在 jar 内生效**，弹出三菜单 | 新增绑定项，显示名「挂机」 |
-| **红键（物理挂机键）** | 物理电源键（`KEY_POWER`），由 native 拦截器接管，全局面行为 | 见《挂机键行为定义.md》，**与本文的「挂机」是两个概念**；与 `NokiaKeyBinding` 的「锁屏」绑定（默认 ENDCALL）亦无关 |
+| **红键（物理挂机键）** | 物理电源键（`KEY_POWER`），由 native 拦截器接管，全局面行为 | 见《挂机键行为定义.md》，**与本文的「挂机」是两个概念**；与 `KeydroidxKeyBinding` 的「锁屏」绑定（默认 ENDCALL）亦无关 |
 | 挂机 | jar 转入后台、进程存活、MIDlet 收到 `pauseApp()`，可随时续跑 | — |
 | 续跑 | 再次进入同一 jar，不重新 `new MIDlet`，恢复到挂机时界面 | — |
 
@@ -49,7 +49,7 @@ jar 应用（MIDlet）支持「挂机」：进入 jar 后按**挂机菜单键（
 
 | 组件 | 进程 | 说明 |
 |---|---|---|
-| `NokiaDesktopActivity` | 主进程 | 桌面宿主（HOME，singleTask） |
+| `KeydroidxDesktopActivity` | 主进程 | 桌面宿主（HOME，singleTask） |
 | `MicroActivity` | `:midlet` | MIDlet 的 Android 前台；manifest 中当前为 `standard` 启动模式 |
 | `MidletThread` | `:midlet` | **静态单例**（`static MidletThread instance`）驱动 MIDlet 状态机 INIT/START/PAUSE/DESTROY |
 | `Display`/`ContextHolder`/`VirtualKeyboard` | `:midlet` | 全 static —— 单实例架构的根因 |
@@ -66,7 +66,7 @@ jar 应用（MIDlet）支持「挂机」：进入 jar 后按**挂机菜单键（
 4. 退出路径 `MidletThread.notifyDestroyed()` 最后 `Process.killProcess(myPid())` 整进程死亡；
    切换 jar 的现成机制 `MidletThread.startAfterDestroy[]`：销毁前先 `Config.startApp(新jar)`，
    进程死后 AMS 重新拉起 `:midlet` 进程加载新 jar（`MIDlet.platformRequest` 在用，可靠）。
-5. `NokiaBgManagerHelper.isSelfProcess()` 排除 `pkg:*` 自身进程 ——
+5. `KeydroidxBgManagerHelper.isSelfProcess()` 排除 `pkg:*` 自身进程 ——
    **当前后台管理看不到挂机 jar**；且 `am force-stop` / `killBackgroundProcesses` 作用于
    **整个包**，会把桌面一起杀 —— 清除挂机 jar **必须精确杀 `:midlet` 进程**。
 
@@ -85,7 +85,7 @@ jar 应用（MIDlet）支持「挂机」：进入 jar 后按**挂机菜单键（
 - `interceptor.c` 的 `extract_front_package()` 只提取 `/` 之前的**包名**；
 - `is_nokia_package()` 按包名匹配 → jar 前台时 `front_is_nokia=1`；
 - 决策处 `else if (front_is_nokia && page_is_main)` → 走 C 态**锁屏**。
-  而 `page_is_main` 是 `NokiaDesktopActivity` 上次上报的**陈旧值**（通常 1=待机屏）。
+  而 `page_is_main` 是 `KeydroidxDesktopActivity` 上次上报的**陈旧值**（通常 1=待机屏）。
 
 结果：jar 内按红键 → 误判「桌面主界面」→ 锁屏。修正方案见 §6.9。
 
@@ -129,8 +129,8 @@ jar 应用（MIDlet）支持「挂机」：进入 jar 后按**挂机菜单键（
 |---|---|---|
 | 主进程感知「哪个 jar 在挂机」 | **状态文件** `files/midlet_state.properties`（`:midlet` 进程原子写：tmp+rename；主进程直接读） | SP 跨进程有缓存失效问题；ContentProvider 过重 |
 | 判断挂机进程是否存活 | `ActivityManager.getRunningAppProcesses()` 匹配 `包名:midlet`（**对自己 uid 的进程全版本可见**，API 21 收紧不影响）+ 状态文件 pid 校验 | 不依赖 mini_shizuku（4.4 无、5.0+ 未激活也可用） |
-| 清除挂机 jar（精确杀 `:midlet`） | 显式广播 → `:midlet` 进程内 `NokiaMidletControlReceiver` → `MidletThread.destroyApp()`（优雅走 MIDlet 生命周期：END 键 → destroyApp(true) → notifyDestroyed → 清状态 → killProcess） | `force-stop`/`killBackgroundProcesses` 会连桌面一起杀 |
-| `:midlet` 进程获知绿键绑定 | **Intent extra 传 int[] 键码表**（桌面启动时序列化 `NokiaKeyBinding`）；extra 缺省时回退读 SP（新进程首次读必是最新文件值，无缓存问题） | SP 跨进程读在进程存活期间有缓存陈旧问题 |
+| 清除挂机 jar（精确杀 `:midlet`） | 显式广播 → `:midlet` 进程内 `KeydroidxMidletControlReceiver` → `MidletThread.destroyApp()`（优雅走 MIDlet 生命周期：END 键 → destroyApp(true) → notifyDestroyed → 清状态 → killProcess） | `force-stop`/`killBackgroundProcesses` 会连桌面一起杀 |
+| `:midlet` 进程获知绿键绑定 | **Intent extra 传 int[] 键码表**（桌面启动时序列化 `KeydroidxKeyBinding`）；extra 缺省时回退读 SP（新进程首次读必是最新文件值，无缓存问题） | SP 跨进程读在进程存活期间有缓存陈旧问题 |
 | jar 前台状态快速通知 native 拦截器 | `MicroActivity.onResume/onPause` 调 `Shizuku.setPageState(false/恢复由桌面重新上报)`（复用既有 PAGE_STATE TCP 通道，~5ms） | 见 §6.9（闭合 native 2s 轮询窗口） |
 | 挂机进程保活 | 前台 Service（`startForeground` 常驻通知，API 26+ 渠道守卫），仅挂机期间存在 | — |
 
@@ -167,10 +167,10 @@ flowchart TD
 
 ---
 
-## 5. 挂机菜单键绑定（`NokiaKeyBinding` 扩展）
+## 5. 挂机菜单键绑定（`KeydroidxKeyBinding` 扩展）
 
 改动点（单文件；设置页/向导 UI 均按 `ACTION_COUNT` 动态循环，**自动适配无需改**，
-已核实 `NokiaKeyBindFragment` / `NokiaKeyBindWizardFragment` 无硬编码 8 处，仅注释需更新）：
+已核实 `KeydroidxKeyBindFragment` / `KeydroidxKeyBindWizardFragment` 无硬编码 8 处，仅注释需更新）：
 
 | 项 | 改动 |
 |---|---|
@@ -246,7 +246,7 @@ onNewIntent(intent):
 ```
 
 **(3) 键码表读取**：onCreate/onNewIntent 解析 intent extra `int[] keycodes`
-（9 元素，`NokiaKeyBinding` 序列化）；缺省（`:midlet` 进程内 `startAfterDestroy` 重启路径）时回退
+（9 元素，`KeydroidxKeyBinding` 序列化）；缺省（`:midlet` 进程内 `startAfterDestroy` 重启路径）时回退
 `context.getSharedPreferences("nokia_key_bindings", MODE_PRIVATE)` 逐键读取
 （新进程首次读 = 最新文件值，无陈旧缓存）。
 
@@ -261,10 +261,10 @@ keyCode == keycodes[ACTION_HANGUP] 且 isBound（!= KEYCODE_UNKNOWN）：
 
 `dispatchKeyEvent` 位于 `onKeyUp` 之前，即使绿键被绑成 BACK/MENU 也天然优先，无冲突。
 
-**(5) 三菜单 `MidletMenuDialog`**（`:midlet` 进程内自实现，不依赖 NokiaDesktopActivity）：
+**(5) 三菜单 `MidletMenuDialog`**（`:midlet` 进程内自实现，不依赖 KeydroidxDesktopActivity）：
 
 - 形态：AlertDialog + 三行列表（0=继续 / 1=退出 / 2=后台运行）+ 自绘选中高亮
-  （样式对齐 `NokiaOptionsDialog` 的行规格：11sp 白字 + 选中深色底），标题显示 appName。
+  （样式对齐 `KeydroidxOptionsDialog` 的行规格：11sp 白字 + 选中深色底），标题显示 appName。
 - **按键自处理**（Dialog 独立 Window，必须自己接键；键值全部来自 §6.3-(3) 键码表）：
 
 | 按键 | 行为 |
@@ -280,7 +280,7 @@ keyCode == keycodes[ACTION_HANGUP] 且 isBound（!= KEYCODE_UNKNOWN）：
     `showExitConfirmation` 确认按钮完全一致，含 1s 强杀兜底）
   - **后台运行**：`dismiss()` + 显式回桌面：
     `Intent(ACTION_MAIN).addCategory(CATEGORY_HOME)`
-    `.setClassName(this, NokiaDesktopActivity)` + `FLAG_ACTIVITY_NEW_TASK`（**不加 CLEAR_TOP**，
+    `.setClassName(this, KeydroidxDesktopActivity)` + `FLAG_ACTIVITY_NEW_TASK`（**不加 CLEAR_TOP**，
     保留本 Activity 实例 stopped → 下次走 R1 快速续跑）→ 桌面 `onNewIntent → goHome()` 回待机屏
     → 本 Activity `onPause → pauseApp()`（挂机）→ `onStop` 触发保活 Service（§6.4）。
     显式组件保证即使本应用未被设为默认桌面，也回到原键桌面。
@@ -290,8 +290,8 @@ keyCode == keycodes[ACTION_HANGUP] 且 isBound（!= KEYCODE_UNKNOWN）：
 
 ```java
 onStop():  若 MidletThread.hasInstance() 且 runningAppPath != null
-           → startService(NokiaMidletKeepAliveService)   // 覆盖绿键/红键/Home 键全部挂机路径
-onResume(): stopService(NokiaMidletKeepAliveService)      // 回前台撤通知
+           → startService(KeydroidxMidletKeepAliveService)   // 覆盖绿键/红键/Home 键全部挂机路径
+onResume(): stopService(KeydroidxMidletKeepAliveService)      // 回前台撤通知
 ```
 
 `onDestroy` 不改（现状不销毁 MIDlet 正是挂机所需）。exit 路径 `destroyApp → killProcess`
@@ -300,10 +300,10 @@ onResume(): stopService(NokiaMidletKeepAliveService)      // 回前台撤通知
 **(7) PAGE_STATE 快速上报（配合 §6.9）**：
 `onResume()` 追加 `Shizuku.setPageState(false)`（jar 前台 ≈「桌面非主界面」语义，
 使红键决策落到 go_home 分支；mini_shizuku 未运行时该调用静默无副作用）。
-jar 离开后无需本进程恢复值——桌面 `NokiaDesktopActivity` 在 onResume/goHome/
+jar 离开后无需本进程恢复值——桌面 `KeydroidxDesktopActivity` 在 onResume/goHome/
 Fragment 切换时会重新上报真实页面状态（既有机制，见《挂机键行为定义.md》§9.6）。
 
-### 6.4 保活前台 Service（新文件 `nokia/NokiaMidletKeepAliveService.java`）
+### 6.4 保活前台 Service（新文件 `nokia/KeydroidxMidletKeepAliveService.java`）
 
 - manifest：`android:process=":midlet" android:exported="false"`，无 intent-filter。
 - `onStartCommand()`：
@@ -316,7 +316,7 @@ Fragment 切换时会重新上报真实页面状态（既有机制，见《挂�
   API 26+ 建 NotificationChannel（守卫包裹）；小图标用现有 `ic_launcher` 资源，不新增。
 - `onDestroy()`：`stopForeground(true)`。
 
-### 6.5 清除通道（新文件 `nokia/NokiaMidletControlReceiver.java`）
+### 6.5 清除通道（新文件 `nokia/KeydroidxMidletControlReceiver.java`）
 
 - manifest：`android:process=":midlet" android:exported="false"`，
   action = `ru.playsoftware.j2meloader.ACTION_DESTROY_MIDLET`（显式 Intent 调用）。
@@ -326,7 +326,7 @@ Fragment 切换时会重新上报真实页面状态（既有机制，见《挂�
   → `notifyDestroyed()`（**此处追加 `MidletStateStore.clear()`**，在 `killProcess` 前）→
   Activity finish → 进程死 → 通知/Service 随之消亡。
 
-### 6.6 桌面启动入口（新文件 `nokia/NokiaJarLauncher.java`）
+### 6.6 桌面启动入口（新文件 `nokia/KeydroidxJarLauncher.java`）
 
 ```java
 public static void launch(FragmentActivity act, String name, String path) {
@@ -335,7 +335,7 @@ public static void launch(FragmentActivity act, String name, String path) {
         Config.startApp(act, name, path, false);
         return;
     }
-    // 有其它 jar 挂机 → 确认弹窗（复用 NokiaOptionsDialog，自带按键接入，符合弹窗规范）
+    // 有其它 jar 挂机 → 确认弹窗（复用 KeydroidxOptionsDialog，自带按键接入，符合弹窗规范）
     // 标题「提示」 文案「后台运行的『r.appName』将被停止，是否继续？」
     // 选项：继续 → Config.startApp(act, name, path, false)
     //       取消 → 关闭，无事发生
@@ -346,16 +346,16 @@ public static void launch(FragmentActivity act, String name, String path) {
 
 | 文件 | 位置 | 改动 |
 |---|---|---|
-| `NokiaBoxFragment` | onSelect 直接启动（2 处 `startApp(..., false)`） | 换 `NokiaJarLauncher.launch` |
-| `NokiaBoxFragment` | 「设置」入口（`startApp(..., true)`） | **不换**（打开 ConfigActivity，不触发启动） |
-| `NokiaDesktopFragment` | `launchShortcutApp()` TYPE_J2ME 分支 | 换 `NokiaJarLauncher.launch` |
+| `KeydroidxBoxFragment` | onSelect 直接启动（2 处 `startApp(..., false)`） | 换 `KeydroidxJarLauncher.launch` |
+| `KeydroidxBoxFragment` | 「设置」入口（`startApp(..., true)`） | **不换**（打开 ConfigActivity，不触发启动） |
+| `KeydroidxDesktopFragment` | `launchShortcutApp()` TYPE_J2ME 分支 | 换 `KeydroidxJarLauncher.launch` |
 
 **`Config.startApp` 唯一增补**：构造 MicroActivity intent 时附加键码表 extra
-（`new NokiaKeyBinding(context)` 读当前绑定序列化为 `int[]`）。
+（`new KeydroidxKeyBinding(context)` 读当前绑定序列化为 `int[]`）。
 
 ### 6.7 后台管理联动
 
-**(1) 显示挂机条目**（`NokiaBgManagerHelper.enumerateBackgroundTasks` 末尾追加）：
+**(1) 显示挂机条目**（`KeydroidxBgManagerHelper.enumerateBackgroundTasks` 末尾追加）：
 
 ```java
 MidletStateStore.RunningInfo r = MidletStateStore.getRunning(ctx);
@@ -378,13 +378,13 @@ if (r != null) {
 if (t.pkg.startsWith("midlet:")) {          // 挂机 jar 条目
     if (t.prot) continue;                    // 受保护 → 跳过
     ctx.sendBroadcast(显式 Intent(ACTION_DESTROY_MIDLET
-            .setClass(ctx, NokiaMidletControlReceiver.class)));  // 见 §6.5
+            .setClass(ctx, KeydroidxMidletControlReceiver.class)));  // 见 §6.5
     cleared++;
     continue;                                // 绝不走 am force-stop / killBackgroundProcesses
 }
 ```
 
-**(3) 保护与交互**（`NokiaBackgroundManagerFragment`）：
+**(3) 保护与交互**（`KeydroidxBackgroundManagerFragment`）：
 - 选中 + 确认 = 切换保护状态：key 为 `"midlet:<appPath>"`，`toggleProtect` 现有按 key 存取
   逻辑**零改动**自然兼容；「全部保护 / 全部解除」同样按 key 生效。
 - 「清除全部」/ 数字 0 一键清理：乐观移除已含（`tasks.removeIf(t -> !t.prot)` 覆盖挂机条目，
@@ -413,7 +413,7 @@ jar 的三种「离开方式」全部殊途同归为挂机：
   `mCurrentFocus=Window{hash u0 pkg/javax.microedition.shell.MicroActivity}`，activity 名天然在输出中）；
 - 判定：activity 名以 `MicroActivity` 结尾 → **`front_is_nokia = 0`**（jar 界面不算原键桌面）；
 - 效果：短按红键决策落到 else 分支 `inject_go_home`（A/B 态）→ 回桌面待机屏 →
-  `NokiaDesktopActivity.onNewIntent → goHome()` → CLEAR_TOP 销毁 MicroActivity →
+  `KeydroidxDesktopActivity.onNewIntent → goHome()` → CLEAR_TOP 销毁 MicroActivity →
   `onPause → pauseApp()` 挂机、`onStop` 起保活通知、后台管理出现条目（全链路与本方案自动衔接）。
 - debug/release 两个 flavor 的 MicroActivity 类路径相同（`javax.microedition.shell.MicroActivity`），
   后缀匹配即可；不依赖包名，不受 flavor 切换影响。
@@ -434,7 +434,7 @@ jar 界面（`MicroActivity`，同包名异进程异 Activity）归入「非诺�
 
 | # | 场景 | 流程 | 结果 |
 |---|---|---|---|
-| S1 | 首次启动 jar A | 桌面 → `NokiaJarLauncher.launch`（无挂机）→ MicroActivity 分支 N | 全新加载，状态文件写入 |
+| S1 | 首次启动 jar A | 桌面 → `KeydroidxJarLauncher.launch`（无挂机）→ MicroActivity 分支 N | 全新加载，状态文件写入 |
 | S2 | jar A 运行中，按绿键 → 后台运行 | 三菜单 → 显式 HOME → 桌面 goHome → MicroActivity stopped → pauseApp → onStop 起 Service | 挂机：进程活、MIDlet 挂起、通知栏常驻、后台管理可见条目；下次走 R1 |
 | S3 | jar A 运行中，直接按 Home 键 | 不经三菜单，其余同 S2 | 挂机（静默，下次走 R1） |
 | S4 | jar A 运行中，按红键（POWER） | §6.9 → inject_go_home（CLEAR_TOP）→ 桌面 goHome → MicroActivity finished → 挂机链路 | **回桌面不锁屏**（bug 361 修正）；下次走 R2 |
@@ -475,7 +475,7 @@ jar 界面（`MicroActivity`，同包名异进程异 Activity）归入「非诺�
 7. **后台管理清除后立即再点该 jar**：进程死亡为异步（≤1s）。若用户极速操作，`getRunning`
    仍见进程存活 → 直接 startActivity → 进程恰死 → AMS 重启进程 → 分支 N。结果仍正确。
 8. **通知 PendingIntent 的 intent**：必须携带与状态文件一致的 appPath/appName 与键码表
-   extra（Service 从状态文件 + `:midlet` 进程内 NokiaKeyBinding 快照获取）。
+   extra（Service 从状态文件 + `:midlet` 进程内 KeydroidxKeyBinding 快照获取）。
 9. **Android 12+ 前台 Service 启动限制**（targetSdk 31+）：Service 由 `onStop`（应用仍在前台
    的生命周期回调）内启动，属于允许场景；若实测 targetSdk 行为有变，退路为
    「挂机动作（三菜单后台运行 / HOME 键 UP）时显式 startForegroundService」。
@@ -488,19 +488,19 @@ jar 界面（`MicroActivity`，同包名异进程异 Activity）归入「非诺�
 
 | 文件 | 类型 | 内容 |
 |---|---|---|
-| `nokia/NokiaKeyBinding.java` | 改 | ACTION_HANGUP / ACTION_COUNT=9 / 默认 CALL / 名称「挂机」 |
-| `nokia/NokiaKeyBindFragment.java` | 改 | 仅更新类注释「8 个动作」→「9 个动作」（UI 循环自动适配） |
+| `nokia/KeydroidxKeyBinding.java` | 改 | ACTION_HANGUP / ACTION_COUNT=9 / 默认 CALL / 名称「挂机」 |
+| `nokia/KeydroidxKeyBindFragment.java` | 改 | 仅更新类注释「8 个动作」→「9 个动作」（UI 循环自动适配） |
 | `util/MidletStateStore.java` | **新** | 状态文件读写 + 进程存活校验 + taskKey |
 | `shell/MidletThread.java` | 改 | 静态：runningAppPath / currentDisplayable / savedOrientation / savedMenuKey / hasInstance()；notifyDestroyed 追加清状态文件 |
 | `shell/MicroActivity.java` | 改 | onCreate 三分支；onNewIntent R1；键码表 extra；绿键拦截；MidletMenuDialog；onStop/onResume Service 联动；onResume setPageState(false)；setCurrent 同步 currentDisplayable |
 | `shell/MidletMenuDialog.java` | **新**（或 MicroActivity 内部类） | 三菜单弹窗（自接按键） |
-| `nokia/NokiaMidletKeepAliveService.java` | **新** | 前台保活 + 恢复通知 |
-| `nokia/NokiaMidletControlReceiver.java` | **新** | 清除广播 → destroyApp |
-| `nokia/NokiaJarLauncher.java` | **新** | 启动入口封装：同 jar 直启 / 异 jar 确认 |
+| `nokia/KeydroidxMidletKeepAliveService.java` | **新** | 前台保活 + 恢复通知 |
+| `nokia/KeydroidxMidletControlReceiver.java` | **新** | 清除广播 → destroyApp |
+| `nokia/KeydroidxJarLauncher.java` | **新** | 启动入口封装：同 jar 直启 / 异 jar 确认 |
 | `config/Config.java` | 改 | startApp intent 追加键码表 extra |
-| `nokia/NokiaBoxFragment.java` | 改 | 2 处启动调用换 NokiaJarLauncher |
-| `nokia/NokiaDesktopFragment.java` | 改 | 快捷栏 J2ME 启动换 NokiaJarLauncher |
-| `nokia/NokiaBgManagerHelper.java` | 改 | enumerateBackgroundTasks 追加挂机条目；clearBackgroundTasks 增 midlet: 分支（发广播） |
+| `nokia/KeydroidxBoxFragment.java` | 改 | 2 处启动调用换 KeydroidxJarLauncher |
+| `nokia/KeydroidxDesktopFragment.java` | 改 | 快捷栏 J2ME 启动换 KeydroidxJarLauncher |
+| `nokia/KeydroidxBgManagerHelper.java` | 改 | enumerateBackgroundTasks 追加挂机条目；clearBackgroundTasks 增 midlet: 分支（发广播） |
 | `util/AppUtils.java` | 改 | 新增 findAppByPath() |
 | `AndroidManifest.xml` | 改 | MicroActivity 加 `launchMode="singleTask"`；注册 Service + Receiver（均 `:midlet` 进程、exported=false） |
 | `cpp/interceptor/interceptor.c` | 改 | §6.9-(1)：提取前台 activity 名，MicroActivity → front_is_nokia=0 |
@@ -581,11 +581,11 @@ jar 界面（`MicroActivity`，同包名异进程异 Activity）归入「非诺�
 ### A.2 三菜单白底（不符合诺基亚风格）
 
 自建 `MidletMenuDialog` 用 androidx AlertDialog 默认亮色主题（白底白字），且违反《NOKIA_DEVELOPMENT_RULES.md》
-「所有选项弹窗一律 NokiaOptionsDialog」。
+「所有选项弹窗一律 KeydroidxOptionsDialog」。
 
-**修复**：删除 `MidletMenuDialog`；`NokiaOptionsDialog` 新增**键码表注入模式**
-`show(fm, title, items, int[] keyCodes)`（不依赖 NokiaDesktopActivity 宿主），
-`NokiaKeyBinding` 抽静态 `resolveAction(int[], KeyEvent)`；三菜单 = NokiaOptionsDialog（底部弹出深色风格），
+**修复**：删除 `MidletMenuDialog`；`KeydroidxOptionsDialog` 新增**键码表注入模式**
+`show(fm, title, items, int[] keyCodes)`（不依赖 KeydroidxDesktopActivity 宿主），
+`KeydroidxKeyBinding` 抽静态 `resolveAction(int[], KeyEvent)`；三菜单 = KeydroidxOptionsDialog（底部弹出深色风格），
 绿键/返回=关闭弹窗（=继续）。
 
 ### A.3 挂机恢复白屏卡死
@@ -615,6 +615,6 @@ native 决策 C 态（front_is_nokia && page_is_main → 锁屏）依赖 2s 轮�
 
 ### A.6 顺带修正
 
-`NokiaDesktopActivity.reportPageState` 增加 force 参数：从 jar 返回桌面（onResume/goHome）时
+`KeydroidxDesktopActivity.reportPageState` 增加 force 参数：从 jar 返回桌面（onResume/goHome）时
 **强制重报**页面状态。原因：jar 前台时 MicroActivity 会把 native 端 `page_is_main` 置 0，
 若桌面按去重逻辑跳过上报，红键在桌面会误判为子页面（应锁屏却回桌面）。
