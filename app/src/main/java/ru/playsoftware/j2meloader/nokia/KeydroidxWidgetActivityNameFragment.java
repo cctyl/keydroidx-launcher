@@ -86,7 +86,7 @@ public class KeydroidxWidgetActivityNameFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_widget_activity_name;
+		return R.layout.fragment_keydroidx_widget_activity_name;
 	}
 
 	@Override
@@ -191,7 +191,7 @@ public class KeydroidxWidgetActivityNameFragment extends KeydroidxPageFragment {
 		// 名称字段：焦点态蓝色高亮，非焦点态灰色边框
 		etName.setBackgroundResource(
 				(focusIndex == FOCUS_NAME && !editing) || editing
-						? 0 : R.drawable.bg_nokia_searchbox);
+						? 0 : R.drawable.bg_keydroidx_searchbox);
 
 		// 保存按钮：焦点态蓝色高亮，非焦点态普通样式
 		if (focusIndex == FOCUS_SAVE) {

@@ -50,7 +50,7 @@ public class KeydroidxNotificationCenterFragment extends KeydroidxListPageFragme
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_notification_center;
+		return R.layout.fragment_keydroidx_notification_center;
 	}
 
 	@Override

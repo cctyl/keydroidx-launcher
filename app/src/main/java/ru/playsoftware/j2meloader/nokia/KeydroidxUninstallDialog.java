@@ -52,7 +52,7 @@ public class KeydroidxUninstallDialog extends DialogFragment {
 	public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
 		KeydroidxLog.i(TAG, "onCreateDialog: 创建卸载确认弹窗");
 		Dialog dialog = new Dialog(requireActivity());
-		dialog.setContentView(R.layout.dialog_nokia_uninstall);
+		dialog.setContentView(R.layout.dialog_keydroidx_uninstall);
 		dialog.setCancelable(false);
 		dialog.setCanceledOnTouchOutside(false);
 		if (dialog.getWindow() != null) {

@@ -72,7 +72,7 @@ public class KeydroidxBackgroundManagerFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_bg_manager;
+		return R.layout.fragment_keydroidx_bg_manager;
 	}
 
 	@Override
@@ -251,7 +251,7 @@ public class KeydroidxBackgroundManagerFragment extends KeydroidxPageFragment {
 					KeydroidxDimens.dp(getResources(), 14), KeydroidxDimens.dp(getResources(), 14)));
 			shield.setScaleType(ImageView.ScaleType.FIT_CENTER);
 			try {
-				shield.setImageDrawable(ContextCompat.getDrawable(ctx, R.drawable.ic_nokia_protect));
+				shield.setImageDrawable(ContextCompat.getDrawable(ctx, R.drawable.ic_keydroidx_protect));
 			} catch (Exception ignored) {}
 			row.addView(shield);
 		} else if (!tabProtected) {

@@ -96,46 +96,46 @@ public class KeydroidxQuickToggleItem {
 	public static KeydroidxQuickToggleItem createDefault(int type) {
 		switch (type) {
 			case TYPE_WIFI:
-				return new KeydroidxQuickToggleItem(TYPE_WIFI, "wifi", "WLAN", R.drawable.ic_nokia_wifi, true);
+				return new KeydroidxQuickToggleItem(TYPE_WIFI, "wifi", "WLAN", R.drawable.ic_keydroidx_wifi, true);
 			case TYPE_DATA:
-				return new KeydroidxQuickToggleItem(TYPE_DATA, "data", "移动数据", R.drawable.ic_nokia_data, true);
+				return new KeydroidxQuickToggleItem(TYPE_DATA, "data", "移动数据", R.drawable.ic_keydroidx_data, true);
 			case TYPE_BLUETOOTH:
-				return new KeydroidxQuickToggleItem(TYPE_BLUETOOTH, "bluetooth", "蓝牙", R.drawable.ic_nokia_bluetooth, true);
+				return new KeydroidxQuickToggleItem(TYPE_BLUETOOTH, "bluetooth", "蓝牙", R.drawable.ic_keydroidx_bluetooth, true);
 			case TYPE_AIRPLANE:
-				return new KeydroidxQuickToggleItem(TYPE_AIRPLANE, "airplane", "飞行模式", R.drawable.ic_nokia_airplane, true);
+				return new KeydroidxQuickToggleItem(TYPE_AIRPLANE, "airplane", "飞行模式", R.drawable.ic_keydroidx_airplane, true);
 			case TYPE_TORCH:
-				return new KeydroidxQuickToggleItem(TYPE_TORCH, "torch", "手电筒", R.drawable.ic_nokia_torch, true);
+				return new KeydroidxQuickToggleItem(TYPE_TORCH, "torch", "手电筒", R.drawable.ic_keydroidx_torch, true);
 			case TYPE_SOUND:
-				return new KeydroidxQuickToggleItem(TYPE_SOUND, "sound", "情景模式", R.drawable.ic_nokia_sound, true);
+				return new KeydroidxQuickToggleItem(TYPE_SOUND, "sound", "情景模式", R.drawable.ic_keydroidx_sound, true);
 			case TYPE_ROTATE:
-				return new KeydroidxQuickToggleItem(TYPE_ROTATE, "rotate", "自动旋转", R.drawable.ic_nokia_rotate, true);
+				return new KeydroidxQuickToggleItem(TYPE_ROTATE, "rotate", "自动旋转", R.drawable.ic_keydroidx_rotate, true);
 			case TYPE_LOCK:
-				return new KeydroidxQuickToggleItem(TYPE_LOCK, "lock", "一键锁屏", R.drawable.ic_nokia_lock, true);
+				return new KeydroidxQuickToggleItem(TYPE_LOCK, "lock", "一键锁屏", R.drawable.ic_keydroidx_lock, true);
 			case TYPE_BRIGHTNESS:
-				return new KeydroidxQuickToggleItem(TYPE_BRIGHTNESS, "brightness", "屏幕亮度", R.drawable.ic_nokia_brightness, false);
+				return new KeydroidxQuickToggleItem(TYPE_BRIGHTNESS, "brightness", "屏幕亮度", R.drawable.ic_keydroidx_brightness, false);
 			case TYPE_LOCATION:
-				return new KeydroidxQuickToggleItem(TYPE_LOCATION, "location", "位置信息", R.drawable.ic_nokia_location, false);
+				return new KeydroidxQuickToggleItem(TYPE_LOCATION, "location", "位置信息", R.drawable.ic_keydroidx_location, false);
 			case TYPE_HOTSPOT:
-				return new KeydroidxQuickToggleItem(TYPE_HOTSPOT, "hotspot", "个人热点", R.drawable.ic_nokia_hotspot, false);
+				return new KeydroidxQuickToggleItem(TYPE_HOTSPOT, "hotspot", "个人热点", R.drawable.ic_keydroidx_hotspot, false);
 			case TYPE_SAVER:
-				return new KeydroidxQuickToggleItem(TYPE_SAVER, "saver", "省电模式", R.drawable.ic_nokia_saver, false);
+				return new KeydroidxQuickToggleItem(TYPE_SAVER, "saver", "省电模式", R.drawable.ic_keydroidx_saver, false);
 			case TYPE_FREEZE:
-				return new KeydroidxQuickToggleItem(TYPE_FREEZE, "freeze", "一键冻结", R.drawable.ic_nokia_freeze, true);
+				return new KeydroidxQuickToggleItem(TYPE_FREEZE, "freeze", "一键冻结", R.drawable.ic_keydroidx_freeze, true);
 			case TYPE_UNFREEZE:
-				return new KeydroidxQuickToggleItem(TYPE_UNFREEZE, "unfreeze", "一键解冻", R.drawable.ic_nokia_unfreeze, false);
+				return new KeydroidxQuickToggleItem(TYPE_UNFREEZE, "unfreeze", "一键解冻", R.drawable.ic_keydroidx_unfreeze, false);
 			case TYPE_CLEAN_BG:
-				return new KeydroidxQuickToggleItem(TYPE_CLEAN_BG, "clean_bg", "清理后台", R.drawable.ic_nokia_clean, true);
+				return new KeydroidxQuickToggleItem(TYPE_CLEAN_BG, "clean_bg", "清理后台", R.drawable.ic_keydroidx_clean, true);
 			// 电源类默认全部关闭：破坏性且不可逆，需用户在设置里主动启用
 			case TYPE_SHUTDOWN:
-				return new KeydroidxQuickToggleItem(TYPE_SHUTDOWN, "shutdown", "关机", R.drawable.ic_nokia_settings, false);
+				return new KeydroidxQuickToggleItem(TYPE_SHUTDOWN, "shutdown", "关机", R.drawable.ic_keydroidx_settings, false);
 			case TYPE_REBOOT:
-				return new KeydroidxQuickToggleItem(TYPE_REBOOT, "reboot", "重启", R.drawable.ic_nokia_settings, false);
+				return new KeydroidxQuickToggleItem(TYPE_REBOOT, "reboot", "重启", R.drawable.ic_keydroidx_settings, false);
 			case TYPE_RECOVERY:
-				return new KeydroidxQuickToggleItem(TYPE_RECOVERY, "recovery", "重启到Recovery", R.drawable.ic_nokia_settings, false);
+				return new KeydroidxQuickToggleItem(TYPE_RECOVERY, "recovery", "重启到Recovery", R.drawable.ic_keydroidx_settings, false);
 			case TYPE_FASTBOOT:
-				return new KeydroidxQuickToggleItem(TYPE_FASTBOOT, "fastboot", "重启到Fastboot", R.drawable.ic_nokia_settings, false);
+				return new KeydroidxQuickToggleItem(TYPE_FASTBOOT, "fastboot", "重启到Fastboot", R.drawable.ic_keydroidx_settings, false);
 			default:
-				return new KeydroidxQuickToggleItem(type, "unknown_" + type, "未知开关", R.drawable.ic_nokia_settings, false);
+				return new KeydroidxQuickToggleItem(type, "unknown_" + type, "未知开关", R.drawable.ic_keydroidx_settings, false);
 		}
 	}
 }

@@ -71,7 +71,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		applyCurrentTheme();
 		super.onCreate(savedInstanceState);
 		sInstance = this;
-		setContentView(R.layout.activity_nokia);
+		setContentView(R.layout.activity_keydroidx);
 		setupKeydroidxUi();
 		findViewById(R.id.midPanel).setVisibility(View.VISIBLE);
 

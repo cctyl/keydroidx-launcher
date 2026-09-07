@@ -60,7 +60,7 @@ public class KeydroidxWallpaperSettingsFragment extends KeydroidxListPageFragmen
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_wallpaper_settings;
+		return R.layout.fragment_keydroidx_wallpaper_settings;
 	}
 
 	@Override

@@ -34,7 +34,7 @@ import ru.playsoftware.j2meloader.R;
  *   <li>{@link #getLayoutRes()}：返回布局资源（宽度固定 240dp）；</li>
  *   <li>{@link #onPageCreated(View, Bundle)}：页面自己的初始化；</li>
  *   <li>特殊页面覆写 {@link #isTopAlign()}（默认 true，百宝箱等居中页返回 false）
- *       与 {@link #getWallpaperRes()}（默认 bg_nokia_menu）。</li>
+ *       与 {@link #getWallpaperRes()}（默认 bg_keydroidx_menu）。</li>
  * </ul>
  * <p>
  * 背景：历史 bug 全部源于各页面手抄样板时漏写/写错缩放与高度调整
@@ -55,7 +55,7 @@ public abstract class KeydroidxPageFragment extends Fragment implements Keydroid
 	/** 页面壁纸资源；返回 0 表示不设置。默认深蓝渐变菜单壁纸。 */
 	@LayoutRes
 	protected int getWallpaperRes() {
-		return R.drawable.bg_nokia_menu;
+		return R.drawable.bg_keydroidx_menu;
 	}
 
 	@Nullable

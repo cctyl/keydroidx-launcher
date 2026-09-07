@@ -39,7 +39,7 @@ import ru.playsoftware.j2meloader.R;
  * 解决「启动/向导自动弹窗错过时机即无入口、release 详细日志关闭不可见」的问题：
  * 用户随时进设置→系统与权限→系统权限自检查看状态并修复。
  * <p>复用 {@link KeydroidxListPageFragment} 的循环导航/焦点/滚动，复用
- * {@code fragment_nokia_settings_group} 布局。
+ * {@code fragment_keydroidx_settings_group} 布局。
  */
 public class KeydroidxPermissionCheckFragment extends KeydroidxListPageFragment {
 
@@ -67,7 +67,7 @@ public class KeydroidxPermissionCheckFragment extends KeydroidxListPageFragment 
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_settings_group;
+		return R.layout.fragment_keydroidx_settings_group;
 	}
 
 	@Override

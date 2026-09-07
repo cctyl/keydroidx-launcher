@@ -219,7 +219,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_menu;
+		return R.layout.fragment_keydroidx_menu;
 	}
 
 	@Override
@@ -612,9 +612,9 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 
 	// 应用程序图标：优先用 S60 应用程序图标
 	Drawable boxIcon = safeDrawable(appCtx, R.drawable.s60_app);
-	if (boxIcon == null) boxIcon = safeDrawable(appCtx, R.drawable.ic_nokia_box);
+	if (boxIcon == null) boxIcon = safeDrawable(appCtx, R.drawable.ic_keydroidx_box);
 	Drawable settingsIcon = safeDrawable(appCtx, R.drawable.s60_settings);
-	if (settingsIcon == null) settingsIcon = safeDrawable(appCtx, R.drawable.ic_nokia_settings);
+	if (settingsIcon == null) settingsIcon = safeDrawable(appCtx, R.drawable.ic_keydroidx_settings);
 	result.add(new KeydroidxAppItem(KeydroidxAppItem.TYPE_BOX, "应用程序", boxIcon, null));
 	// 原始 J2ME-Loader 主界面（启动器/文件选择器/应用列表）入口
 	Drawable mainIcon = safeDrawable(appCtx, R.mipmap.ic_launcher);
@@ -925,7 +925,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 						coverLp.gravity = Gravity.CENTER;
 						iceCover.setLayoutParams(coverLp);
 						iceCover.setScaleType(ImageView.ScaleType.FIT_CENTER);
-						iceCover.setImageResource(R.drawable.ic_nokia_ice_block_cover);
+						iceCover.setImageResource(R.drawable.ic_keydroidx_ice_block_cover);
 						iconContainer.addView(iceCover);
 					} else if (isInList) {
 						ImageView badgeIv = new ImageView(requireContext());
@@ -933,7 +933,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 						FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(badgeSize, badgeSize);
 						badgeLp.gravity = Gravity.BOTTOM | Gravity.END;
 						badgeIv.setLayoutParams(badgeLp);
-						badgeIv.setImageResource(R.drawable.ic_nokia_ice_badge);
+						badgeIv.setImageResource(R.drawable.ic_keydroidx_ice_badge);
 						iconContainer.addView(badgeIv);
 					}
 
@@ -1236,7 +1236,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		boolean isFrozen = KeydroidxFreezeManager.getInstance(requireContext()).isAppFrozen(pkg);
 		if (inFreezeList) {
 			if (isFrozen) {
-				options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_nokia_freeze,
+				options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_freeze,
 						"解冻应用", true, false, () -> {
 					KeydroidxFreezeManager.getInstance(requireContext()).unfreezeApp(pkg, (success, msg) -> {
 						if (isAdded()) {
@@ -1247,7 +1247,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 					});
 				}));
 			} else {
-				options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_nokia_freeze,
+				options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_freeze,
 						"立即冻结", true, false, () -> {
 					KeydroidxFreezeManager.getInstance(requireContext()).freezeApp(pkg, (success, msg) -> {
 						if (isAdded()) {
@@ -1266,7 +1266,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				buildCurrentPage();
 			}));
 		} else {
-			options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_nokia_freeze,
+			options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_freeze,
 					"加入冻结列表", true, false, () -> {
 				KeydroidxFreezeManager.getInstance(requireContext()).addToFreezeList(pkg);
 				Toast.makeText(requireContext(), "已加入冻结列表", Toast.LENGTH_SHORT).show();

@@ -58,7 +58,7 @@ android:layout_height="match_parent"
 
 ### 3.3 各页面子系统的响应式适配
 
-#### 1. 诺基亚主桌面（`KeydroidxDesktopFragment` / `fragment_nokia_desktop.xml`）
+#### 1. 诺基亚主桌面（`KeydroidxDesktopFragment` / `fragment_keydroidx_desktop.xml`）
 - **顶部快捷应用栏**：
   - 宽度 `match_parent`，高度固定 `KeydroidxDimens.dp(38)`。
   - 单元格固定宽度 `36dp`，水平居中/水平平滑滚动。
@@ -77,7 +77,7 @@ android:layout_height="match_parent"
 #### 3. 垂直单列设置页面（`KeydroidxListPageFragment` 及所有派生列表）
 - 列表项宽度 `match_parent`，左右 padding 设为 `8dp`。
 - 点线分隔线（`KeydroidxDashedLineDrawable`）横向自然撑满整屏。
-- 选中的高亮焦点框（`bg_nokia_selected`）铺满整行，视觉一致。
+- 选中的高亮焦点框（`bg_keydroidx_selected`）铺满整行，视觉一致。
 
 #### 4. 通用选项弹窗（`KeydroidxOptionsDialog`）
 - 弹窗根布局宽度设为 `wrap_content`（最大宽度 `260dp`）并居中，或 `240dp` 优雅悬浮于屏幕中央。
@@ -90,10 +90,10 @@ android:layout_height="match_parent"
 | :--- | :--- |
 | `KeydroidxBaseActivity.java` | 移除 `scaleMidContent` 中的 `setScaleX/Y` 变换，`getScale()` 返回 1.0f，废弃 `scalePanelContent` 中的二次缩放 |
 | `KeydroidxPageFragment.java` | 移除旧版 `scaleMidContent` 与 `fixMidContentHeight` 的样板调用 |
-| `fragment_nokia_desktop.xml` | 根宽度改为 `match_parent`，各分区采用标准 Relative/Linear 响应式约束 |
-| `fragment_nokia_menu.xml` | 根宽度改为 `match_parent`，12 宫格 3 列均分自适应 |
-| `fragment_nokia_box.xml` | 根宽度改为 `match_parent`，百宝箱网格响应式均分 |
-| `fragment_nokia_*_settings.xml` | 所有设置页根宽度统一由 `240dp` 改为 `match_parent` |
+| `fragment_keydroidx_desktop.xml` | 根宽度改为 `match_parent`，各分区采用标准 Relative/Linear 响应式约束 |
+| `fragment_keydroidx_menu.xml` | 根宽度改为 `match_parent`，12 宫格 3 列均分自适应 |
+| `fragment_keydroidx_box.xml` | 根宽度改为 `match_parent`，百宝箱网格响应式均分 |
+| `fragment_keydroidx_*_settings.xml` | 所有设置页根宽度统一由 `240dp` 改为 `match_parent` |
 | `NOKIA_DEVELOPMENT_RULES.md` | 更新开发规范：废除“必须写死 240dp”的旧规，确立响应式原生 DP 规范 |
 
 ---

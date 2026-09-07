@@ -302,7 +302,7 @@ Single.create(installer::install)
 | 文件 | 类型 | 说明 |
 |---|---|---|
 | `KeydroidxInstallerDialog.java` | Java | 诺基亚风格安装弹窗（进度+结果） |
-| `dialog_nokia_installer.xml` | Layout | 安装弹窗布局 |
+| `dialog_keydroidx_installer.xml` | Layout | 安装弹窗布局 |
 
 #### 5.1.2 修改文件
 
@@ -422,7 +422,7 @@ public class KeydroidxInstallerDialog extends DialogFragment {
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
         Dialog dialog = new Dialog(requireActivity());
-        dialog.setContentView(R.layout.dialog_nokia_installer);
+        dialog.setContentView(R.layout.dialog_keydroidx_installer);
         dialog.setCancelable(false);
         dialog.setCanceledOnTouchOutside(false);
 
@@ -577,10 +577,10 @@ public class KeydroidxInstallerDialog extends DialogFragment {
     private void applyFocus() {
         if (softLeft == null || softRight == null) return;
         if (focusIndex == 0) {
-            softLeft.setBackgroundResource(R.drawable.bg_nokia_selected);
+            softLeft.setBackgroundResource(R.drawable.bg_keydroidx_selected);
             softRight.setBackgroundResource(0);
         } else {
-            softRight.setBackgroundResource(R.drawable.bg_nokia_selected);
+            softRight.setBackgroundResource(R.drawable.bg_keydroidx_selected);
             softLeft.setBackgroundResource(0);
         }
     }
@@ -783,7 +783,7 @@ public class KeydroidxInstallerDialog extends DialogFragment {
 
 ---
 
-### 5.3 布局文件 dialog_nokia_installer.xml
+### 5.3 布局文件 dialog_keydroidx_installer.xml
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -796,7 +796,7 @@ public class KeydroidxInstallerDialog extends DialogFragment {
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="28dp"
-        android:background="@drawable/bg_nokia_softkey"
+        android:background="@drawable/bg_keydroidx_softkey"
         android:gravity="center_vertical"
         android:paddingStart="10dp"
         android:paddingEnd="10dp">
@@ -884,7 +884,7 @@ public class KeydroidxInstallerDialog extends DialogFragment {
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="28dp"
-        android:background="@drawable/bg_nokia_softkey"
+        android:background="@drawable/bg_keydroidx_softkey"
         android:orientation="horizontal"
         android:paddingStart="10dp"
         android:paddingEnd="10dp">
@@ -935,7 +935,7 @@ private void onPickFileResult(android.net.Uri uri) {
     // InstallerDialog.newInstance(uri).show(getChildFragmentManager(), "installer");
 
     // ===== 修改后 =====
-    KeydroidxInstallerDialog.newInstance(uri).show(getChildFragmentManager(), "nokia_installer");
+    KeydroidxInstallerDialog.newInstance(uri).show(getChildFragmentManager(), "keydroidx_installer");
 }
 ```
 
@@ -1043,14 +1043,14 @@ private void onPickFileResult(android.net.Uri uri) {
 | `KeydroidxBoxFragment.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/KeydroidxBoxFragment.java` |
 | `KeydroidxUninstallDialog.java` | `app/src/main/java/ru/playsoftware/j2meloader/nokia/KeydroidxUninstallDialog.java` |
 | `dialog_installer.xml` | `app/src/main/res/layout/dialog_installer.xml` |
-| `dialog_nokia_uninstall.xml` | `app/src/main/res/layout/dialog_nokia_uninstall.xml` |
+| `dialog_keydroidx_uninstall.xml` | `app/src/main/res/layout/dialog_keydroidx_uninstall.xml` |
 
 ### 9.2 诺基亚风格 UI 元素复用
 
 | 元素 | 资源 |
 |---|---|
-| 标题栏/软键栏背景 | `@drawable/bg_nokia_softkey` |
-| 焦点高亮背景 | `@drawable/bg_nokia_selected` |
+| 标题栏/软键栏背景 | `@drawable/bg_keydroidx_softkey` |
+| 焦点高亮背景 | `@drawable/bg_keydroidx_selected` |
 | 内容区背景色 | `#102040`（深蓝） |
 | 软键文字颜色 | `#64b5f6`（浅蓝） |
 | 内容文字颜色 | `#FFFFFF`（白色） |

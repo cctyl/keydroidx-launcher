@@ -241,7 +241,7 @@ Activity 列表不加搜索框。理由：
 | **标题** | 「输入名称」 |
 | **字段标签** | 灰色小字（`#AAAAAA`），如「显示名称」 |
 | **字段值** | 预填 Activity 的 label（`ActivityInfo.loadLabel(pm)`），白色文字 |
-| **字段焦点** | 蓝色高亮边框（复用 `bg_nokia_selected_dark`） |
+| **字段焦点** | 蓝色高亮边框（复用 `bg_keydroidx_selected_dark`） |
 | **激活态** | 确认键后 EditText 获得焦点 → 系统光标闪烁 + 软键盘弹出 |
 | **保存按钮** | 居中，诺基亚风格按钮（深色底 + 蓝色文字/边框），可被方向键选中 |
 | **底部软键** | 左「保存」、中（空）、右「返回」 |
@@ -427,7 +427,7 @@ startActivity(intent);
 | 步骤2 行图标 | 14×14dp，应用图标缩放 | 不用单独的 Activity 图标 |
 | 步骤2 行文字 | 11sp，白色 `#FFFFFF`，monospace | 与桌面组件行一致 |
 | 步骤2 行高度 | 22~24dp | 与桌面组件行一致 |
-| 步骤2 选中高亮 | `#662196F3`，圆角 4dp | 复用 `bg_nokia_selected` |
+| 步骤2 选中高亮 | `#662196F3`，圆角 4dp | 复用 `bg_keydroidx_selected` |
 | 步骤3 表单 | 与 3 号文档完全一致 | 单字段 + 保存按钮 |
 
 ---
@@ -474,8 +474,8 @@ startActivity(intent);
 | `KeydroidxWidgetAppPickerFragment.java` | 修改 | 增加 `ACTIVITY_ADD` / `ACTIVITY_EDIT` 模式，确认键不添加而是跳步骤2 |
 | `KeydroidxWidgetActivityPickerFragment.java` | 新建 | 步骤2：Activity 纵向列表选择 |
 | `KeydroidxWidgetActivityNameFragment.java` | 新建 | 步骤3：名称输入表单（单字段 + 保存） |
-| `fragment_nokia_widget_activity_picker.xml` | 新建 | 步骤2 布局（标题 + 列表容器 + 页码） |
-| `fragment_nokia_widget_activity_name.xml` | 新建 | 步骤3 布局（标题 + 字段 + 保存按钮） |
+| `fragment_keydroidx_widget_activity_picker.xml` | 新建 | 步骤2 布局（标题 + 列表容器 + 页码） |
+| `fragment_keydroidx_widget_activity_name.xml` | 新建 | 步骤3 布局（标题 + 字段 + 保存按钮） |
 | `KeydroidxWidgetStorage.java` | 已有 | 需提供 `addItem()`、`updateItem(index, item)` 方法 |
 
 ---
@@ -533,11 +533,11 @@ Activity 快捷组件使用的全部是 API 1+ 的基础 API，**全版本兼容
 
 Activity 快捷组件桌面显示用的图标是 `PackageManager.getApplicationIcon()` 返回的应用图标（BitmapDrawable / AdaptiveIconDrawable），**不是 vector drawable**，无兼容性问题。
 
-但如果步骤2列表中使用了通用 Activity 图标（如 `ic_nokia_activity_default.xml`）作为占位图，则该图标如果是 vector drawable，需遵守：
+但如果步骤2列表中使用了通用 Activity 图标（如 `ic_keydroidx_activity_default.xml`）作为占位图，则该图标如果是 vector drawable，需遵守：
 
 | 场景 | 正确写法 |
 |------|----------|
-| 布局 XML | `app:srcCompat="@drawable/ic_nokia_xxx"` |
+| 布局 XML | `app:srcCompat="@drawable/ic_keydroidx_xxx"` |
 | 代码加载 | `ContextCompat.getDrawable()` / `AppCompatResources.getDrawable()` |
 
 > 详见 `安卓 4.4（API 19）矢量图崩溃修复计划.md`。

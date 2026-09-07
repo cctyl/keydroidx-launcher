@@ -43,7 +43,7 @@
             android:id="@+id/etActivityName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_nokia_searchbox"
+            android:background="@drawable/bg_keydroidx_searchbox"
             android:focusable="false"
             android:gravity="start"
             android:hint="输入显示名称"

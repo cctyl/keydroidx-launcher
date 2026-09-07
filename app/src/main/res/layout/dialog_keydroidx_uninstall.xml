@@ -8,8 +8,8 @@
     <LinearLayout
         android:id="@+id/uninstall_title_bar"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/nokia_dialog_title_bar_height"
-        android:background="@drawable/bg_nokia_softkey"
+        android:layout_height="@dimen/keydroidx_dialog_title_bar_height"
+        android:background="@drawable/bg_keydroidx_softkey"
         android:gravity="center_vertical"
         android:paddingStart="10dp"
         android:paddingEnd="10dp">
@@ -20,7 +20,7 @@
             android:layout_height="wrap_content"
             android:text="卸载"
             android:textColor="#FFFFFF"
-            android:textSize="@dimen/nokia_dialog_title_text"
+            android:textSize="@dimen/keydroidx_dialog_title_text"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -41,15 +41,15 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:textColor="#FFFFFF"
-            android:textSize="@dimen/nokia_dialog_title_text" />
+            android:textSize="@dimen/keydroidx_dialog_title_text" />
     </LinearLayout>
 
     <!-- 底部软键栏：左=卸载（确认），右=取消。两键宽度贴合文字，中间 spacer 撑开 -->
     <LinearLayout
         android:id="@+id/uninstall_bottom_bar"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/nokia_dialog_title_bar_height"
-        android:background="@drawable/bg_nokia_softkey"
+        android:layout_height="@dimen/keydroidx_dialog_title_bar_height"
+        android:background="@drawable/bg_keydroidx_softkey"
         android:orientation="horizontal"
         android:paddingStart="10dp"
         android:paddingEnd="10dp">
@@ -64,7 +64,7 @@
             android:paddingHorizontal="8dp"
             android:text="卸载"
             android:textColor="#64b5f6"
-            android:textSize="@dimen/nokia_dialog_body_text" />
+            android:textSize="@dimen/keydroidx_dialog_body_text" />
 
         <View
             android:layout_width="0dp"
@@ -81,6 +81,6 @@
             android:paddingHorizontal="8dp"
             android:text="取消"
             android:textColor="#64b5f6"
-            android:textSize="@dimen/nokia_dialog_body_text" />
+            android:textSize="@dimen/keydroidx_dialog_body_text" />
     </LinearLayout>
 </LinearLayout>

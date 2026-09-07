@@ -58,7 +58,7 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_shortcut_settings;
+		return R.layout.fragment_keydroidx_shortcut_settings;
 	}
 
 	@Override

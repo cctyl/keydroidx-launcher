@@ -517,17 +517,17 @@ public class KeydroidxSettingsStorage {
 	public int getWallpaperDrawableRes() {
 		String wp = getWallpaper();
 		if (WALLPAPER_OBSIDIAN_BLACK.equals(wp)) {
-			return R.drawable.bg_nokia_obsidian_black;
+			return R.drawable.bg_keydroidx_obsidian_black;
 		} else if (WALLPAPER_CYAN_SEA.equals(wp)) {
-			return R.drawable.bg_nokia_cyan_sea;
+			return R.drawable.bg_keydroidx_cyan_sea;
 		} else if (WALLPAPER_EMERALD_GREEN.equals(wp)) {
-			return R.drawable.bg_nokia_emerald_green;
+			return R.drawable.bg_keydroidx_emerald_green;
 		} else if (WALLPAPER_WINE_PURPLE.equals(wp)) {
-			return R.drawable.bg_nokia_wine_purple;
+			return R.drawable.bg_keydroidx_wine_purple;
 		} else if (WALLPAPER_AMBER_GOLD.equals(wp)) {
-			return R.drawable.bg_nokia_amber_gold;
+			return R.drawable.bg_keydroidx_amber_gold;
 		}
-		return R.drawable.bg_nokia_desktop;
+		return R.drawable.bg_keydroidx_desktop;
 	}
 
 	// ── 左右软键 ──

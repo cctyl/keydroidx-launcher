@@ -36,7 +36,7 @@ import ru.playsoftware.j2meloader.R;
  *   <li>静态入口 {@link #show(FragmentManager, String, List)} 打开，返回实例以便调用 {@link #setItems(List)} 动态刷新；</li>
  *   <li>{@code keepOpen=true} 的项点击后不关闭弹窗，由宿主更新数据后调用 {@link #setItems(List)} 重建列表并刷新文案（全选/取消全选场景）；</li>
  *   <li>禁用项（{@code enabled=false}）灰显，方向键自动跳过；</li>
- *   <li>统一窗口配置（底部锚定、透明背景）、行高亮（{@code bg_nokia_selected_dark}）、
+ *   <li>统一窗口配置（底部锚定、透明背景）、行高亮（{@code bg_keydroidx_selected_dark}）、
  *       {@code forceNonTouchMode} 与按键分发。</li>
  * </ul>
  * <p>
@@ -174,7 +174,7 @@ public class KeydroidxOptionsDialog extends DialogFragment {
 		KeydroidxLog.i(TAG, "onCreateDialog: 创建通用选项弹窗，title=" + title + " options=" + items.size());
 
 		Dialog dialog = new Dialog(requireActivity());
-		dialog.setContentView(R.layout.dialog_nokia_widget_options);
+		dialog.setContentView(R.layout.dialog_keydroidx_widget_options);
 		dialog.setCancelable(false);
 		dialog.setCanceledOnTouchOutside(false);
 		if (dialog.getWindow() != null) {

@@ -28,7 +28,7 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_custom_font_scale;
+		return R.layout.fragment_keydroidx_custom_font_scale;
 	}
 
 	@Override

@@ -127,7 +127,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_box;
+		return R.layout.fragment_keydroidx_box;
 	}
 
 	@Override
@@ -138,7 +138,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getWallpaperRes() {
-		return R.drawable.bg_nokia_box;
+		return R.drawable.bg_keydroidx_box;
 	}
 
 	@Override

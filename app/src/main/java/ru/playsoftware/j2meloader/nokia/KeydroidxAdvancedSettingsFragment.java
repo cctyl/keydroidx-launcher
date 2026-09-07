@@ -58,7 +58,7 @@ public class KeydroidxAdvancedSettingsFragment extends KeydroidxListPageFragment
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_advanced_settings;
+		return R.layout.fragment_keydroidx_advanced_settings;
 	}
 
 	@Override

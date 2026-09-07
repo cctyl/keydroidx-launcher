@@ -67,7 +67,7 @@ public class KeydroidxDesktopSettingsFragment extends KeydroidxListPageFragment 
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_desktop_settings;
+		return R.layout.fragment_keydroidx_desktop_settings;
 	}
 
 	@Override

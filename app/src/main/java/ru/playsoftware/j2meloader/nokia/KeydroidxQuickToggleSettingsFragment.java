@@ -55,7 +55,7 @@ public class KeydroidxQuickToggleSettingsFragment extends KeydroidxPageFragment 
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_quick_toggle_settings;
+		return R.layout.fragment_keydroidx_quick_toggle_settings;
 	}
 
 	@Override
@@ -227,7 +227,7 @@ public class KeydroidxQuickToggleSettingsFragment extends KeydroidxPageFragment 
 			if (row == null) continue;
 			if (mode == MODE_SORT && lifted && liftedIndex == i) {
 				// 拎起高亮：浅青蓝色半透明背景
-				row.setBackgroundResource(R.drawable.bg_nokia_lifted);
+				row.setBackgroundResource(R.drawable.bg_keydroidx_lifted);
 			} else if (i == focusIndex) {
 				// 正常焦点高亮
 				row.setBackground(KeydroidxTheme.createSelectionDrawable(requireContext(), 4));

@@ -39,7 +39,7 @@ public class KeydroidxNotificationSettingsFragment extends KeydroidxListPageFrag
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_settings_group;
+		return R.layout.fragment_keydroidx_settings_group;
 	}
 
 	@Override

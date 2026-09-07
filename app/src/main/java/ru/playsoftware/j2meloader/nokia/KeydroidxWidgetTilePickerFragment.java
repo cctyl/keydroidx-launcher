@@ -68,7 +68,7 @@ public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_widget_tile_picker;
+		return R.layout.fragment_keydroidx_widget_tile_picker;
 	}
 
 	@Override
@@ -217,7 +217,7 @@ public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment
 			if (info.icon != null) {
 				ivIcon.setImageDrawable(info.icon);
 			} else {
-				ivIcon.setImageResource(R.drawable.ic_nokia_torch);
+				ivIcon.setImageResource(R.drawable.ic_keydroidx_torch);
 			}
 			row.addView(ivIcon);
 

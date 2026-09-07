@@ -176,7 +176,7 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_widget_app_picker;
+		return R.layout.fragment_keydroidx_widget_app_picker;
 	}
 
 	@Override
@@ -604,7 +604,7 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 	private void applyFocus() {
 		if (etSearch != null) {
 			etSearch.setBackgroundResource(
-					(focusPos == -1 || editing) ? 0 : R.drawable.bg_nokia_searchbox);
+					(focusPos == -1 || editing) ? 0 : R.drawable.bg_keydroidx_searchbox);
 		}
 		if (cellViews == null) return;
 		for (int i = 0; i < cellViews.length; i++) {
@@ -625,9 +625,9 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 		if (focused) {
 			cell.setBackground(KeydroidxTheme.createSelectionDrawable(requireContext(), 4));
 		} else if (current) {
-			cell.setBackgroundResource(R.drawable.bg_nokia_current);
+			cell.setBackgroundResource(R.drawable.bg_keydroidx_current);
 		} else if (added) {
-			cell.setBackgroundResource(R.drawable.bg_nokia_disabled);
+			cell.setBackgroundResource(R.drawable.bg_keydroidx_disabled);
 		} else {
 			cell.setBackgroundResource(0);
 		}

@@ -54,7 +54,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_key_bind_wizard;
+		return R.layout.fragment_keydroidx_key_bind_wizard;
 	}
 
 	@Override
@@ -220,7 +220,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		if (!isAdded() || !(getActivity() instanceof KeydroidxDesktopActivity)) return;
 		KeydroidxDesktopActivity host = (KeydroidxDesktopActivity) getActivity();
 		List<KeydroidxOptionsDialog.OptionItem> items = new ArrayList<>();
-		items.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_nokia_home, "设置默认桌面", true, false,
+		items.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_home, "设置默认桌面", true, false,
 				() -> {
 					KeydroidxLog.i("KeyWizard", "用户选择设置默认桌面");
 					host.requestSetDefaultLauncher();

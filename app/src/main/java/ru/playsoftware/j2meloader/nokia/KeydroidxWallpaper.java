@@ -35,7 +35,7 @@ import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
 /**
  * 桌面壁纸管理（桌面设置 → 外观与显示 → 壁纸设置）。
  * <p>
- * 背景机制：{@code activity_nokia.xml} 里有一个全屏 {@code R.id.wallpaper} View，
+ * 背景机制：{@code activity_keydroidx.xml} 里有一个全屏 {@code R.id.wallpaper} View，
  * 由 {@link KeydroidxDesktopActivity#applyCurrentTheme()} 统一设置背景；所有页面 Fragment 的根视图
  * 都被 {@link KeydroidxPageFragment#onViewCreated} 强制透明化，因此<b>桌面、功能表、百宝箱、设置等
  * 全部页面共用这一张全屏背景</b>——设置图片后所有页面同步生效，无需逐页处理。

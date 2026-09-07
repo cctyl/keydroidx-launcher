@@ -68,7 +68,7 @@ public class KeydroidxWidgetUrlEditFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_widget_url_edit;
+		return R.layout.fragment_keydroidx_widget_url_edit;
 	}
 
 	@Override
@@ -187,10 +187,10 @@ public class KeydroidxWidgetUrlEditFragment extends KeydroidxPageFragment {
 		if (etName == null || etUrl == null) return;
 		etName.setBackgroundResource(
 				(focusIndex == FOCUS_NAME && !editing) || editingField == FOCUS_NAME
-						? 0 : R.drawable.bg_nokia_searchbox);
+						? 0 : R.drawable.bg_keydroidx_searchbox);
 		etUrl.setBackgroundResource(
 				(focusIndex == FOCUS_URL && !editing) || editingField == FOCUS_URL
-						? 0 : R.drawable.bg_nokia_searchbox);
+						? 0 : R.drawable.bg_keydroidx_searchbox);
 	}
 
 	// ---- 导航 ----

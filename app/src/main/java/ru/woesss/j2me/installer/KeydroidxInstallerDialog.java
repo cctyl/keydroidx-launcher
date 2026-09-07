@@ -107,7 +107,7 @@ public class KeydroidxInstallerDialog extends DialogFragment {
 	@Override
 	public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
 		Dialog dialog = new Dialog(requireActivity());
-		dialog.setContentView(R.layout.dialog_nokia_installer);
+		dialog.setContentView(R.layout.dialog_keydroidx_installer);
 		dialog.setCancelable(false);
 		dialog.setCanceledOnTouchOutside(false);
 

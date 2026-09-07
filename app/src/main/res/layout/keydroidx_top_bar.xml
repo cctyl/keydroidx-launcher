@@ -83,7 +83,7 @@
                 android:layout_height="15dp"
                 android:layout_marginStart="8dp"
                 android:scaleType="fitCenter"
-                app:srcCompat="@drawable/ic_nokia_wifi"
+                app:srcCompat="@drawable/ic_keydroidx_wifi"
                 android:visibility="gone" />
 
             <!-- 蓝牙（开启时显示） -->
@@ -93,7 +93,7 @@
                 android:layout_height="15dp"
                 android:layout_marginStart="6dp"
                 android:scaleType="fitCenter"
-                app:srcCompat="@drawable/ic_nokia_bluetooth"
+                app:srcCompat="@drawable/ic_keydroidx_bluetooth"
                 android:visibility="gone" />
 
             <!-- 飞行模式（开启时显示） -->
@@ -103,7 +103,7 @@
                 android:layout_height="15dp"
                 android:layout_marginStart="6dp"
                 android:scaleType="fitCenter"
-                app:srcCompat="@drawable/ic_nokia_airplane"
+                app:srcCompat="@drawable/ic_keydroidx_airplane"
                 android:visibility="gone" />
         </LinearLayout>
 
@@ -119,7 +119,7 @@
             android:layout_height="13dp"
             android:layout_marginEnd="6dp"
         android:scaleType="fitCenter"
-        app:srcCompat="@drawable/ic_nokia_battery" />
+        app:srcCompat="@drawable/ic_keydroidx_battery" />
 
         <TextView
             android:id="@+id/tvTime"

@@ -7,7 +7,7 @@
     android:id="@+id/bottomPanel"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_nokia_softkey"
+    android:background="@drawable/bg_keydroidx_softkey"
     android:visibility="invisible">
 
     <LinearLayout

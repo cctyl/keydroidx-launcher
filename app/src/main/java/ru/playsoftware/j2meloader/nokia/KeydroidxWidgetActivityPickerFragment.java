@@ -117,7 +117,7 @@ public class KeydroidxWidgetActivityPickerFragment extends KeydroidxPageFragment
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_widget_activity_picker;
+		return R.layout.fragment_keydroidx_widget_activity_picker;
 	}
 
 	@Override

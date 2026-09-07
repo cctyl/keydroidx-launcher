@@ -173,19 +173,19 @@ public class KeydroidxWidgetItem {
 	/** 类型对应的图标资源 ID（S1 行图标 / S6 类型图标）。 */
 	public static int getTypeIcon(int type) {
 		switch (type) {
-			case TYPE_APP: return R.drawable.ic_nokia_box;
-			case TYPE_URL: return R.drawable.ic_nokia_web;
-			case TYPE_CALENDAR: return R.drawable.ic_nokia_calendar;
-			case TYPE_ACTIVITY: return R.drawable.ic_nokia_widget_activity;
-			case TYPE_MEMORY: return R.drawable.ic_nokia_widget_memory;
-			case TYPE_STORAGE: return R.drawable.ic_nokia_widget_storage;
-			case TYPE_USAGE: return R.drawable.ic_nokia_widget_usage;
-			case TYPE_LOCK_SCREEN: return R.drawable.ic_nokia_lock;
-			case TYPE_BG_MANAGER: return R.drawable.ic_nokia_widget_bg_manager;
-			case TYPE_IP: return R.drawable.ic_nokia_widget_ip;
-			case TYPE_QS_TILE: return R.drawable.ic_nokia_torch;
-			case TYPE_MUSIC_PLAYER: return R.drawable.ic_nokia_music;
-			default: return R.drawable.ic_nokia_box;
+			case TYPE_APP: return R.drawable.ic_keydroidx_box;
+			case TYPE_URL: return R.drawable.ic_keydroidx_web;
+			case TYPE_CALENDAR: return R.drawable.ic_keydroidx_calendar;
+			case TYPE_ACTIVITY: return R.drawable.ic_keydroidx_widget_activity;
+			case TYPE_MEMORY: return R.drawable.ic_keydroidx_widget_memory;
+			case TYPE_STORAGE: return R.drawable.ic_keydroidx_widget_storage;
+			case TYPE_USAGE: return R.drawable.ic_keydroidx_widget_usage;
+			case TYPE_LOCK_SCREEN: return R.drawable.ic_keydroidx_lock;
+			case TYPE_BG_MANAGER: return R.drawable.ic_keydroidx_widget_bg_manager;
+			case TYPE_IP: return R.drawable.ic_keydroidx_widget_ip;
+			case TYPE_QS_TILE: return R.drawable.ic_keydroidx_torch;
+			case TYPE_MUSIC_PLAYER: return R.drawable.ic_keydroidx_music;
+			default: return R.drawable.ic_keydroidx_box;
 		}
 	}
 }

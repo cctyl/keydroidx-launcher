@@ -74,7 +74,7 @@ public class KeydroidxWidgetSettingsFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_widget_settings;
+		return R.layout.fragment_keydroidx_widget_settings;
 	}
 
 	@Override
@@ -734,7 +734,7 @@ public class KeydroidxWidgetSettingsFragment extends KeydroidxPageFragment {
 		if (mode == MODE_SORT && lifted && liftedIndex >= 0 && liftedIndex < itemViews.length) {
 			// 拎起行：独立视觉样式（亮蓝底 + 亮青边框 + 增高，模拟"抓起/抬起"）
 			View liftedRow = itemViews[liftedIndex];
-			liftedRow.setBackgroundResource(R.drawable.bg_nokia_lifted);
+			liftedRow.setBackgroundResource(R.drawable.bg_keydroidx_lifted);
 			LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) liftedRow.getLayoutParams();
 			if (lp != null) {
 				lp.height = KeydroidxDimens.dp(getResources(), 40);

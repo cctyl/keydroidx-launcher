@@ -218,12 +218,12 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_desktop;
+		return R.layout.fragment_keydroidx_desktop;
 	}
 
 	@Override
 	protected int getWallpaperRes() {
-		return R.drawable.bg_nokia_desktop;
+		return R.drawable.bg_keydroidx_desktop;
 	}
 
 	@Override
@@ -2080,7 +2080,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(badgeSize, badgeSize);
 		badgeLp.gravity = Gravity.BOTTOM | Gravity.END;
 		badgeIv.setLayoutParams(badgeLp);
-		badgeIv.setImageResource(R.drawable.ic_nokia_ice_badge);
+		badgeIv.setImageResource(R.drawable.ic_keydroidx_ice_badge);
 		badgeIv.setTag(TAG_FREEZE_BADGE);
 		iconBox.addView(badgeIv);
 	}

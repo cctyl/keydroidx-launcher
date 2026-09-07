@@ -57,7 +57,7 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 
 	@Override
 	protected int getLayoutRes() {
-		return R.layout.fragment_nokia_key_bind;
+		return R.layout.fragment_keydroidx_key_bind;
 	}
 
 	@Override
