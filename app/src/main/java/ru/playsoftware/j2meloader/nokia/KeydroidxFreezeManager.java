@@ -14,8 +14,11 @@ import android.widget.Toast;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.permission.KeydroidxPermissionManager;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +44,8 @@ public class KeydroidxFreezeManager {
 	public static final String EXTRA_PACKAGE = "extra_package";
 	/** 广播 extra：该包预期冻结状态（true=已冻结，false=已解冻） */
 	public static final String EXTRA_FROZEN = "extra_frozen";
+	/** 广播 extra：批量发生变更的包名列表（一键冻结/解冻完成后携带，接收方据此批量预写缓存） */
+	public static final String EXTRA_PACKAGES = "extra_packages";
 
 	private static volatile KeydroidxFreezeManager sInstance;
 	private final Context appContext;
@@ -49,6 +54,16 @@ public class KeydroidxFreezeManager {
 	private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
 	private final Set<String> frozenList = new HashSet<>();
+
+	/**
+	 * 运行期已知冻结集合：本进程内 executeFreeze 成功过的包。
+	 * <p>用于功能表进入时预写冻结缓存，绕过 {@code pm disable-user} 之后 PackageManagerService
+	 * 对高 targetSdk 包的数秒级状态更新延迟——桌面自己冻结的，桌面当然知道结果，
+	 * 不必等 PMS 反馈、也不必依赖广播能否被功能表收到。
+	 * <p>仅本进程生命周期内有效；进程重启后清空，由 {@link #isAppFrozen} 直接查询 PMS
+	 * （此时状态早已稳定，无延迟问题）。
+	 */
+	private final Set<String> knownFrozen = new HashSet<>();
 
 	private KeydroidxFreezeManager(Context context) {
 		this.appContext = context.getApplicationContext();
@@ -94,11 +109,26 @@ public class KeydroidxFreezeManager {
 	}
 
 	/**
+	 * 检查包名是否属于保护包（本启动器各变体、Shizuku 核心服务等，严禁冻结）
+	 */
+	public boolean isProtectedPackage(String packageName) {
+		if (packageName == null || packageName.trim().isEmpty()) return true;
+		if (packageName.equals(appContext.getPackageName())) return true;
+		if ("io.github.cctyl.nokia".equals(packageName)
+				|| "io.github.cctyl.nokia.debug".equals(packageName)) {
+			return true;
+		}
+		if ("moe.shizuku.privileged.api".equals(packageName)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
 	 * 添加到冻结名单
 	 */
 	public synchronized void addToFreezeList(String packageName) {
-		if (packageName == null || packageName.trim().isEmpty()) return;
-		if (packageName.equals(appContext.getPackageName())) return; // 禁止把自己加入冻结名单
+		if (isProtectedPackage(packageName)) return; // 禁止将保护包加入冻结名单
 		frozenList.add(packageName);
 		saveList();
 		notifyStateChanged();
@@ -162,6 +192,42 @@ public class KeydroidxFreezeManager {
 		intent.putExtra(EXTRA_PACKAGE, pkg);
 		intent.putExtra(EXTRA_FROZEN, frozen);
 		appContext.sendBroadcast(intent);
+	}
+
+	/**
+	 * 发送携带批量预期冻结状态的变更广播（一键冻结/解冻完成后调用）。
+	 * <p>与单包版本同理：功能表若恰好正在前台，可据此一次性预写整批缓存，
+	 * 避免逐包查询 PMS 的状态更新延迟导致冰块不立即显示。
+	 * <p><b>注意</b>：广播是 best-effort——一键冻结通常从桌面快捷开关触发，此刻功能表
+	 * 不在屏上、其接收器未注册，广播会被丢失。因此这只是「锦上添花」；真正的兜底
+	 * 在功能表 {@code onPageCreated} 里通过 {@link #getKnownFrozenSet()} 主动预写。
+	 *
+	 * @param pkgs   发生变更的包名集合
+	 * @param frozen 预期冻结状态（true=已冻结，false=已解冻）
+	 */
+	public void notifyStateChanged(Collection<String> pkgs, boolean frozen) {
+		Intent intent = new Intent(ACTION_FREEZE_STATE_CHANGED);
+		intent.setPackage(appContext.getPackageName());
+		intent.putExtra(EXTRA_FROZEN, frozen);
+		intent.putStringArrayListExtra(EXTRA_PACKAGES, new ArrayList<>(pkgs));
+		appContext.sendBroadcast(intent);
+	}
+
+	/**
+	 * 本进程内桌面已成功冻结的包名集合（不可变副本）。
+	 * <p>供功能表进入时预写冻结缓存——桌面自己执行过 executeFreeze 的包，结果桌面当然知道，
+	 * 无需依赖广播是否被功能表收到，也无需等待 PMS 状态更新延迟。
+	 */
+	public synchronized Set<String> getKnownFrozenSet() {
+		return Collections.unmodifiableSet(new HashSet<>(knownFrozen));
+	}
+
+	private synchronized void markKnownFrozen(String pkg) {
+		if (pkg != null) knownFrozen.add(pkg);
+	}
+
+	private synchronized void unmarkKnownFrozen(String pkg) {
+		if (pkg != null) knownFrozen.remove(pkg);
 	}
 
 	public interface FreezeCallback {
@@ -303,17 +369,21 @@ public class KeydroidxFreezeManager {
 				return;
 			}
 
-			int successCount = 0;
+			List<String> succeeded = new ArrayList<>();
 			for (String pkg : list) {
 				if (executeFreeze(pkg)) {
-					successCount++;
+					succeeded.add(pkg);
 				}
 			}
 
 			final int total = list.size();
-			final int success = successCount;
+			final int success = succeeded.size();
+			final List<String> done = succeeded;
 			mainHandler.post(() -> {
-				notifyStateChanged();
+				// 携带整批成功包 + 预期 true：若功能表正在前台可一次性预写缓存，
+				// 绕过 PMS 状态更新延迟。功能表不在前台时广播丢失，由其
+				// onPageCreated 读 getKnownFrozenSet() 兜底（见 KeydroidxMenuFragment）。
+				notifyStateChanged(done, true);
 				String msg = "已一键冻结 " + success + "/" + total + " 个应用";
 				Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show();
 				if (callback != null) {
@@ -340,17 +410,18 @@ public class KeydroidxFreezeManager {
 				return;
 			}
 
-			int successCount = 0;
+			List<String> succeeded = new ArrayList<>();
 			for (String pkg : list) {
 				if (executeUnfreeze(pkg)) {
-					successCount++;
+					succeeded.add(pkg);
 				}
 			}
 
 			final int total = list.size();
-			final int success = successCount;
+			final int success = succeeded.size();
+			final List<String> done = succeeded;
 			mainHandler.post(() -> {
-				notifyStateChanged();
+				notifyStateChanged(done, false);
 				String msg = "已一键解冻 " + success + "/" + total + " 个应用";
 				Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show();
 				if (callback != null) {
@@ -364,7 +435,7 @@ public class KeydroidxFreezeManager {
 	 * 底层执行冻结：优先使用 mini_shizuku Shell (pm disable-user / pm hide)，其次 DevicePolicyManager
 	 */
 	private boolean executeFreeze(String packageName) {
-		if (packageName == null || packageName.equals(appContext.getPackageName())) return false;
+		if (isProtectedPackage(packageName)) return false;
 		KeydroidxLog.i(TAG, "executeFreeze: " + packageName);
 
 		// 1. mini_shizuku Shell (最通用稳妥)
@@ -374,6 +445,7 @@ public class KeydroidxFreezeManager {
 				String cmd = "am force-stop " + packageName + " ; pm disable-user --user 0 " + packageName + " || pm hide " + packageName;
 				boolean res = Shizuku.exec(cmd);
 				KeydroidxLog.i(TAG, "已通过 mini_shizuku 执行冻结: " + packageName + " res=" + res);
+				if (res) markKnownFrozen(packageName);
 				return res;
 			}
 		} catch (Throwable e) {
@@ -388,6 +460,7 @@ public class KeydroidxFreezeManager {
 				if (dpm.isDeviceOwnerApp(appContext.getPackageName()) || dpm.isProfileOwnerApp(appContext.getPackageName())) {
 					boolean res = dpm.setApplicationHidden(admin, packageName, true);
 					KeydroidxLog.i(TAG, "DevicePolicyManager.setApplicationHidden: " + res);
+					if (res) markKnownFrozen(packageName);
 					return res;
 				}
 			}
@@ -411,6 +484,7 @@ public class KeydroidxFreezeManager {
 				String cmd = "pm enable " + packageName + " ; pm default-state --user 0 " + packageName + " ; pm unhide " + packageName;
 				boolean res = Shizuku.exec(cmd);
 				KeydroidxLog.i(TAG, "已通过 mini_shizuku 执行解冻: " + packageName + " res=" + res);
+				if (res) unmarkKnownFrozen(packageName);
 				return res;
 			}
 		} catch (Throwable e) {
@@ -425,6 +499,7 @@ public class KeydroidxFreezeManager {
 				if (dpm.isDeviceOwnerApp(appContext.getPackageName()) || dpm.isProfileOwnerApp(appContext.getPackageName())) {
 					boolean res = dpm.setApplicationHidden(admin, packageName, false);
 					KeydroidxLog.i(TAG, "DevicePolicyManager.setApplicationHidden(false): " + res);
+					if (res) unmarkKnownFrozen(packageName);
 					return res;
 				}
 			}

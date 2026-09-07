@@ -160,6 +160,19 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 							KeydroidxFreezeManager.EXTRA_FROZEN, false);
 					frozenStateCache.put(changedPkg, expectedFrozen);
 					KeydroidxLog.d("Menu", "预写冻结缓存: " + changedPkg + " -> " + expectedFrozen);
+				} else {
+					// 一键冻结/解冻走批量路径：携带整包名列表 + 预期状态。
+					ArrayList<String> batch = intent.getStringArrayListExtra(
+							KeydroidxFreezeManager.EXTRA_PACKAGES);
+					if (batch != null && !batch.isEmpty()) {
+						boolean expectedFrozen = intent.getBooleanExtra(
+								KeydroidxFreezeManager.EXTRA_FROZEN, false);
+						for (String p : batch) {
+							frozenStateCache.put(p, expectedFrozen);
+						}
+						KeydroidxLog.d("Menu", "批量预写冻结缓存: " + batch.size()
+								+ " 个 -> " + expectedFrozen);
+					}
 				}
 				if (isAdded() && getView() != null) {
 					buildCurrentPage();
@@ -243,6 +256,23 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			requireContext().registerReceiver(packageReceiver, freezeFilter);
 		} catch (Exception e) {
 			KeydroidxLog.e("Menu", "注册冻结状态广播失败", e);
+		}
+
+		// 进入功能表时主动校正冻结缓存——这是本 Bug 的兜底修复：
+		// 一键冻结通常从桌面快捷开关触发，此刻功能表不在屏上、接收器未注册，
+		// freezeAll 发出的变更广播会被丢失，导致本 Fragment 跨实例残留的静态
+		// frozenStateCache 里仍是冻结前的 false，buildCurrentPage 命中后不画冰块。
+		// 解法与用户判断一致：「桌面自己冻结、桌面自己知道」——直接读本进程内
+		// executeFreeze 成功过的 getKnownFrozenSet() 预写 true，既清掉陈旧 false，
+		// 又绕过 pm disable-user 后 PMS 对高 targetSdk 包的数秒级状态更新延迟。
+		invalidateFrozenCache();
+		int prewritten = 0;
+		for (String p : KeydroidxFreezeManager.getInstance(requireContext()).getKnownFrozenSet()) {
+			frozenStateCache.put(p, true);
+			prewritten++;
+		}
+		if (prewritten > 0) {
+			KeydroidxLog.i("Menu", "进入功能表预写冻结缓存: " + prewritten + " 个（来自桌面已知冻结集）");
 		}
 
 		appGrid = view.findViewById(R.id.appGrid);
