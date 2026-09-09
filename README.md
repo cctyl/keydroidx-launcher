@@ -70,6 +70,11 @@
    ```bash
    adb shell sh /sdcard/Android/data/io.github.cctyl.nokia/files/mini_shizuku.sh
    ```
+  
+  debug版本：
+  ```bash
+   adb shell sh /sdcard/Android/data/io.github.cctyl.nokia.debug/files/mini_shizuku.sh
+  ```
 
 4. 手机返回 mini_shizuku 页面，按左软键「刷新」，显示「在线」即激活成功。
 

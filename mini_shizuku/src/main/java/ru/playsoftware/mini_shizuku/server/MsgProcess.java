@@ -102,8 +102,15 @@ public class MsgProcess implements Runnable {
             handleServerStop();
         } else {
             // 普通 Shell 命令（静默执行）
+            //
+            // 快路径：input tap / swipe 由本进程直接注入事件（InputInjector），
+            // 省掉 ShellUtil 的 fork + Dalvik VM 冷启动（4.4 实测约 1.2s → 数十 ms）。
+            // InputInjector 只认严格形态，处理不了或注入不了都返回 false，
+            // 这里再退回原来的 shell 路径，行为与改动前一致。
             Log.i(TAG, "exec(silent): " + cmd);
-            ShellUtil.execute(cmd);
+            if (!InputInjector.handle(cmd)) {
+                ShellUtil.execute(cmd);
+            }
         }
     }
 
