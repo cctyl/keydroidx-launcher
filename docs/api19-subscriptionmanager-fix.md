@@ -44,7 +44,7 @@ if (Build.VERSION.SDK_INT >= 22) {
 影响：单向安全。API 22+ 行为完全不变；API 19 仅丢失双卡能力（4.4 设备本无双卡订阅机制，符合实际），单卡信号/WiFi/蓝牙/飞行/电池均正常。
 
 ## 五、验证方式（迭代式）
-1. 修改后重新 `assembleOpenDebug -x lint` 构建并 `adb -s 4a24ecf install -r`。
+1. 修改后重新 `gradlew.bat :app:lintOpenDebug assembleOpenDebug` 构建（Lint 必须通过，**禁止** `-x lint`）并 `adb -s 4a24ecf install -r`。
 2. 启动 `KeydroidxDesktopActivity`，抓取 logcat，确认：
    - 不再出现 `NoClassDefFoundError: android.telephony.SubscriptionManager`；
    - 不再出现 `invalid drawable tag vector` / `InflateException`。
@@ -53,7 +53,7 @@ if (Build.VERSION.SDK_INT >= 22) {
 5. 高版本设备（320×480、16:9）回归，确认无回退。
 
 ## 六、验证结果（2026-07-30，设备 4a24ecf / SDK 19）
-- 重新 `assembleOpenDebug -x lint` 构建成功，`adb -s 4a24ecf install -r` 安装成功。
+- 重新 `assembleOpenDebug` 构建成功，`adb -s 4a24ecf install -r` 安装成功。（当时命令里还带着 `-x lint`——该写法现已全生态禁止，见 `docs/NOKIA_DEVELOPMENT_RULES.md` 第 6 条。）
 - 启动 `KeydroidxDesktopActivity`，logcat 确认：
   - `I/ActivityManager: Displayed ... KeydroidxDesktopActivity` —— **Activity 正常显示**（首次安装 MultiDex 解压约 20s，属正常）。
   - `I/KeydroidxDesktop: [Desktop] 首次启动：进入按键绑定向导` —— 桌面逻辑已跑起来。
