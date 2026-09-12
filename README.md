@@ -50,8 +50,10 @@
 构建 Release APK（推荐 `open` 渠道）：
 
 ```bash
-.\gradlew.bat assembleOpenRelease -x lint
+.\gradlew.bat assembleOpenRelease
 ```
+
+> 不要用 `-x lint` 跳过 Lint：`minSdk=19`（Android 4.4），Lint 的 `NewApi` 规则是拦截「误用高版本 API 导致 4.4 上运行时闪退」的唯一防线，必须通过。
 
 输出路径：`app/build/outputs/apk/open/release/KeydroidX-*-open-release.apk`
 

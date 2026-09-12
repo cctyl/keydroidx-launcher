@@ -63,9 +63,9 @@ adb shell am start -n io.github.cctyl.nokia.debug/ru.playsoftware.j2meloader.nok
 
 构建 release APK（推荐本地 flavor `open`）：
 ```
-.\gradlew.bat assembleOpenRelease -x lint
+.\gradlew.bat assembleOpenRelease
 ```
-需要 `-x lint` 参数，是因为本工程的 Lint 配置在出错时会中断构建。输出位置：`app/build/outputs/apk/open/release/KeydroidXLauncher-*-open-release.apk`。需要 `keystore.properties` + `app/test.jks`（已存在）以及 NDK 22.1.7171670。
+**禁止使用 `-x lint` 跳过 Lint**：本工程 `minSdk=19`（Android 4.4），Lint 的 `NewApi` 规则是拦截「用了高于 minSdk 的 API」这类运行时 `NoSuchMethodError`/`NoClassDefFoundError` 闪退的唯一防线，已启用且必须通过（详见「Lint 与 API 兼容红线」）。输出位置：`app/build/outputs/apk/open/release/KeydroidXLauncher-*-open-release.apk`。需要 `keystore.properties` + `app/test.jks`（已存在）以及 NDK 22.1.7171670。
 
 构建 debug APK：
 ```
@@ -86,13 +86,27 @@ Debug 变体会追加 `.debug` 到 applicationId 后缀，并以 `KeydroidXLaunc
 ```
 插桩（设备上）测试：`.\gradlew.bat connectedOpenDebugAndroidTest`。
 
+单独跑 Lint（`NewApi` 等，改完涉及 API 调用的代码后必跑）：
+```
+.\gradlew.bat :app:lintOpenDebug
+```
+（`assembleDebug` 不触发 lint，`assembleRelease` 只跑 `lintVital` 的致命项，因此日常开发请显式执行上面的命令。）
+
 清理并重新配置：
 ```
 .\gradlew.bat clean
 .\gradlew.bat --stop
 ```
 
-其他 flavor：把 `Open` 替换为 `Play`/`Fdroid`/`Dev`/`Midlet`（例如 `assemblePlayRelease -x lint`）。`dev` flavor 会在配置期根据 git 历史计算出一个 version code。
+其他 flavor：把 `Open` 替换为 `Play`/`Fdroid`/`Dev`/`Midlet`（例如 `assemblePlayRelease`）。`dev` flavor 会在配置期根据 git 历史计算出一个 version code。
+
+## Lint 与 API 兼容红线（强制）
+
+`app/build.gradle` 的 `lint` 块**只允许**豁免这些：`MissingTranslation`/`ExtraTranslation`（翻译缺失）、`InlinedApi`（常量内联，运行时安全）、`MissingPermission`、`RtlCompat`、`StringFormatMatches`（历史文案）。
+
+- **`NewApi` 禁止全局关闭**，任何构建命令也**禁止 `-x lint`**。判断依据是 `minSdk=19`：调用 API 20+ 的方法/类在 4.4 设备上会在**运行时**才抛 `NoSuchMethodError`/`NoClassDefFoundError`，编译器（按 `compileSdk` 编译）永远发现不了，只有 Lint 能静态拦截。
+- 确属误报（如刻意兼容低版本的兼容层）时，**逐处**用 `@SuppressLint("NewApi")` / `@RequiresApi` / `@TargetApi` 豁免并写明理由，禁止在 `lint {}` 里加 `disable`。
+- 典型错误写法：`if (Build.VERSION.SDK_INT >= 22)` 守卫内调用**要求 API 24** 的方法（守卫版本号写低了）。守卫版本的依据必须查该方法/类的"Added in API level"，而不是"这个判断能编译过"。
 
 ## 环境前置要求（本检出中已配置好）
 

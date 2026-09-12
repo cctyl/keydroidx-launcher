@@ -71,10 +71,12 @@ android {
 
     lint {
         disable 'MissingTranslation', 'ExtraTranslation'
-        // 以下为项目历史遗留/误报（完整 lint 会导致 release 构建失败）：
-        // J2ME 兼容层(javax.bluetooth/location)与原键桌面刻意兼容 minSdk 14，
-        // 高版本 API 调用均带 SDK_INT 守卫，lint 静态分析无法识别。
-        disable 'NewApi', 'InlinedApi', 'MissingPermission'
+        // NewApi 必须开启：minSdk=19（Android 4.4），调用高于 minSdk 的 API 会
+        // 在旧设备上抛 NoSuchMethodError/NoClassDefFoundError 闪退，必须由 lint
+        // 静态拦截。确属误报（J2ME 兼容层等刻意兼容低版本）时，在调用点用
+        // @RequiresApi/@TargetApi 或 @SuppressLint("NewApi") 逐处豁免，禁止全局关闭。
+        // InlinedApi：常量内联（如 Settings.Global 的低版本常量）在运行时安全，保留豁免。
+        disable 'InlinedApi', 'MissingPermission'
         // 原键桌面为固定 LTR 布局，不适用 RTL 适配检查。
         disable 'RtlCompat'
         // 字符串占位符历史遗留，与翻译文案不匹配，非运行错误。

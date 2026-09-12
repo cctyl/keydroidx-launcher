@@ -61,7 +61,7 @@ flowchart LR
 
 - **版本守卫**：项目 `MIN_SDK=14`，新增代码严禁出现无守卫的高版本 API；版本判断一律 `Build.VERSION.SDK_INT >= 24` 形式。
 - **遵守原键桌面规范**：新 Fragment 根布局宽固定 240dp、高度 match_parent；尺寸换算走 `KeydroidxDimens.dp()`；scale 走 `host.getScale()`；按键走 `KeydroidxKeyBinding` 语义动作（不能写死 keyCode）。
-- **lint 约束**：`app/build.gradle` 已 `disable 'NewApi'` 等，但 mini_shizuku 模块的 lint 配置需确认，新增代码保持与现有风格一致。
+- **lint 约束**：`app/build.gradle` 的 `NewApi` **已启用（禁止全局关闭，也禁止 `-x lint` 跳过）**——minSdk 19/14 下未守卫的高版本 API 调用只会在运行时抛 `NoSuchMethodError`/`NoClassDefFoundError`，必须由 lint 静态拦截；确属误报时逐处用 `@SuppressLint("NewApi")`/`@RequiresApi` 豁免。仅 `InlinedApi`/`MissingPermission` 等仍保留豁免。注意 `mini_shizuku`、`dexlib` 模块自身配置为 `abortOnError false`，其代码不受本规则阻断，新增代码请自觉按「版本守卫」要求编写。
 - **不要改动 J2ME 兼容层**：本次改动仅在 `mini_shizuku` 模块和诺基亚包 `ru.playsoftware.j2meloader.nokia` 下，不影响 `javax.microedition.*`。
 - **启动脚本保持**：`app/src/debug/assets/demon.sh` 与 `app/src/release/assets/demon.sh` 已存在且正确，无需改动；设置页展示的命令从这两个脚本内容派生。
 
@@ -171,7 +171,7 @@ public static boolean isSupported() {
 
 1. **构建并安装应用**（debug 版带 `.debug` 后缀包名）：
    ```bash
-   .\gradlew.bat assembleOpenDebug -x lint
+   .\gradlew.bat assembleOpenDebug
    adb install -r app/build/outputs/apk/open/debug/J2ME_Loader-*-open-debug.apk
    ```
    > **必须使用最新构建的 APK**。旧 APK 可能因 multidex 拆分问题（见下方「已知坑」）导致服务无法启动。

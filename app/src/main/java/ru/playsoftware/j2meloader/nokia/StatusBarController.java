@@ -27,6 +27,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
+import androidx.annotation.RequiresApi;
 import io.github.cctyl.nokia.common.ui.KeydroidxBatteryDrawable;
 import ru.playsoftware.j2meloader.R;
 
@@ -216,7 +217,8 @@ public class StatusBarController {
 		} catch (Exception ignore) {
 			// 忽略
 		}
-		if (subListener != null && subscriptionManager != null) {
+		// removeOnSubscriptionsChangedListener 需 API 22，必须同时校验版本。
+		if (subListener != null && subscriptionManager != null && Build.VERSION.SDK_INT >= 22) {
 			try {
 				subscriptionManager.removeOnSubscriptionsChangedListener(subListener);
 			} catch (Exception ignore) {
@@ -237,6 +239,9 @@ public class StatusBarController {
 		unregisterSignalListeners();
 
 		boolean usedSubscriptionPath = false;
+		// createForSubscriptionId(int) 是 API 24 才加入的公开方法，API 22/23（如 Android 5.1
+		// 的双卡机型）调用会抛 NoSuchMethodError，必须降级为默认 TelephonyManager。
+		boolean canCreateForSubId = Build.VERSION.SDK_INT >= 24;
 		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
 			List<SubscriptionInfo> subs = getActiveSubs();
 			Log.d(TAG, "registerSignalListeners subs.size=" + subs.size());
@@ -246,7 +251,15 @@ public class StatusBarController {
 					int subId = subs.get(i).getSubscriptionId();
 					Log.d(TAG, "  sub i=" + i + " subId=" + subId
 							+ " slot=" + subs.get(i).getSimSlotIndex());
-					TelephonyManager tm = telephonyManager.createForSubscriptionId(subId);
+					if (i > 0 && !canCreateForSubId) {
+						// API 22/23 无法按订阅分卡监听，只能监听默认卡（卡 1），
+						// 第二张卡图标保持空。
+						listener2.setLevel(0);
+						break;
+					}
+					TelephonyManager tm = canCreateForSubId
+							? telephonyManager.createForSubscriptionId(subId)
+							: telephonyManager;
 					PhoneStateListener l = (i == 0) ? listener1 : listener2;
 					tm.listen(l, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
 					// 记录每张卡对应的 TM，供读取运营商名使用。
@@ -276,7 +289,9 @@ public class StatusBarController {
 		if (telephonyManager == null) {
 			return;
 		}
-		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
+		// createForSubscriptionId 需 API 24；API 22/23 只监听过默认 TM（卡 1），
+		// 由下方统一的 telephonyManager.listen(LISTEN_NONE) 注销即可。
+		if (Build.VERSION.SDK_INT >= 24 && subscriptionManager != null) {
 			List<SubscriptionInfo> subs = getActiveSubs();
 			for (int i = 0; i < subs.size() && i < 2; i++) {
 				int subId = subs.get(i).getSubscriptionId();
@@ -296,7 +311,12 @@ public class StatusBarController {
 		}
 	}
 
+	/**
+	 * 读取活动 SIM 列表。内部使用的 SubscriptionManager/SubscriptionInfo 方法均要求
+	 * API 22，故用 @RequiresApi 声明前提；调用方必须在 SDK_INT >= 22 分支内调用。
+	 */
 	@SuppressLint("MissingPermission")
+	@RequiresApi(22)
 	private List<SubscriptionInfo> getActiveSubs() {
 		List<SubscriptionInfo> result = new java.util.ArrayList<>();
 		try {

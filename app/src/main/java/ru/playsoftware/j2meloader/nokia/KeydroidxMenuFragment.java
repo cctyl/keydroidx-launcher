@@ -244,7 +244,8 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		pkgFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
 		pkgFilter.addDataScheme("package");
 		try {
-			requireContext().registerReceiver(packageReceiver, pkgFilter);
+			ContextCompat.registerReceiver(requireContext(), packageReceiver, pkgFilter,
+					ContextCompat.RECEIVER_NOT_EXPORTED);
 			KeydroidxLog.i("Menu", "已注册包变化广播接收器（ADDED/REMOVED/REPLACED）");
 		} catch (Exception e) {
 			KeydroidxLog.e("Menu", "注册包变化广播失败", e);
@@ -253,7 +254,10 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		IntentFilter freezeFilter = new IntentFilter();
 		freezeFilter.addAction(KeydroidxFreezeManager.ACTION_FREEZE_STATE_CHANGED);
 		try {
-			requireContext().registerReceiver(packageReceiver, freezeFilter);
+			// targetSdk 34 起必须显式声明导出性，否则 Android 14+ 注册时抛 SecurityException；
+			// 冻结广播来自系统与应用自身，声明 NOT_EXPORTED。
+			ContextCompat.registerReceiver(requireContext(), packageReceiver, freezeFilter,
+					ContextCompat.RECEIVER_NOT_EXPORTED);
 		} catch (Exception e) {
 			KeydroidxLog.e("Menu", "注册冻结状态广播失败", e);
 		}

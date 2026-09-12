@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 
 import android.widget.ScrollView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -53,7 +54,7 @@ public abstract class KeydroidxPageFragment extends Fragment implements Keydroid
 	}
 
 	/** 页面壁纸资源；返回 0 表示不设置。默认深蓝渐变菜单壁纸。 */
-	@LayoutRes
+	@DrawableRes
 	protected int getWallpaperRes() {
 		return R.drawable.bg_keydroidx_menu;
 	}

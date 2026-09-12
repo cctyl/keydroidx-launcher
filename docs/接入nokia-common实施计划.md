@@ -166,7 +166,7 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 - **暂不做的部分**：common `KeydroidxFontManager` 的字体/缩放状态未在 EmulatorApplication 初始化、也未在设置变更处双写。原因：当前桌面没有任何代码消费 common 的字体状态，且 common 不认识 `custom_*` 字体 id（会退回内置字体），此时同步会埋下"自定义字体被静默替换"的隐患。**待阶段 3 引入 common 控件（或 D5 把自定义字体能力贡献回 common）时一并处理。**
 走查：字体缩放切换后文字尺寸按倍率变化（0.85x/1.0x/1.5x 实测状态栏文字高度 15/19/27px）；**3 套内置字体切换、自定义字体导入/删除、J2ME 文字渲染待真机目视确认**（待补）。
 
-**阶段 2 出口标准**：工具类全部单一来源到 common；真机全功能走查通过；`assembleOpenRelease -x lint` + proguard 装机验证一次。
+**阶段 2 出口标准**：工具类全部单一来源到 common；真机全功能走查通过；`assembleOpenRelease`（含 lint）+ proguard 装机验证一次。
 > 注：本工程无单元测试（`testOpenDebugUnitTest` 为 NO-SOURCE），原"单测全绿"标准修正为「编译通过 + 装机走查通过」。已完成。
 
 ### 阶段 3：页面契约体系（中风险，逐层小步）
@@ -207,7 +207,8 @@ common 侧同时对齐绘制语义：`createSelectedRowDrawable`/`createFocusDra
 - 每个 commit 可独立 revert；阶段 2 每步截图对比基线。
 - **双进程**：涉及 Theme/Font/Log 的改动必须同时验证主进程与 `:midlet` 进程。
 - **API 19 回归**：阶段 2.6/2.7 完成后在 4.4 模拟器跑一轮（4.4 兼容是硬规则）。
-  - ⚠️ **挂账（2026-08-29 复审发现漏项）**：尚未执行。release 构建一直 `-x lint`，编译期拦不住 `>19` API 误用，运行时 `NoSuchMethodError` 风险真实存在（尤其本次 common 新合入的 KeydroidxLog/KeydroidxTheme/getThemes 等代码）。需要一台 API 19 模拟器或 4.4 真机验证冷启动 + 主流程。
+  - ✅ **静态拦截部分已解决（2026-09-12）**：此前 release 构建一直 `-x lint`，编译期拦不住 `>19` API 误用（曾因此产生 API 22 设备上 `createForSubscriptionId` 的 `NoSuchMethodError` 闪退）。现已启用 lint `NewApi`（`app/build.gradle` 的 `disable 'NewApi'` 已移除），并清零全部 lint error；构建脚本/文档中的 `-x lint` 也已删除，新代码误用高版本 API 会被静态拦截。
+  - ⚠️ **仍挂账（运行时验证）**：尚未执行。需要一台 API 19 模拟器或 4.4 真机验证冷启动 + 主流程（尤其本次 common 新合入的 KeydroidxLog/KeydroidxTheme/getThemes 等代码）。
 - **release 验证**：阶段 2 出口已完成（装机无崩溃、主题渲染正确）。阶段 3 仅收敛接口，改动小，随阶段 4 一起做一次。
 - **兼容红线**：SP 文件名/key、keyprovider uri、ACTION_* 常量值全程不变。
 - **D2 收尾挂账**：common 稳定后删除 settings.gradle 中的 `includeBuild('../keydroidx-core')`，回到 mavenLocal/远程坐标形态。

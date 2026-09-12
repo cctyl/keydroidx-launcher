@@ -987,7 +987,11 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		filter.addAction(LocationManager.PROVIDERS_CHANGED_ACTION);
 		filter.addAction("android.location.MODE_CHANGED");
 		filter.addAction(KeydroidxFreezeManager.ACTION_FREEZE_STATE_CHANGED);
-		ctx.registerReceiver(toggleStateReceiver, filter);
+		// filter 含应用内自定义广播（ACTION_FREEZE_STATE_CHANGED），targetSdk 34 起未声明
+		// 导出性时，Android 14+ 注册会抛 SecurityException；这些广播只来自系统与应用自身，
+		// 因此声明为 NOT_EXPORTED。
+		ContextCompat.registerReceiver(ctx, toggleStateReceiver, filter,
+				ContextCompat.RECEIVER_NOT_EXPORTED);
 		receiverRegistered = true;
 		KeydroidxLog.i("Desktop", "已注册开关栏广播接收器");
 	}
