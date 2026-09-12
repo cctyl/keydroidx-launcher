@@ -144,58 +144,78 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
-			String action = intent.getAction();
-			if (action == null) return;
-			KeydroidxLog.i("Menu", "收到包变化广播: " + action + " data=" + intent.getDataString());
-
-			// 冻结状态变化：列表内容不变，只需重绘当前页的冰块/角标（轻量，主线程直接做）
-			if (KeydroidxFreezeManager.ACTION_FREEZE_STATE_CHANGED.equals(action)) {
-				invalidateFrozenCache();
-				// pm disable-user 通过 Shizuku 返回成功后，PMS 对部分包（targetSdk 较高者）
-				// 的状态更新存在数秒级延迟，buildCurrentPage 即时查询 getApplicationInfo
-				// 会返回旧状态、毒化缓存导致冰块不显示。优先用广播携带的预期值预写缓存。
-				String changedPkg = intent.getStringExtra(KeydroidxFreezeManager.EXTRA_PACKAGE);
-				if (changedPkg != null) {
-					boolean expectedFrozen = intent.getBooleanExtra(
-							KeydroidxFreezeManager.EXTRA_FROZEN, false);
-					frozenStateCache.put(changedPkg, expectedFrozen);
-					KeydroidxLog.d("Menu", "预写冻结缓存: " + changedPkg + " -> " + expectedFrozen);
-				} else {
-					// 一键冻结/解冻走批量路径：携带整包名列表 + 预期状态。
-					ArrayList<String> batch = intent.getStringArrayListExtra(
-							KeydroidxFreezeManager.EXTRA_PACKAGES);
-					if (batch != null && !batch.isEmpty()) {
-						boolean expectedFrozen = intent.getBooleanExtra(
-								KeydroidxFreezeManager.EXTRA_FROZEN, false);
-						for (String p : batch) {
-							frozenStateCache.put(p, expectedFrozen);
-						}
-						KeydroidxLog.d("Menu", "批量预写冻结缓存: " + batch.size()
-								+ " 个 -> " + expectedFrozen);
-					}
-				}
-				if (isAdded() && getView() != null) {
-					buildCurrentPage();
-					applyFocusBackground();
-				}
-				return;
-			}
-
-			// 包安装/卸载/替换：列表内容会变，需重新枚举。
-			// 稍作延迟等系统包表稳定，避免偶发仍能查到底层已卸载的残留
-			View v = getView();
-			if (v != null) {
-				v.postDelayed(new Runnable() {
-					@Override
-					public void run() {
-						if (isAdded()) refreshAppList();
-					}
-				}, 300);
-			} else {
-				refreshAppList();
-			}
+			handleAppListBroadcast(intent);
 		}
 	};
+
+	/**
+	 * 冻结状态变更广播接收器（与 packageReceiver 必须是<b>两个独立实例</b>）。
+	 * <p>
+	 * 历史 bug：曾用同一个 {@code packageReceiver} 先注册 pkgFilter 再注册 freezeFilter，
+	 * 而 Android 语义下「同一实例重复 registerReceiver 会用新 filter <b>替换</b>旧 filter」，
+	 * 导致包安装/卸载/替换广播实际从未生效。二者又不能合并成一个 filter —— pkgFilter 带
+	 * {@code dataScheme("package")}，而冻结广播 intent 无 data，合并后会匹配不上。
+	 */
+	private final BroadcastReceiver freezeReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			handleAppListBroadcast(intent);
+		}
+	};
+
+	/** 两个 receiver 共用的处理逻辑（冻结状态变更 / 包安装卸载替换）。 */
+	private void handleAppListBroadcast(Intent intent) {
+		String action = intent.getAction();
+		if (action == null) return;
+		KeydroidxLog.i("Menu", "收到包变化广播: " + action + " data=" + intent.getDataString());
+
+		// 冻结状态变化：列表内容不变，只需重绘当前页的冰块/角标（轻量，主线程直接做）
+		if (KeydroidxFreezeManager.ACTION_FREEZE_STATE_CHANGED.equals(action)) {
+			invalidateFrozenCache();
+			// pm disable-user 通过 Shizuku 返回成功后，PMS 对部分包（targetSdk 较高者）
+			// 的状态更新存在数秒级延迟，buildCurrentPage 即时查询 getApplicationInfo
+			// 会返回旧状态、毒化缓存导致冰块不显示。优先用广播携带的预期值预写缓存。
+			String changedPkg = intent.getStringExtra(KeydroidxFreezeManager.EXTRA_PACKAGE);
+			if (changedPkg != null) {
+				boolean expectedFrozen = intent.getBooleanExtra(
+						KeydroidxFreezeManager.EXTRA_FROZEN, false);
+				frozenStateCache.put(changedPkg, expectedFrozen);
+				KeydroidxLog.d("Menu", "预写冻结缓存: " + changedPkg + " -> " + expectedFrozen);
+			} else {
+				// 一键冻结/解冻走批量路径：携带整包名列表 + 预期状态。
+				ArrayList<String> batch = intent.getStringArrayListExtra(
+						KeydroidxFreezeManager.EXTRA_PACKAGES);
+				if (batch != null && !batch.isEmpty()) {
+					boolean expectedFrozen = intent.getBooleanExtra(
+							KeydroidxFreezeManager.EXTRA_FROZEN, false);
+					for (String p : batch) {
+						frozenStateCache.put(p, expectedFrozen);
+					}
+					KeydroidxLog.d("Menu", "批量预写冻结缓存: " + batch.size()
+							+ " 个 -> " + expectedFrozen);
+				}
+			}
+			if (isAdded() && getView() != null) {
+				buildCurrentPage();
+				applyFocusBackground();
+			}
+			return;
+		}
+
+		// 包安装/卸载/替换：列表内容会变，需重新枚举。
+		// 稍作延迟等系统包表稳定，避免偶发仍能查到底层已卸载的残留
+		View v = getView();
+		if (v != null) {
+			v.postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					if (isAdded()) refreshAppList();
+				}
+			}, 300);
+		} else {
+			refreshAppList();
+		}
+	}
 
 	/** 应用显示名内存缓存（进程内复用，避免每次进入功能表反复 loadLabel IPC） */
 	private static final Map<String, String> labelCache = new HashMap<>();
@@ -207,7 +227,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	 * 2 次 {@code queryIntentActivities} + 逐个 {@code loadLabel}，期间网格为空
 	 * —— 这就是「打开功能表先空白一瞬」的根因。缓存后第二次进入零 IPC 直接出图。
 	 * <p>
-	 * 失效时机：包安装/卸载/替换、冻结状态变化（见 packageReceiver）。
+	 * 失效时机：包安装/卸载/替换（见 packageReceiver）、冻结状态变化（见 freezeReceiver）。
 	 */
 	private static final List<KeydroidxAppItem> cachedItems = new ArrayList<>();
 
@@ -254,10 +274,13 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		IntentFilter freezeFilter = new IntentFilter();
 		freezeFilter.addAction(KeydroidxFreezeManager.ACTION_FREEZE_STATE_CHANGED);
 		try {
+			// 必须用独立的 freezeReceiver：同一实例再注册会替换掉上面的 pkgFilter，
+			// 而两个 filter 又不能合并（pkgFilter 带 dataScheme，冻结广播无 data）。
 			// targetSdk 34 起必须显式声明导出性，否则 Android 14+ 注册时抛 SecurityException；
 			// 冻结广播来自系统与应用自身，声明 NOT_EXPORTED。
-			ContextCompat.registerReceiver(requireContext(), packageReceiver, freezeFilter,
+			ContextCompat.registerReceiver(requireContext(), freezeReceiver, freezeFilter,
 					ContextCompat.RECEIVER_NOT_EXPORTED);
+			KeydroidxLog.i("Menu", "已注册冻结状态广播接收器");
 		} catch (Exception e) {
 			KeydroidxLog.e("Menu", "注册冻结状态广播失败", e);
 		}
@@ -467,6 +490,12 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		try {
 			requireContext().unregisterReceiver(packageReceiver);
 			KeydroidxLog.i("Menu", "已注销包变化广播接收器");
+		} catch (Exception ignore) {
+			// 未注册或已注销，忽略
+		}
+		try {
+			requireContext().unregisterReceiver(freezeReceiver);
+			KeydroidxLog.i("Menu", "已注销冻结状态广播接收器");
 		} catch (Exception ignore) {
 			// 未注册或已注销，忽略
 		}
