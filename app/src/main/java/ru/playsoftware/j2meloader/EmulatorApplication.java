@@ -45,6 +45,7 @@ import java.util.Arrays;
 
 import javax.microedition.util.ContextHolder;
 
+import io.github.cctyl.nokia.common.feedback.KeydroidxCrashReporter;
 import io.github.cctyl.nokia.common.feedback.KeydroidxFeedback;
 import io.github.cctyl.nokia.common.feedback.KeydroidxFeedbackConfig;
 import io.github.cctyl.nokia.common.feedback.KeydroidxInstall;
@@ -76,6 +77,15 @@ public class EmulatorApplication extends Application {
 		if (BuildConfig.DEBUG) {
 			MultiDex.install(this);
 		}
+
+		// 【全局崩溃入口，必须最早安装】此后本进程任意线程逃逸出的 Throwable（Error / RuntimeException…）
+		// 都会先落「待上传」标记、再落盘日志、最后交给链上原有处理器（ACRA / 系统「已停止运行」）。
+		// 安装点一旦后移，下面这些初始化（主题注入、字体、SharedPreferences、Shizuku、日志系统）
+		// 里抛出的异常就会漏掉，所以刻意放在最前面、所有初始化之前。
+		// 主进程与 :midlet 子进程都注册标记；只有主进程会上传（见下方 uploadPendingIfAny）。
+		KeydroidxCrashReporter.install(this);
+		installCrashHandler();
+
 		ContextHolder.setApplication(this);
 
 		// 向 common 注入桌面主题提供者（主进程与 :midlet 进程都需要，J2ME 层换用 common 主题后依赖此注入）
@@ -120,9 +130,13 @@ public class EmulatorApplication extends Application {
 					null));
 			// 首次安装 / 版本升级时自动上报一次设备信息（后台、幂等、静默）
 			KeydroidxInstall.reportOnce(this);
-			installCrashHandler();
+			// 上次运行遗留的崩溃/错误标记 → 自动上传日志并重置标记；失败保留标记，下次启动再试。
+			// 只主进程上传：:midlet 子进程只落标记（已在 attachBaseContext 开头 install），避免重复上报。
+			KeydroidxCrashReporter.uploadPendingIfAny(this);
 			new Handler(Looper.getMainLooper()).postDelayed(this::initAcra, 2000);
 		} else {
+			// :midlet 子进程：只落标记、不上传（上传由主进程下次启动统一完成），
+			// 并保持「仅主进程落文件日志」的既有约定。
 			initAcra();
 		}
 		long elapsed = System.currentTimeMillis() - appStart;

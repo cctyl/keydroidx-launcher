@@ -176,4 +176,16 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
    - 主界面/设置页选项菜单必须提供「详细日志：开/关」切换项（调用 `KeydroidxLog.setDetailedLogEnabled`）。
 4. **日志落盘约定**：
    - 统一输出至 `/sdcard/Android/data/<包名>/files/log/yyyyMMdd.log`，按天自动轮转，保留 7 天。
+5. **崩溃/错误日志自动上报（`KeydroidxCrashReporter`）**：
+   - 全局崩溃入口（`installCrashHandler()` + `KeydroidxCrashReporter.install(this)`）必须**在 `attachBaseContext` 最开头**安装，
+     且在所有初始化之前——否则主题注入、字体同步、`KeydroidxLog.init`、`Shizuku.init` 等早期异常会漏掉。
+   - 主进程额外调用 `uploadPendingIfAny(this)`；`:midlet` 子进程只落标记、不上传（避免重复上报）。
+   - 任意 `KeydroidxLog.e(...)` 或未捕获异常（Error / RuntimeException，任意线程）都会同步落标记
+     `<logDir>/pending_report.json`（含异常类型/消息/完整堆栈/进程/线程），下次启动时自动上传日志 zip，
+     **上传成功才重置标记**；失败保留，下次启动再试。
+   - 带节流（间隔 ≥60 秒、每天 ≤10 次），防止崩溃死循环触发服务端 `/upload` 的 IP 限流（3 次/分、20 次/天，超额封禁 30 分钟，会连带手动反馈一起挂）。
+   - **注释（`comment`）按 UTF-8 字节限制**：服务端 `comment` 上限 500 **字节**（Rust `s.len()`），而 SDK `buildMetaJson` 按字符截断，中文 3 字节/字 → 长中文注释会越界被判协议违规、掐断 TCP（客户端表现为 `EOFException`）。自动上报侧已自行压到 480 字节以内。
+   - 抓不到的场景：被 `catch` 且未走 `KeydroidxLog.e/w` 的异常、native 崩溃（NDK 3D 库 SIGSEGV）、ANR / 被系统杀进程
+     （这类没有 Java 异常，默认异常处理器无能为力）。
+   - 新增错误日志一律走 `KeydroidxLog.e(...)` 才会被标记；直接 `android.util.Log.e` 既不落盘也不会标记。
 
