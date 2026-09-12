@@ -34,6 +34,8 @@ import ru.playsoftware.j2meloader.R;
  * 供用户选择并添加为桌面组件。
  */
 public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment {
+	private static final String TAG = "KeydroidxWidgetTilePickerFragment";
+
 
 	private static class TileInfo {
 		final String packageName;
@@ -146,13 +148,17 @@ public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment
 					if (si.applicationInfo != null) {
 						appLabel = si.applicationInfo.loadLabel(pm).toString();
 					}
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "clear failed: " + ignored.getMessage());
+				}
 
 				String tileLabel = "";
 				try {
 					CharSequence cs = si.loadLabel(pm);
 					if (cs != null) tileLabel = cs.toString();
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "clear failed: " + ignored.getMessage());
+				}
 
 				if (TextUtils.isEmpty(tileLabel)) {
 					tileLabel = appLabel;
@@ -164,11 +170,15 @@ public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment
 				Drawable icon = null;
 				try {
 					icon = si.loadIcon(pm);
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "clear failed: " + ignored.getMessage());
+				}
 				if (icon == null && si.applicationInfo != null) {
 					try {
 						icon = si.applicationInfo.loadIcon(pm);
-					} catch (Exception ignored) {}
+					} catch (Exception ignored) {
+						KeydroidxLog.w(TAG, "clear failed: " + ignored.getMessage());
+					}
 				}
 
 				tileList.add(new TileInfo(pkg, name, appLabel, tileLabel, icon));

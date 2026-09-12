@@ -56,6 +56,8 @@ import ru.playsoftware.j2meloader.R;
  * 末尾追加「百宝箱」「按键绑定」两个特殊入口，保留原功能可达性。
  */
 public class KeydroidxMenuFragment extends KeydroidxPageFragment {
+	private static final String TAG = "KeydroidxMenuFragment";
+
 
 	/**
 	 * 第一页固定槽位（参照诺基亚 S60 功能表布局）。
@@ -491,12 +493,14 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			requireContext().unregisterReceiver(packageReceiver);
 			KeydroidxLog.i("Menu", "已注销包变化广播接收器");
 		} catch (Exception ignore) {
+			KeydroidxLog.w(TAG, "unregister package receiver failed failed: " + ignore.getMessage());
 			// 未注册或已注销，忽略
 		}
 		try {
 			requireContext().unregisterReceiver(freezeReceiver);
 			KeydroidxLog.i("Menu", "已注销冻结状态广播接收器");
 		} catch (Exception ignore) {
+			KeydroidxLog.w(TAG, "unregister freeze receiver failed failed: " + ignore.getMessage());
 			// 未注册或已注销，忽略
 		}
 		super.onDestroyView();

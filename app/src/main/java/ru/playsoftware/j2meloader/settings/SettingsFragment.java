@@ -25,6 +25,7 @@ import android.provider.DocumentsContract;
 
 import com.nononsenseapps.filepicker.Utils;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.File;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -42,6 +43,8 @@ import static ru.playsoftware.j2meloader.util.Constants.PREF_ADD_CUTOUT_AREA;
 import static ru.playsoftware.j2meloader.util.Constants.PREF_EMULATOR_DIR;
 
 public class SettingsFragment extends PreferenceFragmentCompat {
+	private static final String TAG = "SettingsFragment";
+
 	private Preference prefFolder;
 	private final ActivityResultLauncher<String> openDirLauncher = registerForActivityResult(
 			new PickDirResultContract(),
@@ -71,23 +74,31 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 		try {
 			startActivity(getFileManagerIntentOnDocumentProvider(Intent.ACTION_VIEW));
 			return;
-		} catch (ActivityNotFoundException ignored) {}
+		} catch (ActivityNotFoundException ignored) {
+			KeydroidxLog.w(TAG, "startActivity failed: " + ignored.getMessage());
+		}
 
 		try {
 			startActivity(getFileManagerIntentOnDocumentProvider("android.provider.action.BROWSE"));
 			return;
-		} catch (ActivityNotFoundException ignored) {}
+		} catch (ActivityNotFoundException ignored) {
+			KeydroidxLog.w(TAG, "startActivity failed: " + ignored.getMessage());
+		}
 
 		try {
 			// Just try to open the file manager, try the package name used on "normal" phones
 			startActivity(getFileManagerIntent("com.google.android.documentsui"));
 			return;
-		} catch (ActivityNotFoundException ignored) {}
+		} catch (ActivityNotFoundException ignored) {
+			KeydroidxLog.w(TAG, "startActivity failed: " + ignored.getMessage());
+		}
 
 		try {
 			// Next, try the AOSP package name
 			startActivity(getFileManagerIntent("com.android.documentsui"));
-		} catch (ActivityNotFoundException ignored) {}
+		} catch (ActivityNotFoundException ignored) {
+			KeydroidxLog.w(TAG, "startActivity failed: " + ignored.getMessage());
+		}
 	}
 
 	private Intent getFileManagerIntent(String packageName) {

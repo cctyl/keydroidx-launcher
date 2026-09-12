@@ -36,6 +36,8 @@ import ru.playsoftware.j2meloader.BuildConfig;
  * 管理快捷栏应用列表、壁纸、软键映射等设置项的读写。
  */
 public class KeydroidxSettingsStorage {
+	private static final String TAG = "KeydroidxSettingsStorage";
+
 
 	private static final String PREFS_NAME = "nokia_desktop_settings";
 	private static final String KEY_SHORTCUT_APPS = "shortcut_apps";
@@ -288,6 +290,7 @@ public class KeydroidxSettingsStorage {
 				pm.getPackageInfo(pkg, 0);
 				return true;
 			} catch (PackageManager.NameNotFoundException e) {
+				KeydroidxLog.w(TAG, "getPackageInfo failed: " + e.getMessage());
 				return false;
 			} catch (Throwable t) {
 				// 与 addPackageApp 同理：部分 ROM 的 CTA 钩子会对后台线程 PackageManager IPC 抛异常
@@ -356,6 +359,7 @@ public class KeydroidxSettingsStorage {
                 try {
                         pm.getPackageInfo(pkg, 0);
                 } catch (PackageManager.NameNotFoundException e) {
+                	KeydroidxLog.w(TAG, "getPackageInfo failed: " + e.getMessage());
                         continue; // 未安装，尝试下一个
                 }
                 Intent launch;

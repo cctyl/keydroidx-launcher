@@ -6,12 +6,15 @@ import android.net.Uri;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
 /**
  * 快捷栏应用数据模型。支持安卓应用与 J2ME(JAR) 应用。
  * 可序列化为 JSON 存入 SharedPreferences。
  */
 public class ShortcutApp {
+	private static final String TAG = "ShortcutApp";
+
 
 	public static final int TYPE_ANDROID = 0;
 	public static final int TYPE_J2ME = 1;
@@ -57,7 +60,9 @@ public class ShortcutApp {
 			if (intentUri != null && !intentUri.isEmpty()) {
 				try {
 					intent = Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME);
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "fromJson failed: " + ignored.getMessage());
+				}
 			}
 			return new ShortcutApp(type, label, appKey, intent);
 		}
@@ -84,6 +89,7 @@ public class ShortcutApp {
 		try {
 			return Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME);
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "getLaunchIntent failed: " + e.getMessage());
 			return null;
 		}
 	}

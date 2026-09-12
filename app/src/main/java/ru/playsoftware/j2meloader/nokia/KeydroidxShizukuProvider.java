@@ -16,6 +16,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.security.MessageDigest;
 
 import io.github.cctyl.nokia.shizuku.MiniShizukuConst;
@@ -115,6 +116,7 @@ public class KeydroidxShizukuProvider extends ContentProvider {
                 if (d != null && MessageDigest.isEqual(d, selfDigest)) return true;
             }
         } catch (PackageManager.NameNotFoundException ignored) {
+        	KeydroidxLog.w(TAG, "signatureMatches failed: " + ignored.getMessage());
         } catch (Exception e) {
             Log.w(TAG, "signatureMatches failed for " + pkg, e);
         }
@@ -146,6 +148,7 @@ public class KeydroidxShizukuProvider extends ContentProvider {
         try {
             return MessageDigest.getInstance("SHA-256").digest(data);
         } catch (Exception e) {
+        	KeydroidxLog.w(TAG, "sha256 failed: " + e.getMessage());
             return null;
         }
     }

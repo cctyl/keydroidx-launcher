@@ -267,6 +267,7 @@ public class KeydroidxWallpaperSettingsFragment extends KeydroidxListPageFragmen
 			requireActivity().getContentResolver().takePersistableUriPermission(uri,
 					Intent.FLAG_GRANT_READ_URI_PERMISSION);
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "requireActivity failed: " + ignored.getMessage());
 			// 非 SAF 返回的 Uri 不支持持久化授权，退化为本次临时授权
 		}
 

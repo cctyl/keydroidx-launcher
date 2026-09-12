@@ -325,6 +325,7 @@ public final class KeydroidxWallpaper {
 					return 0;
 			}
 		} catch (Throwable t) {
+			KeydroidxLog.w(TAG, "readOrientation failed: " + t.getMessage());
 			return 0;
 		}
 	}
@@ -434,6 +435,7 @@ public final class KeydroidxWallpaper {
 		try {
 			c.close();
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "close failed: " + ignored.getMessage());
 		}
 	}
 

@@ -1491,7 +1491,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					if (d == null && si.applicationInfo != null) d = si.applicationInfo.loadIcon(pm);
 					if (d != null) iv.setImageDrawable(d);
 				}
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+				KeydroidxLog.w("Desktop", "load app icon failed: " + ignored.getMessage());
+			}
 		}
 		iv.setPadding(0, 0, KeydroidxDimens.dp(getResources(), 5), 0);
 		row.addView(iv);
@@ -1588,6 +1590,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					ip & 0xff, (ip >> 8) & 0xff,
 					(ip >> 16) & 0xff, (ip >> 24) & 0xff);
 		} catch (Exception e) {
+			KeydroidxLog.w("Desktop", "format ip address failed: " + e.getMessage());
 			return "未连接";
 		}
 	}
@@ -1614,6 +1617,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			memTotal = mi.totalMem;
 			memAvail = mi.availMem;
 		} catch (Exception e) {
+			KeydroidxLog.w("Desktop", "read memory info failed: " + e.getMessage());
 			memTotal = 0;
 		}
 	}
@@ -1651,6 +1655,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				storageAvail = (long) stat.getAvailableBlocks() * stat.getBlockSize();
 			}
 		} catch (Exception e) {
+			KeydroidxLog.w("Desktop", "read storage info failed: " + e.getMessage());
 			storageTotal = 0;
 		}
 	}
@@ -1678,6 +1683,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 			return weekDay + " " + sdf.format(cal.getTime());
 		} catch (Exception e) {
+			KeydroidxLog.w("Desktop", "format date failed: " + e.getMessage());
 			return "日历";
 		}
 	}
@@ -1692,6 +1698,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			}
 			return minutes + "分钟";
 		} catch (Exception e) {
+			KeydroidxLog.w("Desktop", "format usage duration failed: " + e.getMessage());
 			return "使用时长";
 		}
 	}
@@ -1915,6 +1922,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 						KeydroidxLog.i("Desktop", "Root 执行 click-tile 成功");
 					}
 				} catch (Exception ignored) {
+					KeydroidxLog.w("Desktop", "root click-tile failed: " + ignored.getMessage());
 				}
 			}
 
@@ -1972,7 +1980,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		} else {
 			try {
 				iv.setImageDrawable(ContextCompat.getDrawable(ctx, R.mipmap.ic_launcher));
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+				KeydroidxLog.w("Desktop", "load fallback launcher icon failed: " + ignored.getMessage());
+			}
 		}
 		iconContainer.addView(iv);
 
@@ -2000,7 +2010,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 								Drawable s60Icon = ContextCompat.getDrawable(ctx, s60Res);
 								if (s60Icon != null) return s60Icon.mutate();
 							}
-						} catch (Exception ignored) {}
+						} catch (Exception ignored) {
+							KeydroidxLog.w("Desktop", "load s60 icon failed: " + ignored.getMessage());
+						}
 					}
 				}
 			}
@@ -2028,14 +2040,18 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 								Drawable s60Icon = ContextCompat.getDrawable(ctx, s60Res);
 								if (s60Icon != null) return s60Icon.mutate();
 							}
-						} catch (Exception ignored) {}
+						} catch (Exception ignored) {
+							KeydroidxLog.w("Desktop", "load s60 icon drawable failed: " + ignored.getMessage());
+						}
 					}
 					try {
 						if (getActivity() != null) {
 							return getActivity().getPackageManager()
 									.getActivityIcon(intent.getComponent());
 						}
-					} catch (Exception ignored) {}
+					} catch (Exception ignored) {
+						KeydroidxLog.w("Desktop", "load activity icon failed: " + ignored.getMessage());
+					}
 				}
 			}
 		} catch (Exception e) {

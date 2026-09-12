@@ -39,6 +39,8 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  * 页面结构：状态行（root 权限可用性 + 服务在线状态）+ 操作列表（root 激活 / 刷新状态）。
  */
 public class ShizukuRootFragment extends KeydroidxListPageFragment {
+	private static final String TAG = "ShizukuRootFragment";
+
 
 	private static final String[] ACTION_NAMES = {
 			"root 激活",
@@ -185,6 +187,7 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 					try {
 						Thread.sleep(POLL_INTERVAL_MS);
 					} catch (InterruptedException e) {
+						KeydroidxLog.w(TAG, "sleep failed: " + e.getMessage());
 						break;
 					}
 				}
@@ -257,6 +260,7 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 		try {
 			shell.waitAndClose(1, java.util.concurrent.TimeUnit.SECONDS);
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "waitAndClose failed: " + ignored.getMessage());
 		}
 		// 重建期间若用户拒绝 su 授权，仍会退回 sh（non-root），此处校验兜底
 		Shell rebuilt = Shell.getShell();

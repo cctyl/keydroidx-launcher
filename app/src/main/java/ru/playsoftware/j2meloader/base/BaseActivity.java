@@ -31,9 +31,12 @@ import androidx.preference.PreferenceManager;
 import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
 @SuppressLint("Registered")
 public class BaseActivity extends AppCompatActivity {
+	private static final String TAG = "BaseActivity";
+
 
 	@Override
 	protected void attachBaseContext(Context newBase) {
@@ -45,6 +48,7 @@ public class BaseActivity extends AppCompatActivity {
 			}
 			KeydroidxFontManager.setCurrentFontId(fontId);
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "setCurrentFontId failed: " + ignored.getMessage());
 		}
 		Configuration config = newBase.getResources().getConfiguration();
 		if (config.fontScale != 1.0f) {

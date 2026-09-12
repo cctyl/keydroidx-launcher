@@ -45,6 +45,8 @@ import ru.playsoftware.j2meloader.R;
  * 继承 {@link KeydroidxScrollPageFragment}，支持方向键平滑滚动；左软键「复制」把命令写入系统剪贴板；右软键「返回」。
  */
 public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
+	private static final String TAG = "ShizukuAdbFragment";
+
 
 	/** assets 中的脚本文件名。 */
 	private static final String ASSET_SCRIPT = "mini_shizuku.sh";

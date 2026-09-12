@@ -17,6 +17,8 @@ import java.util.List;
  * 使用 SharedPreferences + JSON 数组持久化。
  */
 public class KeydroidxQuickToggleStorage {
+	private static final String TAG = "KeydroidxQuickToggleStorage";
+
 
 	private static final String PREFS_NAME = "nokia_quick_toggles";
 	private static final String KEY_TOGGLE_LIST = "toggle_list";
@@ -107,7 +109,9 @@ public class KeydroidxQuickToggleStorage {
 				obj.put("id", item.id);
 				obj.put("enabled", item.enabled);
 				array.put(obj);
-			} catch (JSONException ignored) {}
+			} catch (JSONException ignored) {
+				KeydroidxLog.w(TAG, "put failed: " + ignored.getMessage());
+			}
 		}
 		prefs.edit().putString(KEY_TOGGLE_LIST, array.toString()).apply();
 		KeydroidxLog.i("QuickToggleStorage", "快捷开关列表已保存，共 " + list.size() + " 项");

@@ -23,6 +23,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -109,6 +110,7 @@ public class AppUtils {
 					return item;
 				}
 			} catch (Exception e) {
+				KeydroidxLog.w(TAG, "getVersion failed: " + e.getMessage());
 			}
 		}
 		return null;

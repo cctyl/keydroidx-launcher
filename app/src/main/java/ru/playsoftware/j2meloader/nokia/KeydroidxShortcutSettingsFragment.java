@@ -47,6 +47,8 @@ import ru.playsoftware.j2meloader.config.Config;
  * 支持方向键导航，SELECT 切换选中状态，左软键保存，右软键返回。
  */
 public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment {
+	private static final String TAG = "KeydroidxShortcutSettingsFragment";
+
 
 	private LinearLayout appListLayout;
 	private final List<KeydroidxAppItem> allApps = new ArrayList<>();
@@ -266,7 +268,9 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 					try {
 						Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
 						if (s60Icon != null) listIcon = s60Icon;
-					} catch (Exception ignored) {}
+					} catch (Exception ignored) {
+						KeydroidxLog.w(TAG, "startsWith failed: " + ignored.getMessage());
+					}
 				}
 			}
 			// 选中/未选中标记。
@@ -287,7 +291,9 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 			} else {
 				try {
 					iv.setImageDrawable(ContextCompat.getDrawable(requireContext(), R.mipmap.ic_launcher));
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "setImageDrawable failed: " + ignored.getMessage());
+				}
 			}
 			row.addView(iv);
 

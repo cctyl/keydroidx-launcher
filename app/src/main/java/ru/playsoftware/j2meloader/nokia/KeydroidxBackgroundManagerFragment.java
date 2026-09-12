@@ -229,7 +229,9 @@ public class KeydroidxBackgroundManagerFragment extends KeydroidxPageFragment {
 		} else {
 			try {
 				iv.setImageDrawable(ContextCompat.getDrawable(ctx, R.mipmap.ic_launcher));
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "setImageDrawable failed: " + ignored.getMessage());
+			}
 		}
 		row.addView(iv);
 
@@ -252,7 +254,9 @@ public class KeydroidxBackgroundManagerFragment extends KeydroidxPageFragment {
 			shield.setScaleType(ImageView.ScaleType.FIT_CENTER);
 			try {
 				shield.setImageDrawable(ContextCompat.getDrawable(ctx, R.drawable.ic_keydroidx_protect));
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "setImageDrawable failed: " + ignored.getMessage());
+			}
 			row.addView(shield);
 		} else if (!tabProtected) {
 			TextView clearTv = new TextView(ctx);

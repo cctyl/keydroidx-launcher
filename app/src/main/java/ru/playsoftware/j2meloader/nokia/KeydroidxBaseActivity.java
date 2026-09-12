@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.github.cctyl.nokia.common.util.KeydroidxDimens;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -37,6 +38,8 @@ import ru.playsoftware.j2meloader.R;
  * 呈现怀旧的全屏效果。
  */
 public abstract class KeydroidxBaseActivity extends AppCompatActivity {
+	private static final String TAG = "KeydroidxBaseActivity";
+
 	/**
 	 * 部分低分辨率设备（如 320x480 且系统 density 非标准，例如 136 DPI → density=0.85）
 	 * 会让所有 dp 尺寸落在亚像素位置，被抗锯齿虚化成灰边，导致图标发虚。
@@ -56,6 +59,7 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 			userFontScale = KeydroidxSettingsStorage.getFontScale(newBase);
 			fontId = KeydroidxSettingsStorage.getFontId(newBase);
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "attachBaseContext failed: " + ignored.getMessage());
 			userFontScale = 1f;
 		}
 		if (userFontScale <= 0f) {

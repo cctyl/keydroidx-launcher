@@ -15,6 +15,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.util.Locale;
 
 import ru.playsoftware.j2meloader.R;
@@ -24,6 +25,8 @@ import ru.playsoftware.j2meloader.R;
  * 允许高分辨率用户直接输入任意比例值（0.5 ~ 3.0）。
  */
 public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
+	private static final String TAG = "KeydroidxCustomFontScaleFragment";
+
 	private EditText etCustomScale;
 	private TextView tvPreviewText;
 
@@ -99,7 +102,9 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 							updatePreview(val);
 						}
 					}
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "updatePreview failed: " + ignored.getMessage());
+				}
 			}
 
 			@Override
@@ -147,6 +152,7 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 			((KeydroidxDesktopActivity) requireActivity()).recreate();
 			return true;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "makeText failed: " + e.getMessage());
 			Toast.makeText(requireContext(), "格式不正确，请输入数字（如 1.5）", Toast.LENGTH_SHORT).show();
 			return false;
 		}

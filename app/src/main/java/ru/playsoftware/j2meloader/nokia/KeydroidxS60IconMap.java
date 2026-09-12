@@ -42,6 +42,8 @@ import ru.playsoftware.j2meloader.R;
  * </ul>
  */
 public class KeydroidxS60IconMap {
+	private static final String TAG = "KeydroidxS60IconMap";
+
 
 	/** IntentFilter 探测项：图标资源 + 探测 Intent */
 	private static class Probe {
@@ -323,6 +325,7 @@ public class KeydroidxS60IconMap {
 						loaded.put(line.substring(0, eq),
 								Integer.valueOf(line.substring(eq + 1)));
 					} catch (NumberFormatException ignore) {
+						KeydroidxLog.w(TAG, "valueOf failed: " + ignore.getMessage());
 					}
 				}
 				if (!loaded.isEmpty()) {

@@ -30,6 +30,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.graphics.drawable.IconCompat;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.util.Hashtable;
 
 import javax.microedition.shell.MicroActivity;
@@ -39,6 +40,8 @@ import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.util.PNGUtils;
 
 public class SoftNotificationImpl extends SoftNotification {
+	private static final String TAG = "SoftNotificationImpl";
+
 	final static int EVENT_ACCEPT = 1;
 	final static int EVENT_DISMISS = 2;
 
@@ -65,6 +68,7 @@ public class SoftNotificationImpl extends SoftNotification {
 			notificationmgr = NotificationManagerCompat.from(activity);
 			instanceMap = new Hashtable<>();
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "operation failed: " + ignored.getMessage());
 		}
 	}
 

@@ -45,6 +45,8 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -227,6 +229,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 						s.replace(0, s.length(), "1000");
 					}
 				} catch (NumberFormatException e) {
+					KeydroidxLog.w(TAG, "parse progress input failed, clear: " + e.getMessage());
 					s.clear();
 				}
 			}
@@ -287,6 +290,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 			try {
 				w = Integer.parseInt(binding.screenWidth.getText().toString());
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "parse screen width failed: " + ignored.getMessage());
 				w = 0;
 			}
 			if (w <= 0) {
@@ -297,6 +301,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 			try {
 				h = Integer.parseInt(binding.screenHeight.getText().toString());
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "parse screen height failed: " + ignored.getMessage());
 				h = 0;
 			}
 			if (h <= 0) {
@@ -584,6 +589,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 		try {
 			result = Integer.parseInt(s, radix);
 		} catch (NumberFormatException e) {
+			KeydroidxLog.w(TAG, "parse int with radix failed: " + e.getMessage());
 			result = 0;
 		}
 		return result;
@@ -673,10 +679,12 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 				params.screenBackgroundColor = Integer.parseInt(
 						binding.screenBackgroundHexColor.getText().toString(), 16);
 			} catch (NumberFormatException ignored) {
+				KeydroidxLog.w(TAG, "parse screen background color failed: " + ignored.getMessage());
 			}
 			try {
 				params.screenScaleRatio = Integer.parseInt(binding.scaleRatio.getText().toString());
 			} catch (NumberFormatException e) {
+				KeydroidxLog.w(TAG, "parse scale ratio failed, fallback 100: " + e.getMessage());
 				params.screenScaleRatio = 100;
 			}
 			params.orientation = binding.screenOrientationSelector.getSelectedItemPosition();
@@ -700,16 +708,19 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 			try {
 				params.fontSizeSmall = Integer.parseInt(binding.fontSizeSmall.getText().toString());
 			} catch (NumberFormatException e) {
+				KeydroidxLog.w(TAG, "parse font size small failed: " + e.getMessage());
 				params.fontSizeSmall = 0;
 			}
 			try {
 				params.fontSizeMedium = Integer.parseInt(binding.fontSizeMedium.getText().toString());
 			} catch (NumberFormatException e) {
+				KeydroidxLog.w(TAG, "parse font size medium failed: " + e.getMessage());
 				params.fontSizeMedium = 0;
 			}
 			try {
 				params.fontSizeLarge = Integer.parseInt(binding.fontSizeLarge.getText().toString());
 			} catch (NumberFormatException e) {
+				KeydroidxLog.w(TAG, "parse font size large failed: " + e.getMessage());
 				params.fontSizeLarge = 0;
 			}
 			params.fontApplyDimensions = binding.showFontSizesInScaledPixelsToggle.isChecked();
@@ -727,26 +738,31 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 				params.vkBgColor = Integer.parseInt(
 						binding.keyboardNotPressedButtonBackgroundColorHex.getText().toString(), 16);
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "parse vk bg color failed: " + ignored.getMessage());
 			}
 			try {
 				params.vkFgColor = Integer.parseInt(
 						binding.keyboardNotPressedButtonLabelColorHex.getText().toString(), 16);
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "parse vk fg color failed: " + ignored.getMessage());
 			}
 			try {
 				params.vkBgColorSelected = Integer.parseInt(
 						binding.keyboardPressedButtonBackgroundColorHex.getText().toString(), 16);
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "parse vk selected bg color failed: " + ignored.getMessage());
 			}
 			try {
 				params.vkFgColorSelected = Integer.parseInt(
 						binding.keyboardPressedButtonLabelColorHex.getText().toString(), 16);
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "parse vk selected fg color failed: " + ignored.getMessage());
 			}
 			try {
 				params.vkOutlineColor = Integer.parseInt(
 						binding.keyboardOutlineColorHex.getText().toString(), 16);
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "parse vk outline color failed: " + ignored.getMessage());
 			}
 			params.systemProperties = getSystemProperties();
 
@@ -771,6 +787,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 					Charset.forName(line.substring(22).trim());
 					validCharset = true;
 				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "invalid charset, skip: " + ignored.getMessage());
 					continue;
 				}
 			}
@@ -992,6 +1009,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 				int color = Integer.parseInt(s.toString(), 16);
 				drawable.setColor(color | Color.BLACK);
 			} catch (NumberFormatException e) {
+				KeydroidxLog.w(TAG, "parse color hex failed, fallback black: " + e.getMessage());
 				drawable.setColor(Color.BLACK);
 				s.clear();
 			}
@@ -1028,7 +1046,9 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 				if (size <= 0) return;
 				int value = Math.round(size * aspect);
 				dst.setText(String.valueOf(value));
-			} catch (NumberFormatException ignored) { }
+			} catch (NumberFormatException ignored) {
+				KeydroidxLog.w(TAG, "parse scaled font size failed: " + ignored.getMessage());
+			}
 		}
 
 		public void onFocusChange(View v, boolean hasFocus) {

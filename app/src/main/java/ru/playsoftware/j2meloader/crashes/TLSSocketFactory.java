@@ -18,6 +18,7 @@ package ru.playsoftware.j2meloader.crashes;
 
 import android.content.Context;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -34,6 +35,8 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
 
 public class TLSSocketFactory extends SSLSocketFactory {
+	private static final String TAG = "TLSSocketFactory";
+
 
 	private final SSLSocketFactory internalSSLSocketFactory;
 
@@ -57,6 +60,7 @@ public class TLSSocketFactory extends SSLSocketFactory {
 			sslContext.init(null, tmf.getTrustManagers(), null);
 			factory = sslContext.getSocketFactory();
 		} catch (GeneralSecurityException | IOException e) {
+			KeydroidxLog.w(TAG, "init failed: " + e.getMessage());
 			factory = HttpsURLConnection.getDefaultSSLSocketFactory();
 		}
 		internalSSLSocketFactory = factory;

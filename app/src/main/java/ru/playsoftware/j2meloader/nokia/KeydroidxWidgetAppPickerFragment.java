@@ -548,7 +548,9 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 						try {
 							iv.setImageDrawable(ContextCompat.getDrawable(
 									requireContext(), R.mipmap.ic_launcher));
-						} catch (Exception ignored) {}
+						} catch (Exception ignored) {
+							KeydroidxLog.w(TAG, "requireContext failed: " + ignored.getMessage());
+						}
 					}
 					inner.addView(iv);
 

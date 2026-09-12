@@ -75,6 +75,7 @@ public final class KeydroidxBgManagerHelper {
 				shizukuActivated = true;
 			}
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "doProbe failed: " + e.getMessage());
 			shizukuActivated = false;
 		}
 		if (prev != shizukuActivated) {
@@ -332,6 +333,7 @@ public final class KeydroidxBgManagerHelper {
 						ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
 						if (isSystemApp(ai)) continue;
 					} catch (PackageManager.NameNotFoundException e) {
+						KeydroidxLog.w(TAG, "countBackgroundProcesses failed: " + e.getMessage());
 						continue;
 					}
 					n++;
@@ -371,10 +373,13 @@ public final class KeydroidxBgManagerHelper {
 					Drawable icon = null;
 					try {
 						icon = pm.getApplicationIcon(ai);
-					} catch (Exception ignored) {}
+					} catch (Exception ignored) {
+						KeydroidxLog.w(TAG, "getApplicationLabel failed: " + ignored.getMessage());
+					}
 					boolean prot = protectedSet != null && protectedSet.contains(pkg);
 					out.add(new BgTask(pkg, name, icon, prot));
 				} catch (PackageManager.NameNotFoundException e) {
+					KeydroidxLog.w(TAG, "add failed: " + e.getMessage());
 					// 非应用进程（init/守护进程）或已卸载残留，跳过
 				}
 			}
@@ -413,6 +418,7 @@ public final class KeydroidxBgManagerHelper {
 			Bitmap bmp = BitmapFactory.decodeFile(appPath + rel);
 			return bmp == null ? null : new BitmapDrawable(ctx.getResources(), bmp);
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "loadMidletIcon failed: " + e.getMessage());
 			return null;
 		}
 	}

@@ -20,6 +20,7 @@ import android.content.Context;
 import android.text.SpannableStringBuilder;
 import android.util.Log;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -116,13 +117,17 @@ public class Descriptor {
 			if (i < mv.length) {
 				try {
 					m = Integer.parseInt(mv[i].trim());
-				} catch (NumberFormatException ignored) { }
+				} catch (NumberFormatException ignored) {
+					KeydroidxLog.w(TAG, "compareVersion failed: " + ignored.getMessage());
+				}
 			}
 			int o = 0;
 			if (i < ov.length) {
 				try {
 					o = Integer.parseInt(ov[i].trim());
-				} catch (NumberFormatException ignored) { }
+				} catch (NumberFormatException ignored) {
+					KeydroidxLog.w(TAG, "compareVersion failed: " + ignored.getMessage());
+				}
 			}
 			if (m != o) {
 				return Integer.signum(m - o);

@@ -31,6 +31,7 @@ import androidx.annotation.RequiresApi;
 import io.github.cctyl.nokia.common.ui.KeydroidxBatteryDrawable;
 import ru.playsoftware.j2meloader.R;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.util.List;
 
 import ru.playsoftware.j2meloader.R;
@@ -205,16 +206,19 @@ public class StatusBarController {
 		try {
 			activity.unregisterReceiver(stateReceiver);
 		} catch (Exception ignore) {
+			KeydroidxLog.w(TAG, "unregisterReceiver failed: " + ignore.getMessage());
 			// 未注册或已注销，忽略
 		}
 		try {
 			activity.getContentResolver().unregisterContentObserver(airplaneObserver);
 		} catch (Exception ignore) {
+			KeydroidxLog.w(TAG, "getContentResolver failed: " + ignore.getMessage());
 			// 忽略
 		}
 		try {
 			activity.getContentResolver().unregisterContentObserver(powerSaveObserver);
 		} catch (Exception ignore) {
+			KeydroidxLog.w(TAG, "getContentResolver failed: " + ignore.getMessage());
 			// 忽略
 		}
 		// removeOnSubscriptionsChangedListener 需 API 22，必须同时校验版本。
@@ -222,6 +226,7 @@ public class StatusBarController {
 			try {
 				subscriptionManager.removeOnSubscriptionsChangedListener(subListener);
 			} catch (Exception ignore) {
+				KeydroidxLog.w(TAG, "removeOnSubscriptionsChangedListener failed: " + ignore.getMessage());
 				// 忽略
 			}
 			subListener = null;
@@ -590,6 +595,7 @@ public class StatusBarController {
 		try {
 			return Settings.Global.getInt(activity.getContentResolver(), "low_power", 0) == 1;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "read low_power setting failed failed: " + e.getMessage());
 			return false;
 		}
 	}
@@ -636,6 +642,7 @@ public class StatusBarController {
 			int lvl = WifiManager.calculateSignalLevel(rssi, 4);
 			return Math.max(0, Math.min(3, lvl));
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "getWifiLevel failed: " + e.getMessage());
 			return 3;
 		}
 	}
@@ -671,6 +678,7 @@ public class StatusBarController {
 					activity.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 			return wm != null && wm.isWifiEnabled();
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "getApplicationContext failed: " + e.getMessage());
 			return false;
 		}
 	}
@@ -700,6 +708,7 @@ public class StatusBarController {
 			return Settings.Global.getInt(activity.getContentResolver(),
 					Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "isAirplaneModeOn failed: " + e.getMessage());
 			return false;
 		}
 	}

@@ -19,6 +19,8 @@ import java.util.List;
  * 首次启动时自动写入默认组件（日历、网址、内存、使用时长、音乐播放器）。
  */
 public class KeydroidxWidgetStorage {
+	private static final String TAG = "KeydroidxWidgetStorage";
+
 
 	private static final String PREFS_NAME = "nokia_desktop_widgets";
 	private static final String KEY_WIDGETS = "widget_list";
@@ -91,6 +93,7 @@ public class KeydroidxWidgetStorage {
 			try {
 				pm.getPackageInfo(pkg, 0);
 			} catch (PackageManager.NameNotFoundException e) {
+				KeydroidxLog.w(TAG, "getPackageInfo failed: " + e.getMessage());
 				continue;
 			}
 			Intent launch = pm.getLaunchIntentForPackage(pkg);

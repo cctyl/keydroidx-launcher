@@ -264,6 +264,7 @@ public class KeydroidxWidgetActivityPickerFragment extends KeydroidxPageFragment
 			CharSequence label = appInfo.loadLabel(pm);
 			return label != null ? label.toString() : null;
 		} catch (PackageManager.NameNotFoundException e) {
+			KeydroidxLog.w(TAG, "getApplicationLabel failed: " + e.getMessage());
 			return null;
 		}
 	}
@@ -338,7 +339,9 @@ public class KeydroidxWidgetActivityPickerFragment extends KeydroidxPageFragment
 				try {
 					iv.setImageDrawable(ContextCompat.getDrawable(requireContext(),
 							R.mipmap.ic_launcher));
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "setImageDrawable failed: " + ignored.getMessage());
+				}
 			}
 			row.addView(iv);
 

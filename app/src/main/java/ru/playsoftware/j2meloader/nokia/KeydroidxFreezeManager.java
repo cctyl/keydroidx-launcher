@@ -288,7 +288,9 @@ public class KeydroidxFreezeManager {
 				// 短暂等待系统恢复组件
 				try {
 					Thread.sleep(100);
-				} catch (InterruptedException ignored) {}
+				} catch (InterruptedException ignored) {
+					KeydroidxLog.w(TAG, "sleep failed: " + ignored.getMessage());
+				}
 			}
 			mainHandler.post(() -> {
 				if (targetPkg != null) {

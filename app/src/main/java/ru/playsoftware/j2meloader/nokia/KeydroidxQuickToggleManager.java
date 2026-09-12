@@ -202,6 +202,7 @@ public class KeydroidxQuickToggleManager {
 			int state = wm.getWifiState();
 			return state == WifiManager.WIFI_STATE_ENABLED || state == WifiManager.WIFI_STATE_ENABLING;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "isWifiOn failed: " + e.getMessage());
 			return false;
 		}
 	}
@@ -234,7 +235,9 @@ public class KeydroidxQuickToggleManager {
 					if (wm != null && wm.setWifiEnabled(targetOn)) {
 						return;
 					}
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "setWifiEnabled fallback failed: " + ignored.getMessage());
+				}
 
 				openSettings(context, Settings.ACTION_WIFI_SETTINGS);
 			}
@@ -247,9 +250,11 @@ public class KeydroidxQuickToggleManager {
 		try {
 			return Settings.Global.getInt(context.getContentResolver(), "mobile_data", 0) == 1;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "read mobile_data (global) failed: " + e.getMessage());
 			try {
 				return Settings.Secure.getInt(context.getContentResolver(), "mobile_data", 0) == 1;
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "read mobile_data (secure) failed: " + ignored.getMessage());
 				return false;
 			}
 		}
@@ -293,6 +298,7 @@ public class KeydroidxQuickToggleManager {
 			int state = adapter.getState();
 			return state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_TURNING_ON;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "isBluetoothOn failed: " + e.getMessage());
 			return false;
 		}
 	}
@@ -327,7 +333,9 @@ public class KeydroidxQuickToggleManager {
 						boolean ret = targetOn ? adapter.enable() : adapter.disable();
 						if (ret) return;
 					}
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "toggle bluetooth fallback failed: " + ignored.getMessage());
+				}
 
 				openSettings(context, Settings.ACTION_BLUETOOTH_SETTINGS);
 			}
@@ -340,9 +348,11 @@ public class KeydroidxQuickToggleManager {
 		try {
 			return Settings.Global.getInt(context.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "read airplane_mode (global) failed: " + e.getMessage());
 			try {
 				return Settings.System.getInt(context.getContentResolver(), Settings.System.AIRPLANE_MODE_ON, 0) != 0;
 			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "read airplane_mode (system) failed: " + ignored.getMessage());
 				return false;
 			}
 		}
@@ -377,7 +387,9 @@ public class KeydroidxQuickToggleManager {
 					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
 					p.waitFor();
 					if (p.exitValue() == 0) return;
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "su airplane mode toggle failed: " + ignored.getMessage());
+				}
 
 				openSettings(context, Settings.ACTION_AIRPLANE_MODE_SETTINGS);
 			}
@@ -451,6 +463,7 @@ public class KeydroidxQuickToggleManager {
 			AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 			return am != null && am.getRingerMode() == AudioManager.RINGER_MODE_NORMAL;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "isSoundOn failed: " + e.getMessage());
 			return true;
 		}
 	}
@@ -476,6 +489,7 @@ public class KeydroidxQuickToggleManager {
 				Toast.makeText(context.getApplicationContext(), toastMsg, Toast.LENGTH_SHORT).show();
 			}
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "setRingerMode failed, open sound settings: " + e.getMessage());
 			openSettings(context, Settings.ACTION_SOUND_SETTINGS);
 		}
 	}
@@ -486,6 +500,7 @@ public class KeydroidxQuickToggleManager {
 		try {
 			return Settings.System.getInt(context.getContentResolver(), Settings.System.ACCELEROMETER_ROTATION, 1) == 1;
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "isRotateOn failed: " + e.getMessage());
 			return true;
 		}
 	}
@@ -503,6 +518,7 @@ public class KeydroidxQuickToggleManager {
 				try {
 					Settings.System.putInt(context.getContentResolver(), Settings.System.ACCELEROMETER_ROTATION, targetOn ? 1 : 0);
 				} catch (Exception e) {
+					KeydroidxLog.w(TAG, "write ACCELEROMETER_ROTATION failed, open display settings: " + e.getMessage());
 					openSettings(context, Settings.ACTION_DISPLAY_SETTINGS);
 				}
 			}
@@ -550,12 +566,14 @@ public class KeydroidxQuickToggleManager {
 				return LEVEL_AUTO;
 			}
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "read SCREEN_BRIGHTNESS_MODE failed: " + ignored.getMessage());
 		}
 		int val = 128;
 		try {
 			val = Settings.System.getInt(context.getContentResolver(),
 					Settings.System.SCREEN_BRIGHTNESS, 128);
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "read SCREEN_BRIGHTNESS failed: " + ignored.getMessage());
 		}
 		if (val >= 200) return LEVEL_HIGH;
 		if (val >= 80) return LEVEL_MEDIUM;
@@ -713,7 +731,9 @@ public class KeydroidxQuickToggleManager {
 			try {
 				int mode = Settings.Secure.getInt(context.getContentResolver(), Settings.Secure.LOCATION_MODE);
 				return mode != Settings.Secure.LOCATION_MODE_OFF;
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "read location_mode failed: " + ignored.getMessage());
+			}
 		}
 
 		// 2. 读取 LOCATION_PROVIDERS_ALLOWED
@@ -727,7 +747,9 @@ public class KeydroidxQuickToggleManager {
 				boolean hasNetwork = allowed.contains("network") && !allowed.contains("-network");
 				return hasGps || hasNetwork;
 			}
-		} catch (Exception ignored) {}
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "read location_providers_allowed failed: " + ignored.getMessage());
+		}
 
 		// 3. 降级：仅检查 GPS_PROVIDER
 		try {
@@ -735,7 +757,9 @@ public class KeydroidxQuickToggleManager {
 			if (lm != null) {
 				return lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
 			}
-		} catch (Exception ignored) {}
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "isProviderEnabled(GPS) failed: " + ignored.getMessage());
+		}
 		return false;
 	}
 
@@ -763,7 +787,9 @@ public class KeydroidxQuickToggleManager {
 					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
 					p.waitFor();
 					if (p.exitValue() == 0) return;
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "su location toggle failed: " + ignored.getMessage());
+				}
 
 				openSettings(context, Settings.ACTION_LOCATION_SOURCE_SETTINGS);
 			}
@@ -782,7 +808,9 @@ public class KeydroidxQuickToggleManager {
 					Method isApEnabled = wm.getClass().getDeclaredMethod("isWifiApEnabled");
 					isApEnabled.setAccessible(true);
 					return Boolean.TRUE.equals(isApEnabled.invoke(wm));
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "reflect isWifiApEnabled failed: " + ignored.getMessage());
+				}
 
 				// 尝试 getWifiApState (Android 4.4 ~ 7.1)
 				try {
@@ -790,9 +818,13 @@ public class KeydroidxQuickToggleManager {
 					getApState.setAccessible(true);
 					int state = (Integer) getApState.invoke(wm);
 					return state == 12 || state == 13; // 12=ENABLING, 13=ENABLED
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "reflect getWifiApState failed: " + ignored.getMessage());
+				}
 			}
-		} catch (Exception ignored) {}
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "isHotspotOn failed: " + ignored.getMessage());
+		}
 
 		// 检查网络接口是否处于热点状态 (wlan/ap/softap)
 		try {
@@ -809,7 +841,9 @@ public class KeydroidxQuickToggleManager {
 					}
 				}
 			}
-		} catch (Exception ignored) {}
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "reflect getTetheredIfaces failed: " + ignored.getMessage());
+		}
 
 		return false;
 	}
@@ -831,7 +865,9 @@ public class KeydroidxQuickToggleManager {
 					return;
 				}
 			}
-		} catch (Exception ignored) {}
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "reflect setWifiApEnabled failed: " + ignored.getMessage());
+		}
 
 		// 2. Android 8.0+ 若关闭热点，尝试 stopTethering
 		if (!targetOn) {
@@ -843,7 +879,9 @@ public class KeydroidxQuickToggleManager {
 					stopTethering.invoke(cm, 0);
 					return;
 				}
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "reflect stopTethering failed: " + ignored.getMessage());
+			}
 		}
 
 		// 3. Fallback: 调起系统热点/网络共享设置页
@@ -853,7 +891,9 @@ public class KeydroidxQuickToggleManager {
 		try {
 			context.startActivity(tetherIntent);
 			return;
-		} catch (Exception ignored) {}
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "open tether settings failed: " + ignored.getMessage());
+		}
 
 		openSettings(context, Settings.ACTION_WIRELESS_SETTINGS);
 	}
@@ -865,11 +905,14 @@ public class KeydroidxQuickToggleManager {
 			try {
 				PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
 				return pm != null && pm.isPowerSaveMode();
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "isPowerSaveMode failed: " + ignored.getMessage());
+			}
 		}
 		try {
 			return Settings.Global.getInt(context.getContentResolver(), "low_power", 0) == 1;
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "read low_power failed: " + ignored.getMessage());
 			return false;
 		}
 	}
@@ -891,7 +934,9 @@ public class KeydroidxQuickToggleManager {
 					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
 					p.waitFor();
 					if (p.exitValue() == 0) return;
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "su battery saver toggle failed: " + ignored.getMessage());
+				}
 
 				openSettings(context, Settings.ACTION_BATTERY_SAVER_SETTINGS);
 			}
@@ -1031,11 +1076,14 @@ public class KeydroidxQuickToggleManager {
 					intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					context.startActivity(intent);
 				} catch (Exception e) {
+					KeydroidxLog.w(TAG, "open settings failed, fallback to ACTION_SETTINGS: " + e.getMessage());
 					try {
 						Intent intent = new Intent(Settings.ACTION_SETTINGS);
 						intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 						context.startActivity(intent);
-					} catch (Exception ignored) {}
+					} catch (Exception ignored) {
+						KeydroidxLog.w(TAG, "open fallback settings failed: " + ignored.getMessage());
+					}
 				}
 			}
 		});

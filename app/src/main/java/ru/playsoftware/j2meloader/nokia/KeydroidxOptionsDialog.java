@@ -298,7 +298,9 @@ public class KeydroidxOptionsDialog extends DialogFragment {
 				iv.setLayoutParams(new LinearLayout.LayoutParams(KeydroidxDimens.dp(getResources(), 18), KeydroidxDimens.dp(getResources(), 18)));
 				try {
 					iv.setImageResource(item.icon);
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "setImageResource failed: " + ignored.getMessage());
+				}
 				if (!item.enabled) {
 					iv.setAlpha(0.5f);
 				}

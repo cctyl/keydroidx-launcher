@@ -57,6 +57,8 @@ import ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage;
 import ru.playsoftware.j2meloader.util.Constants;
 
 public class EmulatorApplication extends Application {
+	private static final String TAG = "EmulatorApplication";
+
 	private static final String[] VALID_SIGNATURES = {
 			"78EF7758720A9902F731ED706F72C669C39B765C", // GPlay
 			"289F84A32207DF89BE749481ED4BD07E15FC268F", // F-Droid
@@ -100,6 +102,7 @@ public class EmulatorApplication extends Application {
 			}
 			KeydroidxFontManager.setCurrentFontId(fontId);
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "setCurrentFontId failed: " + ignored.getMessage());
 		}
 
 		// 主题与向量图设置必须早期同步完成（毫秒级，直接决定首帧主题），不能延迟
@@ -212,6 +215,7 @@ public class EmulatorApplication extends Application {
 				br.close();
 			}
 		} catch (Exception ignore) {
+			KeydroidxLog.w(TAG, "close failed: " + ignore.getMessage());
 		}
 		return true;
 	}

@@ -26,6 +26,7 @@ import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.io.inputstream.ZipInputStream;
 import net.lingala.zip4j.model.FileHeader;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
@@ -257,10 +258,13 @@ public class AppInstaller {
 			Log.d(TAG, "Download complete");
 			return;
 		} catch (MalformedURLException e) {
+			KeydroidxLog.w(TAG, "download jad failed: bad url failed: " + e.getMessage());
 			exception = e;
 		} catch (FileNotFoundException e) {
+			KeydroidxLog.w(TAG, "download jad failed: not found failed: " + e.getMessage());
 			exception = e;
 		} catch (IOException e) {
+			KeydroidxLog.w(TAG, "download jad failed: io failed: " + e.getMessage());
 			exception = e;
 		} finally {
 			if (connection != null) {
@@ -455,10 +459,13 @@ public class AppInstaller {
 			Log.d(TAG, "Download complete");
 			return;
 		} catch (MalformedURLException e) {
+			KeydroidxLog.w(TAG, "download jar failed: bad url failed: " + e.getMessage());
 			exception = e;
 		} catch (FileNotFoundException e) {
+			KeydroidxLog.w(TAG, "download jar failed: not found failed: " + e.getMessage());
 			exception = e;
 		} catch (IOException e) {
+			KeydroidxLog.w(TAG, "download jar failed: io failed: " + e.getMessage());
 			exception = e;
 		} finally {
 			if (connection != null) {

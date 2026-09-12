@@ -54,6 +54,8 @@ import ru.woesss.j2me.installer.KeydroidxInstallerDialog;
  * 方向键导航，复用 J2ME-Loader 原有的安装与启动逻辑。
  */
 public class KeydroidxBoxFragment extends KeydroidxPageFragment {
+	private static final String TAG = "KeydroidxBoxFragment";
+
 
 	// ---- 网格常量 ----
 	private static final int COLS = 3;
@@ -344,7 +346,9 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		try {
 			Drawable icon = ContextCompat.getDrawable(requireContext(), R.drawable.s60_app);
 			if (icon != null) iv.setImageDrawable(icon);
-		} catch (Exception ignored) {}
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "setLayoutParams failed: " + ignored.getMessage());
+		}
 		cell.addView(iv);
 
 		TextView tv = new TextView(requireContext());
@@ -365,7 +369,9 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		try {
 			Drawable icon = ContextCompat.getDrawable(requireContext(), R.drawable.s60_settings);
 			if (icon != null) iv.setImageDrawable(icon);
-		} catch (Exception ignored) {}
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "setLayoutParams failed: " + ignored.getMessage());
+		}
 		cell.addView(iv);
 
 		TextView tv = new TextView(requireContext());

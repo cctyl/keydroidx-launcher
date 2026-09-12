@@ -32,6 +32,7 @@ import androidx.sqlite.db.SupportSQLiteQuery;
 
 import org.jetbrains.annotations.NotNull;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,8 @@ import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.util.AppUtils;
 
 public class AppRepository implements SharedPreferences.OnSharedPreferenceChangeListener {
+	private static final String TAG = "AppRepository";
+
 
 	private final String[] orderTerms;
 	private final Context context;
@@ -72,6 +75,7 @@ public class AppRepository implements SharedPreferences.OnSharedPreferenceChange
 		try {
 			sortVariant = preferences.getInt(PREF_APP_SORT, 0);
 		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "IllegalStateException failed: " + e.getMessage());
 			sortVariant = preferences.getString(PREF_APP_SORT, "name").equals("name") ? 0 : 1;
 			preferences.edit().putInt(PREF_APP_SORT, sortVariant).apply();
 		}

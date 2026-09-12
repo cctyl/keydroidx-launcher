@@ -231,6 +231,7 @@ public class KeydroidxMidletKeepAliveService extends Service {
 		try {
 			context.stopService(new Intent(context, KeydroidxMidletKeepAliveService.class));
 		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "stopService failed: " + ignored.getMessage());
 		}
 	}
 }

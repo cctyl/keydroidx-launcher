@@ -66,6 +66,7 @@ public class KeydroidxLockServer {
 			try {
 				serverSocket.close();
 			} catch (IOException ignored) {
+				KeydroidxLog.w(TAG, "close failed: " + ignored.getMessage());
 			}
 			serverSocket = null;
 		}
@@ -98,6 +99,7 @@ public class KeydroidxLockServer {
 					try {
 						client.close();
 					} catch (IOException ignored) {
+						KeydroidxLog.w(TAG, "close failed: " + ignored.getMessage());
 					}
 				}
 			}

@@ -4,6 +4,7 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.util.Log;
 
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -99,6 +100,7 @@ public final class MidletStateStore {
 		try {
 			pid = Integer.parseInt(props.getProperty(KEY_PID, "-1"));
 		} catch (NumberFormatException e) {
+			KeydroidxLog.w(TAG, "parse pid failed failed: " + e.getMessage());
 			pid = -1;
 		}
 		if (appPath.isEmpty()) return null;
