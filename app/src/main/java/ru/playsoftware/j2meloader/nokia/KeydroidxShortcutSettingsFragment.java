@@ -105,13 +105,15 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 				.observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
 				.subscribe(
 						apps -> {
+							if (!isAdded()) return; // 结果返回前页面已退出，丢弃，避免 buildAppList() 里 requireContext() 崩溃
 							allApps.clear();
 							allApps.addAll(apps);
 							buildAppList();
 							KeydroidxLog.i("ShortcutSettings", "应用列表加载完成：共 " + apps.size() + " 个（安卓 + J2ME）");
 						},
 						error -> {
-							KeydroidxLog.e("ShortcutSettings", "加载应用列表失败", error);
+							KeydroidxLog.w("ShortcutSettings", "加载应用列表失败", error);
+							if (!isAdded()) return; // 同上：detach 后 buildAppList/requireActivity 会再次抛异常
 							// 降级：至少加载安卓应用
 							allApps.clear();
 							loadAndroidApps(allApps);
