@@ -47,7 +47,6 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	private static KeydroidxDesktopActivity sInstance = null;
 	private StatusBarController statusBarController;
 	private KeydroidxKeyBinding keyBinding;
-	private KeydroidxLockServer lockServer;
 	/** Activity 是否处于 resumed 状态（延迟任务防重入校验用） */
 	private boolean resumedFlag = false;
 	/**
@@ -81,9 +80,10 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		statusBarController = new StatusBarController(this);
 		keyBinding = new KeydroidxKeyBinding(this);
 
-		// 启动锁屏指令服务器（供 native 拦截器 socket 直连，替代 am broadcast）
-		lockServer = new KeydroidxLockServer(this);
-		lockServer.start();
+		// 启动锁屏指令服务器（供 native 拦截器 socket 直连，替代 am broadcast）。
+		// 进程级单例幂等启动：同进程内 Activity 重建不会重复 bind 端口 10501（避免 EADDRINUSE），
+		// 且不随本 Activity onDestroy 停止——保活进程存活期间 native 拦截器仍可下发锁屏/回桌面指令。
+		KeydroidxLockServer.start(this);
 
 		// 监听返回栈变化，自动上报页面状态给拦截器（覆盖 goHome/switchFragment/exitCurrent）
 		getSupportFragmentManager().addOnBackStackChangedListener(() -> postReportPageState());
@@ -423,9 +423,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		if (sInstance == this) {
 			sInstance = null;
 		}
-		if (lockServer != null) {
-			lockServer.stop();
-		}
+		// 不停止 KeydroidxLockServer：它是进程级资源，随进程生灭。
 		super.onDestroy();
 	}
 
