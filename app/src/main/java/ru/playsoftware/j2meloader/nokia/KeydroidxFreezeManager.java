@@ -38,6 +38,11 @@ public class KeydroidxFreezeManager {
 	private static final String PREF_NAME = "nokia_freeze_config";
 	private static final String KEY_FROZEN_LIST = "frozen_packages";
 
+	/** 解冻后轮询等待包真正可启动的间隔（毫秒） */
+	private static final int UNFREEZE_WAIT_STEP_MS = 100;
+	/** 解冻后轮询等待包真正可启动的最大次数（约 1s 上限，低端机 PMS 更新可能较慢） */
+	private static final int UNFREEZE_WAIT_MAX_TRIES = 10;
+
 	/** 广播：当冻结状态或冻结列表发生变化时发送，通知功能表和桌面快捷栏刷新图标角标 */
 	public static final String ACTION_FREEZE_STATE_CHANGED = "ru.playsoftware.j2meloader.nokia.ACTION_FREEZE_STATE_CHANGED";
 	/** 广播 extra：发生变更的包名（单包冻结/解冻时携带，供接收方预写缓存） */
@@ -282,49 +287,136 @@ public class KeydroidxFreezeManager {
 		}
 		final String targetPkg = packageName;
 		executor.execute(() -> {
+			// 只有包「真的」处于启用状态才允许启动：以 isAppFrozen 实测为准，
+			// 而不是看解冻命令的返回值（Shizuku.exec 的返回值在部分 ROM 上不准确）。
+			boolean enabled = true;
 			if (targetPkg != null && isAppFrozen(targetPkg)) {
 				KeydroidxLog.i(TAG, "正在解冻应用: " + targetPkg);
-				executeUnfreeze(targetPkg);
-				// 短暂等待系统恢复组件
-				try {
-					Thread.sleep(100);
-				} catch (InterruptedException ignored) {
-					KeydroidxLog.w(TAG, "sleep failed: " + ignored.getMessage());
+				boolean cmdOk = executeUnfreeze(targetPkg);
+				enabled = waitUntilLaunchable(targetPkg, launchIntent);
+				if (!enabled) {
+					// 解冻未生效：mini_shizuku 未运行 / 未授权，且非设备所有者 —— 两条解冻通道都不可用。
+					// 此时包仍被系统停用，任何 startActivity 都必然抛 ActivityNotFoundException，
+					// 所以在这里直接放弃启动，并明确告知用户原因（见下方 mainHandler）。
+					KeydroidxLog.w(TAG, "解冻未生效: " + targetPkg + " cmdOk=" + cmdOk
+							+ " shizukuRunning=" + Shizuku.isRunning());
 				}
 			}
+			final boolean canLaunch = enabled;
+			// 在后台线程解析启动入口（PackageManager IPC 不在主线程做）
+			final Intent resolved = canLaunch ? resolveLaunchIntent(targetPkg, launchIntent) : null;
+			final String displayName = label != null ? label : targetPkg;
 			mainHandler.post(() -> {
 				if (targetPkg != null) {
-					notifyStateChanged(targetPkg, false);
+					// 解冻失败时必须广播「仍处于冻结」，否则会把 false 预写进功能表缓存，
+					// 导致冰块角标消失、用户以为已解冻（实际包仍是停用状态）。
+					notifyStateChanged(targetPkg, canLaunch ? false : true);
 				} else {
 					notifyStateChanged();
 				}
+				if (!canLaunch) {
+					Toast.makeText(appContext, "解冻失败，请先启动 mini_shizuku 服务后重试",
+							Toast.LENGTH_SHORT).show();
+					return;
+				}
+				if (resolved == null) {
+					// 启动 Intent 解析为空：极大可能是缺少读取应用列表权限导致
+					handleLaunchFailurePermissionRepair(targetPkg, label);
+					return;
+				}
 				try {
-					Intent intent = null;
-					PackageManager pm = appContext.getPackageManager();
-					// 解冻后重新解析当前「启用」的启动入口，绝不复用传入的 intent——
-					// 传入组件可能指向停用的主题别名/失效入口（如 MT 的 MainNoBgIcon），
-					// 解冻包不会连带启用该组件，直接启动会抛 ActivityNotFoundException。
-					if (targetPkg != null) {
-						intent = pm.getLaunchIntentForPackage(targetPkg);
-					}
-					if (intent == null) {
-						intent = launchIntent;
-					}
-					if (intent != null) {
-						intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-						appContext.startActivity(intent);
-						KeydroidxLog.i(TAG, "成功解冻并启动: " + (label != null ? label : targetPkg)
-								+ " -> " + intent.getComponent());
-					} else {
-						// 启动 Intent 解析为空：极大可能是缺少读取应用列表权限导致
-						handleLaunchFailurePermissionRepair(targetPkg, label);
-					}
+					resolved.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+					appContext.startActivity(resolved);
+					KeydroidxLog.i(TAG, "成功解冻并启动: " + displayName + " -> " + resolved.getComponent());
+				} catch (android.content.ActivityNotFoundException e) {
+					// 环境问题（组件别名被停用 / 被其它管理器隐藏 / PMS 尚未就绪），非程序缺陷：
+					// 用 w 记录，避免误触发自动上报配额。
+					KeydroidxLog.w(TAG, "解冻后启动失败，转应用详情页: " + targetPkg
+							+ " -> " + resolved.getComponent() + " : " + e.getMessage());
+					openAppDetailsOrToast(targetPkg, displayName);
 				} catch (Exception e) {
-					KeydroidxLog.e(TAG, "解冻后启动失败: " + targetPkg, e);
-					Toast.makeText(appContext, "启动失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+					KeydroidxLog.w(TAG, "解冻后启动失败: " + targetPkg + " : " + e.getMessage());
+					openAppDetailsOrToast(targetPkg, displayName);
 				}
 			});
 		});
+	}
+
+	/**
+	 * 解冻后等待系统真正允许启动该包：PackageManagerService 的状态更新存在数十至数百毫秒延迟。
+	 * <p>判定「可启动」有多个信号，任一成立即可，避免因单一判据（{@code ApplicationInfo.enabled}）
+	 * 在部分 ROM 上不准/更新慢而误判为解冻失败、拒绝启动：
+	 * <ol>
+	 *   <li>{@link #isAppFrozen} 返回 false（包已启用）；</li>
+	 *   <li>能解析到默认启动入口（停用期间该入口会被 PMS 过滤掉，故非 null 即代表已就绪）；</li>
+	 *   <li>调用方传入的显式组件已可解析（如桌面组件指向的应用内二级页面）。</li>
+	 * </ol>
+	 *
+	 * @param pkg      目标包名，可为 null
+	 * @param provided 调用方传入的启动 Intent，可为 null
+	 */
+	private boolean waitUntilLaunchable(String pkg, Intent provided) {
+		for (int i = 0; i < UNFREEZE_WAIT_MAX_TRIES; i++) {
+			if (pkg != null && !isAppFrozen(pkg)) return true;
+			try {
+				PackageManager pm = appContext.getPackageManager();
+				if (pkg != null && pm.getLaunchIntentForPackage(pkg) != null) return true;
+				if (provided != null && provided.getComponent() != null
+						&& pm.resolveActivity(provided, 0) != null) {
+					return true;
+				}
+			} catch (Exception e) {
+				KeydroidxLog.w(TAG, "等待解冻生效时查询失败: " + pkg + " : " + e.getMessage());
+			}
+			try {
+				Thread.sleep(UNFREEZE_WAIT_STEP_MS);
+			} catch (InterruptedException e) {
+				KeydroidxLog.w(TAG, "waitUntilLaunchable 被中断: " + e.getMessage());
+				Thread.currentThread().interrupt();
+				return false;
+			}
+		}
+		KeydroidxLog.w(TAG, "等待解冻生效超时: " + pkg);
+		return false;
+	}
+
+	/**
+	 * 解析解冻后「当前可用」的启动入口。
+	 * <p>优先用 {@link PackageManager#getLaunchIntentForPackage}（只返回启用中的默认入口），
+	 * 解析不到时才退回调用方传入的显式组件——例如桌面组件指向的应用内二级页面。
+	 */
+	private Intent resolveLaunchIntent(String pkg, Intent provided) {
+		if (pkg != null) {
+			try {
+				Intent launch = appContext.getPackageManager().getLaunchIntentForPackage(pkg);
+				if (launch != null) return launch;
+			} catch (Exception e) {
+				KeydroidxLog.w(TAG, "解析启动入口失败: " + pkg + " : " + e.getMessage());
+			}
+		}
+		if (provided != null) {
+			KeydroidxLog.i(TAG, "无默认启动入口，改用调用方组件: " + provided.getComponent());
+			return new Intent(provided);
+		}
+		return null;
+	}
+
+	/** 启动彻底失败时的兜底：跳到系统「应用详情」页，让用户自行启用/解除隐藏。 */
+	private void openAppDetailsOrToast(String pkg, String displayName) {
+		if (pkg != null) {
+			try {
+				Intent details = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+						android.net.Uri.fromParts("package", pkg, null));
+				details.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				appContext.startActivity(details);
+				Toast.makeText(appContext, "无法启动「" + displayName + "」，请在应用详情页手动启用",
+						Toast.LENGTH_LONG).show();
+				return;
+			} catch (Exception e) {
+				KeydroidxLog.w(TAG, "打开应用详情页失败: " + pkg + " : " + e.getMessage());
+			}
+		}
+		Toast.makeText(appContext, "启动失败: " + displayName, Toast.LENGTH_SHORT).show();
 	}
 
 	/**
