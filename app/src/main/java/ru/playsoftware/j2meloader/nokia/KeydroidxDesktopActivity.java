@@ -204,11 +204,15 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			if (isDefaultLauncher()) {
 				// 已设为默认：RoleManager 不会为已是 holder 的应用再次弹选择器，
 				// 直接打开系统「默认应用 → 主屏幕」设置页，保证界面一定能弹出。
-				KeydroidxLog.i("Desktop", "已是默认桌面，改为打开系统默认应用(主屏幕)设置页");
-				Intent settings = new Intent(Settings.ACTION_HOME_SETTINGS);
-				settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				startActivity(settings);
-				return;
+				// 注意：Settings.ACTION_HOME_SETTINGS 是 API 24 新增，4.4 不存在该 Activity，
+				// 低版本退化为隐式 HOME 选择器路径（与下方未设默认分支一致）。
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+					KeydroidxLog.i("Desktop", "已是默认桌面，改为打开系统默认应用(主屏幕)设置页");
+					Intent settings = new Intent(Settings.ACTION_HOME_SETTINGS);
+					settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+					startActivity(settings);
+					return;
+				}
 			}
 			// 未设置默认：走标准默认桌面申请流程
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
