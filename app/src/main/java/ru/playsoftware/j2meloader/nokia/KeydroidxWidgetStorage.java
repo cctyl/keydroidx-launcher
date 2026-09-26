@@ -25,6 +25,10 @@ public class KeydroidxWidgetStorage {
 	private static final String PREFS_NAME = "nokia_desktop_widgets";
 	private static final String KEY_WIDGETS = "widget_list";
 	private static final String KEY_INITIALIZED = "widgets_initialized";
+	/** 旧版默认 3g.qq.com 网址组件是否已清理（一次性迁移标记） */
+	private static final String KEY_LEGACY_URL_CLEANED = "legacy_default_url_widget_cleaned";
+	/** 旧版默认「内存」组件是否已换成后台管理（一次性迁移标记） */
+	private static final String KEY_LEGACY_MEMORY_SWAPPED = "legacy_default_memory_widget_swapped";
 	public static final int MAX_COUNT = 15;
 
 	/** 音乐播放器优先级列表（包名, 显示名）。取第一个已安装的。 */
@@ -42,6 +46,62 @@ public class KeydroidxWidgetStorage {
 	public KeydroidxWidgetStorage(Context context) {
 		prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 		initDefaultsIfNeeded(context.getApplicationContext());
+		removeLegacyDefaultUrlWidgetIfNeeded();
+		replaceLegacyDefaultMemoryWidgetIfNeeded();
+	}
+
+	/**
+	 * 一次性迁移：把旧版默认写入的「内存」组件换成「后台管理」（最近任务）。
+	 * <p>
+	 * 默认组件只在首次启动写入一次（KEY_INITIALIZED 守卫），旧版本设备上已
+	 * 持久化的「内存」不会因默认列表变化而更新；这里按精确特征
+	 * （TYPE_MEMORY + label "内存" + value 空）原位替换为 TYPE_BG_MANAGER，
+	 * 用户手动添加的内存组件不受影响。
+	 */
+	private void replaceLegacyDefaultMemoryWidgetIfNeeded() {
+		if (prefs.getBoolean(KEY_LEGACY_MEMORY_SWAPPED, false)) return;
+		List<KeydroidxWidgetItem> list = getWidgets();
+		for (int i = 0; i < list.size(); i++) {
+			KeydroidxWidgetItem item = list.get(i);
+			if (item.type == KeydroidxWidgetItem.TYPE_MEMORY
+					&& "内存".equals(item.label)
+					&& (item.value == null || item.value.isEmpty())) {
+				list.set(i, new KeydroidxWidgetItem(
+						KeydroidxWidgetItem.TYPE_BG_MANAGER, "最近任务", ""));
+				setWidgets(list);
+				KeydroidxLog.i("WidgetStorage", "已迁移旧版默认内存组件 -> 后台管理（最近任务）");
+				break;
+			}
+		}
+		prefs.edit().putBoolean(KEY_LEGACY_MEMORY_SWAPPED, true).apply();
+	}
+
+	/**
+	 * 一次性清理旧版本默认写入的 3g.qq.com 网址组件。
+	 * <p>
+	 * 默认组件只在首次启动写入一次（KEY_INITIALIZED 守卫），旧版本用户设备上
+	 * 已经持久化了该组件，仅从默认列表移除不会使其消失；这里按精确特征
+	 * （TYPE_URL + label "3g.qq.com" + value "http://wkypub.top:9999"）匹配，
+	 * 只删这一个自动写入的默认项，用户自行添加的网址组件不受影响。
+	 */
+	private void removeLegacyDefaultUrlWidgetIfNeeded() {
+		if (prefs.getBoolean(KEY_LEGACY_URL_CLEANED, false)) return;
+		List<KeydroidxWidgetItem> list = getWidgets();
+		KeydroidxWidgetItem legacy = null;
+		for (KeydroidxWidgetItem item : list) {
+			if (item.type == KeydroidxWidgetItem.TYPE_URL
+					&& "3g.qq.com".equals(item.label)
+					&& "http://wkypub.top:9999".equals(item.value)) {
+				legacy = item;
+				break;
+			}
+		}
+		if (legacy != null) {
+			list.remove(legacy);
+			setWidgets(list);
+			KeydroidxLog.i("WidgetStorage", "已清理旧版默认网址组件: 3g.qq.com");
+		}
+		prefs.edit().putBoolean(KEY_LEGACY_URL_CLEANED, true).apply();
 	}
 
 	/**
@@ -58,19 +118,15 @@ public class KeydroidxWidgetStorage {
 		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_CALENDAR, "日历", ""));
 		KeydroidxLog.i("WidgetStorage", "默认组件: 日历");
 
-		// 2. 网址组件: 显示 3g.qq.com，实际跳转 http://wkypub.top:9999
-		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_URL, "3g.qq.com", "http://wkypub.top:9999"));
-		KeydroidxLog.i("WidgetStorage", "默认组件: 网址 3g.qq.com -> http://wkypub.top:9999");
+		// 2. 后台管理组件（点击打开最近任务页，桌面显示类型名「最近任务」）
+		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_BG_MANAGER, "最近任务", ""));
+		KeydroidxLog.i("WidgetStorage", "默认组件: 后台管理（最近任务）");
 
-		// 3. 内存组件
-		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_MEMORY, "内存", ""));
-		KeydroidxLog.i("WidgetStorage", "默认组件: 内存");
-
-		// 4. 使用时长组件
+		// 3. 使用时长组件
 		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_USAGE, "使用时长", ""));
 		KeydroidxLog.i("WidgetStorage", "默认组件: 使用时长");
 
-		// 5. 应用组件：默认音乐播放器（取第一个已安装的）
+		// 4. 应用组件：默认音乐播放器（取第一个已安装的）
 		String musicAppKey = findMusicApp(ctx);
 		if (musicAppKey != null) {
 			String musicLabel = findMusicLabel(ctx, musicAppKey);

@@ -688,22 +688,20 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	// 被冻结（包级停用）的应用单独枚举后追加，不混入正常应用枚举，保证列表确定性
 	addFrozenApps(pool, appCtx, pm, selfPkg);
 
-	// 最终顺序：固定槽位 → 应用程序 → 按键绑定 → 桌面设置 → S60匹配应用（按名） → 未匹配应用（按名）
+	// 最终顺序：固定槽位 → 应用程序 → S60匹配应用（按名） → 未匹配应用（按名）
+	// （桌面设置入口已移除：主界面右软键即可进入，功能表不再重复提供）
 	List<KeydroidxAppItem> result = new ArrayList<>();
 	result.addAll(pinned);
 
 	// 应用程序图标：优先用 S60 应用程序图标
 	Drawable boxIcon = safeDrawable(appCtx, R.drawable.s60_app);
 	if (boxIcon == null) boxIcon = safeDrawable(appCtx, R.drawable.ic_keydroidx_box);
-	Drawable settingsIcon = safeDrawable(appCtx, R.drawable.s60_settings);
-	if (settingsIcon == null) settingsIcon = safeDrawable(appCtx, R.drawable.ic_keydroidx_settings);
 	result.add(new KeydroidxAppItem(KeydroidxAppItem.TYPE_BOX, "应用程序", boxIcon, null));
 	// 原始 J2ME-Loader 主界面（启动器/文件选择器/应用列表）入口
 	Drawable mainIcon = safeDrawable(appCtx, R.mipmap.ic_launcher);
 	if (mainIcon == null) mainIcon = boxIcon;
 	result.add(new KeydroidxAppItem(KeydroidxAppItem.TYPE_MAIN, "J2ME Loader", mainIcon, null));
 	KeydroidxLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入 J2meLoaderActivity）");
-	result.add(new KeydroidxAppItem(KeydroidxAppItem.TYPE_SETTINGS, "桌面设置", settingsIcon, null));
 	// 通知中心：读取系统通知并展示，可清除（见 docs/通知中心功能设计.md）
 	Drawable notifIcon = io.github.cctyl.nokia.common.ui.KeydroidxIcons.get(appCtx,
 			io.github.cctyl.nokia.common.ui.KeydroidxIcons.ICON_NOTIFICATIONS, 0xFFFFFFFF, 20);
