@@ -36,18 +36,18 @@ import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import ru.playsoftware.j2meloader.R;
 
 /**
- * 「最近任务」卡片页（桌面主界面 / 功能表内按绑定键进入；桌面「后台管理」组件亦进入本页）。
+ * 「最近任务」卡片页（桌面主界面 / 功能表内按绑定键进入；桌面「最近任务」组件亦进入本页）。
  *
  * <p><b>交互（与设计稿 docs/recent-apps/prototype.html 一致）：</b></p>
  * <ul>
  *   <li>2 列卡片网格：图标 + 应用名 + 最近时间；已保护应用右上角绿色盾牌；</li>
  *   <li>方向键循环移动焦点；确认键把该应用恢复到前台（不重启，回到它之前的界面）；</li>
- *   <li>左软键 = 选项（打开 / 保护此应用 / 后台管理 / 刷新 / 清理此任务 / 清理全部后台）；</li>
+ *   <li>左软键 = 选项（打开 / 保护此应用 / 刷新 / 清理此任务 / 清理全部任务）；</li>
  *   <li>右软键 / 返回键 = 退出；</li>
- *   <li><b>数字键 0 = 一键清理未保护后台（无二次确认）</b>；「清理全部后台」同样无需确认。</li>
+ *   <li><b>数字键 0 = 一键清理未保护任务（无二次确认）</b>；「清理全部任务」同样无需确认。</li>
  * </ul>
  *
- * <p><b>保护名单语义：</b>与「后台管理」页共用同一份（{@link KeydroidxSettingsStorage}）。
+ * <p><b>保护名单语义：</b>持久化于 {@link KeydroidxSettingsStorage}，重启不丢。
  * 保护只挡批量清理（0 键 / 清理全部）；「清理此任务」是手动清理，<b>不受保护名单限制</b>，
  * 因为它是用户对单个应用的显式操作。</p>
  *
@@ -68,8 +68,8 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 	/** 保护盾牌角标尺寸（dp）。 */
 	private static final int PROT_FLAG_DP = 11;
 
-	// 主题未提供「成功 / 警示」语义色，沿用兄弟页面（KeydroidxBackgroundManagerFragment）的
-	// 同一组字面量，避免同类状态在不同页面出现两种颜色。卡片底色与焦点高亮仍取自 KeydroidxTheme。
+	// 主题未提供「成功 / 警示」语义色，这里沿用同一组字面量，
+	// 避免同类状态在不同页面出现两种颜色。卡片底色与焦点高亮仍取自 KeydroidxTheme。
 	private static final int COLOR_TEXT = 0xFFE8EEF5;
 	private static final int COLOR_SUB = 0xFF90CAF9;
 	private static final int COLOR_ACCENT = 0xFF64B5F6;
@@ -138,7 +138,7 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 			firstResume = false;
 			return;
 		}
-		// 从其它应用或子页面（如「后台管理」改过保护名单）返回：重新读名单并刷新
+		// 从其它应用返回：重新读保护名单并刷新
 		if (settingsStorage != null) {
 			protectedSet = new HashSet<>(settingsStorage.getProtectedPackages());
 		}
@@ -513,15 +513,13 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 					prot ? KeydroidxIcons.ICON_LOCK_OPEN : KeydroidxIcons.ICON_SHIELD,
 					prot ? "取消保护" : "保护此应用", true, false, () -> toggleProtect(cur)));
 		}
-		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_BG_MANAGER,
-				"后台管理", true, false, this::openBgManager));
 		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_REFRESH,
 				"刷新列表", true, false, this::loadAsync));
 		if (!unavailable && cur != null) {
 			items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_DELETE,
 					"清理此任务", true, false, () -> confirmClearTask(cur)));
 			items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_CLEAR_ALL,
-					"清理全部后台", true, false, this::clearAllUnprotected));
+					"清理全部任务", true, false, this::clearAllUnprotected));
 		}
 
 		String title = (cur != null && !unavailable) ? "选项 · " + cur.name : "选项";
@@ -536,7 +534,7 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 		return KeydroidxRecentTasksHelper.bringToFront(act, t);
 	}
 
-	/** 切换保护状态并持久化（与「后台管理」页共用同一份名单）。 */
+	/** 切换保护状态并持久化。 */
 	private void toggleProtect(KeydroidxRecentTasksHelper.RecentTask t) {
 		boolean wasProtected = protectedSet.contains(t.taskKey);
 		if (wasProtected) {
@@ -568,21 +566,23 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 		KeydroidxLog.i(TAG, "弹出清理确认: " + t.name + " protected=" + prot);
 	}
 
-	/** 数字键 0：一键清理未保护后台（<b>无二次确认</b>，与「后台管理」页 0 键行为一致）。 */
+	/** 数字键 0：一键清理未保护任务（<b>无二次确认</b>）。 */
 	public boolean onCleanKey() {
-		KeydroidxLog.i(TAG, "数字键 0：一键清理未保护后台");
+		KeydroidxLog.i(TAG, "数字键 0：一键清理未保护任务");
 		clearAllUnprotected();
 		return true;
 	}
 
 	/**
-	 * 清理全部未保护后台（<b>无二次确认</b>；保护名单自动跳过）。必须在后台线程执行 shell。
+	 * 清理全部未保护任务（<b>无二次确认</b>；保护名单自动跳过）。必须在后台线程执行 shell。
 	 *
 	 * <p>清理对象是<b>本页列出的任务</b>而不是「正在运行的进程」：
 	 * {@link KeydroidxBgManagerHelper#clearBackgroundTasks} 只枚举存活进程，而最近任务列表是
 	 * 任务历史——被列出但进程已死的应用清不掉任何东西，用户会以为按键没反应。
-	 * 因此这里逐个 {@code am force-stop}：force-stop 会同时移除该应用的任务记录，
-	 * 清理后卡片才会真正消失。</p>
+	 * 因此这里逐个调 {@link KeydroidxBgManagerHelper#clearSingleTask}：它除了
+	 * {@code am force-stop} 杀进程，还会把对应的系统任务记录一并删除
+	 * （Android 5.0+ 走 {@code am stack remove}）。只 force-stop 是不够的——
+	 * 实测任务记录（{@code sz=0} 空壳）仍留在 recents 里，卡片不会消失。</p>
 	 */
 	private void clearAllUnprotected() {
 		if (!isAdded() || getContext() == null) return;
@@ -591,7 +591,7 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 			if (!protectedSet.contains(t.taskKey)) targets.add(t);
 		}
 		if (targets.isEmpty()) {
-			showToast(tasks.isEmpty() ? "没有可清理的后台应用" : "可清理的应用都已被保护");
+			showToast(tasks.isEmpty() ? "没有可清理的任务" : "可清理的应用都已被保护");
 			return;
 		}
 		final Context appCtx = requireContext().getApplicationContext();
@@ -610,7 +610,7 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 				}
 				int cleared = 0;
 				for (KeydroidxRecentTasksHelper.RecentTask t : targets) {
-					if (KeydroidxBgManagerHelper.clearSingleTask(appCtx, t.pkg, t.taskKey)) cleared++;
+					if (KeydroidxBgManagerHelper.clearSingleTask(appCtx, t.pkg, t.taskKey, t.taskId)) cleared++;
 				}
 				final int n = cleared;
 				KeydroidxLog.i(TAG, "一键清理完成: 目标=" + targets.size() + " 成功=" + n);
@@ -618,7 +618,7 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 					@Override
 					public void run() {
 						if (!isAdded() || getView() == null) return;
-						showToast(n > 0 ? "已清理 " + n + " 个后台应用" : "清理失败，请检查 mini_shizuku");
+						showToast(n > 0 ? "已清理 " + n + " 个任务" : "清理失败，请检查 mini_shizuku");
 						loadAsync();
 					}
 				});
@@ -634,7 +634,7 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 			@Override
 			public void run() {
 				KeydroidxBgManagerHelper.probeShizukuSync();
-				final boolean ok = KeydroidxBgManagerHelper.clearSingleTask(appCtx, t.pkg, t.taskKey);
+				final boolean ok = KeydroidxBgManagerHelper.clearSingleTask(appCtx, t.pkg, t.taskKey, t.taskId);
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
@@ -655,12 +655,6 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 	private void openShizukuPage() {
 		if (getActivity() instanceof KeydroidxDesktopActivity) {
 			((KeydroidxDesktopActivity) getActivity()).openFragment(new ShizukuFragment());
-		}
-	}
-
-	private void openBgManager() {
-		if (getActivity() instanceof KeydroidxDesktopActivity) {
-			((KeydroidxDesktopActivity) getActivity()).openFragment(new KeydroidxBackgroundManagerFragment());
 		}
 	}
 

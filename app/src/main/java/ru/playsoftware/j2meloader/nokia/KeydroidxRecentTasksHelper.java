@@ -149,14 +149,38 @@ public final class KeydroidxRecentTasksHelper {
 
 	/**
 	 * 枚举最近任务（<b>必须在后台线程调用</b>）。
-	 * 结果按最近使用时间倒序去重；挂机 jar 条目（若存在）固定置于首位。
+	 * 结果按系统任务栈顺序去重；挂机 jar 条目（若存在）固定置于首位。
 	 *
 	 * @return 可渲染的条目列表；任何异常都会降级为空列表，不会抛出
 	 */
 	public static List<RecentTask> enumerate(Context ctx) {
 		List<RecentTask> out = new ArrayList<>();
 		if (ctx == null) return out;
+		collect(ctx, out, true);
+		KeydroidxLog.i(TAG, "最近任务枚举完成: 条目=" + out.size());
+		return out;
+	}
 
+	/**
+	 * 只统计「最近任务」条目数（<b>必须在后台线程调用</b>），不加载应用名与图标。
+	 * <p>供桌面「最近任务」组件行实时显示。它与页面列表走<b>同一个</b> {@link #collect}，
+	 * 同源同规则，因此两处数字在结构上不可能对不上——这正是本次重构的目的
+	 * （此前组件数存活进程、页面数任务栈，两套口径必然不一致）。
+	 * 跳过名称与图标加载，是为了省掉每个包的 PackageManager 重 IPC。
+	 */
+	public static int countTasks(Context ctx) {
+		if (ctx == null) return 0;
+		List<RecentTask> out = new ArrayList<>();
+		collect(ctx, out, false);
+		return out.size();
+	}
+
+	/**
+	 * 收集最近任务条目：枚举 → 过滤 → （可选）加载名称图标 → 挂机 jar 置顶。
+	 *
+	 * @param loadUi true 加载应用名与图标（页面渲染用）；false 仅计数（桌面组件用）
+	 */
+	private static void collect(Context ctx, List<RecentTask> out, boolean loadUi) {
 		int mode = getMode(ctx);
 		List<Cand> cands = new ArrayList<>();
 		try {
@@ -171,16 +195,13 @@ public final class KeydroidxRecentTasksHelper {
 			KeydroidxLog.w(TAG, "枚举最近任务失败（降级为空列表）: " + e.getMessage());
 		}
 
-		buildTasks(ctx, cands, out, mode);
+		buildTasks(ctx, cands, out, mode, loadUi);
 
 		// 挂机 jar 固定置顶：它是唯一"确定还活着"的条目，且自身进程可枚举、不依赖任何特权
-		RecentTask midlet = buildMidletTask(ctx);
+		RecentTask midlet = buildMidletTask(ctx, loadUi);
 		if (midlet != null) {
 			out.add(0, midlet);
 		}
-
-		KeydroidxLog.i(TAG, "最近任务枚举完成: mode=" + mode + " 条目=" + out.size());
-		return out;
 	}
 
 	// ---- 通道 1：API < 21 的 getRecentTasks ----
@@ -329,14 +350,24 @@ public final class KeydroidxRecentTasksHelper {
 	// ============================================================
 
 	/**
-	 * 统一收口：按包名去重（保留最近一次）、排除自身、剔除已停止的空壳任务、
-	 * 过滤无可启动入口的应用（系统服务/输入法等），并加载名称与图标。
+	 * 统一收口：按包名去重（保留最近一次）、排除桌面自身、过滤无可启动入口的应用，
+	 * 并（可选）加载名称与图标。
 	 *
-	 * <p>
+	 * <p><b>「最近任务」的口径（重要）：</b>只认系统 recents 里的任务记录，即
+	 * <b>用户确实打开过</b>的东西。因此：</p>
+	 * <ul>
+	 *   <li><b>不</b>排除系统应用——用户打开过的「设置」本来就该出现在最近任务里
+	 *       （此前排除它属于"后台管理"思路，与最近任务语义冲突）；</li>
+	 *   <li>进程已死但任务记录还在的条目<b>照样显示</b>：那是系统内存回收，用户确实进入过、
+	 *       也没人清理它，这正是「最近任务」的固有形态；</li>
+	 *   <li>唯一主动隐去的是<b>本应用刚清理掉的</b>应用（见下方 {@code wasCleared} 说明）。</li>
+	 * </ul>
 	 *
-	 * @param mode {@link #getMode(Context)} 的结果；真实任务模式下才做存活校验
+	 * @param mode   {@link #getMode(Context)} 的结果；真实任务模式下才做存活校验
+	 * @param loadUi true 加载应用名与图标（页面渲染用）；false 仅做过滤与计数
 	 */
-	private static void buildTasks(Context ctx, List<Cand> cands, List<RecentTask> out, int mode) {
+	private static void buildTasks(Context ctx, List<Cand> cands, List<RecentTask> out,
+			int mode, boolean loadUi) {
 		if (cands.isEmpty()) return;
 		String self = ctx.getPackageName();
 		PackageManager pm = ctx.getPackageManager();
@@ -353,11 +384,11 @@ public final class KeydroidxRecentTasksHelper {
 			if (!unique.containsKey(c.pkg)) unique.put(c.pkg, c);
 		}
 
-		// 真实任务模式：任务记录 ≠ 应用还活着。am force-stop（含本应用的 0 键清理、系统查杀）
-		// 只杀进程，任务记录会变成 sz=0 的空壳继续留在系统 recents 里；若不过滤，页面会列出
-		// 一堆点进去只能冷启动的"尸体卡"，且与桌面组件的后台计数对不上。
-		// 这里用与后台计数同一套存活判据（ps -A / getRunningAppProcesses）过滤；
-		// 无法判断（5.0+ 未激活 mini_shizuku）时返回 null，跳过过滤以免误杀有效条目。
+		// 存活判据只有一个用途：识别「本应用刚清理掉的」条目。
+		// 清理只杀进程、任务记录不会消失（实测 4.4 与 Android 13 均如此；13 需要
+		// am stack remove 才能真删），所以清完必须靠 wasCleared 把卡片隐去，否则
+		// 用户会觉得"清了等于没清"。该标记只在内存里（进程重启即失效）：
+		// 重启后这些条目会以"点进去需冷启动"的形态回来，属于无删栈能力时的已知取舍。
 		Set<String> alive = mode == MODE_REAL_TASK
 				? KeydroidxBgManagerHelper.getAlivePackages(ctx) : null;
 
@@ -366,11 +397,12 @@ public final class KeydroidxRecentTasksHelper {
 			Cand c = e.getValue();
 			if (alive != null) {
 				if (!alive.contains(pkg)) {
-					// 进程已不在：任务为空壳（刚被清理或已被系统查杀），不展示
-					KeydroidxLog.d(TAG, "跳过已停止任务: " + pkg);
-					continue;
-				}
-				if (KeydroidxBgManagerHelper.wasCleared(pkg)) {
+					// 进程已死：只有「本应用清的」才隐去；系统回收的照样显示
+					if (KeydroidxBgManagerHelper.wasCleared(pkg)) {
+						KeydroidxLog.d(TAG, "跳过已清理任务: " + pkg);
+						continue;
+					}
+				} else if (KeydroidxBgManagerHelper.wasCleared(pkg)) {
 					// 进程还在 = 用户又从图标把它打开了，撤销「已清理」标记
 					KeydroidxBgManagerHelper.unmarkCleared(pkg);
 					KeydroidxLog.i(TAG, "已清理包检测到重新启动，撤销标记: " + pkg);
@@ -381,17 +413,20 @@ public final class KeydroidxRecentTasksHelper {
 				continue;
 			}
 			try {
-				// 无可启动入口的应用（系统服务、输入法、Provider 进程等）不是"任务"
+				// 无可启动入口的应用（系统服务、Provider 进程等）不是"任务"
 				Intent launch = pm.getLaunchIntentForPackage(pkg);
 				if (launch == null) continue;
 				ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-				CharSequence label = pm.getApplicationLabel(ai);
-				String name = label != null ? label.toString() : pkg;
+				String name = pkg;
 				Drawable icon = null;
-				try {
-					icon = pm.getApplicationIcon(ai);
-				} catch (Exception ie) {
-					KeydroidxLog.w(TAG, "加载图标失败 " + pkg + ": " + ie.getMessage());
+				if (loadUi) {
+					CharSequence label = pm.getApplicationLabel(ai);
+					name = label != null ? label.toString() : pkg;
+					try {
+						icon = pm.getApplicationIcon(ai);
+					} catch (Exception ie) {
+						KeydroidxLog.w(TAG, "加载图标失败 " + pkg + ": " + ie.getMessage());
+					}
 				}
 				out.add(new RecentTask(pkg, name, pkg, c.taskId, c.agoMs, icon));
 			} catch (PackageManager.NameNotFoundException nfe) {
@@ -401,13 +436,17 @@ public final class KeydroidxRecentTasksHelper {
 		}
 	}
 
-	/** 构造挂机 jar 条目（读跨进程状态文件 + 校验 :midlet 进程存活）。 */
-	private static RecentTask buildMidletTask(Context ctx) {
+	/**
+	 * 构造挂机 jar 条目（读跨进程状态文件 + 校验 :midlet 进程存活）。
+	 *
+	 * @param loadUi false 时不加载图标（桌面组件仅计数，省一次图片解码）
+	 */
+	private static RecentTask buildMidletTask(Context ctx, boolean loadUi) {
 		try {
 			MidletStateStore.RunningInfo running = MidletStateStore.getRunning(ctx);
 			if (running == null) return null;
 			String key = MidletStateStore.taskKey(running.appPath);
-			Drawable icon = KeydroidxBgManagerHelper.loadMidletIcon(ctx, running.appPath);
+			Drawable icon = loadUi ? KeydroidxBgManagerHelper.loadMidletIcon(ctx, running.appPath) : null;
 			// 挂机中 = 正在前台/后台运行，视为「刚刚」
 			return new RecentTask(key, running.appName, key, -1, 1000L, icon);
 		} catch (Exception e) {

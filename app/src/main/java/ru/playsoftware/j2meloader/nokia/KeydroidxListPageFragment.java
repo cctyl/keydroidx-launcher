@@ -100,7 +100,7 @@ public abstract class KeydroidxListPageFragment extends KeydroidxPageFragment {
 
 	/**
 	 * 左右方向键的处理钩子。<b>默认消费（返回 true，无效果）</b>。
-	 * 子类可覆写实现左右切页签（如 {@code KeydroidxBackgroundManagerFragment}）或其它操作。
+	 * 子类可覆写实现左右切页签或其它操作。
 	 *
 	 * @param direction {@code KeydroidxKeyBinding.ACTION_LEFT} 或 {@code ACTION_RIGHT}
 	 * @return true 表示已消费该事件

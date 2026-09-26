@@ -93,8 +93,8 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 	private Handler bubbleHandler;
 	private static final long BUBBLE_DURATION = 2000;
 
-	/** 后台管理组件计数缓存（由后台线程刷新，主线程只读，避免 TCP 卡顿）。 */
-	private volatile int cachedBgCount = -1;
+	/** 桌面「最近任务」组件行的条目数缓存（后台线程刷新，主线程只读，避免 TCP 卡顿）。 */
+	private volatile int cachedTaskCount = -1;
 
 	/**
 	 * 离开过桌面后才需要在 onResume 重建内容区。
@@ -330,7 +330,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		// 通知条：订阅通知变化并按最新快照刷新（从通知中心清除后回桌面立即同步）
 		KeydroidxNotificationRepository.get().addListener(notifRepoListener);
 		refreshNotifBar();
-		// 异步刷新后台管理组件计数（countBackgroundProcesses 含 shizuku TCP，不能在主线程）
+		// 异步刷新「最近任务」组件计数（含 shizuku TCP / dumpsys，不能在主线程）
 		refreshBgCountAsync();
 		// 音乐组件读取播放状态首选 MediaSession，它依赖通知使用权；
 		// 未授予时主动弹窗说明并给一键入口，而不是默默退化到会冷启动音乐的 Provider 查询
@@ -377,7 +377,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		KeydroidxNotificationRepository.get().removeListener(notifRepoListener);
 	}
 
-	/** 后台线程计算后台进程数并回主线程刷新「后台管理」组件行（避免主线程 TCP 卡顿）。 */
+	/** 后台线程统计「最近任务」条目数并回主线程刷新组件行（避免主线程 TCP 卡顿）。 */
 	private void refreshBgCountAsync() {
 		Context c = getContext();
 		if (c == null) return;
@@ -388,14 +388,14 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			@Override
 			public void run() {
 				KeydroidxBgManagerHelper.probeShizukuSync();
-				final int count = KeydroidxBgManagerHelper.countBackgroundProcesses(appCtx);
+				final int count = KeydroidxRecentTasksHelper.countTasks(appCtx);
 				Activity activity = getActivity();
 				if (activity == null) return;
 				activity.runOnUiThread(new Runnable() {
 					@Override
 					public void run() {
 						if (!isAdded() || getView() == null) return;
-						cachedBgCount = count;
+						cachedTaskCount = count;
 						// 只改这一行的文字：整体重建会连带重查内存/存储/音乐 Provider
 						updateBgManagerRowText(getView());
 					}
@@ -1527,6 +1527,11 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 
 	/** 获取组件主标签文字。锁屏组件动态显示「按下XX键锁屏」（XX 为当前绑定的锁屏键名，非 keycode）。 */
 	private String getWidgetLabel(KeydroidxWidgetItem item) {
+		// 「最近任务」组件：item.label 是添加组件时写入的历史文案（曾叫"后台管理"），
+		// 按当前类型名渲染，避免老组件一直停留在旧名字上
+		if (item.type == KeydroidxWidgetItem.TYPE_BG_MANAGER) {
+			return KeydroidxWidgetItem.getTypeName(item.type);
+		}
 		if (item.type != KeydroidxWidgetItem.TYPE_LOCK_SCREEN) return item.label;
 		KeydroidxDesktopActivity host = (KeydroidxDesktopActivity) requireActivity();
 		KeydroidxKeyBinding kb = host != null ? host.getKeyBinding() : null;
@@ -1550,10 +1555,10 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				if (!KeydroidxBgManagerHelper.isBgManagerAvailable()) {
 					return "未激活";
 				}
-				if (cachedBgCount < 0) {
+				if (cachedTaskCount < 0) {
 					return "…";
 				}
-				return cachedBgCount + " 个后台";
+				return cachedTaskCount + " 个任务";
 			case KeydroidxWidgetItem.TYPE_IP:
 				return getWifiIpAddress();
 			case KeydroidxWidgetItem.TYPE_QS_TILE:

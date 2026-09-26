@@ -161,7 +161,11 @@ public final class KeydroidxBgManagerHelper {
 		return processName != null && processName.startsWith(self + ":");
 	}
 
-	/** 是否为不可清理的系统应用（纯系统应用，非用户更新过的系统应用）。 */
+	/**
+	 * 是否为不可清理的系统应用（纯系统应用，非用户更新过的系统应用）。
+	 * <p>包级可见：供「最近任务」页复用，保证两处对"系统应用"的口径完全一致
+	 * （见 {@link KeydroidxRecentTasksHelper#buildTasks}）。
+	 */
 	private static boolean isSystemApp(ApplicationInfo ai) {
 		if (ai == null) return false;
 		if ((ai.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0) return false;
@@ -362,34 +366,6 @@ public final class KeydroidxBgManagerHelper {
 		}
 	}
 
-	/** 统计当前后台进程数（按包名去重，排除桌面自身与系统应用，含挂机 jar）。供桌面组件行实时显示。 */
-	public static int countBackgroundProcesses(Context ctx) {
-		Set<String> pkgs = enumerateBackgroundPackages(ctx);
-		int n = 0;
-		if (!pkgs.isEmpty()) {
-			PackageManager pm = ctx.getPackageManager();
-			if (pm == null) {
-				n = pkgs.size();
-			} else {
-				for (String pkg : pkgs) {
-					try {
-						ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-						if (isSystemApp(ai)) continue;
-					} catch (PackageManager.NameNotFoundException e) {
-						KeydroidxLog.w(TAG, "countBackgroundProcesses failed: " + e.getMessage());
-						continue;
-					}
-					n++;
-				}
-			}
-		}
-		// 挂机 jar 计入后台进程数（不依赖 shizuku）
-		if (MidletStateStore.getRunning(ctx) != null) {
-			n++;
-		}
-		return n;
-	}
-
 	/**
 	 * 枚举后台任务（含图标与保护状态），按名称排序。
 	 * 可在后台线程调用（内部有 PackageManager 查询 / shizuku 命令）。已卸载的残留进程
@@ -548,9 +524,13 @@ public final class KeydroidxBgManagerHelper {
 	 *
 	 * @param pkg     包名；挂机 jar 条目可传条目 key
 	 * @param taskKey 任务标识（{@code midlet:<appPath>} 或包名）
+	 * @param taskId  系统任务栈 id（来自 dumpsys / getRecentTasks）；未知传 &lt;= 0。
+	 *                Android 5.0+ 用它把任务记录一并删除，卡片才会真正从「最近任务」消失——
+	 *                实测 {@code am force-stop} <b>只杀进程</b>，任务记录会以 {@code sz=0} 的
+	 *                形态继续留在系统 recents 里。
 	 * @return 是否已下发清理
 	 */
-	public static boolean clearSingleTask(Context ctx, String pkg, String taskKey) {
+	public static boolean clearSingleTask(Context ctx, String pkg, String taskKey, int taskId) {
 		if (ctx == null) return false;
 		// 挂机 jar：显式广播 → :midlet 进程内优雅销毁（与批量清理同一链路）
 		if (MidletStateStore.isMidletTaskKey(taskKey)) {
@@ -568,8 +548,16 @@ public final class KeydroidxBgManagerHelper {
 				return false;
 			}
 			boolean ok = Shizuku.exec("am force-stop " + pkg);
+			if (ok && taskId > 0) {
+				// force-stop 不清任务记录（实测 Android 13 上任务变成 sz=0 仍留在 recents），
+				// 追加 removeTask 才能真正抹掉「最近任务」卡片（实测有效）。
+				// 老版本若不支持该子命令，仅报错不影响上面的进程清理。
+				Shizuku.exec("am stack remove " + taskId);
+			}
+			// 保留「已清理」标记：拿不到 taskId（或删栈失败）时，靠它把该条目从列表隐去
 			if (ok) markCleared(pkg);
-			KeydroidxLog.i(TAG, "手动清理单任务(force-stop): " + pkg + " ok=" + ok);
+			KeydroidxLog.i(TAG, "手动清理单任务(force-stop"
+					+ (taskId > 0 ? "+removeTask" : "") + "): " + pkg + " ok=" + ok);
 			return ok;
 		}
 		try {

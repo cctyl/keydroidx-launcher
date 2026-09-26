@@ -103,7 +103,7 @@ public class KeydroidxWidgetItem {
 			case TYPE_STORAGE: return "存储信息";
 			case TYPE_USAGE: return "使用时长";
 			case TYPE_LOCK_SCREEN: return "锁屏";
-			case TYPE_BG_MANAGER: return "后台管理";
+			case TYPE_BG_MANAGER: return "最近任务";
 			case TYPE_IP: return "IP地址";
 			case TYPE_QS_TILE: return "快捷开关";
 			case TYPE_MUSIC_PLAYER: return "正在播放";
@@ -122,7 +122,7 @@ public class KeydroidxWidgetItem {
 			case TYPE_STORAGE: return "存储信息";
 			case TYPE_USAGE: return "使用时长";
 			case TYPE_LOCK_SCREEN: return "锁屏";
-			case TYPE_BG_MANAGER: return "后台管理";
+			case TYPE_BG_MANAGER: return "最近任务";
 			case TYPE_IP: return "IP地址";
 			case TYPE_QS_TILE: return "快捷开关";
 			case TYPE_MUSIC_PLAYER: return "正在播放";

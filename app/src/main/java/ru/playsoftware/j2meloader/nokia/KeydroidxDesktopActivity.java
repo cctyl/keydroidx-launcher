@@ -529,16 +529,10 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		int action = keyBinding.resolveAction(event);
 
 		if (action < 0) {
-			// 数字键 0：在后台管理 / 最近任务窗口内一键清理
+			// 数字键 0：在最近任务窗口内一键清理
 			// （0 键默认未绑定任何动作，仅在目标页面生效）
 			if (event.getKeyCode() == KeyEvent.KEYCODE_0) {
 				Fragment bgHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
-				if (bgHost instanceof KeydroidxBackgroundManagerFragment) {
-					KeydroidxLog.i("Desktop", "数字键 0：后台管理一键清理");
-					((KeydroidxBackgroundManagerFragment) bgHost).onCleanKey();
-					lastHandledDownKeyCode = event.getKeyCode();
-					return true;
-				}
 				if (bgHost instanceof KeydroidxRecentTasksFragment) {
 					KeydroidxLog.i("Desktop", "数字键 0：最近任务一键清理未保护");
 					((KeydroidxRecentTasksFragment) bgHost).onCleanKey();
