@@ -15,6 +15,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,11 +41,13 @@ import ru.playsoftware.j2meloader.R;
  *
  * <p><b>交互（与设计稿 docs/recent-apps/prototype.html 一致）：</b></p>
  * <ul>
- *   <li>2 列卡片网格：图标 + 应用名 + 最近时间；已保护应用右上角绿色盾牌；</li>
+ *   <li>2 列最近任务卡：头部（图标 + 应用名 + 最近时间）+ 预览区（应用图标水印作「截图」占位），
+ *       视觉对齐系统最近任务而非应用列表；已保护应用预览区右上角绿色盾牌；</li>
  *   <li>方向键循环移动焦点；确认键把该应用恢复到前台（不重启，回到它之前的界面）；</li>
  *   <li>左软键 = 选项（打开 / 保护此应用 / 刷新 / 清理此任务 / 清理全部任务）；</li>
  *   <li>右软键 / 返回键 = 退出；</li>
- *   <li><b>数字键 0 = 一键清理未保护任务（无二次确认）</b>；「清理全部任务」同样无需确认。</li>
+ *   <li><b>数字键 5 = 清理选中的任务（无二次确认，不受保护名单限制）</b>；
+ *       <b>数字键 0 = 一键清理未保护任务（无二次确认）</b>。</li>
  * </ul>
  *
  * <p><b>保护名单语义：</b>持久化于 {@link KeydroidxSettingsStorage}，重启不丢。
@@ -61,10 +64,13 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 
 	/** 卡片网格列数。 */
 	private static final int COLUMNS = 2;
-	/** 卡片高度（dp）：对齐排版规范「Grid Card」。 */
-	private static final int CARD_H_DP = 56;
-	/** 应用图标尺寸（dp）。 */
-	private static final int ICON_DP = 26;
+	/** 卡片总高（dp）：头部行（图标+应用名+时间）+ 预览区，模拟系统最近任务卡。 */
+	private static final int CARD_H_DP = 70;
+	/** 头部行高（dp）。 */
+	private static final int HEAD_H_DP = 20;
+	/** 头部图标 / 预览区水印图标尺寸（dp）。 */
+	private static final int ICON_DP = 13;
+	private static final int PREVIEW_ICON_DP = 22;
 	/** 保护盾牌角标尺寸（dp）。 */
 	private static final int PROT_FLAG_DP = 11;
 
@@ -79,7 +85,6 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 	private LinearLayout gridLayout;
 	private ScrollView scroll;
 	private TextView tvMode;
-	private TextView tvSummary;
 	private TextView tvHint;
 	private View emptyBox;
 	private ImageView emptyIcon;
@@ -113,7 +118,6 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 		gridLayout = view.findViewById(R.id.recentGridLayout);
 		scroll = view.findViewById(R.id.recentScroll);
 		tvMode = view.findViewById(R.id.tvRecentMode);
-		tvSummary = view.findViewById(R.id.tvRecentSummary);
 		tvHint = view.findViewById(R.id.tvRecentHint);
 		emptyBox = view.findViewById(R.id.recentEmptyBox);
 		emptyIcon = view.findViewById(R.id.recentEmptyIcon);
@@ -214,22 +218,9 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 		tvMode.setText(KeydroidxRecentTasksHelper.getModeLabel(mode));
 		tvMode.setTextColor(mode == KeydroidxRecentTasksHelper.MODE_REAL_TASK ? COLOR_OK : COLOR_WARN);
 
-		if (loading) {
-			tvSummary.setText("正在读取…");
-			tvHint.setText("");
-			return;
-		}
-		if (mode == KeydroidxRecentTasksHelper.MODE_UNAVAILABLE) {
-			tvSummary.setText("数据源不可用");
-			tvHint.setText("");
-			return;
-		}
-		int prot = 0;
-		for (KeydroidxRecentTasksHelper.RecentTask t : tasks) {
-			if (protectedSet.contains(t.taskKey)) prot++;
-		}
-		tvSummary.setText("未保护 " + (tasks.size() - prot) + " · 已保护 " + prot);
-		tvHint.setText("按 0 键清理");
+		// 操作提示统一放在顶部信息区一行；加载中/不可用状态由空态容器与徽标表达，提示行留空
+		tvHint.setText(loading || mode == KeydroidxRecentTasksHelper.MODE_UNAVAILABLE
+				? "" : "确认键回到应用 · 5 清理选中 · 0 清理全部");
 	}
 
 	/** 空态 / 未激活态 / 加载态（三者共用同一容器，文案与图标按状态切换）。 */
@@ -289,50 +280,122 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 			if (row != null) row.addView(cell);
 			cellViews[i] = cell;
 		}
+		// 末行不满 2 个时补透明占位：卡片宽度由 weight 均分决定，
+		// 若最后一个 cell 独占一行会吞掉整行剩余宽度、被撑成全宽卡片。
+		if (tasks.size() % COLUMNS != 0 && row != null) {
+			View filler = new Space(ctx);
+			LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(
+					0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+			flp.setMarginStart(gap);
+			filler.setLayoutParams(flp);
+			row.addView(filler);
+		}
 	}
 
-	/** 单张卡片：图标 + 应用名 + 最近时间（+ 已保护盾牌角标）。 */
+	/**
+	 * 单张最近任务卡：头部行（图标 + 应用名 + 最近时间）+ 预览区
+	 * （居中大号半透明应用图标充当「截图」占位），视觉对齐系统最近任务而非应用列表。
+	 * 已保护盾牌角标位于预览区右上角。
+	 */
 	private View createCard(Context ctx, KeydroidxRecentTasksHelper.RecentTask t) {
 		FrameLayout cell = new FrameLayout(ctx);
 		cell.setClickable(true);
 		cell.setBackground(createCardBackground(ctx));
+		int padH = KeydroidxDimens.dp(getResources(), 5);
+		int padV = KeydroidxDimens.dp(getResources(), 3);
 
 		LinearLayout inner = new LinearLayout(ctx);
 		inner.setOrientation(LinearLayout.VERTICAL);
-		inner.setGravity(Gravity.CENTER);
+		inner.setPadding(padH, padV, padH, padV);
 		inner.setLayoutParams(new FrameLayout.LayoutParams(
 				ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-		int iconPx = KeydroidxDimens.dp(getResources(), ICON_DP);
+		// 头部行：小图标 + 应用名（撑满剩余宽）+ 距今时间
+		LinearLayout head = new LinearLayout(ctx);
+		head.setOrientation(LinearLayout.HORIZONTAL);
+		head.setGravity(Gravity.CENTER_VERTICAL);
+		head.setLayoutParams(new LinearLayout.LayoutParams(
+				ViewGroup.LayoutParams.MATCH_PARENT,
+				KeydroidxDimens.dp(getResources(), HEAD_H_DP)));
+
 		ImageView icon = new ImageView(ctx);
+		int iconPx = KeydroidxDimens.dp(getResources(), ICON_DP);
 		icon.setLayoutParams(new LinearLayout.LayoutParams(iconPx, iconPx));
 		icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
 		icon.setImageDrawable(t.icon != null
 				? t.icon
 				: KeydroidxIcons.get(ctx, KeydroidxIcons.ICON_APP, 0xFFFFFFFF, ICON_DP));
-		inner.addView(icon);
+		head.addView(icon);
 
 		TextView name = new TextView(ctx);
 		LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(
-				ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-		np.topMargin = KeydroidxDimens.dp(getResources(), 1);
+				0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+		np.setMarginStart(KeydroidxDimens.dp(getResources(), 3));
+		np.setMarginEnd(KeydroidxDimens.dp(getResources(), 2));
 		name.setLayoutParams(np);
 		name.setText(t.name);
 		name.setTextColor(COLOR_TEXT);
-		KeydroidxFontManager.textSize(name, 12);
+		KeydroidxFontManager.textSize(name, 11);
 		name.setSingleLine(true);
 		name.setEllipsize(TextUtils.TruncateAt.END);
-		name.setMaxWidth(KeydroidxDimens.dp(getResources(), 92));
-		inner.addView(name);
+		head.addView(name);
 
+		// 右上角 ×：纯装饰（对齐系统最近任务样式），不可聚焦不可点，
+		// 点击落在整卡上仍是「回到应用」；清理走数字键 5 或选项菜单
+		TextView close = new TextView(ctx);
+		close.setText("×");
+		close.setTextColor(COLOR_SUB);
+		KeydroidxFontManager.textSize(close, 13);
+		close.setIncludeFontPadding(false);
+		close.setClickable(false);
+		close.setFocusable(false);
+		close.setContentDescription(null);
+		LinearLayout.LayoutParams xlp = new LinearLayout.LayoutParams(
+				ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+		xlp.gravity = Gravity.CENTER_VERTICAL;
+		xlp.setMarginStart(KeydroidxDimens.dp(getResources(), 2));
+		close.setLayoutParams(xlp);
+		head.addView(close);
+
+		inner.addView(head);
+
+		// 预览区：占满卡片剩余高度，模拟系统最近任务的「截图」区域
+		FrameLayout preview = new FrameLayout(ctx);
+		LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
+				ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+		plp.topMargin = KeydroidxDimens.dp(getResources(), 3);
+		preview.setLayoutParams(plp);
+		preview.setBackground(createPreviewBackground(ctx));
+
+		ImageView watermark = new ImageView(ctx);
+		int wPx = KeydroidxDimens.dp(getResources(), PREVIEW_ICON_DP);
+		FrameLayout.LayoutParams wlp = new FrameLayout.LayoutParams(wPx, wPx);
+		wlp.gravity = Gravity.CENTER;
+		watermark.setLayoutParams(wlp);
+		watermark.setScaleType(ImageView.ScaleType.FIT_CENTER);
+		watermark.setImageDrawable(t.icon != null
+				? t.icon
+				: KeydroidxIcons.get(ctx, KeydroidxIcons.ICON_APP, 0xFFFFFFFF, PREVIEW_ICON_DP));
+		watermark.setAlpha(0.3f);
+		preview.addView(watermark);
+
+		// 「距今多久」放在预览区左下角（头部行右侧让位给装饰 ×）
 		String ago = formatAgo(t.agoMs);
 		if (!ago.isEmpty()) {
 			TextView time = new TextView(ctx);
+			FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(
+					ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+			tlp.gravity = Gravity.BOTTOM | Gravity.START;
+			tlp.setMargins(KeydroidxDimens.dp(getResources(), 3), 0,
+					0, KeydroidxDimens.dp(getResources(), 2));
+			time.setLayoutParams(tlp);
 			time.setText(ago);
 			time.setTextColor(COLOR_SUB);
-			KeydroidxFontManager.textSize(time, 9);
-			inner.addView(time);
+			KeydroidxFontManager.textSize(time, 8);
+			preview.addView(time);
 		}
+		inner.addView(preview);
+
 		cell.addView(inner);
 
 		if (protectedSet.contains(t.taskKey)) {
@@ -341,7 +404,8 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 					KeydroidxDimens.dp(getResources(), PROT_FLAG_DP),
 					KeydroidxDimens.dp(getResources(), PROT_FLAG_DP));
 			fp.gravity = Gravity.TOP | Gravity.END;
-			fp.topMargin = KeydroidxDimens.dp(getResources(), 3);
+			fp.topMargin = padV + KeydroidxDimens.dp(getResources(), HEAD_H_DP)
+					+ KeydroidxDimens.dp(getResources(), 3);
 			fp.rightMargin = KeydroidxDimens.dp(getResources(), 3);
 			flag.setLayoutParams(fp);
 			flag.setImageDrawable(KeydroidxIcons.get(ctx, KeydroidxIcons.ICON_SHIELD, COLOR_OK, PROT_FLAG_DP));
@@ -358,6 +422,24 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 		gd.setColor(theme.cardBgColor);
 		gd.setCornerRadius(KeydroidxDimens.dp(getResources(), 6));
 		return gd;
+	}
+
+	/** 预览区底色：卡片底色压暗，模拟系统最近任务的「截图」区域，与头部形成层次。 */
+	private Drawable createPreviewBackground(Context ctx) {
+		KeydroidxTheme.ThemeDef theme = KeydroidxTheme.getCurrentTheme(ctx);
+		GradientDrawable gd = new GradientDrawable();
+		gd.setShape(GradientDrawable.RECTANGLE);
+		gd.setColor(darken(theme.cardBgColor, 0.65f));
+		gd.setCornerRadius(KeydroidxDimens.dp(getResources(), 4));
+		return gd;
+	}
+
+	/** 颜色按比例压暗（保留 alpha）。 */
+	private static int darken(int color, float factor) {
+		int r = (int) (((color >> 16) & 0xFF) * factor);
+		int g = (int) (((color >> 8) & 0xFF) * factor);
+		int b = (int) ((color & 0xFF) * factor);
+		return (color & 0xFF000000) | (r << 16) | (g << 8) | b;
 	}
 
 	/** 「距今多久」文案；未知（&lt;=0）返回空串，卡片不显示时间行。 */
@@ -570,6 +652,21 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 	public boolean onCleanKey() {
 		KeydroidxLog.i(TAG, "数字键 0：一键清理未保护任务");
 		clearAllUnprotected();
+		return true;
+	}
+
+	/**
+	 * 数字键 5：清理当前选中（焦点所在）的任务。与「清理此任务」同一手动清理语义
+	 * ——不受保护名单限制、<b>无二次确认</b>（与 0 键批量清理保持一致的按键风格）。
+	 */
+	public boolean onClearFocusedKey() {
+		KeydroidxRecentTasksHelper.RecentTask t = focusedTask();
+		if (t == null) {
+			showToast("没有选中的任务");
+			return true;
+		}
+		KeydroidxLog.i(TAG, "数字键 5：清理选中任务 " + t.taskKey);
+		clearSingleTask(t);
 		return true;
 	}
 
