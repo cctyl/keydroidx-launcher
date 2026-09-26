@@ -3,11 +3,14 @@ package ru.playsoftware.j2meloader.nokia;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.LruCache;
@@ -63,7 +66,9 @@ public final class KeydroidxAppIconCache {
 		Context ctx = context.getApplicationContext();
 		memCache = new LruCache<>(MEM_MAX);
 		prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-		diskDir = new File(ctx.getCacheDir(), "app_icons");
+		// v2：v1 的 PNG 是按自适应图标 108dp 画布原样渲染的（前景仅占约 66%），
+		// 与满幅图标混排时视觉尺寸跳变；换目录名让旧缓存一次性重建。
+		diskDir = new File(ctx.getCacheDir(), "app_icons_v2");
 		if (!diskDir.exists() && !diskDir.mkdirs()) {
 			KeydroidxLog.w("AppIconCache", "创建磁盘缓存目录失败: " + diskDir.getAbsolutePath());
 		}
@@ -123,19 +128,50 @@ public final class KeydroidxAppIconCache {
 		try {
 			Drawable icon = context.getPackageManager().getActivityIcon(component);
 			if (icon != null) {
-				memCache.put(packageName, icon);
-				saveToDisk(packageName, icon, file);
+				// 自适应图标归一化为满幅位图，避免与满幅图标混排时视觉尺寸跳变
+				Drawable normalized = normalizeFullBleed(context.getResources(), icon);
+				memCache.put(packageName, normalized);
+				saveToDisk(packageName, normalized, file);
 				if (lastUpdate >= 0) {
 					prefs.edit().putLong(KEY_UPDATE_TIME + ":" + packageName, lastUpdate).apply();
 				}
 				KeydroidxLog.i("AppIconCache", packageName + " 系统加载完成并写入缓存");
-				post(packageName, icon, callback);
+				post(packageName, normalized, callback);
 				return;
 			}
 		} catch (Exception e) {
 			KeydroidxLog.w("AppIconCache", "系统加载图标失败 " + packageName + ": " + e.getMessage());
 		}
 		post(packageName, null, callback);
+	}
+
+	/**
+	 * 图标归一化：把 API 26+ 的自适应图标（AdaptiveIconDrawable）渲染成满幅位图。
+	 *
+	 * <p>自适应图标画布为 108dp，前景安全区只有约 72dp（66%）。直接放进
+	 * FIT_CENTER 的固定格子里会显得偏小，与满幅位图（S60 图标、旧式 PNG
+	 * 图标）混排时视觉尺寸来回跳变，表现为进入功能表时图标「先小后大」
+	 * 闪烁。这里把安全区放大裁切到满幅（缩放 108/72 倍）再渲染为位图；
+	 * 其余图标原样返回。</p>
+	 *
+	 * @param res 用于创建 BitmapDrawable
+	 * @param icon 原始图标，可为 null（原样返回 null）
+	 */
+	public static Drawable normalizeFullBleed(Resources res, Drawable icon) {
+		if (icon == null) return null;
+		if (Build.VERSION.SDK_INT >= 26 && icon instanceof AdaptiveIconDrawable) {
+			int size = Math.max(icon.getIntrinsicWidth(), icon.getIntrinsicHeight());
+			if (size <= 0) size = 108;
+			Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+			Canvas canvas = new Canvas(bmp);
+			// 108dp 画布中可见安全区为 72dp，放大 1.5 倍使前景铺满整幅
+			float scale = 108f / 72f;
+			canvas.scale(scale, scale, size / 2f, size / 2f);
+			icon.setBounds(0, 0, size, size);
+			icon.draw(canvas);
+			return new BitmapDrawable(res, bmp);
+		}
+		return icon;
 	}
 
 	/** 把任意 Drawable 渲染成 Bitmap（PNG 写盘用） */

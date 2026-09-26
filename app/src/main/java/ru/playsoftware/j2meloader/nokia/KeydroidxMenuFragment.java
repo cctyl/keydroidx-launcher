@@ -310,34 +310,49 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		// 先初始化滑动监听（在 buildCurrentPage 之前，使每个 cell 都能挂载）
 		initSwipeListener(view);
 
-		// 按默认行数预分配页内数组，供首次同步构建使用
+		// 先尝试同步计算行数：从桌面进入功能表时 midPanel 早已布局完成，
+		// panelH 实测值立即可用，首帧就能按正确行数/行高构建一版到位。
+		// 若仍按默认行数构建、post 后再重建，用户会看到一版「行高被拉伸」
+		// 的网格一闪而过（进入功能表闪烁的根源）。
+		KeydroidxDesktopActivity host = (KeydroidxDesktopActivity) requireActivity();
+		boolean panelReady = host.getMidPanelHeight() > 0;
+		if (panelReady) {
+			computeRowsPerPage();
+		}
+
+		// 按行数预分配页内数组，供首次同步构建使用
 		cellViews = new View[perPage];
 		pageItems = new KeydroidxAppItem[perPage];
 
-		// 有进程内缓存时先同步构建一版：零 IPC，首帧直接出图。
+		// 有进程内缓存且行数已实测时先同步构建一版：零 IPC，首帧直接出图。
 		// 原先全部构建都推迟到 view.post() 之后，期间 appGrid 是空的，
 		// 用户会看到「只有标题、没有图标」的空白功能表闪一下。
 		boolean hadCache = applyCachedItems();
-		if (hadCache) {
+		if (hadCache && panelReady) {
 			buildCurrentPage();
 			setFocusPos(0);
 			KeydroidxLog.i("Menu", "复用进程内应用列表缓存，首帧直接构建：" + items.size() + " 项");
 		}
+		final boolean builtFirstPage = hadCache && panelReady;
 
-		// 延迟到 midPanel 布局完成后再按真实高度计算行数并重建（panelH 需要实测反推）
+		// 延迟到 midPanel 布局完成后再按真实高度计算行数（冷启动时 panelH 尚不可用）
 		view.post(() -> {
 			if (!isAdded()) return;
 			int oldRows = rowsPerPage;
 			computeRowsPerPage();
-			if (rowsPerPage != oldRows) {
+			boolean rowsChanged = rowsPerPage != oldRows;
+			if (rowsChanged) {
 				// 行数变化：重新分配页内数组
 				cellViews = new View[perPage];
 				pageItems = new KeydroidxAppItem[perPage];
 			}
 			if (applyCachedItems()) {
-				buildCurrentPage();
-				setFocusPos(0);
-				KeydroidxLog.i("Menu", "功能表初始化完成（panelH 已可用，复用缓存）：共 " + items.size()
+				// 首帧已按正确行数构建且行数未变 → 跳过重建，消除闪烁
+				if (!builtFirstPage || rowsChanged) {
+					buildCurrentPage();
+					setFocusPos(0);
+				}
+				KeydroidxLog.i("Menu", "功能表初始化完成：共 " + items.size()
 						+ " 项，" + totalPages + " 页，每页 " + perPage
 						+ " 格（" + COLS + "×" + rowsPerPage + "）");
 				// 缓存命中也要静默后台校准一次：Fragment View 销毁期间（在返回栈中）
@@ -885,7 +900,15 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		if (placeholderIcon == null) {
 			try {
 				Drawable d = ContextCompat.getDrawable(requireContext(), R.mipmap.ic_launcher);
-				placeholderIcon = d != null ? d.mutate() : null;
+				if (d != null) {
+					// 占位图与真实图标做同样的满幅归一化：API 26+ 的 ic_launcher 是
+					// 自适应图标（画布 108dp、前景仅占 66%），不归一化会比真实图标
+					// 明显偏小，异步换图瞬间产生「先小后大」的闪烁
+					d.mutate();
+					d = KeydroidxAppIconCache.normalizeFullBleed(
+							requireContext().getResources(), d);
+				}
+				placeholderIcon = d;
 			} catch (Exception e) {
 				KeydroidxLog.w("Menu", "加载占位图标失败");
 			}
