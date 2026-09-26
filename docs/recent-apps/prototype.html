@@ -302,7 +302,7 @@
           <div class="hintbar"><em>未保护 4 · 已保护 2</em><em>按 0 键清理</em></div>
           <div class="content">
             <div class="grid">
-              <div class="card focus">
+              <div class="card">
                 <span class="app-ico" style="--a:#2E6FD6;--b:#1A3A6B"><svg><use href="#i-music"/></svg></span>
                 <span class="app-name">音乐</span><span class="app-time">刚刚</span>
               </div>
@@ -310,7 +310,7 @@
                 <span class="app-ico" style="--a:#3DDC97;--b:#1B9E63"><svg><use href="#i-msg"/></svg></span>
                 <span class="app-name">信息</span><span class="app-time">5 分钟前</span>
               </div>
-              <div class="card prot">
+              <div class="card prot focus">
                 <span class="prot-flag"><svg><use href="#i-shield"/></svg></span>
                 <span class="app-ico" style="--a:#7E8AA8;--b:#4A5670"><svg><use href="#i-shield"/></svg></span>
                 <span class="app-name">设置</span><span class="app-time">23 分钟前</span>
@@ -330,10 +330,10 @@
           <div class="overlay">
             <div class="overlay-scrim"></div>
             <div class="sheet">
-              <div class="sheet-h"><span>清理后台？</span></div>
+              <div class="sheet-h"><span>清理此任务？</span></div>
               <div class="sheet-body">
-                将结束 <b>4</b> 个未保护的后台应用，此操作不可撤销。
-                <span class="sub">已保护 2 个（音乐、设置）会自动跳过；如需清理已保护的应用，请在选项里用「清理此任务」手动清理。</span>
+                将结束「<b>设置</b>」，此操作不可撤销。
+                <span class="sub">该应用在保护名单中，本次为手动清理——保护名单只挡 0 键 / 清理全部后台这类批量清理。</span>
               </div>
               <div class="sheet-soft">
                 <span class="sk l">取消</span>
@@ -344,13 +344,14 @@
           </div>
         </div>
       </div>
-      <div class="ruler"><span></span><b>0 键 / 清理全部 共用此确认</b><span></span></div>
+      <div class="ruler"><span></span><b>仅「清理此任务」有确认</b><span></span></div>
       <figcaption>
         <div class="cap-id">Screen 04</div>
-        <div class="cap-name">清理确认（破坏性）</div>
+        <div class="cap-name">清理此任务确认（破坏性）</div>
         <div class="cap-desc">
           同为底部锚定面板，正文块用 <code>#102040</code>（对齐 <code>dialog_keydroidx_uninstall.xml</code>）。
-          <strong>0 键</strong>与选项里的「清理全部后台」共用此确认；正文明确只清<strong>未保护</strong>数量，并说明已保护项如何手动清理。
+          <strong>批量清理（0 键 / 清理全部后台）不做二次确认</strong>——与「后台管理」页 0 键的既有行为保持一致，
+          且它们只清未保护项、已有保护名单兜底；只有<strong>单项手动清理</strong>（可作用于已保护应用，无"批量"预期）需要确认。
           按 <code>FEATURE_PHONE_UI_SPEC</code> §16：<strong>「取消」在左</strong>（更安全的选项前置）、<strong>「清理」在右</strong>；
           确认键不直接触发清理，必须显式按右软键。
         </div>
@@ -430,7 +431,7 @@
             <span class="ttl-badge" style="color:#FF8A80;background:rgba(244,67,54,.10);border-color:rgba(244,67,54,.32)">未激活</span>
           </div>
 
-          <div class="hintbar"><em>数据源不可用</em><em>按 0 键清理仍可用</em></div>
+          <div class="hintbar"><em>数据源不可用</em><em></em></div>
 
           <div class="content">
             <div class="empty">
@@ -528,7 +529,7 @@
         <tr><td>左软键</td><td>选项菜单（打开 / 保护 / 清理…）</td></tr>
         <tr><td>右软键</td><td>退出返回桌面</td></tr>
         <tr><td>返回键</td><td>先关面板，再退出页面</td></tr>
-        <tr><td>数字键 0</td><td><strong>一键清理未保护后台</strong>（先弹确认）</td></tr>
+        <tr><td>数字键 0</td><td><strong>一键清理未保护后台</strong>（<span class="warn">无需确认</span>，与「后台管理」页 0 键一致）</td></tr>
         <tr><td>长按</td><td>过滤连发：仅首次按下生效，方向键放行</td></tr>
       </table>
     </div>
