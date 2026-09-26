@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:background="@android:color/transparent">
 
-    <!-- 功能表标题（左） -->
+    <!-- 功能表标题（左）：marginTop 收紧为 0，紧贴顶栏运营商行，不浪费纵向空间 -->
     <TextView
         android:id="@+id/menuTitle"
         android:layout_width="wrap_content"
@@ -14,7 +14,8 @@
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
         android:layout_marginStart="6dp"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="0dp"
+        android:includeFontPadding="false"
         android:text="功能表"
         android:textColor="#FFFFFF"
         android:textSize="@dimen/keydroidx_font_title"
@@ -33,7 +34,7 @@
         android:textColor="#AAAAAA"
         android:textSize="@dimen/keydroidx_font_small_title" />
 
-    <!-- 网格容器：行由 KeydroidxMenuFragment 动态填充 -->
+    <!-- 网格容器：行由 KeydroidxMenuFragment 动态填充；顶部 padding 收紧为 0 -->
     <LinearLayout
         android:id="@+id/appGrid"
         android:layout_width="match_parent"
@@ -41,7 +42,7 @@
         android:layout_below="@id/menuTitle"
         android:orientation="vertical"
         android:paddingStart="8dp"
-        android:paddingTop="2dp"
+        android:paddingTop="0dp"
         android:paddingEnd="8dp"
         android:paddingBottom="2dp" />
 

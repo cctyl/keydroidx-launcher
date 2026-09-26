@@ -10,9 +10,14 @@
     android:background="@drawable/bg_keydroidx_softkey"
     android:visibility="invisible">
 
+    <!-- 内层高度由固定 24dp 改为 wrap_content + minHeight=24dp：
+         点阵字体行高（含 fontScale 放大与字体自身 ascent/descent）可能超出 24dp，
+         固定高度 + center_vertical 会把中间标题底部裁掉；wrap_content 保证文字完整，
+         文字行高不足 24dp 时仍保持 24dp 标准栏高不变。三栏 weight 与 INVISIBLE 占位逻辑不变。 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="24dp"
+        android:layout_height="wrap_content"
+        android:minHeight="24dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="8dp"
@@ -26,6 +31,7 @@
             android:gravity="start"
             android:singleLine="true"
             android:ellipsize="end"
+            android:includeFontPadding="false"
             android:textColor="#64b5f6"
             android:textSize="@dimen/keydroidx_font_small_title" />
 
@@ -37,6 +43,7 @@
             android:gravity="center"
             android:singleLine="true"
             android:ellipsize="middle"
+            android:includeFontPadding="false"
             android:textColor="#FFFFFF"
             android:textSize="@dimen/keydroidx_font_body"
             android:textStyle="bold" />
@@ -49,6 +56,7 @@
             android:gravity="end"
             android:singleLine="true"
             android:ellipsize="end"
+            android:includeFontPadding="false"
             android:textColor="#64b5f6"
             android:textSize="@dimen/keydroidx_font_small_title" />
     </LinearLayout>

@@ -454,7 +454,8 @@ public class StatusBarController {
 	 * 始终显示运营商行（避免顶部栏出现空白浪费）。
 	 *   - 双卡：分别显示两张卡的运营商名
 	 *   - 单卡：仅 tvCarrier1 显示运营商名
-	 *   - 飞行模式：tvCarrier1 显示「飞行模式」
+	 *   - 飞行模式：tvCarrier1 显示「飞行模式」（仅一份，tvCarrier2 置空，
+	 *     重复两遍既浪费宽度也让顶栏信息显得冗余）
 	 *   - 无 SIM：tvCarrier1 显示「无 SIM」
 	 * 优先用网络运营商名，回退到 SIM 卡中的 SPN，都读不到则按状态填占位文字。
 	 */
@@ -467,9 +468,11 @@ public class StatusBarController {
 
 		boolean airplane = isAirplaneModeOn();
 		if (airplane) {
-			// 飞行模式：两卡槽位都标「飞行模式」
+			// 飞行模式：仅 tvCarrier1 标一份「飞行模式」，第二槽位置空
 			setCarrierOrFallback(tvCarrier1, null, "飞行模式");
-			setCarrierOrFallback(tvCarrier2, null, "飞行模式");
+			if (tvCarrier2 != null) {
+				tvCarrier2.setText("");
+			}
 			return;
 		}
 

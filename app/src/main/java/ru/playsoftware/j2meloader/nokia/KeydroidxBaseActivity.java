@@ -2,6 +2,7 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.DisplayMetrics;
@@ -159,6 +160,15 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 		View topPanel = findViewById(R.id.topPanel);
 		if (topPanel != null) {
 			KeydroidxFontManager.applyFontToViewHierarchy(topPanel);
+		}
+		// 时钟改用系统默认字体：点阵字体（ArkPixel/FusionPixel）的 descent 度量异常大，
+		// 13sp 时钟的行盒被撑到约 27dp——数字字形贴着行盒顶部绘制，下方约 2/3 是纯空白。
+		// 顶栏第一行以最高子视图定高，时钟就成了唯一的高度来源，导致信号/WiFi 图标
+		// 下方多出一段空隙、整个中间内容区被往下挤。系统默认字体行高正常（约 1.3 倍字号），
+		// 时钟行盒回落到与图标相当的高度，空隙随之消失。
+		// 字号仍保留 keydroidx_font_title 的缩放结果（applyScaledTextSize 已记录设计基准）。
+		if (tvTime != null) {
+			tvTime.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
 		}
 		View bottomPanel = findViewById(R.id.bottomPanel);
 		if (bottomPanel != null) {

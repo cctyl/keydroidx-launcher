@@ -38,6 +38,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
                     android:text="1"
                     android:textColor="#FFFFFF"
                     android:textSize="@dimen/keydroidx_font_caption" />
@@ -63,6 +64,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
                     android:text="2"
                     android:textColor="#FFFFFF"
                     android:textSize="@dimen/keydroidx_font_caption" />
@@ -125,13 +127,16 @@
             android:id="@+id/tvTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:includeFontPadding="false"
             android:text="09:55"
             android:textColor="#FFFFFF"
-            android:textSize="@dimen/keydroidx_font_title"
+            android:textSize="@dimen/keydroidx_font_small_title"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 双卡运营商名（横排）：始终显示，根据状态显示运营商名/飞行模式/无SIM -->
+    <!-- 双卡运营商名（横排）：始终显示，根据状态显示运营商名/飞行模式/无SIM。
+         上下 padding 收紧为 1dp，且关闭 includeFontPadding（点阵字体自带上部额外行距），
+         减少顶栏第二行占用的纵向空间，把空间还给中间内容区。 -->
     <LinearLayout
         android:id="@+id/simCarrierContainer"
         android:layout_width="match_parent"
@@ -139,25 +144,27 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="6dp"
-        android:paddingTop="2dp"
+        android:paddingTop="1dp"
         android:paddingEnd="6dp"
-        android:paddingBottom="2dp">
+        android:paddingBottom="1dp">
 
         <TextView
             android:id="@+id/tvCarrier1"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:includeFontPadding="false"
             android:text=""
             android:textColor="#FFFFFF"
-            android:textSize="@dimen/keydroidx_font_caption" />
+            android:textSize="@dimen/keydroidx_font_micro" />
 
         <TextView
             android:id="@+id/tvCarrier2"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
+            android:includeFontPadding="false"
             android:text=""
             android:textColor="#FFFFFF"
-            android:textSize="@dimen/keydroidx_font_caption" />
+            android:textSize="@dimen/keydroidx_font_micro" />
     </LinearLayout>
 </LinearLayout>

@@ -115,8 +115,17 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	private static final int COLS = 3;
 	/** 行高由实际可用空间均分，此常量仅作为 fallback（panelH 尚未可用时）。图标 36 + 标签 9 + 间距 */
 	private static final int ROW_H_DP = 58;
-	/** 标题预留高度（dp，含功能表标题与网格上下内边距，留少量余量防裁切） */
-	private static final int TITLE_H_DP = 22;
+
+	/**
+	 * 标题区实际高度预算（dp）：13sp 标题行高（点阵字体行距系数 1.5，随 fontScale 缩放）
+	 * + appGrid 底部 padding 2dp。
+	 * 必须与 fragment_keydroidx_menu.xml 的实际占位严格一致（标题 marginTop=0、
+	 * appGrid paddingTop=0 / paddingBottom=2），否则网格总高会超出 midPanel，
+	 * 最后一行应用名被底部裁切。预算宁可略大（多出的是底部留白）也不可小于实际占位。
+	 */
+	private static float titleBudgetDp(float fontScale) {
+		return 13f * fontScale * 1.5f + 2f;
+	}
 
 	private final ArrayList<KeydroidxAppItem> items = new ArrayList<>();
 	private LinearLayout appGrid;
@@ -544,8 +553,8 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 
 		// 实测反推：可用设计高度 = panelH(px) / density / scale
 		float availDesign = panelH / density / scale;
-		// 标题栏(22dp) + appGrid上下padding(4dp)
-		float availForGrid = Math.max(0f, availDesign - TITLE_H_DP - 4f);
+		// 标题区预算（13sp 标题行高 ×fontScale + appGrid 底部 padding 2dp，顶部已收紧为 0）
+		float availForGrid = Math.max(0f, availDesign - titleBudgetDp(fontScale) - 2f);
 
 		// 单行单元格所需的绝对最小安全设计高度：
 		// 36dp (图标) + 8dp (上下Cell padding 4+4) + 文字行高预算 (9sp * fontScale * 1.6f + 2dp) + 2dp (选中高亮边框余量)
@@ -931,7 +940,9 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		float density = getResources().getDisplayMetrics().density;
 		float scale = host.getScale();
 		float availDesign = panelH > 0 ? (panelH / density / scale) : 262f;
-		float availForGrid = Math.max(0f, availDesign - TITLE_H_DP - 4f);
+		float fontScale = KeydroidxSettingsStorage.getFontScale(requireContext());
+		if (fontScale <= 0f) fontScale = 1.0f;
+		float availForGrid = Math.max(0f, availDesign - titleBudgetDp(fontScale) - 2f);
 		float rowActualDp = rowsPerPage > 0 ? (availForGrid / rowsPerPage) : ROW_H_DP;
 		int rowH = KeydroidxDimens.dp(getResources(), Math.round(rowActualDp));
 
