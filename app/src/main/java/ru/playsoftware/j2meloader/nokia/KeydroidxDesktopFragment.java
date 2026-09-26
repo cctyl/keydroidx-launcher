@@ -1788,12 +1788,13 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				});
 				break;
 			case KeydroidxWidgetItem.TYPE_BG_MANAGER:
-				// 后台管理组件：点击打开后台管理窗口（运行/受保护页签 + 清除）
+				// 后台管理组件：点击进入「最近任务」页（组件与新按键动作两个入口共用同一套 UI）；
+				// 运行/受保护页签的「后台管理」页改从该页选项菜单进入。
 				row.setOnClickListener(v -> {
-					KeydroidxLog.i("Desktop", "后台管理组件点击：打开后台窗口");
+					KeydroidxLog.i("Desktop", "后台管理组件点击：打开最近任务页");
 					if (getActivity() instanceof KeydroidxDesktopActivity) {
 						((KeydroidxDesktopActivity) getActivity())
-								.openFragment(new KeydroidxBackgroundManagerFragment());
+								.openFragment(new KeydroidxRecentTasksFragment());
 					}
 				});
 				break;

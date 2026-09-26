@@ -1,8 +1,6 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.app.ActivityManager;
-import android.app.AppOpsManager;
-import android.app.usage.UsageStats;
 import android.app.usage.UsageStatsManager;
 import android.content.Context;
 import android.content.Intent;
@@ -133,20 +131,6 @@ public final class KeydroidxBgManagerHelper {
 		return shizukuActivated;
 	}
 
-	/** 跳转系统「使用情况访问权限」设置页（API 21+，旧版降级保留，现已不再依赖）。 */
-	public static boolean openUsageAccessSettings(Context ctx) {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return false;
-		try {
-			Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
-			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			ctx.startActivity(intent);
-			return true;
-		} catch (Exception e) {
-			KeydroidxLog.e(TAG, "打开使用情况访问权限设置失败", e);
-			return false;
-		}
-	}
-
 	// ---- 后台任务条目 ----
 
 	/** 后台任务条目：包名 + 显示名 + 图标 + 保护状态。 */
@@ -184,6 +168,27 @@ public final class KeydroidxBgManagerHelper {
 		return (ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
 	}
 
+	/**
+	 * 当前默认输入法的包名（读不到返回 null）。
+	 * <p>用户安装的第三方输入法（如搜狗）不带 FLAG_SYSTEM，{@link #isSystemApp} 拦不住它；
+	 * 而输入法进程常驻内存，把它算进「N 个后台」只会让数字虚高（实测组件显示 2、
+	 * 实际可清后台为 0，差的那 1 个就是输入法）。输入法由系统管理生命周期，
+	 * 不是用户语义里的"后台应用"，后台枚举统一排除。
+	 */
+	private static String getDefaultImePackage(Context ctx) {
+		try {
+			String ime = Settings.Secure.getString(
+					ctx.getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+			if (ime == null || ime.isEmpty()) return null;
+			// 形如 "com.sogou.inputmethod.iot/.GBIme"，取斜杠前的包名
+			int slash = ime.indexOf('/');
+			return slash > 0 ? ime.substring(0, slash) : ime;
+		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "读取默认输入法失败: " + e.getMessage());
+			return null;
+		}
+	}
+
 	// ---- 后台枚举：版本分流 ----
 
 	/**
@@ -197,9 +202,12 @@ public final class KeydroidxBgManagerHelper {
 	private static Set<String> enumerateBackgroundPackages(Context ctx) {
 		Set<String> out = new HashSet<>();
 		try {
+			String imePkg = getDefaultImePackage(ctx);
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 				if (!shizukuActivated) return out;
 				out.addAll(enumerateViaPs(ctx));
+				// 输入法进程常驻但不算"后台应用"
+				if (imePkg != null) out.remove(imePkg);
 				return out;
 			}
 			// API < 21：getRunningAppProcesses 可正常枚举全部后台
@@ -211,6 +219,7 @@ public final class KeydroidxBgManagerHelper {
 				if (!isBackgroundProcess(p)) continue;
 				if (p.pkgList == null || p.pkgList.length == 0) continue;
 				if (isSelfProcess(ctx, p.processName, p.pkgList[0])) continue;
+				if (p.pkgList[0].equals(imePkg)) continue;
 				out.add(p.pkgList[0]);
 			}
 		} catch (Exception e) {
@@ -285,6 +294,40 @@ public final class KeydroidxBgManagerHelper {
 	/** 目标包是否刚被本应用清理、且尚未确认重新启动。 */
 	public static boolean wasCleared(String pkg) {
 		return pkg != null && CLEARED_PKGS.contains(pkg);
+	}
+
+	/**
+	 * 当前存活的应用包名集合（只读，绝不拉起任何进程）。
+	 * <p>供「最近任务」页判定任务是否为空壳：{@code am force-stop} 在 Android 13 上只杀进程，
+	 * <b>系统任务记录不会删除</b>（任务变成 sz=0 的空壳留在 recents 里），若不做存活校验，
+	 * 页面会显示一堆已死应用（实测「桌面后台 1、最近任务 4」）。本集合与桌面组件的
+	 * 后台计数用的是同一套存活判据，两处口径一致。
+	 * <b>必须在后台线程调用</b>（含 shell 命令 / IPC）。
+	 *
+	 * @return 存活包名集合；<b>无法判断时返回 null</b>（5.0+ 未激活 mini_shizuku），
+	 *         调用方应据此跳过过滤，不要当成"全部已死"
+	 */
+	public static Set<String> getAlivePackages(Context ctx) {
+		if (ctx == null) return null;
+		try {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+				if (!shizukuActivated) return null;
+				return enumerateViaPs(ctx);
+			}
+			// 4.4：getRunningAppProcesses 可枚举全部进程
+			ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+			if (am == null) return null;
+			List<ActivityManager.RunningAppProcessInfo> procs = am.getRunningAppProcesses();
+			if (procs == null) return null;
+			Set<String> alive = new HashSet<>();
+			for (ActivityManager.RunningAppProcessInfo p : procs) {
+				if (p.pkgList != null) Collections.addAll(alive, p.pkgList);
+			}
+			return alive;
+		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "getAlivePackages 探测失败: " + e.getMessage());
+			return null;
+		}
 	}
 
 	/**
@@ -408,8 +451,8 @@ public final class KeydroidxBgManagerHelper {
 		}
 	}
 
-	/** 加载挂机 jar 图标（复用百宝箱 AppItem 图标），失败返回 null（UI 有兜底）。 */
-	private static Drawable loadMidletIcon(Context ctx, String appPath) {
+	/** 加载挂机 jar 图标（复用百宝箱 AppItem 图标），失败返回 null（UI 有兜底）。包级可见：最近任务页复用。 */
+	static Drawable loadMidletIcon(Context ctx, String appPath) {
 		try {
 			AppItem item = AppUtils.findAppByPath(appPath);
 			if (item == null) return null;
@@ -495,5 +538,50 @@ public final class KeydroidxBgManagerHelper {
 			}
 		}
 		return cleared;
+	}
+
+	/**
+	 * 手动清理<b>单个</b>任务（<b>不受保护名单限制</b>）。
+	 * <p>供「最近任务」页的「清理此任务」使用：保护名单只挡批量清理（0 键 / 清理全部），
+	 * 用户对某个应用显式发起的手动清理仍然生效。
+	 * <b>必须在后台线程调用</b>（含 TCP / shell 命令）。
+	 *
+	 * @param pkg     包名；挂机 jar 条目可传条目 key
+	 * @param taskKey 任务标识（{@code midlet:<appPath>} 或包名）
+	 * @return 是否已下发清理
+	 */
+	public static boolean clearSingleTask(Context ctx, String pkg, String taskKey) {
+		if (ctx == null) return false;
+		// 挂机 jar：显式广播 → :midlet 进程内优雅销毁（与批量清理同一链路）
+		if (MidletStateStore.isMidletTaskKey(taskKey)) {
+			Intent intent = new Intent(KeydroidxMidletControlReceiver.ACTION_DESTROY_MIDLET);
+			intent.setClass(ctx, KeydroidxMidletControlReceiver.class);
+			ctx.sendBroadcast(intent);
+			KeydroidxLog.i(TAG, "手动清理挂机jar(广播销毁): " + taskKey);
+			return true;
+		}
+		if (pkg == null || pkg.isEmpty()) return false;
+
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			if (!shizukuActivated) {
+				KeydroidxLog.w(TAG, "mini_shizuku 未激活，无法手动清理: " + pkg);
+				return false;
+			}
+			boolean ok = Shizuku.exec("am force-stop " + pkg);
+			if (ok) markCleared(pkg);
+			KeydroidxLog.i(TAG, "手动清理单任务(force-stop): " + pkg + " ok=" + ok);
+			return ok;
+		}
+		try {
+			ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+			if (am == null) return false;
+			am.killBackgroundProcesses(pkg);
+			markCleared(pkg);
+			KeydroidxLog.i(TAG, "手动清理单任务(kill): " + pkg);
+			return true;
+		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "手动清理单任务失败: " + pkg + " -> " + e.getMessage());
+			return false;
+		}
 	}
 }

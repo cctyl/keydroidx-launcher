@@ -37,7 +37,8 @@ public class KeydroidxKeyProvider extends ContentProvider {
 
 	private static final String[] ACTION_TAGS = {
 			"UP", "DOWN", "LEFT", "RIGHT",
-			"SELECT", "SOFT_LEFT", "SOFT_RIGHT", "LOCK_SCREEN", "HANGUP"
+			"SELECT", "SOFT_LEFT", "SOFT_RIGHT", "LOCK_SCREEN", "HANGUP",
+			"RECENT_APPS"
 	};
 
 	private UriMatcher uriMatcher;

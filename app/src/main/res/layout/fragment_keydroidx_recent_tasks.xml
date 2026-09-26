@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 最近任务页：标题行（界面名 + 数据模式徽标）+ 摘要行（未保护/已保护 + 0 键提示）+ 卡片网格。
+     卡片行为由代码动态构建（2 列）。
+     规范：根宽 match_parent（响应式原生 DP）；根视图 focusable/focusableInTouchMode 防「首个方向键被吞」；
+     非业务 ScrollView 必须禁焦，否则系统寻焦会把方向键丢给滚动容器。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/recentRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:orientation="vertical">
+
+    <!-- 标题行 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="8dp">
+
+        <TextView
+            android:id="@+id/tvRecentTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="最近任务"
+            android:textColor="#FFFFFF"
+            android:textSize="@dimen/keydroidx_font_title" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/tvRecentMode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#64B5F6"
+            android:textSize="@dimen/keydroidx_font_caption" />
+    </LinearLayout>
+
+    <!-- 摘要行：未保护 N · 已保护 M ／ 按 0 键清理 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="8dp">
+
+        <TextView
+            android:id="@+id/tvRecentSummary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="#90CAF9"
+            android:textSize="@dimen/keydroidx_font_caption" />
+
+        <TextView
+            android:id="@+id/tvRecentHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#90CAF9"
+            android:textSize="@dimen/keydroidx_font_caption" />
+    </LinearLayout>
+
+    <!-- 内容区：卡片网格 / 空态（同一容器内切换，空态居中） -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="3dp"
+        android:layout_weight="1">
+
+        <ScrollView
+            android:id="@+id/recentScroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/recentGridLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="6dp" />
+        </ScrollView>
+
+        <!-- 空态 / 未激活态 / 加载态（文案与图标由代码按状态设置） -->
+        <LinearLayout
+            android:id="@+id/recentEmptyBox"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/recentEmptyIcon"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/recentEmptyTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:textColor="#E8EEF5"
+                android:textSize="@dimen/keydroidx_font_body" />
+
+            <TextView
+                android:id="@+id/recentEmptySub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:gravity="center"
+                android:textColor="#90CAF9"
+                android:textSize="@dimen/keydroidx_font_caption" />
+
+            <TextView
+                android:id="@+id/recentEmptyAction"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="10dp"
+                android:paddingTop="3dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="3dp"
+                android:textColor="#64B5F6"
+                android:textSize="@dimen/keydroidx_font_small_title"
+                android:visibility="gone" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

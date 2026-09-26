@@ -529,12 +529,19 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		int action = keyBinding.resolveAction(event);
 
 		if (action < 0) {
-			// 数字键 0：在后台管理窗口内一键清理（0 键默认未绑定任何动作，仅在目标页面生效）
+			// 数字键 0：在后台管理 / 最近任务窗口内一键清理
+			// （0 键默认未绑定任何动作，仅在目标页面生效）
 			if (event.getKeyCode() == KeyEvent.KEYCODE_0) {
 				Fragment bgHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 				if (bgHost instanceof KeydroidxBackgroundManagerFragment) {
 					KeydroidxLog.i("Desktop", "数字键 0：后台管理一键清理");
 					((KeydroidxBackgroundManagerFragment) bgHost).onCleanKey();
+					lastHandledDownKeyCode = event.getKeyCode();
+					return true;
+				}
+				if (bgHost instanceof KeydroidxRecentTasksFragment) {
+					KeydroidxLog.i("Desktop", "数字键 0：最近任务一键清理未保护");
+					((KeydroidxRecentTasksFragment) bgHost).onCleanKey();
 					lastHandledDownKeyCode = event.getKeyCode();
 					return true;
 				}
@@ -574,6 +581,20 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			KeydroidxLog.d("Desktop", "锁屏动作当前非桌面，交由系统处理");
 			resetLastHandledKeyCode();
 			return super.dispatchKeyEvent(event);
+		}
+
+		// 「最近任务」动作：桌面主界面 / 功能表 / 各子页面内按下即打开卡片页。
+		// 已经停留在该页时忽略（避免重复入栈）。非破坏性动作，DOWN 阶段直接执行即可。
+		if (action == KeydroidxKeyBinding.ACTION_RECENT_APPS) {
+			Fragment recentHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+			if (recentHost instanceof KeydroidxRecentTasksFragment) {
+				KeydroidxLog.i("Desktop", "最近任务按键：已在该页，忽略");
+			} else {
+				KeydroidxLog.i("Desktop", "最近任务按键：打开最近任务页");
+				openFragment(new KeydroidxRecentTasksFragment());
+			}
+			lastHandledDownKeyCode = event.getKeyCode();
+			return true;
 		}
 
 		// 底部软键按下视觉反馈（触摸点击不经过此处，由底部栏点击监听处理）

@@ -24,14 +24,17 @@ public class KeydroidxKeyBinding {
 	public static final int ACTION_LOCK_SCREEN = 7;
 	/** 挂机菜单键（绿键/拨号键）：仅在 jar 应用内生效，弹出 继续/退出/后台运行 三菜单 */
 	public static final int ACTION_HANGUP = 8;
+	/** 最近任务：在桌面主界面 / 功能表内按下即打开「最近任务」卡片页（默认未绑定）。 */
+	public static final int ACTION_RECENT_APPS = 9;
 
-	public static final int ACTION_COUNT = 9;
+	public static final int ACTION_COUNT = 10;
 
 	private static final String PREFS_NAME = "nokia_key_bindings";
 
 	private static final String[] PREF_KEYS = {
 			"up", "down", "left", "right",
-			"select", "soft_left", "soft_right", "lock_screen", "hangup"
+			"select", "soft_left", "soft_right", "lock_screen", "hangup",
+			"recent_apps"
 	};
 
 	// 首次启动按键绑定向导是否已完成（仅首次启动弹出，清数据后重置）
@@ -48,6 +51,7 @@ public class KeydroidxKeyBinding {
 			KeyEvent.KEYCODE_SOFT_RIGHT,            // soft_right
 			KeyEvent.KEYCODE_ENDCALL,               // lock_screen（默认挂机键）
 			KeyEvent.KEYCODE_CALL,                  // hangup 挂机菜单键（默认绿色拨号键）
+			KeyEvent.KEYCODE_UNKNOWN,               // recent_apps（默认未绑定，用户按需在按键绑定里指定）
 	};
 
 	public static String getActionName(int action) {
@@ -61,6 +65,7 @@ public class KeydroidxKeyBinding {
 			case ACTION_SOFT_RIGHT: return "右软键";
 			case ACTION_LOCK_SCREEN: return "锁屏";
 			case ACTION_HANGUP: return "拨号键";
+			case ACTION_RECENT_APPS: return "最近任务";
 			default: return "未知";
 		}
 	}

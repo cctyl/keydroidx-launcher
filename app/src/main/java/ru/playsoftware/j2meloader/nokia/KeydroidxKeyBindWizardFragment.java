@@ -41,7 +41,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	private KeydroidxKeyBinding keyBinding;
 	private int state = STATE_INTRO;
 	private int introChoice = 0;      // 0=绑定, 1=跳过
-	private int recordingStep = -1;   // -1=非录制态；0..7=正在录制第 N 个动作
+	private int recordingStep = -1;   // -1=非录制态；0..ACTION_COUNT-1=正在录制第 N 个动作
 
 	private View introCard;
 	private View recordingLayout;

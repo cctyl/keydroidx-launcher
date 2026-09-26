@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>最近任务 Recent Apps — 设计原型（240×320）</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="aurora"></div>
+
+<!-- ========= 图标精灵（描边风格，对应 KeydroidxIcons） ========= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+    <symbol id="i-cam" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2.5"/><circle cx="12" cy="13" r="3.2"/><path d="M8.5 7l1.4-2h4.2L15.5 7"/></symbol>
+    <symbol id="i-web" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M4 12h16"/><path d="M12 4c2.6 2.8 2.6 13.2 0 16-2.6-2.8-2.6-13.2 0-16z"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6 3h3l2 5-2.4 1.4a12 12 0 0 0 5.9 5.9L16 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 2.8V12c0 4.4-2.9 7.6-7 9-4.1-1.4-7-4.6-7-9V5.8z"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="i-shield-off" viewBox="0 0 24 24"><path d="M12 3l7 2.8V12c0 4.4-2.9 7.6-7 9-4.1-1.4-7-4.6-7-9V5.8z"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 9.5v5M12 17.4v.2"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.5 4v5h-5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+  <!-- ========= 页头 ========= -->
+  <header class="page-head">
+    <span class="eyebrow"><i class="dot"></i>Design Prototype · KeydroidX Launcher</span>
+    <h1>最近任务 Recent Apps</h1>
+    <p>
+      功能机风格的「最近任务」界面：2 列卡片网格展示最近使用的应用，确认键把目标应用拉回之前的界面（恢复而非重启），
+      并支持保护名单与清理后台。严格对齐 <code>NOKIA_DEVELOPMENT_RULES.md</code>、<code>guide/07-dialogs.md</code>、
+      <code>typography-and-font-spec.md</code> 与 <code>FEATURE_PHONE_UI_SPEC.md</code>。
+    </p>
+    <div class="head-tags">
+      <span class="tag">画布 <strong>240 × 320</strong></span>
+      <span class="tag">卡片 <strong>2 列 / 56dp</strong></span>
+      <span class="tag"><strong>0 键</strong> 一键清理未保护</span>
+      <span class="tag">选项 <strong>保护此应用 / 取消保护</strong></span>
+      <span class="tag">面板 <strong>底部锚定 + 上方压暗</strong></span>
+      <span class="tag">≤13sp <strong>一律不加粗</strong></span>
+    </div>
+  </header>
+
+  <!-- ========= 画板 ========= -->
+  <main class="boards">
+
+    <!-- ---------- 01 卡片页 ---------- -->
+    <figure class="board">
+      <div class="device">
+        <div class="phone">
+          <div class="sbar">
+            <div class="sbar-l">
+              <span class="sig"><i></i><i></i><i></i><i class="off"></i></span>
+              <svg class="ico-wifi" viewBox="0 0 16 12"><path d="M8 10.6l2.2-2.6a3.3 3.3 0 0 0-4.4 0z"/><path d="M8 6.1c1.3 0 2.5.45 3.4 1.3l1.4-1.65A7.3 7.3 0 0 0 8 3.8a7.3 7.3 0 0 0-4.8 1.95l1.4 1.65A5.1 5.1 0 0 1 8 6.1z" opacity=".85"/></svg>
+              <span class="net">CMCC</span>
+            </div>
+            <div class="sbar-r">
+              <span class="batt"><i style="width:72%"></i></span>
+              <span class="clock">12:30</span>
+            </div>
+          </div>
+
+          <div class="ttl">
+            <span class="ttl-t">最近任务</span>
+            <span class="ttl-badge ok">实时</span>
+          </div>
+
+          <div class="hintbar">
+            <em>未保护 5 · 已保护 1</em>
+            <em>按 0 键清理</em>
+          </div>
+
+          <div class="content">
+            <div class="grid">
+              <div class="card focus">
+                <span class="app-ico" style="--a:#2E6FD6;--b:#1A3A6B"><svg><use href="#i-music"/></svg></span>
+                <span class="app-name">音乐</span>
+                <span class="app-time">刚刚</span>
+              </div>
+              <div class="card">
+                <span class="app-ico" style="--a:#3DDC97;--b:#1B9E63"><svg><use href="#i-msg"/></svg></span>
+                <span class="app-name">信息</span>
+                <span class="app-time">5 分钟前</span>
+              </div>
+              <div class="card prot">
+                <span class="prot-flag"><svg><use href="#i-shield"/></svg></span>
+                <span class="app-ico" style="--a:#7E8AA8;--b:#4A5670"><svg><use href="#i-shield"/></svg></span>
+                <span class="app-name">设置</span>
+                <span class="app-time">23 分钟前</span>
+              </div>
+              <div class="card">
+                <span class="app-ico" style="--a:#FFB259;--b:#D97B1E"><svg><use href="#i-cam"/></svg></span>
+                <span class="app-name">相机</span>
+                <span class="app-time">1 小时前</span>
+              </div>
+              <div class="card">
+                <span class="app-ico" style="--a:#64B5F6;--b:#2E6FD6"><svg><use href="#i-web"/></svg></span>
+                <span class="app-name">浏览器</span>
+                <span class="app-time">今天 09:12</span>
+              </div>
+              <div class="card">
+                <span class="app-ico" style="--a:#4CAF50;--b:#2E7D32"><svg><use href="#i-phone"/></svg></span>
+                <span class="app-name">电话</span>
+                <span class="app-time">昨天</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="softbar">
+            <span class="sk l">选项</span>
+            <span class="sk c" style="font-size:12px">最近任务</span>
+            <span class="sk r">退出</span>
+          </div>
+        </div>
+      </div>
+      <div class="ruler"><span></span><b>240 × 320</b><span></span></div>
+      <figcaption>
+        <div class="cap-id">Screen 01</div>
+        <div class="cap-name">最近任务（卡片页）</div>
+        <div class="cap-desc">
+          卡片 56dp、图标 26dp；主文本 <code>font_body</code> 12sp、副文本 <code>font_caption</code> 9sp，均不加粗。
+          已保护的应用卡片带<strong>绿色盾牌角标 + 绿色描边</strong>。标题下摘要行显示未保护/已保护数量并提示 <strong>「按 0 键清理」</strong>。
+          底栏 22dp、三栏等宽，<strong>无任何高亮</strong>。
+        </div>
+        <div class="cap-keys"><span class="kbd">方向键 移动焦点</span><span class="kbd">确认 回到该应用原界面</span><span class="kbd">左软键 选项</span><span class="kbd">0 键 一键清理未保护</span></div>
+      </figcaption>
+    </figure>
+
+    <!-- ---------- 02 选项菜单（未保护） ---------- -->
+    <figure class="board">
+      <div class="device">
+        <div class="phone">
+          <!-- 底层：卡片页 -->
+          <div class="sbar">
+            <div class="sbar-l">
+              <span class="sig"><i></i><i></i><i></i><i class="off"></i></span>
+              <svg class="ico-wifi" viewBox="0 0 16 12"><path d="M8 10.6l2.2-2.6a3.3 3.3 0 0 0-4.4 0z"/><path d="M8 6.1c1.3 0 2.5.45 3.4 1.3l1.4-1.65A7.3 7.3 0 0 0 8 3.8a7.3 7.3 0 0 0-4.8 1.95l1.4 1.65A5.1 5.1 0 0 1 8 6.1z" opacity=".85"/></svg>
+              <span class="net">CMCC</span>
+            </div>
+            <div class="sbar-r">
+              <span class="batt"><i style="width:72%"></i></span>
+              <span class="clock">12:30</span>
+            </div>
+          </div>
+          <div class="ttl">
+            <span class="ttl-t">最近任务</span>
+            <span class="ttl-badge ok">实时</span>
+          </div>
+          <div class="hintbar"><em>未保护 5 · 已保护 1</em><em>按 0 键清理</em></div>
+          <div class="content">
+            <div class="grid">
+              <div class="card focus">
+                <span class="app-ico" style="--a:#2E6FD6;--b:#1A3A6B"><svg><use href="#i-music"/></svg></span>
+                <span class="app-name">音乐</span><span class="app-time">刚刚</span>
+              </div>
+              <div class="card">
+                <span class="app-ico" style="--a:#3DDC97;--b:#1B9E63"><svg><use href="#i-msg"/></svg></span>
+                <span class="app-name">信息</span><span class="app-time">5 分钟前</span>
+              </div>
+            </div>
+          </div>
+          <div class="softbar">
+            <span class="sk l">选项</span>
+            <span class="sk c" style="font-size:12px">最近任务</span>
+            <span class="sk r">退出</span>
+          </div>
+
+          <!-- 遮罩 + 底部面板 -->
+          <div class="overlay">
+            <div class="overlay-scrim"></div>
+            <div class="sheet">
+              <div class="sheet-h"><span>选项</span><span class="ctx">音乐</span></div>
+              <div class="sheet-row focus"><svg><use href="#i-open"/></svg><span class="r-t">打开应用</span><span class="r-k">确认</span></div>
+              <div class="sheet-row safe"><svg><use href="#i-shield"/></svg><span class="r-t">保护此应用</span></div>
+              <div class="sheet-row"><svg><use href="#i-layers"/></svg><span class="r-t">后台管理</span></div>
+              <div class="sheet-row"><svg><use href="#i-refresh"/></svg><span class="r-t">刷新列表</span></div>
+              <div class="sheet-row"><svg><use href="#i-trash"/></svg><span class="r-t">清理此任务</span></div>
+              <div class="sheet-row danger"><svg><use href="#i-warn"/></svg><span class="r-t">清理全部后台</span></div>
+              <div class="sheet-soft">
+                <span class="sk l">选择</span>
+                <span class="sk c"></span>
+                <span class="sk r">返回</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ruler"><span></span><b>面板 26+6×32+22 = 240dp，贴底</b><span></span></div>
+      <figcaption>
+        <div class="cap-id">Screen 02</div>
+        <div class="cap-name">选项菜单 · 未保护应用（左软键）</div>
+        <div class="cap-desc">
+          <strong>底部锚定面板</strong>（<code>Gravity.BOTTOM</code> + 宽度铺满 + 高度由内容决定），上方卡片页压暗——
+          与现有 <code>KeydroidxOptionsDialog</code>、「后台管理」页的选项菜单完全一致。
+          标题栏 26dp / 选项行 32dp(11sp) / 自带软键栏 22dp，直角扁平无阴影。
+          <strong>新增「保护此应用」</strong>（绿盾）：保护后不会被 <strong>0 键/清理全部</strong> 清掉。
+          首项为安全项「打开应用」，破坏性项「清理全部后台」置末位、标红、<strong>绝不默认聚焦</strong>。
+        </div>
+        <div class="cap-keys"><span class="kbd">上下 移动</span><span class="kbd">确认/左软键 执行</span><span class="kbd">右软键/返回 关闭</span></div>
+      </figcaption>
+    </figure>
+
+    <!-- ---------- 03 选项菜单（已保护） ---------- -->
+    <figure class="board">
+      <div class="device">
+        <div class="phone">
+          <div class="sbar">
+            <div class="sbar-l">
+              <span class="sig"><i></i><i></i><i></i><i class="off"></i></span>
+              <svg class="ico-wifi" viewBox="0 0 16 12"><path d="M8 10.6l2.2-2.6a3.3 3.3 0 0 0-4.4 0z"/><path d="M8 6.1c1.3 0 2.5.45 3.4 1.3l1.4-1.65A7.3 7.3 0 0 0 8 3.8a7.3 7.3 0 0 0-4.8 1.95l1.4 1.65A5.1 5.1 0 0 1 8 6.1z" opacity=".85"/></svg>
+              <span class="net">CMCC</span>
+            </div>
+            <div class="sbar-r">
+              <span class="batt"><i style="width:72%"></i></span>
+              <span class="clock">12:30</span>
+            </div>
+          </div>
+          <div class="ttl">
+            <span class="ttl-t">最近任务</span>
+            <span class="ttl-badge ok">实时</span>
+          </div>
+          <div class="hintbar"><em>未保护 5 · 已保护 1</em><em>按 0 键清理</em></div>
+          <div class="content">
+            <div class="grid">
+              <div class="card focus prot">
+                <span class="prot-flag"><svg><use href="#i-shield"/></svg></span>
+                <span class="app-ico" style="--a:#2E6FD6;--b:#1A3A6B"><svg><use href="#i-music"/></svg></span>
+                <span class="app-name">音乐</span><span class="app-time">刚刚</span>
+              </div>
+              <div class="card">
+                <span class="app-ico" style="--a:#3DDC97;--b:#1B9E63"><svg><use href="#i-msg"/></svg></span>
+                <span class="app-name">信息</span><span class="app-time">5 分钟前</span>
+              </div>
+            </div>
+          </div>
+          <div class="softbar">
+            <span class="sk l">选项</span>
+            <span class="sk c" style="font-size:12px">最近任务</span>
+            <span class="sk r">退出</span>
+          </div>
+
+          <div class="overlay">
+            <div class="overlay-scrim"></div>
+            <div class="sheet">
+              <div class="sheet-h"><span>选项</span><span class="ctx">音乐（已保护）</span></div>
+              <div class="sheet-row focus"><svg><use href="#i-open"/></svg><span class="r-t">打开应用</span><span class="r-k">确认</span></div>
+              <div class="sheet-row safe"><svg><use href="#i-shield-off"/></svg><span class="r-t">取消保护</span></div>
+              <div class="sheet-row"><svg><use href="#i-layers"/></svg><span class="r-t">后台管理</span></div>
+              <div class="sheet-row"><svg><use href="#i-refresh"/></svg><span class="r-t">刷新列表</span></div>
+              <div class="sheet-row"><svg><use href="#i-trash"/></svg><span class="r-t">清理此任务</span><span class="r-k">手动</span></div>
+              <div class="sheet-row danger"><svg><use href="#i-warn"/></svg><span class="r-t">清理全部后台</span></div>
+              <div class="sheet-soft">
+                <span class="sk l">选择</span>
+                <span class="sk c"></span>
+                <span class="sk r">返回</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ruler"><span></span><b>已保护：条目变为「取消保护」</b><span></span></div>
+      <figcaption>
+        <div class="cap-id">Screen 03</div>
+        <div class="cap-name">选项菜单 · 已保护应用</div>
+        <div class="cap-desc">
+          保护是<strong>每个应用一票</strong>：已保护的条目文案翻转为「取消保护」，图标变为「盾牌 ✕」。
+          <strong>「清理此任务」始终可用</strong>（标注「手动」）——保护只对 <strong>0 键 / 清理全部</strong> 生效，
+          单个任务是手动清理，不受保护名单限制。保护状态持久化在现有
+          <code>KeydroidxSettingsStorage</code> 保护名单里，与「后台管理」页共用一份。
+        </div>
+        <div class="cap-keys"><span class="kbd">保护/取消保护 立即生效</span><span class="kbd">清理此任务 手动可用</span></div>
+      </figcaption>
+    </figure>
+
+    <!-- ---------- 04 清理确认 ---------- -->
+    <figure class="board">
+      <div class="device">
+        <div class="phone">
+          <div class="sbar">
+            <div class="sbar-l">
+              <span class="sig"><i></i><i></i><i></i><i class="off"></i></span>
+              <svg class="ico-wifi" viewBox="0 0 16 12"><path d="M8 10.6l2.2-2.6a3.3 3.3 0 0 0-4.4 0z"/><path d="M8 6.1c1.3 0 2.5.45 3.4 1.3l1.4-1.65A7.3 7.3 0 0 0 8 3.8a7.3 7.3 0 0 0-4.8 1.95l1.4 1.65A5.1 5.1 0 0 1 8 6.1z" opacity=".85"/></svg>
+              <span class="net">CMCC</span>
+            </div>
+            <div class="sbar-r">
+              <span class="batt"><i style="width:72%"></i></span>
+              <span class="clock">12:30</span>
+            </div>
+          </div>
+          <div class="ttl">
+            <span class="ttl-t">最近任务</span>
+            <span class="ttl-badge ok">实时</span>
+          </div>
+          <div class="hintbar"><em>未保护 4 · 已保护 2</em><em>按 0 键清理</em></div>
+          <div class="content">
+            <div class="grid">
+              <div class="card focus">
+                <span class="app-ico" style="--a:#2E6FD6;--b:#1A3A6B"><svg><use href="#i-music"/></svg></span>
+                <span class="app-name">音乐</span><span class="app-time">刚刚</span>
+              </div>
+              <div class="card">
+                <span class="app-ico" style="--a:#3DDC97;--b:#1B9E63"><svg><use href="#i-msg"/></svg></span>
+                <span class="app-name">信息</span><span class="app-time">5 分钟前</span>
+              </div>
+              <div class="card prot">
+                <span class="prot-flag"><svg><use href="#i-shield"/></svg></span>
+                <span class="app-ico" style="--a:#7E8AA8;--b:#4A5670"><svg><use href="#i-shield"/></svg></span>
+                <span class="app-name">设置</span><span class="app-time">23 分钟前</span>
+              </div>
+              <div class="card">
+                <span class="app-ico" style="--a:#FFB259;--b:#D97B1E"><svg><use href="#i-cam"/></svg></span>
+                <span class="app-name">相机</span><span class="app-time">1 小时前</span>
+              </div>
+            </div>
+          </div>
+          <div class="softbar">
+            <span class="sk l">选项</span>
+            <span class="sk c" style="font-size:12px">最近任务</span>
+            <span class="sk r">退出</span>
+          </div>
+
+          <div class="overlay">
+            <div class="overlay-scrim"></div>
+            <div class="sheet">
+              <div class="sheet-h"><span>清理后台？</span></div>
+              <div class="sheet-body">
+                将结束 <b>4</b> 个未保护的后台应用，此操作不可撤销。
+                <span class="sub">已保护 2 个（音乐、设置）会自动跳过；如需清理已保护的应用，请在选项里用「清理此任务」手动清理。</span>
+              </div>
+              <div class="sheet-soft">
+                <span class="sk l">取消</span>
+                <span class="sk c"></span>
+                <span class="sk r">清理</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ruler"><span></span><b>0 键 / 清理全部 共用此确认</b><span></span></div>
+      <figcaption>
+        <div class="cap-id">Screen 04</div>
+        <div class="cap-name">清理确认（破坏性）</div>
+        <div class="cap-desc">
+          同为底部锚定面板，正文块用 <code>#102040</code>（对齐 <code>dialog_keydroidx_uninstall.xml</code>）。
+          <strong>0 键</strong>与选项里的「清理全部后台」共用此确认；正文明确只清<strong>未保护</strong>数量，并说明已保护项如何手动清理。
+          按 <code>FEATURE_PHONE_UI_SPEC</code> §16：<strong>「取消」在左</strong>（更安全的选项前置）、<strong>「清理」在右</strong>；
+          确认键不直接触发清理，必须显式按右软键。
+        </div>
+        <div class="cap-keys"><span class="kbd">右软键 清理</span><span class="kbd">左软键 / 返回 取消</span></div>
+      </figcaption>
+    </figure>
+
+    <!-- ---------- 05 空态 ---------- -->
+    <figure class="board">
+      <div class="device">
+        <div class="phone">
+          <div class="sbar">
+            <div class="sbar-l">
+              <span class="sig"><i></i><i></i><i></i><i class="off"></i></span>
+              <svg class="ico-wifi" viewBox="0 0 16 12"><path d="M8 10.6l2.2-2.6a3.3 3.3 0 0 0-4.4 0z"/><path d="M8 6.1c1.3 0 2.5.45 3.4 1.3l1.4-1.65A7.3 7.3 0 0 0 8 3.8a7.3 7.3 0 0 0-4.8 1.95l1.4 1.65A5.1 5.1 0 0 1 8 6.1z" opacity=".85"/></svg>
+              <span class="net">CMCC</span>
+            </div>
+            <div class="sbar-r">
+              <span class="batt"><i style="width:72%"></i></span>
+              <span class="clock">12:30</span>
+            </div>
+          </div>
+
+          <div class="ttl">
+            <span class="ttl-t">最近任务</span>
+            <span class="ttl-badge ok">实时</span>
+          </div>
+
+          <div class="hintbar"><em>未保护 0 · 已保护 2</em><em></em></div>
+
+          <div class="content">
+            <div class="empty">
+              <span class="eico"><svg><use href="#i-grid"/></svg></span>
+              <span class="etitle">暂无最近任务</span>
+              <span class="esub">打开应用后，它们会出现在这里。<br>按右软键返回桌面。</span>
+            </div>
+          </div>
+
+          <div class="softbar">
+            <span class="sk l hidden">选项</span>
+            <span class="sk c" style="font-size:12px">最近任务</span>
+            <span class="sk r">退出</span>
+          </div>
+        </div>
+      </div>
+      <div class="ruler"><span></span><b>空态（左软键置空但保留占位）</b><span></span></div>
+      <figcaption>
+        <div class="cap-id">Screen 05</div>
+        <div class="cap-name">空态</div>
+        <div class="cap-desc">
+          空列表必须自我解释（§39）。左软键无可用动作时<strong>只置空文字、View 仍在</strong>（视觉等价
+          <code>INVISIBLE</code>），<strong>严禁 <code>View.GONE</code></strong>，否则三栏塌陷、中间标题偏移。
+          注意：仍有保护条目时不算空态，摘要行照常显示。
+        </div>
+        <div class="cap-keys"><span class="kbd">右软键 退出</span><span class="kbd">返回 退出</span></div>
+      </figcaption>
+    </figure>
+
+    <!-- ---------- 06 未激活态 ---------- -->
+    <figure class="board">
+      <div class="device">
+        <div class="phone">
+          <div class="sbar">
+            <div class="sbar-l">
+              <span class="sig"><i></i><i></i><i></i><i class="off"></i></span>
+              <svg class="ico-wifi" viewBox="0 0 16 12"><path d="M8 10.6l2.2-2.6a3.3 3.3 0 0 0-4.4 0z"/><path d="M8 6.1c1.3 0 2.5.45 3.4 1.3l1.4-1.65A7.3 7.3 0 0 0 8 3.8a7.3 7.3 0 0 0-4.8 1.95l1.4 1.65A5.1 5.1 0 0 1 8 6.1z" opacity=".85"/></svg>
+              <span class="net">CMCC</span>
+            </div>
+            <div class="sbar-r">
+              <span class="batt"><i style="width:72%"></i></span>
+              <span class="clock">12:30</span>
+            </div>
+          </div>
+
+          <div class="ttl">
+            <span class="ttl-t">最近任务</span>
+            <span class="ttl-badge" style="color:#FF8A80;background:rgba(244,67,54,.10);border-color:rgba(244,67,54,.32)">未激活</span>
+          </div>
+
+          <div class="hintbar"><em>数据源不可用</em><em>按 0 键清理仍可用</em></div>
+
+          <div class="content">
+            <div class="empty">
+              <span class="eico"><svg><use href="#i-warn"/></svg></span>
+              <span class="etitle">未激活 mini_shizuku</span>
+              <span class="esub">Android 5.0+ 需要 mini_shizuku（shell 权限）才能读取系统真实任务列表。</span>
+              <span class="ebtn">去激活 mini_shizuku</span>
+            </div>
+          </div>
+
+          <div class="softbar">
+            <span class="sk l">选项</span>
+            <span class="sk c" style="font-size:12px">最近任务</span>
+            <span class="sk r">退出</span>
+          </div>
+        </div>
+      </div>
+      <div class="ruler"><span></span><b>未激活态（必须可操作）</b><span></span></div>
+      <figcaption>
+        <div class="cap-id">Screen 06</div>
+        <div class="cap-name">未激活态</div>
+        <div class="cap-desc">
+          状态必须可操作（§38）：文案说明原因 + 给出「去激活 mini_shizuku」入口（左软键「选项」内亦可直达）。
+          不做「最近使用」之类的近似降级——那只是历史打开记录、不代表任务还在，会误导用户。
+          标题右侧徽标由绿转红。列表不可用是<strong>数据源</strong>问题，与清理能力无关。
+        </div>
+        <div class="cap-keys"><span class="kbd">左软键 选项（激活入口）</span><span class="kbd">右软键 退出</span></div>
+      </figcaption>
+    </figure>
+
+    <!-- ---------- 07 加载态 ---------- -->
+    <figure class="board">
+      <div class="device">
+        <div class="phone">
+          <div class="sbar">
+            <div class="sbar-l">
+              <span class="sig"><i></i><i></i><i></i><i class="off"></i></span>
+              <svg class="ico-wifi" viewBox="0 0 16 12"><path d="M8 10.6l2.2-2.6a3.3 3.3 0 0 0-4.4 0z"/><path d="M8 6.1c1.3 0 2.5.45 3.4 1.3l1.4-1.65A7.3 7.3 0 0 0 8 3.8a7.3 7.3 0 0 0-4.8 1.95l1.4 1.65A5.1 5.1 0 0 1 8 6.1z" opacity=".85"/></svg>
+              <span class="net">CMCC</span>
+            </div>
+            <div class="sbar-r">
+              <span class="batt"><i style="width:72%"></i></span>
+              <span class="clock">12:30</span>
+            </div>
+          </div>
+
+          <div class="ttl">
+            <span class="ttl-t">最近任务</span>
+            <span class="ttl-badge ok">实时</span>
+          </div>
+
+          <div class="hintbar"><em>读取中…</em><em></em></div>
+
+          <div class="content">
+            <div class="grid">
+              <div class="card skel"></div>
+              <div class="card skel"></div>
+              <div class="card skel"></div>
+              <div class="card skel"></div>
+              <div class="card skel"></div>
+              <div class="card skel"></div>
+            </div>
+            <div class="loading-tip">正在读取最近任务…</div>
+          </div>
+
+          <div class="softbar">
+            <span class="sk l hidden">选项</span>
+            <span class="sk c" style="font-size:12px">最近任务</span>
+            <span class="sk r">退出</span>
+          </div>
+        </div>
+      </div>
+      <div class="ruler"><span></span><b>加载态（骨架屏 · 低动效）</b><span></span></div>
+      <figcaption>
+        <div class="cap-id">Screen 07</div>
+        <div class="cap-name">加载态</div>
+        <div class="cap-desc">
+          枚举含 TCP / PackageManager 查询，放后台线程执行；首帧用骨架屏占位，避免空白闪烁（§40）。
+          加载期间左软键置空。
+        </div>
+        <div class="cap-keys"><span class="kbd">右软键 退出</span></div>
+      </figcaption>
+    </figure>
+
+  </main>
+
+  <!-- ========= 规格面板 ========= -->
+  <section class="spec">
+
+    <div class="panel">
+      <h3><span class="bar"></span>按键与保护规则</h3>
+      <table class="tbl">
+        <tr><td>上下 / 左右</td><td>移动卡片焦点（2 列网格，跨列换行）</td></tr>
+        <tr><td>确认键</td><td>恢复焦点应用 → 回到它之前的界面（不重启）</td></tr>
+        <tr><td>左软键</td><td>选项菜单（打开 / 保护 / 清理…）</td></tr>
+        <tr><td>右软键</td><td>退出返回桌面</td></tr>
+        <tr><td>返回键</td><td>先关面板，再退出页面</td></tr>
+        <tr><td>数字键 0</td><td><strong>一键清理未保护后台</strong>（先弹确认）</td></tr>
+        <tr><td>长按</td><td>过滤连发：仅首次按下生效，方向键放行</td></tr>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h3><span class="bar"></span>保护名单语义（与「后台管理」共用一份）</h3>
+      <ul class="note">
+        <li><b>加入方式：</b>选项 →「保护此应用」，立即生效并持久化到 <code>KeydroidxSettingsStorage</code> 保护名单。</li>
+        <li><b>保护效果：</b><span class="ok">0 键一键清理 / 清理全部后台 自动跳过</span>已保护的应用。</li>
+        <li><b>手动清理：</b>「清理此任务」<span class="warn">不受保护名单限制</span>，可单独清理已保护的应用（会先弹确认）。</li>
+        <li><b>状态可见：</b>卡片右上角绿色盾牌 + 绿色描边；摘要行显示「未保护 N · 已保护 M」。</li>
+        <li><b>恢复语义：</b>确认键重新下发该应用启动 Intent，系统把已存在的任务栈拉回前台 → <span class="ok">回到它之前的界面</span>（不重建栈顶 Activity）；任务已被系统回收时才会冷启动。</li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h3><span class="bar"></span>色彩 / 字号 Tokens</h3>
+      <div class="sw-row">
+        <span class="sw"><i class="chip" style="background:#1A3A6B"></i><span class="lb">softStart</span></span>
+        <span class="sw"><i class="chip" style="background:#0D1B3E"></i><span class="lb">softEnd</span></span>
+        <span class="sw"><i class="chip" style="background:#64B5F6"></i><span class="lb">accent</span></span>
+        <span class="sw"><i class="chip" style="background:rgba(33,150,243,.40)"></i><span class="lb">focus</span></span>
+        <span class="sw"><i class="chip" style="background:#7DE2A0"></i><span class="lb">protect</span></span>
+        <span class="sw"><i class="chip" style="background:#E8EEF5"></i><span class="lb">text</span></span>
+        <span class="sw"><i class="chip" style="background:#90CAF9"></i><span class="lb">subText</span></span>
+        <span class="sw"><i class="chip" style="background:#0a0f1d"></i><span class="lb">dlgList</span></span>
+        <span class="sw"><i class="chip" style="background:#102040"></i><span class="lb">dlgBody</span></span>
+      </div>
+      <div class="tt-list" style="margin-top:14px">
+        <div class="tt"><span class="sample" style="font-size:16px">最近任务</span><span class="meta">display 16sp</span></div>
+        <div class="tt"><span class="sample" style="font-size:13px">弹窗标题栏</span><span class="meta">title 13sp</span></div>
+        <div class="tt"><span class="sample" style="font-size:12px">卡片应用名</span><span class="meta">body 12sp</span></div>
+        <div class="tt"><span class="sample" style="font-size:11px">选项行 / 软键</span><span class="meta">small_title 11sp</span></div>
+        <div class="tt"><span class="sample" style="font-size:9px">时间 / 摘要 / 徽标</span><span class="meta">caption 9sp</span></div>
+        <div class="tt"><span class="sample" style="font-size:7px">状态栏辅助</span><span class="meta">micro 7sp</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3><span class="bar"></span>尺寸与设计约束</h3>
+      <table class="tbl">
+        <tr><td>卡片</td><td>56dp 高 · 图标 26dp · 2 列</td></tr>
+        <tr><td>软键栏</td><td>22dp · 三栏等宽 · 11sp（中栏 4 字用 12sp）</td></tr>
+        <tr><td>弹窗标题栏</td><td>26dp · 13sp</td></tr>
+        <tr><td>弹窗内容行</td><td>32dp · 11sp</td></tr>
+        <tr><td>摘要行</td><td>13dp · 9sp</td></tr>
+      </table>
+      <ul class="note" style="margin-top:12px">
+        <li><b>无真实缩略图：</b><span class="warn">第三方应用拿不到系统 Recents 快照</span>，卡片用「图标 + 名称 + 时间」表达。</li>
+        <li><b>面板形态：</b>底部锚定 + 宽度铺满 + 高度由内容决定，上方页面由系统压暗——直接复用 <code>KeydroidxOptionsDialog</code> 的窗口配置。</li>
+        <li><b>数据源：</b>4.4 <code>getRecentTasks</code>；5.0+ mini_shizuku <code>dumpsys</code>。<span class="warn">无 mini_shizuku 即不可用</span>，不做降级。列表只展示<strong>进程仍存活</strong>的任务（force-stop 后的空壳记录不显示）。</li>
+        <li><b>规范：</b>软键栏无高亮；空栏只置空文字不用 <code>GONE</code>；色值全部来自 <code>KeydroidxTheme</code>；尺寸走 <code>KeydroidxDimens.dp()</code>；图标走 <code>KeydroidxIcons</code>；≤13sp 不加粗。</li>
+      </ul>
+    </div>
+
+  </section>
+</div>
+</body>
+</html>
