@@ -1763,23 +1763,33 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			case KeydroidxWidgetItem.TYPE_CALENDAR:
 				row.setOnClickListener(v -> {
 					KeydroidxLog.i("Desktop", "打开日历");
-					try {
-						Intent intent = new Intent(Intent.ACTION_MAIN);
-						intent.addCategory(Intent.CATEGORY_APP_CALENDAR);
-						intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-						startActivity(intent);
-					} catch (Exception e) {
-						// 没有日历应用时降级为通用 VIEW
-						KeydroidxLog.w("Desktop", "无日历应用，尝试通用打开");
-						try {
-							Intent fallback = new Intent(Intent.ACTION_VIEW);
-							fallback.setData(android.provider.CalendarContract.CONTENT_URI);
-							fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-							startActivity(fallback);
-						} catch (Exception e2) {
-							KeydroidxLog.e("Desktop", "打开日历失败", e2);
-						}
+					Context ctx = getContext();
+					if (ctx == null) return;
+					// 部分功能机 ROM（如展讯）日历包被出厂停用，且不响应 CATEGORY_APP_CALENDAR /
+					// 通用 content:// VIEW：① 包停用 → 走解冻通道（内部带失败 Toast 兜底）；
+					// ② 依次尝试 CATEGORY_APP_CALENDAR、默认启动入口、通用 VIEW；
+					// ③ 全部失败 → 环境问题，用 w 记录并 Toast 提示，不烧自动上报配额。
+					if (KeydroidxFreezeManager.getInstance(ctx).isAppFrozen("com.android.calendar")) {
+						KeydroidxFreezeManager.getInstance(ctx).unfreezeAndLaunch(
+								null, "com.android.calendar", "日历");
+						return;
 					}
+					Intent calendarIntent = new Intent(Intent.ACTION_MAIN);
+					calendarIntent.addCategory(Intent.CATEGORY_APP_CALENDAR);
+					if (tryStartCalendar(ctx, calendarIntent, "CATEGORY_APP_CALENDAR")) return;
+					Intent launch = null;
+					try {
+						launch = ctx.getPackageManager().getLaunchIntentForPackage("com.android.calendar");
+					} catch (Exception e) {
+						// 展讯 ROM 的 CTA 钩子可能对 PackageManager IPC 抛异常，环境问题用 w
+						KeydroidxLog.w("Desktop", "查询日历启动入口失败: " + e.getMessage());
+					}
+					if (launch != null && tryStartCalendar(ctx, launch, "getLaunchIntentForPackage")) return;
+					Intent fallback = new Intent(Intent.ACTION_VIEW);
+					fallback.setData(android.provider.CalendarContract.CONTENT_URI);
+					if (tryStartCalendar(ctx, fallback, "ACTION_VIEW")) return;
+					KeydroidxLog.w("Desktop", "打开日历失败：系统无可用日历应用");
+					Toast.makeText(ctx, "未找到可用的日历应用", Toast.LENGTH_SHORT).show();
 				});
 				break;
 			case KeydroidxWidgetItem.TYPE_LOCK_SCREEN:
@@ -1838,6 +1848,20 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			default:
 				// 内存、存储、使用时长等不可编辑类型无点击行为
 				break;
+		}
+	}
+
+	/** 尝试启动日历 Intent，成功返回 true；ActivityNotFoundException 等环境类失败用 w 记录。 */
+	private boolean tryStartCalendar(Context ctx, Intent intent, String tag) {
+		try {
+			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+			ctx.startActivity(intent);
+			KeydroidxLog.i("Desktop", "打开日历成功: " + tag);
+			return true;
+		} catch (Exception e) {
+			// 无匹配 Activity / 包停用属环境问题，按规范用 w（不落盘、不触发自动上报）
+			KeydroidxLog.w("Desktop", "打开日历尝试失败(" + tag + "): " + e.getMessage());
+			return false;
 		}
 	}
 
