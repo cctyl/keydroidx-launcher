@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-"""把 UI 文案中 ArkPixel-12px 缺失的字形从 FusionPixel-12px 合并进来（干净版）。
+"""把 UI 文案中 ArkPixel-12px 缺失的字形从 FusionPixel-12px 合并进来。
+用法见同目录 README.md；按脚本位置自动定位仓库 app/src/main。
 注意：glyph 名必须从 cmap 表查映射（getGlyphName 是按 glyph 索引取名，不是码点！）"""
 import os, re
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.pens.recordingPen import DecomposingRecordingPen
 from fontTools.ttLib import TTFont
 
-ROOT = r'd:\project\keydroidx_ecosystem\keydroidx-launcher\app\src\main'
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    '..', 'app', 'src', 'main'))
 ARK = os.path.join(ROOT, 'assets', 'fonts', 'ArkPixel-12px.ttf')
 FUS = os.path.join(ROOT, 'assets', 'fonts', 'FusionPixel-12px.ttf')
 

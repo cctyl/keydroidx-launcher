@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""扫描所有 UI 文案，找出 ArkPixel-12px 字体缺字形的字符"""
+"""扫描所有 UI 文案，找出 ArkPixel-12px 字体缺字形的字符。
+用法见同目录 README.md；按脚本位置自动定位仓库 app/src/main。"""
 import os, re, sys
 from fontTools.ttLib import TTFont
 
-ROOT = r'd:\project\keydroidx_ecosystem\keydroidx-launcher\app\src\main'
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    '..', 'app', 'src', 'main'))
 font = TTFont(os.path.join(ROOT, 'assets', 'fonts', 'ArkPixel-12px.ttf'))
 cmap = font.getBestCmap()
 
