@@ -41,6 +41,15 @@ public final class Shizuku {
         return MiniShizuku.isRunning();
     }
 
+    /**
+     * 探测服务端真实 uid（WHOAMI，不需 K）。
+     * <p>用于校验「所选模式 = 服务端身份」：root 激活应得 0，adb 激活应得 2000；
+     * 返回 {@link ServerIdentity#UID_UNKNOWN} 表示离线或无法确认（旧版服务端）。
+     */
+    public static int serverUid() {
+        return ServerIdentity.fetchServerUid();
+    }
+
     /** 静默执行一条 shell 命令（shell 身份）。同签名才成功。 */
     public static boolean exec(String command) {
         return MiniShizuku.exec(command);

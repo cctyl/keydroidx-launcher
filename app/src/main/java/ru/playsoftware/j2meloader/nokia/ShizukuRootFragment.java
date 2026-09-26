@@ -16,6 +16,8 @@ import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
 import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -23,15 +25,15 @@ import java.util.Locale;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.topjohnwu.superuser.Shell;
-
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.mini_shizuku.Shizuku;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * mini_shizuku → root 激活页。
  * <p>
- * 通过 libsu（{@link Shell}）获取 root 权限，以 root 身份拉起 mini_shizuku 服务端
+ * 通过 {@link KeydroidxRootShell}（su -c 直执）获取 root 权限，以 root 身份拉起 mini_shizuku 服务端
  * （{@code app_process}），使服务端获得完整权限：/dev/uinput 写权限（电源键拦截方案1 的
  * uinput 回放完整生效）、/dev/input 完全读写（grab 更可靠）。拦截逻辑本身与 adb/shell
  * 方式完全一致，仅服务端进程身份不同——root 激活后回到「电源键拦截设置」选方案1 即为完整回放。
@@ -192,6 +194,18 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 					}
 				}
 				final boolean ok = online;
+				// WHOAMI 身份校验：模式选择 ≠ 服务真实身份。root 激活要求服务端 uid==0；
+				// 不一致（如旧 shell 服务未被杀干净）或无法确认（旧版服务端）时明确提示，
+				// 避免后续命令以错误身份执行（设计文档 §3.4）。
+				int serverUid = ru.playsoftware.mini_shizuku.ServerIdentity.UID_UNKNOWN;
+				boolean uidOk = false;
+				if (ok) {
+					serverUid = Shizuku.serverUid();
+					uidOk = serverUid == 0;
+					KeydroidxLog.i(TAG, "WHOAMI 校验: serverUid=" + serverUid + " ok=" + uidOk);
+				}
+				final int finalServerUid = serverUid;
+				final boolean finalUidOk = uidOk;
 				// On failure, reuse the root shell to dump diagnostics into KeydroidxLog.
 				// app_process is backgrounded with &, so exit code 0 only means the root
 				// shell dispatched the command - not that the server actually came up.
@@ -199,16 +213,29 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 				if (!ok) {
 					collectActivationDiagnostics();
 				}
-				KeydroidxLog.i("ShizukuRoot", "root 激活结果: online=" + online + " execOk=true");
+				KeydroidxLog.i("ShizukuRoot", "root 激活结果: online=" + online + " execOk=true"
+						+ (ok ? " serverUid=" + finalServerUid : ""));
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
 						if (!isAdded()) return;
 						refreshStatus();
-						Toast.makeText(requireContext(),
-								ok ? "root 激活成功，方案1 将获得完整回放能力"
-										: "root 启动命令已执行，但服务未上线，请查看 mini_shizuku 日志",
-								Toast.LENGTH_SHORT).show();
+						String msg;
+						if (!ok) {
+							msg = "root 启动命令已执行，但服务未上线，请查看 mini_shizuku 日志";
+						} else if (!finalUidOk) {
+							msg = "服务已上线，但服务端身份异常 (uid=" + finalServerUid
+									+ " ≠ 0)，请重新激活";
+						} else {
+							// root 激活成功且身份校验通过：服务端已是 root 身份，
+							// 同步授权模式偏好为 root 模式，保持设置页状态一致
+							if (finalUidOk) {
+								KeydroidxSettingsStorage.setAuthMode(requireContext(),
+										KeydroidxSettingsStorage.AUTH_MODE_ROOT);
+							}
+							msg = "root 激活成功，方案1 将获得完整回放能力";
+						}
+						Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
 					}
 				});
 			}
@@ -218,26 +245,19 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	/**
 	 * 检测当前设备是否可获取 root 权限。
 	 * <p>
-	 * 使用 libsu {@link Shell#isAppGrantedRoot()}：
-	 * <ul>
-	 *     <li>已确认授权 → {@code true}；</li>
-	 *     <li>PATH 中无 su（未 root）→ {@code false}；</li>
-	 *     <li>有 su 但未授权/未探测过 → {@code null}（待确认）。</li>
-	 * </ul>
-	 * 本方法刻意<strong>不创建 shell</strong>：一旦创建 non-root shell 会被 main shell 缓存，
-	 * 污染后续 root 激活。真正的 root 探测发生在 {@link #startServerAsRoot()}（会弹 su 授权窗）。
+	 * 使用 {@link KeydroidxRootShell#isRootAvailable}（su -c true 探测，5 秒超时）：
+	 * SuperSU 策略为 grant 时秒回 true；策略为 prompt 时会弹授权窗，用户允许后即 granted。
+	 * 未 root（PATH 无 su）时 su 直接失败返回 false。
 	 */
 	private Boolean isRootAvailable() {
 		if (Build.VERSION.SDK_INT < 19) {
-			// libsu core 要求 API 19+，低版本直接判定不可用
 			KeydroidxLog.w("ShizukuRoot", "root 检测跳过: SDK " + Build.VERSION.SDK_INT + " < 19");
 			return Boolean.FALSE;
 		}
 		try {
-			Boolean granted = Shell.isAppGrantedRoot();
-			KeydroidxLog.i("ShizukuRoot", "root 检测(状态): "
-					+ (granted == null ? "待授权" : granted));
-			return granted;
+			boolean ok = KeydroidxRootShell.isRootAvailable(requireContext());
+			KeydroidxLog.i("ShizukuRoot", "root 检测(状态): " + ok);
+			return ok;
 		} catch (Exception e) {
 			KeydroidxLog.w("ShizukuRoot", "root 检测异常: " + e.getMessage());
 			return Boolean.FALSE;
@@ -245,39 +265,16 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	}
 
 	/**
-	 * 确保 main shell 是 root；若缓存的是 non-root（如探测阶段误建），先关闭释放缓存再重建。
-	 *
-	 * @return 返回 root shell；无法获得时返回 {@code null}（无 root / 未授权）。
-	 */
-	private Shell ensureRootShell() {
-		Shell shell = Shell.getShell();
-		if (shell.isRoot()) {
-			return shell;
-		}
-		// 缓存的是 non-root shell：关闭使其状态置 UNKNOWN，MainShell.getCached() 会丢弃，
-		// 下次 get() 重新按 su → sh 顺序构建。
-		KeydroidxLog.w("ShizukuRoot", "main shell 非 root，尝试重建以获取 root 权限");
-		try {
-			shell.waitAndClose(1, java.util.concurrent.TimeUnit.SECONDS);
-		} catch (Exception ignored) {
-			KeydroidxLog.w(TAG, "waitAndClose failed: " + ignored.getMessage());
-		}
-		// 重建期间若用户拒绝 su 授权，仍会退回 sh（non-root），此处校验兜底
-		Shell rebuilt = Shell.getShell();
-		if (rebuilt != null && rebuilt.isRoot()) {
-			return rebuilt;
-		}
-		KeydroidxLog.w("ShizukuRoot", "重建后仍非 root：无 root 或 su 授权被拒绝");
-		return null;
-	}
-
-	/**
-	 * 通过 libsu root shell 以 root 身份拉起 mini_shizuku 服务端：
+	 * 通过 {@link KeydroidxRootShell}（su -c 直执）以 root 身份拉起 mini_shizuku 服务端：
 	 * 先杀掉旧的 app_process（shell/root 均杀），再以 root 启动新服务端。
 	 * 启动参数与 {@code mini_shizuku.sh} 一致，并注入 {@code -Dapp.package}，
 	 * 供 APK 重装后服务端通过 pm path 重新定位。
 	 * <p>
-	 * 注意：app_process 后台化前先 {@code trap '' 1} 忽略 SIGHUP，避免 su 进程退出后被回收。
+	 * 注意：app_process 后台化前先 {@code trap '' 1} 忽略 SIGHUP，避免 su 进程退出后被回收；
+	 * stdin 重定向 /dev/null，防止后台进程持有 su 的 stdin 管道干扰排空。
+	 * <p>
+	 * <b>历史教训：</b>曾用 libsu 持久 root shell 提交此脚本，exec() 标记回显收不到而
+	 * 无限期挂起（脚本实际已执行），4.4 + SuperSU 2.76 上必现——已整体替换为 su -c 直执。
 	 */
 	private boolean startServerAsRoot() {
 		try {
@@ -285,38 +282,104 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 				KeydroidxLog.w("ShizukuRoot", "root 启动跳过: SDK < 19");
 				return false;
 			}
-			// 关键：必须拿到 root shell。直接 Shell.cmd() 会复用被缓存的 non-root shell
-			//（探测阶段误建时），导致脚本实际以非 root 身份执行。ensureRootShell 负责
-			// 关闭 non-root 缓存并重建 root shell。
-			Shell rootShell = ensureRootShell();
-			if (rootShell == null) {
-				KeydroidxLog.e("ShizukuRoot", "root 启动失败: 无法获得 root shell");
-				return false;
-			}
 			String apk = requireContext().getApplicationInfo().sourceDir;
 			String pkg = requireContext().getPackageName();
+			// root 身份的 Java 进程（app_process 所在 SELinux 域）无权写 /data/local/tmp，
+			// 服务端自己部署 so 会 EACCES。改为：App 侧从 APK 解出最新 so 到 cache，
+			// 由本 root 脚本 cat 到 /data/local/tmp——保证服务端加载的永远是当前 APK 的
+			// so 版本（旧 so 可能缺少新 JNI 方法，如 nativeSetSuppGroups）。
+			String deployLib = "";
+			File soInCache = extractInterceptorLibToCache();
+			if (soInCache != null) {
+				deployLib = "cat '" + soInCache.getAbsolutePath()
+						+ "' > /data/local/tmp/libnokiainterceptor.so; "
+						+ "chmod 755 /data/local/tmp/libnokiainterceptor.so; ";
+			} else {
+				KeydroidxLog.w(TAG, "so 解出失败，服务端将尝试使用 /data/local/tmp 已有库");
+			}
 			// 与 assets/mini_shizuku.sh 保持一致：日志先试固定名，写不动（被其它 uid 占用）
 			// 则退到带 uid 后缀的专属文件，避免 root/adb 混用激活时 app_process 因
 			// "can't create ...: Permission denied" 根本不启动。
+			// 关键：app_process 必须用 su -cn u:r:shell:s0 切到 shell SELinux 域拉起（root uid 保留）。
+			// 4.4 真机实测：SuperSU 默认 context=u:r:init:s0 下，root 身份的 app_process 无法
+			// 访问 /data/local/tmp（stat 不可见、create EACCES），so 部署与加载全部失败；
+			// shell 域无此限制，且 root uid + CAP_SETGID 保留（setgroups 补组实测成功）。
 			String script = "trap '' 1; "
 					+ "ps | grep app_process | grep -v grep | while read -r line; do set -- $line; kill -9 $2 2>/dev/null; done; "
+					+ deployLib
 					+ "LOG=/data/local/tmp/minishizuku.log; "
-					+ "if ! ( : >> \"$LOG\" ) 2>/dev/null; then "
-					+ "u=$(id -u 2>/dev/null); [ -z \"$u\" ] && u=$$; "
-					+ "LOG=/data/local/tmp/minishizuku.$u.log; "
-					+ "fi; "
 					+ ": > \"$LOG\" 2>/dev/null; "
-					+ "app_process -Djava.class.path='" + apk + "' -Dapp.package='" + pkg
-					+ "' /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess"
-					+ " >> \"$LOG\" 2>&1 &";
+					+ "su -cn u:r:shell:s0 -c \"trap '' 1; app_process -Djava.class.path=" + apk
+					+ " -Dapp.package=" + pkg
+					+ " /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess"
+					+ " >> /data/local/tmp/minishizuku.log 2>&1 </dev/null &\"";
 			KeydroidxLog.i("ShizukuRoot", "执行 root 启动: " + script);
-			// 在 root shell 上执行脚本（复用同一持久 root shell，与 su -c 等价）
-			Shell.Result r = rootShell.newJob().add(script).exec();
-			KeydroidxLog.i("ShizukuRoot", "root 启动服务端退出码: " + r.getCode());
+			// su -c 直执（libsu 在 4.4 + SuperSU 2.76 上 exec() 会挂死，见类注释）
+			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(requireContext(), script, 15000);
+			KeydroidxLog.i("ShizukuRoot", "root 启动服务端退出码: " + r.code + " out=" + r.out.trim());
 			return r.isSuccess();
 		} catch (Exception e) {
 			KeydroidxLog.e("ShizukuRoot", "root 启动服务端异常", e);
 			return false;
+		}
+	}
+
+	/**
+	 * 从本应用 APK 中解出 libnokiainterceptor.so 到 cacheDir，供 root 激活脚本
+	 * cat 部署到 /data/local/tmp（root shell 可写；root 身份的 Java 服务进程不可写）。
+	 * ABI 选择与 {@code InterceptorNative.getSupportedAbis} 一致：
+	 * API 21+ 读 SUPPORTED_ABIS，4.4 降级 CPU_ABI/CPU_ABI2。失败返回 null（不抛异常）。
+	 */
+	@Nullable
+	private File extractInterceptorLibToCache() {
+		ZipFile zip = null;
+		try {
+			String apkPath = requireContext().getApplicationInfo().sourceDir;
+			zip = new ZipFile(apkPath);
+			String[] abis;
+			try {
+				Object o = Build.class.getField("SUPPORTED_ABIS").get(null);
+				abis = (o instanceof String[] && ((String[]) o).length > 0)
+						? (String[]) o : new String[]{Build.CPU_ABI, Build.CPU_ABI2};
+			} catch (Throwable t) {
+				abis = new String[]{Build.CPU_ABI, Build.CPU_ABI2};
+			}
+			ZipEntry entry = null;
+			for (String abi : abis) {
+				if (abi == null || abi.isEmpty()) continue;
+				entry = zip.getEntry("lib/" + abi + "/libnokiainterceptor.so");
+				if (entry != null) break;
+			}
+			if (entry == null) {
+				return null;
+			}
+			File out = new File(requireContext().getCacheDir(), "libnokiainterceptor.so");
+			InputStream in = zip.getInputStream(entry);
+			try {
+				FileOutputStream fos = new FileOutputStream(out);
+				try {
+					byte[] buf = new byte[8192];
+					int n;
+					while ((n = in.read(buf)) > 0) {
+						fos.write(buf, 0, n);
+					}
+				} finally {
+					fos.close();
+				}
+			} finally {
+				in.close();
+			}
+			return out;
+		} catch (Throwable t) {
+			KeydroidxLog.w(TAG, "解出 libnokiainterceptor.so 失败: " + t.getMessage());
+			return null;
+		} finally {
+			if (zip != null) {
+				try {
+					zip.close();
+				} catch (Exception ignored) {
+				}
+			}
 		}
 	}
 
@@ -337,11 +400,6 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	 */
 	private void collectActivationDiagnostics() {
 		try {
-			Shell rootShell = ensureRootShell();
-			if (rootShell == null) {
-				KeydroidxLog.w("ShizukuRoot", "diagnostics skipped: no root shell");
-				return;
-			}
 			String diag = "echo '=== getenforce ==='; getenforce 2>&1; "
 					+ "echo '=== app_process procs ==='; "
 					+ "(ps -A 2>/dev/null || ps) | grep -i app_process; "
@@ -350,15 +408,11 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 					+ "echo '=== logcat MiniShizuku (tail 60) ==='; "
 					+ "logcat -d -t 500 -s MiniShizuku:* 2>&1 | tail -n 60; "
 					+ "echo '=== END ==='";
-			Shell.Result r = rootShell.newJob().add(diag).exec();
-			StringBuilder sb = new StringBuilder();
-			for (String l : r.getOut()) {
-				sb.append(l).append('\n');
-			}
-			KeydroidxLog.e("ShizukuRoot", "root activation failure diagnostics (exit " + r.getCode() + "):\n" + sb.toString());
+			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(requireContext(), diag, 10000);
+			KeydroidxLog.e("ShizukuRoot", "root activation failure diagnostics (exit " + r.code + "):\n" + r.out);
 			// 保险起见多一步：把整个 minishizuku.log 原样复制到 KeydroidxLog 日志目录，
 			// 保留完整原始文件（内联 tail 只截了 80 行），方便事后排查 / 寄回。
-			copyMinishizukuLog(rootShell);
+			copyMinishizukuLog();
 		} catch (Exception e) {
 			KeydroidxLog.e("ShizukuRoot", "collect diagnostics failed", e);
 		}
@@ -370,7 +424,7 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
  * 目标目录是 app 私有外存（/sdcard/Android/data/&lt;pkg&gt;/files/log），root 可写，
 	 * 复制后用户/我们可直接取走完整原始日志。
 	 */
-	private void copyMinishizukuLog(Shell rootShell) {
+	private void copyMinishizukuLog() {
 		File logDir = KeydroidxLog.getLogDir();
 		if (logDir == null) {
 			KeydroidxLog.w("ShizukuRoot", "copy minishizuku.log skipped: KeydroidxLog dir not initialized");
@@ -384,13 +438,9 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 		String cmd = "cp -f /data/local/tmp/minishizuku.log " + targetPath + " 2>&1; "
 				+ "ls -l " + targetPath + " 2>&1";
 		try {
-			Shell.Result r = rootShell.newJob().add(cmd).exec();
-			StringBuilder sb = new StringBuilder();
-			for (String l : r.getOut()) {
-				sb.append(l).append('\n');
-			}
+			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(requireContext(), cmd, 8000);
 			KeydroidxLog.i("ShizukuRoot", "copied minishizuku.log -> " + target.getAbsolutePath()
-					+ " (exit " + r.getCode() + ") " + sb.toString().trim());
+					+ " (exit " + r.code + ") " + r.out.trim());
 		} catch (Exception e) {
 			KeydroidxLog.e("ShizukuRoot", "copy minishizuku.log failed", e);
 		}

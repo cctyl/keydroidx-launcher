@@ -12,6 +12,8 @@
 #include <time.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <grp.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -862,6 +864,22 @@ void* interceptor_run(void* arg) {
 
     is_running = 0;
     return NULL;
+}
+
+// root 身份的服务端在启动最早阶段调用：补齐 supplemental groups（含 inet 3003）。
+// Android 内核对 socket() 创建的权限检查针对补充组而非 uid（paranoid networking），
+// SuperSU 等拉起的 root 进程默认 uid=0/gid=0 且无任何补充组，不补组则 socket() EACCES。
+// root 自带 CAP_SETGID，setgroups(2) 必成功（4.4 真机已实测验证，见设计文档 §4.3）。
+JNIEXPORT void JNICALL
+Java_ru_playsoftware_mini_1shizuku_server_InterceptorNative_nativeSetSuppGroups(JNIEnv *env, jclass clazz, jintArray gids) {
+    jsize n = (*env)->GetArrayLength(env, gids);
+    jint *arr = (*env)->GetIntArrayElements(env, gids, NULL);
+    if (arr != NULL) {
+        int ret = setgroups((size_t) n, (const gid_t *) arr);
+        LOGI("nativeSetSuppGroups: n=%d ret=%d errno=%d(%s)", n, ret,
+             ret != 0 ? errno : 0, ret != 0 ? strerror(errno) : "ok");
+        (*env)->ReleaseIntArrayElements(env, gids, arr, JNI_ABORT);
+    }
 }
 
 JNIEXPORT void JNICALL

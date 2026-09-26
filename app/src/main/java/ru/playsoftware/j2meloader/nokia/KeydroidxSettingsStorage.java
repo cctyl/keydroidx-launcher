@@ -726,6 +726,41 @@ public class KeydroidxSettingsStorage {
                 KeydroidxLog.i("SettingsStorage", "setNotificationShowOngoing: " + show);
         }
 
+	// ── 授权模式（mini_shizuku 设置页：root 模式 / mini_shizuku 模式，双轨制） ──
+
+	/** 授权模式：mini_shizuku 模式（shell 身份，电脑 adb 激活）。默认值，兼容最广。 */
+	public static final int AUTH_MODE_SHIZUKU = 0;
+	/** 授权模式：root 模式（root 身份，桌面内 root 激活，功能最全）。 */
+	public static final int AUTH_MODE_ROOT = 1;
+
+	private static final String KEY_AUTH_MODE = "auth_mode";
+
+	/**
+	 * 读取授权模式。默认 mini_shizuku 模式（开箱即用、兼容最广）。
+	 * <p>注意：模式是「用户期望的服务端身份」，实际以 WHOAMI 探测到的 uid 为准，
+	 * 两者不一致时设置页会提示重新激活（见设计文档 §3.4）。
+	 */
+	public static int getAuthMode(Context ctx) {
+		int mode = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getInt(KEY_AUTH_MODE, AUTH_MODE_SHIZUKU);
+		if (mode != AUTH_MODE_SHIZUKU && mode != AUTH_MODE_ROOT) {
+			return AUTH_MODE_SHIZUKU;
+		}
+		return mode;
+	}
+
+	/** 保存授权模式。 */
+	public static void setAuthMode(Context ctx, int mode) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putInt(KEY_AUTH_MODE, mode).apply();
+		KeydroidxLog.i("SettingsStorage", "setAuthMode: " + getAuthModeName(mode));
+	}
+
+	/** 授权模式中文名（菜单展示 / 日志复用）。 */
+	public static String getAuthModeName(int mode) {
+		return mode == AUTH_MODE_ROOT ? "root 模式" : "mini_shizuku 模式";
+	}
+
 	// ── 电源键拦截方案（高级设置 → 电源键拦截设置） ──
 
 	/** 电源键拦截：关闭。 */

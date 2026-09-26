@@ -157,14 +157,17 @@ public class InterceptorNative {
         }
     }
 
-    public static void loadLibrary(String absolutePath) {
-        if (isLoaded) return;
+    /** @return true 表示库已加载就绪（含此前已加载的情况）。 */
+    public static boolean loadLibrary(String absolutePath) {
+        if (isLoaded) return true;
         try {
             System.load(absolutePath);
             isLoaded = true;
             Log.i(TAG, "Interceptor library loaded from " + absolutePath);
+            return true;
         } catch (Throwable e) {
             Log.e(TAG, "Failed to load interceptor library", e);
+            return false;
         }
     }
 
@@ -206,4 +209,21 @@ public class InterceptorNative {
     public static native void stopInterceptor();
     public static native void setInterceptEnabled(boolean enabled);
     public static native void nativeSetPageState(int state);
+    /**
+     * 补齐当前进程的 supplemental groups（root 身份调用，需 CAP_SETGID）。
+     * <p>Android 内核对 socket() 创建的权限检查针对补充组（需含 inet=3003）而非 uid；
+     * root 拉起的进程默认无任何补充组，不补组则服务端 TCP 起不来（4.4 实测）。
+     * 必须在任何网络操作之前调用。
+     */
+    public static native void nativeSetSuppGroups(int[] gids);
+
+    /** root 身份服务端需补齐的补充组：root(0) + shell 全组，关键为 inet(3003)。 */
+    public static final int[] SERVER_SUPP_GROUPS = {
+            0, 1004, 1007, 1011, 1015, 1028, 3001, 3002, 3003, 3006, 9997
+    };
+
+    /** native 库是否已加载成功（供 root 启动早期判断补组前提是否满足）。 */
+    public static boolean isLibraryLoaded() {
+        return isLoaded;
+    }
 }

@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,19 +19,27 @@ import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
 import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.mini_shizuku.ServerIdentity;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
 /**
- * mini_shizuku 服务页面。
+ * mini_shizuku 服务页面（授权模式双轨制入口）。
  * <p>
- * 所有 Android 版本统一使用 mini_shizuku 权限通道。服务端由用户在电脑上通过 adb 执行
- * 发布包附带的 {@code mini_shizuku.sh} 脚本拉起（app_process 以 shell 身份运行）。
+ * 两种互斥授权模式（用户单选，持久化于 {@link KeydroidxSettingsStorage}）：
+ * <ul>
+ *     <li><b>root 模式</b>：服务端以 root 身份运行（桌面内 root 激活，su -cn 切 shell 域
+ *     + 启动早期补 inet 组），功能最全；</li>
+ *     <li><b>mini_shizuku 模式</b>：服务端以 shell 身份运行（电脑 adb 激活），兼容最广，
+ *     shell 做不了的操作（如 4.4 冻结）直接失败并提示。</li>
+ * </ul>
+ * 模式是「期望的服务端身份」，实际以 WHOAMI 探测到的 uid 为准，不一致时状态行
+ * 明确提示重新激活（设计文档 §3.4）。
  * <p>
  * 页面结构：
  * <ul>
- *     <li>顶部状态行：显示当前通道与服务在线状态；</li>
- *     <li>主体为两条可导航菜单（adb 激活 / root 激活），方向键选中、确认键进入对应子页；</li>
- *     <li>左软键「刷新」：重新检测服务在线状态；右软键「返回」：返回上一层。</li>
+ *     <li>顶部状态行：当前模式 / 服务状态 / 服务端身份一致性；</li>
+ *     <li>可导航菜单：授权模式切换 / root 激活 / adb 激活；</li>
+ *     <li>左软键「刷新」；右软键「返回」。</li>
  * </ul>
  * <p>
  * 电源键拦截开关已移至「高级设置」（{@link KeydroidxAdvancedSettingsFragment}）。
@@ -40,10 +49,23 @@ public class ShizukuFragment extends KeydroidxListPageFragment {
 	private TextView statusText;
 	private LinearLayout actionList;
 
-	private static final String[] ACTION_NAMES = {
-			"adb 激活",
-			"root 激活",
-	};
+	/** 菜单项：root 模式（确认 = 切换模式并直接 root 激活，无子页）。 */
+	private static final int ACTION_ROOT = 0;
+	/** 菜单项：adb 模式（确认 = 切换模式；激活需电脑 adb，进说明页）。 */
+	private static final int ACTION_ADB = 1;
+	private static final int ACTION_COUNT = 2;
+
+	/** 动态菜单标签。 */
+	private String actionLabel(int index) {
+		switch (index) {
+			case ACTION_ROOT:
+				return "root 模式";
+			case ACTION_ADB:
+				return "adb 模式";
+			default:
+				return "";
+		}
+	}
 
 	@Override
 	protected int getLayoutRes() {
@@ -58,17 +80,22 @@ public class ShizukuFragment extends KeydroidxListPageFragment {
 
 		buildActionList();
 
+		// 顶部状态行的「当前模式」即切换入口（点击 = 在 root ↔ mini_shizuku 间切换），
+		// 不再单设「授权模式」菜单行——避免与状态行信息重复。
+		statusText.setOnClickListener(v -> toggleMode());
+		statusText.setClickable(true);
+
 		// 异步刷新状态，避免 TCP 探测阻塞主线程
 		refreshStatus();
 
 		setFocusIndex(0);
 	}
 
-	/** 构建底部可导航操作列表（方向键 + 确认键触发）。 */
+	/** 构建底部可导航操作列表（方向键 + 确认键触发）。可重复调用以刷新动态标签。 */
 	private void buildActionList() {
 		actionList.removeAllViews();
-		itemViews = new View[ACTION_NAMES.length];
-		for (int i = 0; i < ACTION_NAMES.length; i++) {
+		itemViews = new View[ACTION_COUNT];
+		for (int i = 0; i < ACTION_COUNT; i++) {
 			LinearLayout row = new LinearLayout(requireContext());
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
@@ -80,7 +107,7 @@ public class ShizukuFragment extends KeydroidxListPageFragment {
 			TextView tv = new TextView(requireContext());
 			tv.setLayoutParams(new LinearLayout.LayoutParams(
 					0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-			tv.setText(ACTION_NAMES[i]);
+			tv.setText(actionLabel(i));
 			tv.setTextColor(0xFFFFFFFF);
 			KeydroidxFontManager.textSize(tv, 12);
 			row.addView(tv);
@@ -102,51 +129,161 @@ public class ShizukuFragment extends KeydroidxListPageFragment {
 		}
 	}
 
-	/** 后台检测服务在线状态，回主线程刷新状态行文案。 */
+	/** 后台检测服务在线状态与服务端身份（WHOAMI），回主线程刷新状态行。 */
 	private void refreshStatus() {
 		final Handler mainHandler = new Handler(Looper.getMainLooper());
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
 				final boolean running = Shizuku.isRunning();
+				final int uid = running ? Shizuku.serverUid() : ServerIdentity.UID_UNKNOWN;
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
 						if (!isAdded()) return;
-						updateStatusText(running);
+						updateStatusText(running, uid);
 					}
 				});
 			}
 		}, "shizuku-status-check").start();
 	}
 
-	private void updateStatusText(boolean running) {
+	/**
+	 * 刷新状态行：当前模式 / 服务状态 / 服务端真实身份与所选模式的一致性。
+	 * 身份取 WHOAMI 探测结果（uid），与模式不符时明确提示重新激活。
+	 */
+	private void updateStatusText(boolean running, int serverUid) {
 		if (statusText == null) return;
-		statusText.setText("当前通道：mini_shizuku\n服务状态：" + (running ? "在线" : "离线"));
-		statusText.setTextColor(running ? 0xFF64B5F6 : 0xFFFF8A80);
+		int mode = KeydroidxSettingsStorage.getAuthMode(requireContext());
+		StringBuilder sb = new StringBuilder();
+		sb.append("当前模式：").append(KeydroidxSettingsStorage.getAuthModeName(mode))
+				.append("（点击切换）").append('\n');
+		sb.append("服务状态：").append(running ? "在线" : "离线").append('\n');
+		int color;
+		if (!running) {
+			sb.append("服务端身份：—（服务离线，请激活）");
+			color = 0xFFFF8A80;
+		} else if (serverUid == ServerIdentity.UID_UNKNOWN) {
+			sb.append("服务端身份：无法确认（旧版服务端不含 WHOAMI）");
+			color = 0xFF64B5F6;
+		} else {
+			boolean isRoot = serverUid == 0;
+			boolean match = (mode == KeydroidxSettingsStorage.AUTH_MODE_ROOT) == isRoot;
+			sb.append("服务端身份：uid=").append(serverUid)
+					.append(isRoot ? "（root）" : "（shell）")
+					.append(match ? "  ✓ 与模式一致" : "  ✗ 与模式不符，请重新激活");
+			color = match ? 0xFF81C784 : 0xFFFF8A80;
+		}
+		statusText.setText(sb.toString());
+		statusText.setTextColor(color);
+	}
+
+	/**
+	 * 校验已在线服务端身份与新模式的一致性（不一致则提醒重新激活）。
+	 * <p>
+	 * {@link Shizuku#isRunning()} / {@link Shizuku#serverUid()} 内部是 TCP 连接，
+	 * <b>严禁在主线程调用</b>——4.4 上会抛 {@link android.os.NetworkOnMainThreadException}
+	 * 直接崩溃（2026-09 真机实测：点击「授权模式」即闪退，即此原因）。
+	 */
+	private void checkServerIdentityMatch(final int newMode) {
+		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				if (!Shizuku.isRunning()) return;
+				final int uid = Shizuku.serverUid();
+				mainHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						if (!isAdded()) return;
+						boolean match = (newMode == KeydroidxSettingsStorage.AUTH_MODE_ROOT) == (uid == 0);
+						if (uid != ServerIdentity.UID_UNKNOWN && !match) {
+							Toast.makeText(requireContext(),
+									"当前服务端身份与新模式不符，请重新激活", Toast.LENGTH_SHORT).show();
+						}
+					}
+				});
+			}
+		}, "shizuku-mode-identity").start();
 	}
 
 	private void onAction(int index) {
-		if (index < 0 || index >= ACTION_NAMES.length) return;
+		if (index < 0 || index >= ACTION_COUNT) return;
 		switch (index) {
-			case 0:
-				KeydroidxLog.i("Shizuku", "进入 adb 激活说明页");
-				((KeydroidxDesktopActivity) requireActivity()).openFragment(new ShizukuAdbFragment());
+			case ACTION_ROOT:
+				// 确认即生效：切 root 模式 + 直接 root 激活（无子页）。
+				// 模式切换在 activateRootInline 内做（失败时需按原模式回滚）
+				activateRootInline();
 				break;
-			case 1:
-				KeydroidxLog.i("Shizuku", "进入 root 激活页（占位）");
-				((KeydroidxDesktopActivity) requireActivity()).openFragment(new ShizukuRootFragment());
+			case ACTION_ADB:
+				// 确认即切换 adb 模式；激活需电脑 adb，进说明页（不是子菜单，是必要指引）
+				KeydroidxSettingsStorage.setAuthMode(requireContext(),
+						KeydroidxSettingsStorage.AUTH_MODE_SHIZUKU);
+				refreshStatus();
+				checkServerIdentityMatch(KeydroidxSettingsStorage.AUTH_MODE_SHIZUKU);
+				((KeydroidxDesktopActivity) requireActivity()).openFragment(new ShizukuAdbFragment());
 				break;
 			default:
 				break;
 		}
 	}
 
-	// ---- KeydroidxFocusHost ----
+	/** 后台执行 root 激活并 toast 结果（{@link KeydroidxShizukuActivator} 阻塞流程）。 */
+	private void activateRootInline() {
+		final Context appCtx = requireContext().getApplicationContext();
+		// 记住原模式：无 root 设备上激活必然失败，须回滚，
+		// 否则留下「模式=root 但永远激活不了」的死状态（2026-09 无 root 真机实测）。
+		final int prevMode = KeydroidxSettingsStorage.getAuthMode(appCtx);
+		KeydroidxSettingsStorage.setAuthMode(appCtx, KeydroidxSettingsStorage.AUTH_MODE_ROOT);
+		refreshStatus();
+		Toast.makeText(requireContext(), "正在通过 root 激活...", Toast.LENGTH_SHORT).show();
+		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				final KeydroidxShizukuActivator.Result r =
+						KeydroidxShizukuActivator.activateRootServer(appCtx);
+				mainHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						if (!isAdded()) return;
+						refreshStatus();
+						String msg;
+						if (!r.execOk) {
+							// su 不可用/被拒：回滚模式并明确告知
+							KeydroidxSettingsStorage.setAuthMode(appCtx, prevMode);
+							msg = "root 激活失败：无 root 或 su 授权被拒，已保持原模式";
+						} else if (!r.online) {
+							msg = "root 命令已执行，但服务未上线，请查看日志";
+						} else if (!r.isFullyOk()) {
+							msg = "服务已上线，但身份异常 (uid=" + r.serverUid + " ≠ 0)";
+						} else {
+							msg = "root 激活成功，已切换 root 模式";
+						}
+						// LENGTH_LONG：低分屏上 SHORT 约 2 秒即消失，用户来不及看到失败原因
+						Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show();
+					}
+				});
+			}
+		}, "shizuku-inline-activate").start();
+	}
+
+	/** 切换授权模式（root ↔ mini_shizuku），入口：顶部状态行「当前模式」点击。 */
+	private void toggleMode() {
+		int cur = KeydroidxSettingsStorage.getAuthMode(requireContext());
+		int next = cur == KeydroidxSettingsStorage.AUTH_MODE_ROOT
+				? KeydroidxSettingsStorage.AUTH_MODE_SHIZUKU
+				: KeydroidxSettingsStorage.AUTH_MODE_ROOT;
+		KeydroidxSettingsStorage.setAuthMode(requireContext(), next);
+		KeydroidxLog.i("Shizuku", "授权模式切换: " + KeydroidxSettingsStorage.getAuthModeName(cur)
+				+ " -> " + KeydroidxSettingsStorage.getAuthModeName(next));
+		refreshStatus();
+		checkServerIdentityMatch(next);
+	}
 
 	@Override
 	public boolean onSelect() {
-		if (focusIndex >= 0 && focusIndex < ACTION_NAMES.length) {
+		if (focusIndex >= 0 && focusIndex < ACTION_COUNT) {
 			onAction(focusIndex);
 		}
 		return true;

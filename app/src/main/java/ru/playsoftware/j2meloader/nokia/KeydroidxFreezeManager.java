@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
 
 
 import ru.playsoftware.mini_shizuku.Shizuku;
@@ -35,6 +36,10 @@ import ru.playsoftware.mini_shizuku.Shizuku;
 public class KeydroidxFreezeManager {
 
 	private static final String TAG = "KeydroidxFreezeManager";
+	/** 服务端 shell 身份 uid（mini_shizuku 模式只允许此身份的服务端执行特权命令） */
+	private static final int SERVER_UID_SHELL = 2000;
+	/** 包名白名单：只允许字母/数字/下划线/点，杜绝包名拼入 shell 命令时的注入 */
+	private static final Pattern PKG_PATTERN = Pattern.compile("^[a-zA-Z0-9_.]+$");
 	private static final String PREF_NAME = "nokia_freeze_config";
 	private static final String KEY_FROZEN_LIST = "frozen_packages";
 
@@ -253,7 +258,7 @@ public class KeydroidxFreezeManager {
 					notifyStateChanged();
 				}
 				if (callback != null) {
-					callback.onResult(ok, ok ? "已冻结" : "冻结失败，请检查 mini_shizuku 权限");
+					callback.onResult(ok, ok ? "已冻结" : buildFailHint("冻结"));
 				}
 			});
 		});
@@ -272,7 +277,7 @@ public class KeydroidxFreezeManager {
 					notifyStateChanged();
 				}
 				if (callback != null) {
-					callback.onResult(ok, ok ? "已解冻" : "解冻失败");
+					callback.onResult(ok, ok ? "已解冻" : buildFailHint("解冻"));
 				}
 			});
 		});
@@ -526,27 +531,39 @@ public class KeydroidxFreezeManager {
 	}
 
 	/**
-	 * 底层执行冻结：优先使用 mini_shizuku Shell (pm disable-user / pm hide)，其次 DevicePolicyManager
+	 * 底层执行冻结：固定两级路由——① 服务端（EXEC_OUT 真实结果）→ ② libsu root 直执兜底
+	 * → ③ DevicePolicyManager（设备所有者）。最终以 {@link #isAppFrozen} 真实状态为准，
+	 * 不允许"命令发出即成功"。
 	 */
 	private boolean executeFreeze(String packageName) {
 		if (isProtectedPackage(packageName)) return false;
+		if (!isValidPackageName(packageName)) {
+			KeydroidxLog.w(TAG, "executeFreeze: 包名未通过白名单校验，拒绝执行: " + packageName);
+			return false;
+		}
 		KeydroidxLog.i(TAG, "executeFreeze: " + packageName);
 
-		// 1. mini_shizuku Shell (最通用稳妥)
+		// 1. 服务端优先：EXEC_OUT| 回真实输出，执行后校验 isAppFrozen
 		try {
-			if (Shizuku.isRunning()) {
-				// Android 7.0+ 推荐 pm disable-user --user 0 ；同时强制停止
-				String cmd = "am force-stop " + packageName + " ; pm disable-user --user 0 " + packageName + " || pm hide " + packageName;
-				boolean res = Shizuku.exec(cmd);
-				KeydroidxLog.i(TAG, "已通过 mini_shizuku 执行冻结: " + packageName + " res=" + res);
-				if (res) markKnownFrozen(packageName);
-				return res;
+			if (Shizuku.isRunning() && isServerIdentityAllowed()) {
+				String out = Shizuku.execWithOutput(buildFreezeCmd(packageName));
+				if (isAppFrozen(packageName)) {
+					KeydroidxLog.i(TAG, "冻结成功(服务端): " + packageName + " out=" + out);
+					markKnownFrozen(packageName);
+					return true;
+				}
+				KeydroidxLog.w(TAG, "服务端冻结未生效: " + packageName + " out=" + out);
 			}
 		} catch (Throwable e) {
 			KeydroidxLog.w(TAG, "mini_shizuku 执行冻结异常: " + e.getMessage());
 		}
 
-		// 2. DevicePolicyManager 设备管理员 (针对设备所有者模式)
+		// 2. root 直执兜底：仅 root 模式可用（双轨制契约——mini_shizuku 模式不暗中提权）
+		if (isRootMode() && tryRootExecute(buildFreezeCmd(packageName), packageName, true)) {
+			return true;
+		}
+
+		// 3. DevicePolicyManager 设备管理员 (针对设备所有者模式)
 		try {
 			DevicePolicyManager dpm = (DevicePolicyManager) appContext.getSystemService(Context.DEVICE_POLICY_SERVICE);
 			ComponentName admin = new ComponentName(appContext, KeydroidxLockReceiver.class);
@@ -562,30 +579,41 @@ public class KeydroidxFreezeManager {
 			KeydroidxLog.w(TAG, "DevicePolicyManager 冻结失败: " + e.getMessage());
 		}
 
+		KeydroidxLog.w(TAG, "冻结失败(所有通道均未生效): " + packageName);
 		return false;
 	}
 
 	/**
-	 * 底层执行解冻
+	 * 底层执行解冻：与冻结同构的两级路由，最终以 {@link #isAppFrozen} == false 为准。
 	 */
 	private boolean executeUnfreeze(String packageName) {
-		if (packageName == null) return false;
+		if (!isValidPackageName(packageName)) {
+			KeydroidxLog.w(TAG, "executeUnfreeze: 包名未通过白名单校验，拒绝执行: " + packageName);
+			return false;
+		}
 		KeydroidxLog.i(TAG, "executeUnfreeze: " + packageName);
 
-		// 1. mini_shizuku Shell
+		// 1. 服务端优先：EXEC_OUT| 回真实输出，执行后校验 isAppFrozen
 		try {
-			if (Shizuku.isRunning()) {
-				String cmd = "pm enable " + packageName + " ; pm default-state --user 0 " + packageName + " ; pm unhide " + packageName;
-				boolean res = Shizuku.exec(cmd);
-				KeydroidxLog.i(TAG, "已通过 mini_shizuku 执行解冻: " + packageName + " res=" + res);
-				if (res) unmarkKnownFrozen(packageName);
-				return res;
+			if (Shizuku.isRunning() && isServerIdentityAllowed()) {
+				String out = Shizuku.execWithOutput(buildUnfreezeCmd(packageName));
+				if (!isAppFrozen(packageName)) {
+					KeydroidxLog.i(TAG, "解冻成功(服务端): " + packageName + " out=" + out);
+					unmarkKnownFrozen(packageName);
+					return true;
+				}
+				KeydroidxLog.w(TAG, "服务端解冻未生效: " + packageName + " out=" + out);
 			}
 		} catch (Throwable e) {
 			KeydroidxLog.w(TAG, "mini_shizuku 执行解冻异常: " + e.getMessage());
 		}
 
-		// 2. DevicePolicyManager
+		// 2. libsu root 兜底
+		if (isRootMode() && tryRootExecute(buildUnfreezeCmd(packageName), packageName, false)) {
+			return true;
+		}
+
+		// 3. DevicePolicyManager
 		try {
 			DevicePolicyManager dpm = (DevicePolicyManager) appContext.getSystemService(Context.DEVICE_POLICY_SERVICE);
 			ComponentName admin = new ComponentName(appContext, KeydroidxLockReceiver.class);
@@ -601,6 +629,103 @@ public class KeydroidxFreezeManager {
 			KeydroidxLog.w(TAG, "DevicePolicyManager 解冻失败: " + e.getMessage());
 		}
 
+		KeydroidxLog.w(TAG, "解冻失败(所有通道均未生效): " + packageName);
 		return false;
+	}
+
+	/**
+	 * 冻结命令模板：4.4 用 pm disable（实测 enabled=2 生效）；7.0+ 用 pm disable-user
+	 * （pm hide 在 4.4 不存在，且 hide 需 unhide 配对解冻，不再混用）。
+	 */
+	private String buildFreezeCmd(String pkg) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+			return "am force-stop " + pkg + " ; pm disable-user --user 0 " + pkg;
+		}
+		return "am force-stop " + pkg + " ; pm disable " + pkg;
+	}
+
+	/** 解冻命令模板：4.4 仅 pm enable；7.0+ 追加 pm unhide（覆盖曾被 hide 的包） */
+	private String buildUnfreezeCmd(String pkg) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+			return "pm enable " + pkg + " ; pm unhide " + pkg;
+		}
+		return "pm enable " + pkg;
+	}
+
+	/** 包名白名单校验（所有通道拼命令前一律先过此关） */
+	private static boolean isValidPackageName(String pkg) {
+		return pkg != null && PKG_PATTERN.matcher(pkg).matches();
+	}
+
+	/**
+	 * root 直执（兜底通道）：调用方保证命令是预定义模板且包名已过白名单。
+	 * <p>结果确认：退出码 + stdout + {@link #isAppFrozen} 真实状态，状态不符不算成功。
+	 * <p>实现用 {@link KeydroidxRootShell}（su -c 直执）：libsu 5.2.2 在 4.4 + SuperSU 2.76
+	 * 真机上 exec() 会无限期挂起（详见 ShizukuRootFragment 类注释）。
+	 */
+	private boolean tryRootExecute(String cmd, String packageName, boolean expectFrozen) {
+		if (Build.VERSION.SDK_INT < 19) return false; // su 探测含 I/O，仅后台线程调用
+		try {
+			KeydroidxRootShell.Result result = KeydroidxRootShell.exec(appContext, cmd, 8000);
+			boolean ok = result.isSuccess() && isAppFrozen(packageName) == expectFrozen;
+			KeydroidxLog.i(TAG, "root 直执: code=" + result.code + " ok=" + ok
+					+ " out=" + result.out.trim());
+			if (ok) {
+				if (expectFrozen) {
+					markKnownFrozen(packageName);
+				} else {
+					unmarkKnownFrozen(packageName);
+				}
+			}
+			return ok;
+		} catch (Throwable e) {
+			KeydroidxLog.w(TAG, "root 直执异常: " + e.getMessage());
+			return false;
+		}
+	}
+
+	/** root 通道是否可用（su -c true 探测，5 秒超时） */
+	private boolean hasRootChannel() {
+		if (Build.VERSION.SDK_INT < 19) return false;
+		return KeydroidxRootShell.isRootAvailable(appContext);
+	}
+
+	/** 当前授权模式是否为 root 模式（root 直执兜底的门禁，双轨制契约） */
+	private boolean isRootMode() {
+		return KeydroidxSettingsStorage.getAuthMode(appContext) == KeydroidxSettingsStorage.AUTH_MODE_ROOT;
+	}
+
+	/**
+	 * 服务端通道的身份门禁（双轨制契约）：仅限后台线程调用（内部是 TCP 探测）。
+	 * <ul>
+	 *   <li>root 模式：不限制（shell 服务端冻不住 4.4，会自然落到 root 兜底）；</li>
+	 *   <li>mini_shizuku 模式：只允许 shell 身份（uid=2000）服务端——
+	 *       root 服务端与模式不符（设置页会提示"请重新激活"），特权操作一律不暗中动用，
+	 *       冻结将直接失败并提示切换 root 模式。</li>
+	 * </ul>
+	 */
+	private boolean isServerIdentityAllowed() {
+		if (isRootMode()) {
+			return true;
+		}
+		int uid = Shizuku.serverUid();
+		boolean ok = uid == SERVER_UID_SHELL;
+		if (!ok) {
+			KeydroidxLog.i(TAG, "mini_shizuku 模式下服务端身份不符(uid=" + uid
+					+ ")，跳过服务端通道（不暗中动用 root 能力）");
+		}
+		return ok;
+	}
+
+	/**
+	 * 冻结/解冻失败时的用户提示：
+	 * mini_shizuku 模式（shell 无权冻结 + 不走 root 提权）→ 明确指向 root 模式；
+	 * root 模式仍失败 → 指向 su 授权检查。
+	 */
+	private String buildFailHint(String action) {
+		if (!isRootMode()) {
+			return "当前模式不支持" + action + "，请切换 root 模式";
+		}
+		return action + "失败，请检查 mini_shizuku 服务或 root 授权";
 	}
 }

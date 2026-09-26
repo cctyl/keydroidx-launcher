@@ -31,8 +31,18 @@ public class MsgProcess implements Runnable {
     private static final String CMD_PAGE_STATE = "PAGE_STATE|";
     /** 请求服务端自行退出（跨 uid 切换激活时，新实例通过 IPC 调用，绕开 kill 权限）。 */
     private static final String CMD_SERVER_STOP = "SERVER_STOP";
+    /** 身份查询（不需 K）：回 OK:uid=<myUid()>，客户端校验服务端真实身份用。 */
+    private static final String CMD_WHOAMI = "WHOAMI";
     private static final String EXIT_PREFIX = "EXIT:";
     private static final Charset UTF8 = Charset.forName("UTF-8");
+    /**
+     * 服务端身份在进程启动时即已确定（root 激活 = uid 0，adb 激活 = uid 2000），
+     * 以 myUid 自检为准，与客户端"模式选择"无关。
+     */
+    private static final boolean ROOT_SERVER = android.os.Process.myUid() == 0;
+    /** 包名白名单：只允许字母/数字/下划线/点，杜绝包名参数注入。 */
+    private static final java.util.regex.Pattern PKG_PATTERN =
+            java.util.regex.Pattern.compile("^[a-zA-Z0-9_.]+$");
 
     private final Socket socket;
 
@@ -54,6 +64,11 @@ public class MsgProcess implements Runnable {
                 // 探活握手，不需 K
                 if (command.equals("PING")) {
                     reply("OK:pong");
+                    continue;
+                }
+                // 身份查询，不需 K：返回服务端真实 uid，供客户端校验"所选模式 = 服务端身份"
+                if (command.equals(CMD_WHOAMI)) {
+                    reply("OK:uid=" + android.os.Process.myUid());
                     continue;
                 }
                 // v3：行 = <K>|<inner>。取首段 K 校验，过则处理 inner。
@@ -109,6 +124,13 @@ public class MsgProcess implements Runnable {
             // 这里再退回原来的 shell 路径，行为与改动前一致。
             Log.i(TAG, "exec(silent): " + cmd);
             if (!InputInjector.handle(cmd)) {
+                // root 服务端：InputInjector 处理不了的命令必须过白名单才允许以 root 身份执行，
+                // 否则 K 泄露 = 任意 root 命令执行。shell 服务端爆炸半径有限，保持原行为。
+                if (ROOT_SERVER && !isAllowedShellCommand(cmd)) {
+                    Log.w(TAG, "root server: command rejected by whitelist: " + cmd);
+                    reply("ERR:not allowed");
+                    return;
+                }
                 ShellUtil.execute(cmd);
             }
         }
@@ -192,6 +214,13 @@ public class MsgProcess implements Runnable {
      */
     private void handleExecWithOutput(String command) {
         String cmd = command.trim();
+        // root 服务端白名单：只放行冻结/解冻/force-stop 预定义模板（见 isAllowedShellCommand），
+        // 防止 K 泄露被升级为任意 root 命令执行。shell 服务端不加白名单，行为不变。
+        if (ROOT_SERVER && !isAllowedShellCommand(cmd)) {
+            Log.w(TAG, "root server: command rejected by whitelist: " + cmd);
+            reply("ERR:not allowed");
+            return;
+        }
         Log.i(TAG, "exec(output): " + cmd);
         ShellUtil.Result result = ShellUtil.execWithOutputAndCode(cmd);
         try {
@@ -201,5 +230,39 @@ public class MsgProcess implements Runnable {
         } catch (IOException e) {
             Log.e(TAG, "write output back failed", e);
         }
+    }
+
+    /**
+     * root 服务端 shell 命令白名单：整条命令按 " ; " 拆段后，每一段必须完整匹配
+     * 预定义模板之一且包名过 {@link #PKG_PATTERN}，与客户端冻结/解冻命令模板严格对应：
+     * <pre>
+     *   am force-stop &lt;pkg&gt; | pm disable &lt;pkg&gt; | pm disable-user --user 0 &lt;pkg&gt;
+     *   pm enable &lt;pkg&gt;      | pm unhide &lt;pkg&gt;
+     * </pre>
+     * 任何白名单外的段（如管道、反引号、任意 shell 语法）都会导致整条命令被拒绝。
+     */
+    private static boolean isAllowedShellCommand(String cmd) {
+        for (String segment : cmd.split(" ; ")) {
+            if (!isAllowedSegment(segment.trim())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isAllowedSegment(String segment) {
+        String pkg = null;
+        if (segment.startsWith("am force-stop ")) {
+            pkg = segment.substring("am force-stop ".length());
+        } else if (segment.startsWith("pm disable-user --user 0 ")) {
+            pkg = segment.substring("pm disable-user --user 0 ".length());
+        } else if (segment.startsWith("pm disable ")) {
+            pkg = segment.substring("pm disable ".length());
+        } else if (segment.startsWith("pm enable ")) {
+            pkg = segment.substring("pm enable ".length());
+        } else if (segment.startsWith("pm unhide ")) {
+            pkg = segment.substring("pm unhide ".length());
+        }
+        return pkg != null && PKG_PATTERN.matcher(pkg).matches();
     }
 }
