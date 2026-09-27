@@ -233,8 +233,10 @@ public class KeydroidxIconPackSettingsFragment extends KeydroidxListPageFragment
 			LinearLayout line = new LinearLayout(ctx);
 			line.setOrientation(LinearLayout.HORIZONTAL);
 			line.setGravity(Gravity.CENTER_VERTICAL);
+			// 高度 WRAP_CONTENT + minHeight：大字号/点阵字体行盒放大后固定 38dp 会裁掉文字
 			line.setLayoutParams(new LinearLayout.LayoutParams(
-					ViewGroup.LayoutParams.MATCH_PARENT, rowHeight));
+					ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+			line.setMinimumHeight(rowHeight);
 			line.setPadding(margin, 0, margin, 0);
 			line.setClickable(true);
 

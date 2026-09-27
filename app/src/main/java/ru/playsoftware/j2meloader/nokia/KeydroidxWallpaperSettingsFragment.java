@@ -171,12 +171,14 @@ public class KeydroidxWallpaperSettingsFragment extends KeydroidxListPageFragmen
 		}
 	}
 
-	private LinearLayout buildRow(String iconUnicode, String name, int rowHeight) {
+	private LinearLayout buildRow(String iconUnicode, String name, int minHeight) {
 		LinearLayout row = new LinearLayout(requireContext());
 		row.setOrientation(LinearLayout.HORIZONTAL);
 		row.setGravity(Gravity.CENTER_VERTICAL);
+		// 高度 WRAP_CONTENT + minHeight：大字号/点阵字体行盒放大后固定 44dp 会裁掉文字
 		row.setLayoutParams(new LinearLayout.LayoutParams(
-				ViewGroup.LayoutParams.MATCH_PARENT, rowHeight));
+				ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		row.setMinimumHeight(minHeight);
 		row.setPadding(dp(10), 0, dp(10), 0);
 		row.setClickable(true);
 

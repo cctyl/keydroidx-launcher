@@ -128,9 +128,10 @@ public class KeydroidxThemeSettingsFragment extends KeydroidxListPageFragment {
 			LinearLayout row = new LinearLayout(requireContext());
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
+			// 高度 WRAP_CONTENT + minHeight：大字号/点阵字体行盒放大后固定 44dp 会裁掉文字
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					ViewGroup.LayoutParams.MATCH_PARENT, rowHeight
-			));
+					ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+			row.setMinimumHeight(rowHeight);
 			row.setPadding(margin, 0, margin, 0);
 
 			// 1. 主题预览色块（圆形渐变）

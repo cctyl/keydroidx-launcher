@@ -166,7 +166,7 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 		container.removeAllViews();
 		int count = fontList.size();
 		itemViews = new View[count];
-		int rowHeight = KeydroidxDimens.dp(getResources(), 52);
+		// 行高 WRAP_CONTENT + minHeight：大字号/点阵字体行盒放大后固定 52dp 会裁掉两行文字
 		int margin = KeydroidxDimens.dp(getResources(), 10);
 		KeydroidxTheme.ThemeDef currentTheme = KeydroidxTheme.getTheme(storage.getThemeId());
 
@@ -178,8 +178,9 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					ViewGroup.LayoutParams.MATCH_PARENT, rowHeight
+					ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
 			));
+			row.setMinimumHeight(KeydroidxDimens.dp(getResources(), 52));
 			row.setPadding(margin, KeydroidxDimens.dp(getResources(), 4), margin, KeydroidxDimens.dp(getResources(), 4));
 
 			// 1. 字体图标/文字预览
