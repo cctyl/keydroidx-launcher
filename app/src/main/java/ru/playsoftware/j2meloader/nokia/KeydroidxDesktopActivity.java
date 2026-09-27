@@ -619,6 +619,13 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			return super.dispatchKeyEvent(event);
 		}
 
+		// 拨号键（ACTION_HANGUP）在桌面语境按「最近任务」处理：
+		// 挂机菜单（继续/退出/后台运行）只在 jar 应用内生效，由 :midlet 进程自行处理，
+		// 桌面侧拨号键空闲；按键向导也不单独引导绑定「最近任务」键，统一走拨号键。
+		if (action == KeydroidxKeyBinding.ACTION_HANGUP) {
+			action = KeydroidxKeyBinding.ACTION_RECENT_APPS;
+		}
+
 		// 「最近任务」动作：桌面主界面 / 功能表 / 各子页面内按下即打开卡片页。
 		// 已经停留在该页时忽略（避免重复入栈）。非破坏性动作，DOWN 阶段直接执行即可。
 		if (action == KeydroidxKeyBinding.ACTION_RECENT_APPS) {

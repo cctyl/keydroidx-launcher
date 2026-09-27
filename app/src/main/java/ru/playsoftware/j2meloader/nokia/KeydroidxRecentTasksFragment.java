@@ -218,9 +218,10 @@ public class KeydroidxRecentTasksFragment extends KeydroidxPageFragment {
 		tvMode.setText(KeydroidxRecentTasksHelper.getModeLabel(mode));
 		tvMode.setTextColor(mode == KeydroidxRecentTasksHelper.MODE_REAL_TASK ? COLOR_OK : COLOR_WARN);
 
-		// 操作提示统一放在顶部信息区一行；加载中/不可用状态由空态容器与徽标表达，提示行留空
+		// 操作提示统一放在顶部信息区；第二行说明拨号键入口（拨号键即「最近任务」的桌面入口）
 		tvHint.setText(loading || mode == KeydroidxRecentTasksHelper.MODE_UNAVAILABLE
-				? "" : "确认键回到应用 · 5 清理选中 · 0 清理全部");
+				? ""
+				: "确认键回到应用 · 5 清理选中 · 0 清理全部\n拨号键呼出本页（桌面按下即进入）");
 	}
 
 	/** 空态 / 未激活态 / 加载态（三者共用同一容器，文案与图标按状态切换）。 */

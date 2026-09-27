@@ -23,8 +23,11 @@ import ru.playsoftware.j2meloader.R;
 /**
  * 首次启动按键绑定向导。
  * <p>
- * 状态机：INTRO（弹窗询问是否绑定）→ RECORDING（按 上/下/左/右/确认/左软键/右软键/锁屏
+ * 状态机：INTRO（弹窗询问是否绑定）→ RECORDING（按 上/下/左/右/确认/左软键/右软键/锁屏/拨号键
  * 顺序逐个提示并捕获一次物理键）→ DONE（标记完成并返回桌面）。
+ * <p>
+ * 「最近任务」不进向导：拨号键在桌面语境即打开最近任务（见
+ * {@code KeydroidxDesktopActivity} 的 HANGUP→RECENT_APPS 改写），无需独立按键。
  * <p>
  * 每个录制步骤支持"跳过"：录制态下按返回键即跳过当前动作（保留默认值）并前进，
  * 避免设备缺键时卡死。
@@ -38,6 +41,19 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	private static final int STATE_RECORDING = 1;
 	private static final int STATE_DONE = 2;
 
+	/** 向导引导绑定的动作全集：桌面动作去掉「最近任务」（其复用拨号键，不单独引导）。 */
+	private static final int[] WIZARD_ACTIONS = {
+			KeydroidxKeyBinding.ACTION_UP,
+			KeydroidxKeyBinding.ACTION_DOWN,
+			KeydroidxKeyBinding.ACTION_LEFT,
+			KeydroidxKeyBinding.ACTION_RIGHT,
+			KeydroidxKeyBinding.ACTION_SELECT,
+			KeydroidxKeyBinding.ACTION_SOFT_LEFT,
+			KeydroidxKeyBinding.ACTION_SOFT_RIGHT,
+			KeydroidxKeyBinding.ACTION_LOCK_SCREEN,
+			KeydroidxKeyBinding.ACTION_HANGUP,
+	};
+
 	private KeydroidxKeyBinding keyBinding;
 	private int state = STATE_INTRO;
 	private int introChoice = 0;      // 0=绑定, 1=跳过
@@ -49,6 +65,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	private View introBind;
 	private View introSkip;
 	private TextView recordPrompt;
+	private TextView recordDesc;
 	private TextView recordProgress;
 	private TextView stepBadge;
 
@@ -67,6 +84,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		introBind = view.findViewById(R.id.introBind);
 		introSkip = view.findViewById(R.id.introSkip);
 		recordPrompt = view.findViewById(R.id.recordPrompt);
+		recordDesc = view.findViewById(R.id.recordDesc);
 		recordProgress = view.findViewById(R.id.recordProgress);
 		stepBadge = view.findViewById(R.id.stepBadge);
 
@@ -131,10 +149,25 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	}
 
 	private void updateRecordingPrompt() {
-		recordPrompt.setText("请按下『" + KeydroidxKeyBinding.getWizardPromptName(recordingStep) + "』键");
-		recordProgress.setText("第 " + (recordingStep + 1) + " / " + KeydroidxKeyBinding.ACTION_COUNT + " 项");
+		int action = WIZARD_ACTIONS[recordingStep];
+		recordPrompt.setText("请按下『" + KeydroidxKeyBinding.getWizardPromptName(action) + "』键");
+		recordProgress.setText("第 " + (recordingStep + 1) + " / " + WIZARD_ACTIONS.length + " 项");
 		if (stepBadge != null) {
-			stepBadge.setText((recordingStep + 1) + "/" + KeydroidxKeyBinding.ACTION_COUNT);
+			stepBadge.setText((recordingStep + 1) + "/" + WIZARD_ACTIONS.length);
+		}
+		updateStepDescription(action);
+	}
+
+	/** 步骤用途说明：目前只有拨号键需要特别说明（一键两用），其余步骤不显示。 */
+	private void updateStepDescription(int action) {
+		if (recordDesc == null) return;
+		if (action == KeydroidxKeyBinding.ACTION_HANGUP) {
+			recordDesc.setText("拨号键一键两用：桌面时按下打开最近任务；"
+					+ "jar 应用内按下弹出菜单（继续 / 退出 / 后台运行）");
+			recordDesc.setVisibility(View.VISIBLE);
+		} else {
+			recordDesc.setText("");
+			recordDesc.setVisibility(View.GONE);
 		}
 	}
 
@@ -148,22 +181,22 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	@Override
 	public void onKeyRecorded(int keycode) {
 		if (state != STATE_RECORDING) return;
-		int action = recordingStep;
+		int action = WIZARD_ACTIONS[recordingStep];
 
 		keyBinding.setKeyCode(action, keycode);
 		// 同步到全局 JAR 设置
 		KeydroidxGlobalProfile.syncKeyBindings(requireContext());
-		KeydroidxLog.i("KeyWizard", "第 " + (action + 1) + " 项 绑定成功 "
+		KeydroidxLog.i("KeyWizard", "第 " + (recordingStep + 1) + " 项 绑定成功 "
 				+ KeydroidxKeyBinding.keyName(keycode));
 
-		int next = action + 1;
-		if (next >= KeydroidxKeyBinding.ACTION_COUNT) {
+		int next = recordingStep + 1;
+		if (next >= WIZARD_ACTIONS.length) {
 			finishWizard(true);
 		} else {
 			recordingStep = next;
 			updateRecordingPrompt();
 			KeydroidxLog.i("KeyWizard", "进入第 " + (next + 1) + " 项="
-					+ KeydroidxKeyBinding.getWizardPromptName(next));
+					+ KeydroidxKeyBinding.getWizardPromptName(WIZARD_ACTIONS[next]));
 		}
 	}
 
@@ -171,18 +204,18 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	@Override
 	public void onSkipCurrent() {
 		if (state != STATE_RECORDING) return;
-		int action = recordingStep;
-		KeydroidxLog.i("KeyWizard", "第 " + (action + 1) + " 项 跳过（保留默认 "
+		int action = WIZARD_ACTIONS[recordingStep];
+		KeydroidxLog.i("KeyWizard", "第 " + (recordingStep + 1) + " 项 跳过（保留默认 "
 				+ KeydroidxKeyBinding.keyName(keyBinding.getKeyCode(action)) + "）");
 
-		int next = action + 1;
-		if (next >= KeydroidxKeyBinding.ACTION_COUNT) {
+		int next = recordingStep + 1;
+		if (next >= WIZARD_ACTIONS.length) {
 			finishWizard(true);
 		} else {
 			recordingStep = next;
 			updateRecordingPrompt();
 			KeydroidxLog.i("KeyWizard", "跳过进入第 " + (next + 1) + " 项="
-					+ KeydroidxKeyBinding.getWizardPromptName(next));
+					+ KeydroidxKeyBinding.getWizardPromptName(WIZARD_ACTIONS[next]));
 		}
 	}
 

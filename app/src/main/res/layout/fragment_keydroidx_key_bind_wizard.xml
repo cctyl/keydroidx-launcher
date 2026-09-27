@@ -142,6 +142,17 @@
                 android:textSize="@dimen/keydroidx_font_title"
                 android:textStyle="bold" />
 
+            <!-- 步骤说明（如拨号键的两种用途），由代码按当前步骤填充 -->
+            <TextView
+                android:id="@+id/recordDesc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:textColor="#9fb3d1"
+                android:textSize="@dimen/keydroidx_font_caption"
+                android:visibility="gone" />
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

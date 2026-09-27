@@ -24,7 +24,12 @@ public class KeydroidxKeyBinding {
 	public static final int ACTION_LOCK_SCREEN = 7;
 	/** 挂机菜单键（绿键/拨号键）：仅在 jar 应用内生效，弹出 继续/退出/后台运行 三菜单 */
 	public static final int ACTION_HANGUP = 8;
-	/** 最近任务：在桌面主界面 / 功能表内按下即打开「最近任务」卡片页（默认未绑定）。 */
+	/**
+	 * 最近任务：桌面主界面 / 功能表内按下即打开「最近任务」卡片页。
+	 * <p>绑定语义：复用拨号键（ACTION_HANGUP）——桌面语境下该键由
+	 * {@code KeydroidxDesktopActivity} 改写为本动作（jar 内的挂机菜单由 :midlet
+	 * 进程处理，不受影响），默认不占用独立按键，按键向导也不再引导绑定。</p>
+	 */
 	public static final int ACTION_RECENT_APPS = 9;
 
 	public static final int ACTION_COUNT = 10;
