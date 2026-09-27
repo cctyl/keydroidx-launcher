@@ -1721,7 +1721,13 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 							intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 							startActivity(intent);
 						} catch (Exception e) {
-							KeydroidxLog.e("Desktop", "打开网址失败: " + url, e);
+							// 无浏览器（如手表/极简功能机未内置）属环境问题：按规范用 w，
+							// 不烧自动上报配额，并 Toast 明确告知用户
+							KeydroidxLog.w("Desktop", "打开网址失败: " + url + " : " + e.getMessage());
+							Context c = getContext();
+							if (c != null) {
+								Toast.makeText(c, "未找到可打开网址的浏览器", Toast.LENGTH_SHORT).show();
+							}
 						}
 					}
 				});
