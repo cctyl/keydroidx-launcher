@@ -3,6 +3,9 @@ package ru.playsoftware.j2meloader.nokia;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -66,9 +69,9 @@ public final class KeydroidxAppIconCache {
 		Context ctx = context.getApplicationContext();
 		memCache = new LruCache<>(MEM_MAX);
 		prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-		// v2：v1 的 PNG 是按自适应图标 108dp 画布原样渲染的（前景仅占约 66%），
-		// 与满幅图标混排时视觉尺寸跳变；换目录名让旧缓存一次性重建。
-		diskDir = new File(ctx.getCacheDir(), "app_icons_v2");
+		// v4：v2/v3 的 PNG 是按「自适应图标整体放大 1.5 倍」渲染的，遮罩圆角被挤出画布、
+		// 前景贴边被截断；本轮改回原画布渲染，换目录名让旧缓存一次性重建。
+		diskDir = new File(ctx.getCacheDir(), "app_icons_v4");
 		if (!diskDir.exists() && !diskDir.mkdirs()) {
 			KeydroidxLog.w("AppIconCache", "创建磁盘缓存目录失败: " + diskDir.getAbsolutePath());
 		}
@@ -98,10 +101,13 @@ public final class KeydroidxAppIconCache {
 
 	private static void loadInternal(Context context, String packageName,
 									 ComponentName component, IconCallback callback) {
+		PackageManager pm = context.getPackageManager();
 		long lastUpdate = -1;
+		ApplicationInfo appInfo = null;
 		try {
-			lastUpdate = context.getPackageManager()
-					.getPackageInfo(packageName, 0).lastUpdateTime;
+			PackageInfo pi = pm.getPackageInfo(packageName, 0);
+			lastUpdate = pi.lastUpdateTime;
+			appInfo = pi.applicationInfo;
 		} catch (Exception e) {
 			// 包已卸载等异常 → 视为失效，走系统重新加载（失败回调 null）
 			KeydroidxLog.w("AppIconCache", "查询包更新时间失败 " + packageName + ": " + e.getMessage());
@@ -125,48 +131,82 @@ public final class KeydroidxAppIconCache {
 		}
 
 		// 2. PackageManager 加载（重 IPC，后台线程），成功写回内存 + 磁盘
-		try {
-			Drawable icon = context.getPackageManager().getActivityIcon(component);
-			if (icon != null) {
-				// 自适应图标归一化为满幅位图，避免与满幅图标混排时视觉尺寸跳变
-				Drawable normalized = normalizeFullBleed(context.getResources(), icon);
-				memCache.put(packageName, normalized);
-				saveToDisk(packageName, normalized, file);
-				if (lastUpdate >= 0) {
-					prefs.edit().putLong(KEY_UPDATE_TIME + ":" + packageName, lastUpdate).apply();
-				}
-				KeydroidxLog.i("AppIconCache", packageName + " 系统加载完成并写入缓存");
-				post(packageName, normalized, callback);
-				return;
+		Drawable icon = loadIconWithFallback(pm, packageName, component, appInfo);
+		if (icon != null) {
+			// 自适应图标统一栅格化为位图，保证内存/磁盘/占位图三条路径渲染一致
+			Drawable normalized = normalizeForDisplay(context.getResources(), icon);
+			memCache.put(packageName, normalized);
+			saveToDisk(packageName, normalized, file);
+			if (lastUpdate >= 0) {
+				prefs.edit().putLong(KEY_UPDATE_TIME + ":" + packageName, lastUpdate).apply();
 			}
-		} catch (Exception e) {
-			KeydroidxLog.w("AppIconCache", "系统加载图标失败 " + packageName + ": " + e.getMessage());
+			KeydroidxLog.i("AppIconCache", packageName + " 系统加载完成并写入缓存");
+			post(packageName, normalized, callback);
+			return;
 		}
 		post(packageName, null, callback);
 	}
 
 	/**
-	 * 图标归一化：把 API 26+ 的自适应图标（AdaptiveIconDrawable）渲染成满幅位图。
+	 * 加载应用图标：Activity 图标优先，失败降级为应用级图标。
 	 *
-	 * <p>自适应图标画布为 108dp，前景安全区只有约 72dp（66%）。直接放进
-	 * FIT_CENTER 的固定格子里会显得偏小，与满幅位图（S60 图标、旧式 PNG
-	 * 图标）混排时视觉尺寸来回跳变，表现为进入功能表时图标「先小后大」
-	 * 闪烁。这里把安全区放大裁切到满幅（缩放 108/72 倍）再渲染为位图；
-	 * 其余图标原样返回。</p>
+	 * <p><b>为什么必须降级</b>：冻结（{@code pm disable-user}）会把包的
+	 * {@code ApplicationInfo.enabled} 置 false，而 {@code PackageManager.getActivityIcon()}
+	 * 内部是 {@code getActivityInfo(component, GET_ACTIVITIES)}，flags 不含
+	 * {@code MATCH_DISABLED_COMPONENTS} 时会被 {@code Settings.isEnabledLPr()} 判为
+	 * 「未启用」而直接抛 {@code NameNotFoundException}（异常 message 就是 ComponentInfo 串）。
+	 * 不做降级的话，所有冻结应用的图标必然加载失败，网格里只剩占位图（桌面自身图标）。
+	 * 应用级图标走资源加载，不受包的启用状态影响。</p>
+	 *
+	 * @param appInfo 已知的应用信息，可为 null（此时才走 getApplicationIcon 兜底）
+	 */
+	public static Drawable loadIconWithFallback(PackageManager pm, String packageName,
+												ComponentName component, ApplicationInfo appInfo) {
+		if (component != null) {
+			try {
+				Drawable d = pm.getActivityIcon(component);
+				if (d != null) return d;
+			} catch (Exception e) {
+				// 冻结应用属预期情况 → w（Release 不落盘）；卸载残留等也走这里
+				KeydroidxLog.w("AppIconCache", "取 Activity 图标失败(冻结应用属正常)，降级应用图标 "
+						+ packageName + ": " + e.getMessage());
+			}
+		}
+		if (appInfo != null) {
+			try {
+				Drawable d = appInfo.loadIcon(pm);
+				if (d != null) return d;
+			} catch (Exception e) {
+				KeydroidxLog.w("AppIconCache", "加载应用图标失败 " + packageName + ": " + e.getMessage());
+			}
+		}
+		try {
+			return pm.getApplicationIcon(packageName);
+		} catch (Exception e) {
+			KeydroidxLog.w("AppIconCache", "加载应用图标失败(兜底) " + packageName + ": " + e.getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * 图标栅格化：把 API 26+ 的自适应图标（AdaptiveIconDrawable）按自身遮罩原样渲染成位图，
+	 * 使内存缓存、磁盘缓存（PNG）与占位图三条路径渲染结果完全一致；其余图标原样返回。
+	 *
+	 * <p><b>此处刻意不做任何放大</b>：曾有一版按「前景安全区只占 108dp 画布的约 66%」
+	 * 把整体放大 1.5 倍想铺满整幅，副作用是自适应图标自带的圆角/圆形遮罩被挤出画布、
+	 * 前景内容贴边被截断（InstallerX、LocalSend、MT 管理器、EKA2L1 等尤其明显）。
+	 * 保持原始画布才能得到与系统桌面一致的外观：遮罩完整、内容按设计留白。</p>
 	 *
 	 * @param res 用于创建 BitmapDrawable
 	 * @param icon 原始图标，可为 null（原样返回 null）
 	 */
-	public static Drawable normalizeFullBleed(Resources res, Drawable icon) {
+	public static Drawable normalizeForDisplay(Resources res, Drawable icon) {
 		if (icon == null) return null;
 		if (Build.VERSION.SDK_INT >= 26 && icon instanceof AdaptiveIconDrawable) {
 			int size = Math.max(icon.getIntrinsicWidth(), icon.getIntrinsicHeight());
 			if (size <= 0) size = 108;
 			Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
 			Canvas canvas = new Canvas(bmp);
-			// 108dp 画布中可见安全区为 72dp，放大 1.5 倍使前景铺满整幅
-			float scale = 108f / 72f;
-			canvas.scale(scale, scale, size / 2f, size / 2f);
 			icon.setBounds(0, 0, size, size);
 			icon.draw(canvas);
 			return new BitmapDrawable(res, bmp);

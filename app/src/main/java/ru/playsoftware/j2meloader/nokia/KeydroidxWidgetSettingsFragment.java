@@ -673,7 +673,8 @@ public class KeydroidxWidgetSettingsFragment extends KeydroidxPageFragment {
 				Drawable icon = null;
 				try {
 					PackageManager pm = appContext.getPackageManager();
-					icon = pm.getActivityIcon(cn);
+					// 冻结（停用）的应用取 Activity 图标会抛 NameNotFoundException → 走降级
+					icon = KeydroidxAppIconCache.loadIconWithFallback(pm, pkg, cn, null);
 				} catch (Exception e) {
 					KeydroidxLog.w(TAG, "后台加载系统图标失败: " + item.label + " " + e.getMessage());
 				}

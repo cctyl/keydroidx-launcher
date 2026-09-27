@@ -2082,8 +2082,10 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					}
 					try {
 						if (getActivity() != null) {
-							return getActivity().getPackageManager()
-									.getActivityIcon(intent.getComponent());
+							// 冻结（停用）应用的 Activity 图标取不到（NameNotFoundException）→ 统一降级
+							return KeydroidxAppIconCache.loadIconWithFallback(
+									getActivity().getPackageManager(), pkg,
+									intent.getComponent(), null);
 						}
 					} catch (Exception ignored) {
 						KeydroidxLog.w("Desktop", "load activity icon failed: " + ignored.getMessage());

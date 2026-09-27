@@ -113,8 +113,37 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 
 	/** 列数固定 3 列（诺基亚经典风格） */
 	private static final int COLS = 3;
-	/** 行高由实际可用空间均分，此常量仅作为 fallback（panelH 尚未可用时）。图标 36 + 标签 9 + 间距 */
-	private static final int ROW_H_DP = 58;
+
+	/** 图标框基准边长（dp，fontScale = 1 时）。实际边长随字号缩放，见 {@link #iconBoxDp(float)} */
+	private static final int ICON_BOX_DP = 36;
+
+	/**
+	 * 图标随字号的放大系数：比字号弱一档（0.6），与桌面快捷栏/宫格同一约定，
+	 * 避免大字号下图标喧宾夺主；fontScale &lt; 1 时兜底 0.8 倍。
+	 * 例：字号 1.3x → 图标约 1.18x；1.5x → 1.3x；2.0x → 1.6x。
+	 */
+	private static float iconScale(float fontScale) {
+		return Math.max(0.8f, 1.0f + (fontScale - 1.0f) * 0.6f);
+	}
+
+	/** 图标框边长（dp）：随字号同步放大，避免「字形变大、图标不变」的失衡 */
+	private static int iconBoxDp(float fontScale) {
+		return Math.round(ICON_BOX_DP * iconScale(fontScale));
+	}
+
+	/** 应用名文字行高预算（dp）：9sp × 点阵字体行距 1.6 + 2dp，下限 16dp */
+	private static float textBudgetDp(float fontScale) {
+		return Math.max(16f, (9f * fontScale * 1.6f) + 2f);
+	}
+
+	/**
+	 * 单行单元格所需的绝对最小安全设计高度（dp）：
+	 * 图标框 + 8dp(上下 Cell padding 4+4) + 文字行高预算 + 2dp(选中高亮边框余量)。
+	 * 图标随字号变大后此值随之变大，行数会被自动顶下去——「能放几行就放几行」靠它实现。
+	 */
+	private static float minRowHDp(float fontScale) {
+		return iconBoxDp(fontScale) + 8f + textBudgetDp(fontScale) + 2f;
+	}
 
 	/**
 	 * 标题区实际高度预算（dp）：13sp 标题行高（点阵字体行距系数 1.5，随 fontScale 缩放）
@@ -556,10 +585,8 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		// 标题区预算（13sp 标题行高 ×fontScale + appGrid 底部 padding 2dp，顶部已收紧为 0）
 		float availForGrid = Math.max(0f, availDesign - titleBudgetDp(fontScale) - 2f);
 
-		// 单行单元格所需的绝对最小安全设计高度：
-		// 36dp (图标) + 8dp (上下Cell padding 4+4) + 文字行高预算 (9sp * fontScale * 1.6f + 2dp) + 2dp (选中高亮边框余量)
-		float textHeightBudget = Math.max(16f, (9f * fontScale * 1.6f) + 2f);
-		float minSafeRowHDp = 36f + 8f + textHeightBudget + 2f;
+		// 单行单元格所需的绝对最小安全设计高度（图标框随字号放大 → 行数自适应减少）
+		float minSafeRowHDp = minRowHDp(fontScale);
 
 		int rows = (int) (availForGrid / minSafeRowHDp);
 		// 安全兜底校验：如果均分后的高度小于最小安全高度，减去一行
@@ -571,7 +598,8 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		perPage = COLS * rowsPerPage;
 		KeydroidxLog.i("Menu", "computeRowsPerPage: rowsPerPage=" + rowsPerPage
 				+ " panelH=" + panelH + " scale=" + scale + " density=" + density
-				+ " fontScale=" + fontScale + " minSafeRowHDp=" + minSafeRowHDp
+				+ " fontScale=" + fontScale + " iconBoxDp=" + iconBoxDp(fontScale)
+				+ " minSafeRowHDp=" + minSafeRowHDp
 				+ " availDesign=" + availDesign + " availForGrid=" + availForGrid);
 	}
 
@@ -908,11 +936,10 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			try {
 				Drawable d = ContextCompat.getDrawable(requireContext(), R.mipmap.ic_launcher);
 				if (d != null) {
-					// 占位图与真实图标做同样的满幅归一化：API 26+ 的 ic_launcher 是
-					// 自适应图标（画布 108dp、前景仅占 66%），不归一化会比真实图标
-					// 明显偏小，异步换图瞬间产生「先小后大」的闪烁
+					// 占位图与真实图标做同样的栅格化：API 26+ 的 ic_launcher 是自适应图标，
+					// 两条路径渲染一致，异步换图瞬间才不会出现尺寸跳变
 					d.mutate();
-					d = KeydroidxAppIconCache.normalizeFullBleed(
+					d = KeydroidxAppIconCache.normalizeForDisplay(
 							requireContext().getResources(), d);
 				}
 				placeholderIcon = d;
@@ -943,7 +970,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		float fontScale = KeydroidxSettingsStorage.getFontScale(requireContext());
 		if (fontScale <= 0f) fontScale = 1.0f;
 		float availForGrid = Math.max(0f, availDesign - titleBudgetDp(fontScale) - 2f);
-		float rowActualDp = rowsPerPage > 0 ? (availForGrid / rowsPerPage) : ROW_H_DP;
+		float rowActualDp = rowsPerPage > 0 ? (availForGrid / rowsPerPage) : minRowHDp(fontScale);
 		int rowH = KeydroidxDimens.dp(getResources(), Math.round(rowActualDp));
 
 		int start = pageIndex * perPage;
@@ -981,8 +1008,10 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 					}
 
 					FrameLayout iconContainer = new FrameLayout(requireContext());
-					iconContainer.setLayoutParams(new LinearLayout.LayoutParams(
-							KeydroidxDimens.dp(getResources(), 36), KeydroidxDimens.dp(getResources(), 36)));
+					// 图标框随字号放大（大字号档位下图标同步变大，不再缩在中间）；
+					// 行高预算 minRowHDp() 用同一个 iconBoxDp()，两者始终一致
+					int iconBox = KeydroidxDimens.dp(getResources(), iconBoxDp(fontScale));
+					iconContainer.setLayoutParams(new LinearLayout.LayoutParams(iconBox, iconBox));
 
 					ImageView iv = new ImageView(requireContext());
 					iv.setLayoutParams(new FrameLayout.LayoutParams(
