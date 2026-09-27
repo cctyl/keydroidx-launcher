@@ -34,6 +34,11 @@ public class ScreenSoftBar extends AbstractSoftKeysBar {
 	public ScreenSoftBar(Screen target, SoftButtonBarBinding binding) {
 		super(target, true);
 		this.binding = binding;
+		// 同步桌面「字体大小」设置：软键文字随 KeydroidxFontManager 缩放（设计字号 11，
+		// 与 TextFieldImpl 计数器及生态各弹窗底栏软键一致），否则输入框 1.5x 而底栏不缩放
+		io.github.cctyl.nokia.common.ui.KeydroidxFontManager.textSize(binding.leftButton, 11);
+		io.github.cctyl.nokia.common.ui.KeydroidxFontManager.textSize(binding.middleButton, 11);
+		io.github.cctyl.nokia.common.ui.KeydroidxFontManager.textSize(binding.rightButton, 11);
 		this.binding.leftButton.setOnClickListener(this::onClick);
 		this.binding.middleButton.setOnClickListener(this::onClick);
 		this.binding.rightButton.setOnClickListener(this::onClick);
