@@ -28,6 +28,8 @@ import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.nokia.KeydroidxGlobalProfile;
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.permission.KeydroidxPermissionManager;
+import io.github.cctyl.nokia.common.update.KeydroidxAutoUpdateChecker;
+import io.github.cctyl.nokia.common.update.KeydroidxUpdateConfig;
 import com.hjq.permissions.OnPermissionCallback;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
@@ -111,6 +113,9 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			// 缺失则一次性诺基亚风格弹窗引导补齐。POST_NOTIFICATIONS 已纳入全集统一申请，
 			// 不再单独走原生 requestPermissions。
 			checkCorePermissionsOnStartup();
+			// 每日检查更新发现的「待提醒新版本」：进入应用 1.5s 后弹复古确认弹窗
+			// （延迟以避开权限自检弹窗，避免功能机规范忌讳的弹窗堆叠）。
+			scheduleUpdateReminderDialog();
 			// 拉起常驻保活前台服务并常驻。【必须在桌面 onCreate 启动】，绝不在 onStop 启动——
 			// onStop 往往就是息屏/锁屏发生的瞬间，那时启动前台服务会把它 onCreate/onStartCommand/
 			// startForeground 全部挤进【桌面主线程】，恰好砸进「窗口焦点从有变无」的敏感窗口，
@@ -123,6 +128,37 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 
 	/** 本次启动是否已做过核心权限自检，避免重复弹窗。 */
 	private boolean corePermissionCheckedThisSession = false;
+
+	/** 本次会话是否已弹过更新提醒（BACK 关闭后不重弹，下次进应用再提醒）。 */
+	private boolean updateReminderShownThisSession = false;
+
+	/**
+	 * 弹出「发现新版本」提醒（core 通用能力）：
+	 * 每日检查在后台发现新版本后会落一条「待提醒」记录，进入应用时在这里弹
+	 * 复古确认弹窗（LSK=更新 / RSK=忽略此版本 / BACK=下次再提醒）。
+	 *
+	 * <p>两次尝试：1.5s 弹「上次检查遗留」的待提醒；15s 弹「本次启动刚完成检查」
+	 * 新落盘的待提醒（后台检查 = 8s 延迟 + 网络，普遍晚于首帧）。</p>
+	 */
+	private void scheduleUpdateReminderDialog() {
+		Runnable attempt = () -> {
+			if (isFinishing() || isDestroyed() || updateReminderShownThisSession) {
+				return;
+			}
+			try {
+				KeydroidxUpdateConfig config = new KeydroidxUpdateConfig(
+						"https://github.com/cctyl/keydroidx-launcher");
+				if (KeydroidxAutoUpdateChecker.showPendingUpdateDialog(this, config)) {
+					updateReminderShownThisSession = true;
+				}
+			} catch (Throwable t) {
+				KeydroidxLog.w("Desktop", "show update reminder failed: " + t.getMessage(), t);
+			}
+		};
+		Handler h = new Handler(Looper.getMainLooper());
+		h.postDelayed(attempt, 1500);
+		h.postDelayed(attempt, 15000);
+	}
 
 	/**
 	 * 启动时核心权限自检：检查核心权限全集（应用列表+电话状态+通知权限+通知使用权）

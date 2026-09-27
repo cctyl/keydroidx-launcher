@@ -51,6 +51,8 @@ import io.github.cctyl.nokia.common.feedback.KeydroidxFeedbackConfig;
 import io.github.cctyl.nokia.common.feedback.KeydroidxInstall;
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
+import io.github.cctyl.nokia.common.update.KeydroidxAutoUpdateChecker;
+import io.github.cctyl.nokia.common.update.KeydroidxUpdateConfig;
 import ru.playsoftware.j2meloader.nokia.LauncherThemeProvider;
 import ru.playsoftware.mini_shizuku.Shizuku;
 import ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage;
@@ -136,6 +138,9 @@ public class EmulatorApplication extends Application {
 			// 上次运行遗留的崩溃/错误标记 → 自动上传日志并重置标记；失败保留标记，下次启动再试。
 			// 只主进程上传：:midlet 子进程只落标记（已在 attachBaseContext 开头 install），避免重复上报。
 			KeydroidxCrashReporter.uploadPendingIfAny(this);
+			// 每日一次自动检查更新（core 通用能力）：延迟 8s 避开冷启动，
+			// 开关/按天节流/忽略版本均在 KeydroidxUpdatePrefs 内持久化。
+			scheduleAutoUpdateCheck();
 			new Handler(Looper.getMainLooper()).postDelayed(this::initAcra, 2000);
 		} else {
 			// :midlet 子进程：只落标记、不上传（上传由主进程下次启动统一完成），
@@ -144,6 +149,34 @@ public class EmulatorApplication extends Application {
 		}
 		long elapsed = System.currentTimeMillis() - appStart;
 		android.util.Log.i("EmulatorApp", "attachBaseContext 完成，耗时 " + elapsed + "ms");
+	}
+
+	/** 每日一次自动检查更新（仅主进程，延迟触发以避开冷启动关键路径）。 */
+	private void scheduleAutoUpdateCheck() {
+		try {
+			KeydroidxUpdateConfig config = new KeydroidxUpdateConfig(
+					"https://github.com/cctyl/keydroidx-launcher")
+					.setCurrentVersion(stripFlavorSuffix(BuildConfig.VERSION_NAME));
+			KeydroidxAutoUpdateChecker.checkOncePerDay(this, config, 8000);
+		} catch (Throwable t) {
+			KeydroidxLog.w(TAG, "schedule auto update check failed: " + t.getMessage(), t);
+		}
+	}
+
+	/**
+	 * 剥离 flavor 渠道后缀（-open/-play/-dev-NNNNN），只保留逻辑版本号，
+	 * 避免 semver 比较把渠道后缀当 pre-release 修饰段误判为「有新版本」。
+	 */
+	private static String stripFlavorSuffix(String versionName) {
+		if (versionName == null || versionName.isEmpty()) {
+			return versionName;
+		}
+		String flavor = BuildConfig.FLAVOR;
+		if (flavor == null || flavor.isEmpty()) {
+			return versionName;
+		}
+		String pattern = "-" + java.util.regex.Pattern.quote(flavor) + "(-\\d+)?$";
+		return versionName.replaceFirst(pattern, "");
 	}
 
 	/** ACRA 崩溃上报初始化（签名校验等 IPC 较慢，从首帧路径移出）。 */

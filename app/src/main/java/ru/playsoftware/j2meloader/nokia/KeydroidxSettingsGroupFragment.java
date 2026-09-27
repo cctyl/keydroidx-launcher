@@ -4,6 +4,7 @@ import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxIcons;
 import io.github.cctyl.nokia.common.permission.KeydroidxPermissionManager;
+import io.github.cctyl.nokia.common.update.KeydroidxUpdatePrefs;
 import com.hjq.permissions.OnPermissionCallback;
 import com.hjq.permissions.Permission;
 
@@ -84,6 +85,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 						KeydroidxIcons.ICON_HOME,         // 默认桌面设置
 						KeydroidxIcons.ICON_NOTIFICATIONS, // 通知中心
 						KeydroidxIcons.ICON_SETTINGS,     // 核心权限管理
+						KeydroidxIcons.ICON_DOWNLOAD,     // 自动检查更新
 				};
 			default:
 				return new String[0];
@@ -99,7 +101,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			case GROUP_CONTENT:
 				return new String[]{"顶部快捷栏设置", "桌面组件设置", "快捷开关"};
 			case GROUP_SYSTEM:
-				return new String[]{"日志记录", "默认桌面设置", "通知中心", "系统权限自检"};
+				return new String[]{"日志记录", "默认桌面设置", "通知中心", "系统权限自检", "自动检查更新"};
 			default:
 				return new String[0];
 		}
@@ -236,6 +238,15 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			boolean coreGranted = io.github.cctyl.nokia.common.permission.KeydroidxPermissionManager.isCorePermissionsGranted(requireContext());
 			return coreGranted ? "系统权限：已就绪" : "系统权限：待修复";
 		}
+		if (group == GROUP_SYSTEM && index == 4) {
+			boolean enabled = KeydroidxUpdatePrefs.isAutoCheckEnabled(requireContext());
+			String ignored = KeydroidxUpdatePrefs.getIgnoredVersion(requireContext());
+			String text = enabled ? "自动检查更新：每日" : "自动检查更新：关闭";
+			if (enabled && !ignored.isEmpty()) {
+				text += "（已忽略 v" + ignored + "）";
+			}
+			return text;
+		}
 		return itemNames[index];
 	}
 
@@ -336,6 +347,10 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 				KeydroidxLog.i("SettingsGroup", "进入系统权限自检页");
 				host.openFragment(new KeydroidxPermissionCheckFragment());
 				return true;
+			case 4:
+				KeydroidxLog.i("SettingsGroup", "自动检查更新开关");
+				toggleAutoUpdateCheck();
+				return true;
 			default:
 				return false;
 		}
@@ -352,6 +367,19 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 		KeydroidxLog.i("SettingsGroup", "日志记录切换为: " + (next ? "开启(详细)" : "关闭(仅错误)"));
 		if (tvNames != null && tvNames.length > 0 && tvNames[0] != null) {
 			tvNames[0].setText(getItemDisplayName(0));
+		}
+	}
+
+	/**
+	 * 切换自动检查更新开关（core 通用能力，默认开启）：
+	 * 开启=每日检查一次 GitHub 新版本并发通知；关闭=仅保留「关于」页手动检查。
+	 */
+	private void toggleAutoUpdateCheck() {
+		boolean next = !KeydroidxUpdatePrefs.isAutoCheckEnabled(requireContext());
+		KeydroidxUpdatePrefs.setAutoCheckEnabled(requireContext(), next);
+		KeydroidxLog.i("SettingsGroup", "自动检查更新切换为: " + (next ? "每日" : "关闭"));
+		if (tvNames != null && tvNames.length > 4 && tvNames[4] != null) {
+			tvNames[4].setText(getItemDisplayName(4));
 		}
 	}
 
