@@ -282,8 +282,10 @@ public class KeydroidxOptionsDialog extends DialogFragment {
 			LinearLayout row = new LinearLayout(requireContext());
 			row.setOrientation(LinearLayout.HORIZONTAL);
 			row.setGravity(Gravity.CENTER_VERTICAL);
+			// 高度 WRAP_CONTENT + minHeight：大字号/点阵字体行盒放大后固定行高会裁掉文字
 			row.setLayoutParams(new LinearLayout.LayoutParams(
-					ViewGroup.LayoutParams.MATCH_PARENT, KeydroidxDimens.dp(getResources(), 32)));
+					ViewGroup.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+			row.setMinimumHeight(KeydroidxDimens.dp(getResources(), 32));
 			row.setPadding(KeydroidxDimens.dp(getResources(), 12), 0, KeydroidxDimens.dp(getResources(), 12), 0);
 
 			boolean hasIcon = false;
