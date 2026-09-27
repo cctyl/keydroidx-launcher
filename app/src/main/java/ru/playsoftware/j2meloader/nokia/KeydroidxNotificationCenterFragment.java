@@ -180,8 +180,10 @@ public class KeydroidxNotificationCenterFragment extends KeydroidxListPageFragme
 		LinearLayout row = new LinearLayout(requireContext());
 		row.setOrientation(LinearLayout.HORIZONTAL);
 		row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+		// 高度用 WRAP_CONTENT + minHeight：fontScale/点阵字体行盒放大后固定 46dp 会裁掉文字
 		row.setLayoutParams(new LinearLayout.LayoutParams(
-				LinearLayout.LayoutParams.MATCH_PARENT, KeydroidxDimens.dp(getResources(), 46)));
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		row.setMinimumHeight(KeydroidxDimens.dp(getResources(), 46));
 		row.setPadding(dp4 * 2, dp4, dp4 * 2, dp4);
 		row.setClickable(true);
 
