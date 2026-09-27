@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 import ru.playsoftware.j2meloader.applist.AppItem;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 import ru.playsoftware.j2meloader.util.AppUtils;
 import ru.playsoftware.j2meloader.util.MidletStateStore;
 import ru.playsoftware.mini_shizuku.Shizuku;
@@ -391,9 +392,11 @@ public final class KeydroidxBgManagerHelper {
 							? pm.getApplicationLabel(ai).toString() : pkg;
 					Drawable icon = null;
 					try {
-						icon = pm.getApplicationIcon(ai);
+						// 图标包优先（单应用覆盖 → 全局图标包），未命中再用应用自身图标
+						icon = KeydroidxIconResolver.resolvePackIcon(ctx, pkg, null, name);
+						if (icon == null) icon = pm.getApplicationIcon(ai);
 					} catch (Exception ignored) {
-						KeydroidxLog.w(TAG, "getApplicationLabel failed: " + ignored.getMessage());
+						KeydroidxLog.w(TAG, "加载图标失败: " + ignored.getMessage());
 					}
 					boolean prot = protectedSet != null && protectedSet.contains(pkg);
 					out.add(new BgTask(pkg, name, icon, prot));

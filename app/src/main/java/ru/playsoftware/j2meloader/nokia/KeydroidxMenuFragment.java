@@ -46,6 +46,11 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxAdwIconPack;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconPack;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconPackManager;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxS60Icons;
 import ru.playsoftware.j2meloader.J2meLoaderActivity;
 import ru.playsoftware.j2meloader.R;
 
@@ -173,9 +178,6 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	private KeydroidxAppItem[] pageItems;
 	private View selectedView = null;
 
-	/** 防止 S60 图标异步扫描完成后重复刷新当前页图标 */
-	private boolean iconRefreshDone = false;
-
 	/**
 	 * 包安装/卸载/替换广播接收器：应用列表实时跟随系统变化。
 	 * 卸载（ACTION_DELETE）会切到系统卸载页，Fragment 只是 onPause 不销毁，
@@ -270,6 +272,13 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	 * 失效时机：包安装/卸载/替换（见 packageReceiver）、冻结状态变化（见 freezeReceiver）。
 	 */
 	private static final List<KeydroidxAppItem> cachedItems = new ArrayList<>();
+
+	/**
+	 * 缓存构建时的图标外观指纹（图标包 ID + 单应用覆盖摘要）。
+	 * 与当前指纹不一致说明用户切换过图标包或改过覆盖 → 缓存整体失效重建，
+	 * 避免从图标包设置页返回功能表时仍显示旧图标。
+	 */
+	private static String cachedIconState;
 
 	/** 应用列表构建线程池（仅在缓存缺失时用于后台枚举，避免阻塞主线程）。 */
 	private static final ExecutorService LIST_EXECUTOR = Executors.newSingleThreadExecutor();
@@ -416,6 +425,19 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			if (cachedItems.isEmpty()) {
 				return false;
 			}
+			// 图标包 / 单应用覆盖变化 → 缓存里的图标已过期，直接判为无缓存走重建。
+			// 注意：本 Fragment 实例在返回栈中存活，成员 items 里仍是旧图标，
+			// 一并清掉，避免后台枚举时被误判为「列表无变化」而跳过重建（网格会空着）。
+			String currentState = KeydroidxSettingsStorage.getIconStateFingerprint(requireContext());
+			if (!currentState.equals(cachedIconState)) {
+				KeydroidxLog.i("Menu", "图标外观已变化（" + cachedIconState + " → " + currentState
+						+ "），进程内应用列表缓存失效");
+				cachedItems.clear();
+				items.clear();
+				pageIndex = 0;
+				totalPages = 1;
+				return false;
+			}
 			items.clear();
 			items.addAll(cachedItems);
 		}
@@ -479,14 +501,8 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 						}
 						KeydroidxLog.i("Menu", "后台枚举完成并构建：共 " + items.size() + " 项，"
 								+ totalPages + " 页");
-						// S60 意图扫描若尚未完成，完成后会回调刷新当前页图标
-						refreshAfterIconInit();
-						KeydroidxS60IconMap.initAsync(appCtx, new Runnable() {
-							@Override
-							public void run() {
-								refreshAfterIconInit();
-							}
-						});
+						// 图标包映射表在本方法（后台线程）内已按需解析完成，
+						// 因此列表构建完成即图标即最终态，无需再异步补刷（详见 KeydroidxIconResolver）
 					}
 				});
 			}
@@ -500,7 +516,12 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		}
 	}
 
-	/** 按类型+名称+启动组件逐项比对两个应用列表是否内容一致（后台校准去重用）。 */
+	/**
+	 * 按类型+名称+启动组件+图标来源逐项比对两个应用列表是否内容一致（后台校准去重用）。
+	 * <p>图标来源（{@code iconPackName} / {@code iconOverridden}）必须参与比对：
+	 * 换图标包或改单应用覆盖后，列表的「内容」其实变了（图标变了），
+	 * 只比 label/组件会误判为「无变化」而跳过重建，屏幕上仍是旧图标。</p>
+	 */
 	private static boolean isSameMenuList(List<KeydroidxAppItem> a, List<KeydroidxAppItem> b) {
 		if (a.size() != b.size()) return false;
 		for (int i = 0; i < a.size(); i++) {
@@ -508,6 +529,10 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			KeydroidxAppItem y = b.get(i);
 			if (x == null || y == null) return false;
 			if (x.type != y.type || !TextUtils.equals(x.label, y.label)) return false;
+			if (x.iconOverridden != y.iconOverridden
+					|| !TextUtils.equals(x.iconPackName, y.iconPackName)) {
+				return false;
+			}
 			ComponentName cx = x.launchIntent != null ? x.launchIntent.getComponent() : null;
 			ComponentName cy = y.launchIntent != null ? y.launchIntent.getComponent() : null;
 			if (!TextUtils.equals(cx != null ? cx.flattenToString() : null,
@@ -619,9 +644,13 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 
 		// 图标缓存：内存 + 磁盘 + 后台线程加载（避免主线程逐个 loadIcon IPC 卡顿）
 		KeydroidxAppIconCache.init(appCtx);
-		// S60 图标缓存：冷启动时桌面已通过 initAsync 异步扫描并持久化；
-		// 此处仅读磁盘缓存（毫秒级，无 PackageManager 批量查询），不阻塞功能表打开
-		KeydroidxS60IconMap.loadFromDisk(appCtx);
+		// 图标包映射表：本方法运行在后台线程，此处提前解析（首次约 10ms，之后纯内存），
+		// 保证列表构建完成时命中结果即为最终态
+		KeydroidxIconPack activePack = KeydroidxIconPackManager.get()
+				.findPack(KeydroidxSettingsStorage.getIconPackId(appCtx));
+		if (activePack != null) {
+			activePack.ensureLoaded(appCtx);
+		}
 
 		Intent main = new Intent(Intent.ACTION_MAIN, null);
 		main.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -677,15 +706,10 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 			KeydroidxAppItem item = new KeydroidxAppItem(KeydroidxAppItem.TYPE_APP, label, icon, launch);
 
-			// 尝试替换为 S60 风格图标，同时记录匹配结果用于后续分组排序（传入 label 以启用应用名匹配）
-			int s60IconRes = KeydroidxS60IconMap.getIcon(ai.packageName, label);
-			item.s60IconResId = s60IconRes;
-			if (s60IconRes != 0) {
-				Drawable s60Icon = safeDrawable(appCtx, s60IconRes);
-				if (s60Icon != null) {
-					item.icon = s60Icon;
-				}
-			}
+			// 图标包解析（单应用覆盖 → 全局图标包）：命中则直接取图；未命中留给
+			// buildCurrentPage 后台加载应用原图标（冻结应用走 loadIconWithFallback 降级）
+			applyIconPackResult(item, KeydroidxIconResolver.resolve(
+					appCtx, ai.packageName, launch.getComponent(), label), appCtx);
 
 			pool.add(item);
 		}
@@ -706,11 +730,21 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				hit = pollByPackage(pool, pkg);
 			if (hit != null) {
 				KeydroidxLog.d("Menu", "固定槽位 " + (s + 1) + " 命中: " + pkg + " -> " + hit.label);
-				// 替换为 S60 风格图标
-				Drawable s60icon = safeDrawable(appCtx, PINNED_SLOT_ICONS[s]);
-				if (s60icon != null) {
-					hit.icon = s60icon;
-					KeydroidxLog.d("Menu", "  -> 已替换为 S60 图标");
+				// 固定槽位图标属于内置 S60 图标包：仅当前使用内置 S60 时套用；
+				// 已切到外部图标包 / 不使用图标包时保留图标包解析结果或应用原图标。
+				// 例外：用户在功能表里手动指定过图标（单应用覆盖）时，用户的选择优先级最高，
+				// 不能被固定槽位图标覆盖掉。
+				String pinnedPkg = hit.launchIntent != null && hit.launchIntent.getComponent() != null
+						? hit.launchIntent.getComponent().getPackageName() : null;
+				if (pinnedPkg != null && KeydroidxSettingsStorage.hasIconOverride(appCtx, pinnedPkg)) {
+					KeydroidxLog.d("Menu", "  -> 该应用存在图标覆盖，保留用户指定图标（不动固定槽位图标）");
+				} else if (isBuiltinPackActive(appCtx)) {
+					Drawable s60icon = safeDrawable(appCtx, PINNED_SLOT_ICONS[s]);
+					if (s60icon != null) {
+						s60icon.setFilterBitmap(false);
+						hit.icon = s60icon;
+						KeydroidxLog.d("Menu", "  -> 已替换为固定槽位 S60 图标");
+					}
 				}
 				break;
 			}
@@ -744,12 +778,12 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			io.github.cctyl.nokia.common.ui.KeydroidxIcons.ICON_NOTIFICATIONS, 0xFFFFFFFF, 20);
 	result.add(new KeydroidxAppItem(KeydroidxAppItem.TYPE_NOTIFICATION, "通知中心", notifIcon, null));
 
-		// 将 pool 拆分为已匹配 S60 图标 和 未匹配，匹配的排在前面。
-		// 使用构建 pool 时记录的 s60IconResId，避免二次调用 getIcon() 因缓存状态变化导致分组不一致。
+		// 将 pool 拆分为「被当前图标包命中」与「未命中」，命中的排在前面。
+		// 使用构建 pool 时记录的 iconPackName，避免二次解析导致分组不一致。
 		List<KeydroidxAppItem> matchedPool = new ArrayList<>();
 		List<KeydroidxAppItem> unmatchedPool = new ArrayList<>();
 		for (KeydroidxAppItem app : pool) {
-			if (app.s60IconResId != 0) {
+			if (app.iconPackName != null) {
 				matchedPool.add(app);
 			} else {
 				unmatchedPool.add(app);
@@ -767,6 +801,8 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				+ " + 未匹配 " + unmatchedPool.size() + "）共 " + result.size() + " 项");
 		KeydroidxLog.i("Menu", "buildAppList 耗时 " + (System.currentTimeMillis() - loadStart)
 				+ "ms（枚举 + label，不含系统图标 IPC）");
+		// 记录本次构建用的图标外观指纹：图标偏好变化后缓存自动失效
+		cachedIconState = KeydroidxSettingsStorage.getIconStateFingerprint(appCtx);
 		return result;
 		}
 
@@ -779,8 +815,6 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		KeydroidxLog.i("Menu", "刷新应用列表（包变化触发）");
 		int oldPage = pageIndex;
 		int oldFocus = focusPos;
-		// 允许本次刷新后再次应用 S60 图标缓存（新装应用也走一次）
-		iconRefreshDone = false;
 		// 缓存已失效，走后台重新枚举（不再在主线程做重 IPC），完成后恢复原页码与焦点
 		refreshKeepPosition = true;
 		invalidateCachedItems();
@@ -789,12 +823,19 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		}
 
 		/**
-		 * S60 图标异步扫描完成后：用最新缓存刷新当前页各应用的图标（仅替换 ImageView，不重建网格）。
-		 * 同时把更新后的 item 写回进程内缓存，保证下次进入功能表直接用新图标。
+		 * 图标包 / 单应用图标覆盖变化后的外部刷新入口（图标包设置页、更换图标流程调用）。
+		 * 保持当前页码与焦点，后台重新枚举并重建（图标不可变部分复用缓存）。
+		 */
+		public void onIconPackChanged() {
+			refreshAppList();
+		}
+
+		/**
+		 * 图标包（或单应用覆盖）变化后重建当前页图标：仅替换 ImageView，不重建网格、不改变焦点。
+		 * 由图标包设置页 / 更换图标流程返回时调用。
 		 */
 		private void refreshAfterIconInit() {
-			if (iconRefreshDone || !isAdded() || getView() == null) return;
-			iconRefreshDone = true;
+			if (!isAdded() || getView() == null) return;
 			long start = System.currentTimeMillis();
 			int updated = 0;
 			for (int i = 0; i < perPage; i++) {
@@ -803,19 +844,17 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				if (item == null || cell == null) continue;
 				if (item.type != KeydroidxAppItem.TYPE_APP) continue;
 				if (item.launchIntent == null || item.launchIntent.getComponent() == null) continue;
-				String pkg = item.launchIntent.getComponent().getPackageName();
-				int resId = KeydroidxS60IconMap.getIcon(pkg, item.label);
-				if (resId == 0 || resId == item.s60IconResId) continue;
-				Drawable s60Icon = safeDrawable(requireContext(), resId);
-				if (s60Icon == null) continue;
-				s60Icon.setFilterBitmap(false);
-				item.icon = s60Icon;
-				item.s60IconResId = resId; // 同步更新匹配结果
+				ComponentName cn = item.launchIntent.getComponent();
+				applyIconPackResult(item, KeydroidxIconResolver.resolve(
+						requireContext(), cn.getPackageName(), cn, item.label), requireContext());
+				Drawable icon = item.icon;
+				if (icon == null) icon = getPlaceholderIcon();
+				if (icon == null) continue;
 				updated++;
 				if (cell instanceof LinearLayout) {
 					View iv = ((LinearLayout) cell).getChildAt(0);
 					if (iv instanceof ImageView) {
-						((ImageView) iv).setImageDrawable(s60Icon);
+						((ImageView) iv).setImageDrawable(icon);
 					}
 				}
 			}
@@ -888,13 +927,8 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			launch.setClassName(ai.packageName, ai.name);
 			launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 			KeydroidxAppItem item = new KeydroidxAppItem(KeydroidxAppItem.TYPE_APP, label, null, launch);
-			item.s60IconResId = KeydroidxS60IconMap.getIcon(ai.packageName, label);
-			if (item.s60IconResId != 0) {
-				Drawable s60Icon = safeDrawable(appCtx, item.s60IconResId);
-				if (s60Icon != null) {
-					item.icon = s60Icon;
-				}
-			}
+			applyIconPackResult(item, KeydroidxIconResolver.resolve(
+					appCtx, ai.packageName, launch.getComponent(), label), appCtx);
 			pool.add(item);
 			added++;
 			KeydroidxLog.d("Menu", "追加冻结应用: " + ai.packageName + "/" + ai.name);
@@ -913,6 +947,37 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * 把图标包解析结果应用到列表项。
+	 * <p>命中时直接取图（内置 S60 为 nodpi 位图 → 关闭缩放过滤更锐利）；未命中（或取图失败）
+	 * 时把 {@code iconPackName} 留空，由 {@code buildCurrentPage} 后台加载应用原图标，
+	 * 冻结/停用应用也能正常出图（走 {@code loadIconWithFallback} 降级）。</p>
+	 */
+	private static void applyIconPackResult(KeydroidxAppItem item, KeydroidxIconResolver.Hit hit, Context appCtx) {
+		if (item == null) return;
+		item.iconPackName = hit != null ? hit.iconName : null;
+		item.iconOverridden = hit != null && hit.override;
+		if (hit == null) return;
+		KeydroidxIconPack pack = KeydroidxIconPackManager.get().findPack(hit.packId);
+		if (pack == null) return;
+		Drawable icon = pack.getIconByName(appCtx, hit.iconName);
+		if (icon == null) {
+			// 图标包里取不到图（外部包被卸载 / 资源损坏）→ 视为未命中，回退应用原图标
+			item.iconPackName = null;
+			item.iconOverridden = false;
+			return;
+		}
+		icon.setFilterBitmap(false);
+		item.icon = icon;
+		// 兼容字段：内置 S60 命中时同步资源 ID（排序/日志仍可读）
+		item.s60IconResId = KeydroidxS60Icons.idOf(hit.iconName);
+	}
+
+	/** 当前全局图标包是否为内置 S60（固定槽位图标只属于内置 S60 包） */
+	private static boolean isBuiltinPackActive(Context ctx) {
+		return KeydroidxAdwIconPack.ID_BUILTIN.equals(KeydroidxSettingsStorage.getIconPackId(ctx));
 	}
 
 	private Drawable safeDrawable(Context ctx, int resId) {
@@ -1024,18 +1089,21 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 					} else if (item.type == KeydroidxAppItem.TYPE_APP
 							&& item.launchIntent != null
 							&& item.launchIntent.getComponent() != null) {
-						// S60 未命中 → 先显示占位，后台线程加载真实系统图标（内存/磁盘缓存复用）
+						// 图标包未命中 → 先显示占位，后台线程加载（图标包/应用原图标，内存+磁盘缓存复用）
 						iv.setImageDrawable(getPlaceholderIcon());
 						final String asyncPkg = item.launchIntent.getComponent().getPackageName();
 						final ComponentName cn = item.launchIntent.getComponent();
 						final KeydroidxAppItem fItem = item;
+						final String asyncLabel = item.label;
 						iv.setTag(asyncPkg);
-						KeydroidxAppIconCache.loadAsync(requireContext(), asyncPkg, cn, (loadedPkg, d) -> {
+						// 缓存键由缓存层按当前图标外观自行计算（见 KeydroidxAppIconCache.loadAsync）
+						KeydroidxAppIconCache.loadAsync(requireContext(), asyncPkg, cn, asyncLabel,
+								(loadedPkg, d) -> {
 							// 校验：cell 仍属于该应用（翻页/重建后 tag 变化则跳过），
-							// 且该应用未被 S60 图标替换（S60 优先级高于系统图标）
+							// 且该应用未被图标包替换（图标包优先级高于系统图标）
 							if (d == null || iv.getTag() == null
 									|| !iv.getTag().equals(loadedPkg)) return;
-							if (fItem.s60IconResId != 0) return;
+							if (fItem.iconPackName != null) return;
 							d.setFilterBitmap(false);
 							iv.setImageDrawable(d);
 							fItem.icon = d;
@@ -1400,6 +1468,26 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				Toast.makeText(requireContext(), "已加入冻结列表", Toast.LENGTH_SHORT).show();
 				invalidateFrozenCache();
 				buildCurrentPage();
+			}));
+		}
+		// 更换图标：先选图标包（内置 S60 + 已装图标包），再在图标网格里挑一个图标，
+		// 保存为该应用的图标覆盖（只影响这一个应用；不选则保持全局图标包解析结果）
+		options.add(new KeydroidxOptionsDialog.OptionItem(
+				io.github.cctyl.nokia.common.ui.KeydroidxIcons.ICON_PALETTE,
+				"更换图标", true, false, () -> {
+			KeydroidxLog.i("Menu", "选项菜单-更换图标: " + item.label + " pkg=" + pkg);
+			((KeydroidxDesktopActivity) requireActivity()).openFragment(
+					KeydroidxIconPackSettingsFragment.newInstanceForApp(pkg, item.label));
+		}));
+		// 已有覆盖的应用才显示「恢复默认图标」
+		if (KeydroidxIconResolver.hasOverride(requireContext(), pkg)) {
+			options.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_revert,
+					"恢复默认图标", true, false, () -> {
+				KeydroidxSettingsStorage.clearIconOverride(requireContext(), pkg);
+				KeydroidxIconResolver.invalidatePackage(requireContext(), pkg);
+				Toast.makeText(requireContext(), "已恢复默认图标", Toast.LENGTH_SHORT).show();
+				KeydroidxLog.i("Menu", "选项菜单-恢复默认图标: " + item.label + " pkg=" + pkg);
+				refreshAppList();
 			}));
 		}
 		options.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,

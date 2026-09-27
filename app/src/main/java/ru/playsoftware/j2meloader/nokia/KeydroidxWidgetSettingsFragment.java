@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 
 /**
  * 桌面组件设置主界面。承载设计文档中的全部状态：
@@ -625,19 +626,16 @@ public class KeydroidxWidgetSettingsFragment extends KeydroidxPageFragment {
 		}
 
 		String pkg = cn.getPackageName();
-		// 第 1 优先级：S60 风格图标（读内存缓存，毫秒级，主线程安全；传入 label 以启用应用名匹配）
-		int s60Res = KeydroidxS60IconMap.getIcon(pkg, item.label);
-		if (s60Res != 0) {
-			try {
-				Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-				if (s60Icon != null) {
-					KeydroidxLog.d(TAG, "应用组件 " + item.label + " 使用 S60 图标");
-					iv.setImageDrawable(s60Icon);
-					return;
-				}
-			} catch (Exception e) {
-				KeydroidxLog.w(TAG, "加载 S60 图标失败: " + item.label);
+		// 第 1 优先级：图标包命中（纯内存查询，主线程安全；映射表未就绪时返回 null 走后台加载）
+		try {
+			Drawable packIcon = KeydroidxIconResolver.resolvePackIcon(requireContext(), pkg, cn, item.label);
+			if (packIcon != null) {
+				KeydroidxLog.d(TAG, "应用组件 " + item.label + " 使用图标包图标");
+				iv.setImageDrawable(packIcon);
+				return;
 			}
+		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "加载图标包图标失败: " + item.label);
 		}
 
 		// 第 2 优先级（后台）：系统真实图标。先放占位，避免主线程 IPC 卡顿。
@@ -672,9 +670,13 @@ public class KeydroidxWidgetSettingsFragment extends KeydroidxPageFragment {
 			public void run() {
 				Drawable icon = null;
 				try {
-					PackageManager pm = appContext.getPackageManager();
-					// 冻结（停用）的应用取 Activity 图标会抛 NameNotFoundException → 走降级
-					icon = KeydroidxAppIconCache.loadIconWithFallback(pm, pkg, cn, null);
+					// 后台线程可安全解析映射表：图标包优先，未命中再取应用原图标
+					icon = KeydroidxIconResolver.resolvePackIcon(appContext, pkg, cn, item.label);
+					if (icon == null) {
+						PackageManager pm = appContext.getPackageManager();
+						// 冻结（停用）的应用取 Activity 图标会抛 NameNotFoundException → 走降级
+						icon = KeydroidxAppIconCache.loadIconWithFallback(pm, pkg, cn, null);
+					}
 				} catch (Exception e) {
 					KeydroidxLog.w(TAG, "后台加载系统图标失败: " + item.label + " " + e.getMessage());
 				}

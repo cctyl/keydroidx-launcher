@@ -74,6 +74,15 @@
         </intent>
         <!-- 音乐播放器：桌面组件跨进程读取播放态并打开播放页 -->
         <package android:name="io.github.cctyl.keydroidx.music" />
+        <!-- Android 11+ 包可见性：图标包（ADW / Nova 标准声明），
+             缺少这两条会查不到已装图标包，也读不到其资源（getResourcesForApplication 抛异常）。
+             低版本（minSdk 19）声明 <queries> 无副作用，系统直接忽略。 -->
+        <intent>
+            <action android:name="org.adw.ActivityStarter.THEMES" />
+        </intent>
+        <intent>
+            <action android:name="com.novalauncher.THEME" />
+        </intent>
     </queries>
 
     <uses-feature android:name="android.hardware.microphone" android:required="false" />

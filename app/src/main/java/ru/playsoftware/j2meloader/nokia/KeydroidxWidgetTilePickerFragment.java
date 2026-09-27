@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 
 /**
  * 快捷开关（Quick Settings Tile）选择器界面。
@@ -169,9 +170,17 @@ public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment
 
 				Drawable icon = null;
 				try {
-					icon = si.loadIcon(pm);
+					// 图标包优先（单应用覆盖 → 全局图标包），未命中再用服务/应用自身图标
+					icon = KeydroidxIconResolver.resolvePackIcon(requireContext(), pkg, null, tileLabel);
 				} catch (Exception ignored) {
-					KeydroidxLog.w(TAG, "clear failed: " + ignored.getMessage());
+					KeydroidxLog.w(TAG, "解析图标包图标失败: " + ignored.getMessage());
+				}
+				if (icon == null) {
+					try {
+						icon = si.loadIcon(pm);
+					} catch (Exception ignored) {
+						KeydroidxLog.w(TAG, "加载服务图标失败: " + ignored.getMessage());
+					}
 				}
 				if (icon == null && si.applicationInfo != null) {
 					try {

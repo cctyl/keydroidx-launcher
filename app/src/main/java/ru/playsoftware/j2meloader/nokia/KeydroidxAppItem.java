@@ -25,7 +25,19 @@ public class KeydroidxAppItem {
 	public Drawable icon;
 	/** 启动该应用的 Intent（特殊入口为 null，可被设置以携带 J2ME 数据） */
 	public Intent launchIntent;
-	/** S60 图标资源 ID（构建列表时记录，用于排序分组；0 = 未匹配） */
+	/**
+	 * 被当前图标包命中的图标名（null = 未命中，显示应用原图标）。
+	 * 构建列表时记录，用于分组排序与异步刷新的「图标包优先」判断。
+	 */
+	public String iconPackName;
+
+	/** 是否来自「功能表 → 选项 → 更换图标」写入的单应用覆盖 */
+	public boolean iconOverridden;
+
+	/**
+	 * 内置 S60 图标资源 ID（构建列表时记录）。
+	 * 兼容字段：仅在命中内置 S60 包时有值，供排序/日志等历史逻辑读取。
+	 */
 	public int s60IconResId;
 
 	public KeydroidxAppItem(int type, String label, Drawable icon, Intent launchIntent) {

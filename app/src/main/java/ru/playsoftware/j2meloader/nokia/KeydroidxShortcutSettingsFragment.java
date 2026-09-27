@@ -41,6 +41,7 @@ import ru.playsoftware.j2meloader.applist.AppItem;
 import ru.playsoftware.j2meloader.appsdb.AppDatabase;
 import ru.playsoftware.j2meloader.appsdb.AppItemDao;
 import ru.playsoftware.j2meloader.config.Config;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 
 /**
  * 快捷栏应用选择界面。展示所有可选应用（安卓 + J2ME），多选后保存。
@@ -262,19 +263,17 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 			row.setClickable(true);
 
 
-			// 图标：优先 S60 风格图标（安卓应用，命中时替换；J2ME 占位 component 不参与）
+			// 图标：优先图标包解析结果（单应用覆盖 → 全局图标包；未命中用应用原图标）
 			Drawable listIcon = app.icon;
 			if (app.launchIntent != null && app.launchIntent.getComponent() != null
 					&& !key.startsWith(ShortcutApp.TYPE_J2ME + ":")) {
-				String pkg = app.launchIntent.getComponent().getPackageName();
-				int s60Res = KeydroidxS60IconMap.getIcon(pkg, app.label);
-				if (s60Res != 0) {
-					try {
-						Drawable s60Icon = ContextCompat.getDrawable(requireContext(), s60Res);
-						if (s60Icon != null) listIcon = s60Icon;
-					} catch (Exception ignored) {
-						KeydroidxLog.w(TAG, "startsWith failed: " + ignored.getMessage());
-					}
+				try {
+					Drawable packIcon = KeydroidxIconResolver.resolvePackIcon(requireContext(),
+							app.launchIntent.getComponent().getPackageName(),
+							app.launchIntent.getComponent(), app.label);
+					if (packIcon != null) listIcon = packIcon;
+				} catch (Exception ignored) {
+					KeydroidxLog.w(TAG, "解析图标包图标失败: " + ignored.getMessage());
 				}
 			}
 			// 选中/未选中标记。

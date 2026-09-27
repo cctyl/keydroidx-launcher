@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  内置 S60 图标包「可挑选图标清单」（ADW 标准 drawable.xml 格式）。
+
+  用途：功能表 → 选项 → 更换图标 → 选中「内置 S60 图标包」后，图标挑选页展示的图标来源。
+  取舍：不列出无法独立成图的素材 —— s60_icon_mask（遮罩）、s60_clock_bg（表盘底）、
+        s60_clock_hour_hand / s60_clock_minute_hand（指针层），它们只在时钟动效里组合使用。
+  名称与 res/drawable-nodpi/s60_*.png 资源名一一对应（KeydroidxS60Icons 提供中文标签）。
+-->
+<resources>
+
+    <!-- 常用功能图标 -->
+    <item drawable="s60_app" />
+    <item drawable="s60_app_alt" />
+    <item drawable="s60_app_logo" />
+    <item drawable="s60_browser" />
+    <item drawable="s60_browser_alt" />
+    <item drawable="s60_calculator" />
+    <item drawable="s60_calculator_alt" />
+    <item drawable="s60_calendar" />
+    <item drawable="s60_call_log" />
+    <item drawable="s60_camera" />
+    <item drawable="s60_camera_alt" />
+    <item drawable="s60_clock" />
+    <item drawable="s60_contacts" />
+    <item drawable="s60_dictionary" />
+    <item drawable="s60_downloads" />
+    <item drawable="s60_email" />
+    <item drawable="s60_files" />
+    <item drawable="s60_files_alt" />
+    <item drawable="s60_fm_radio" />
+    <item drawable="s60_gallery" />
+    <item drawable="s60_gmail" />
+    <item drawable="s60_google_plus" />
+    <item drawable="s60_mms" />
+    <item drawable="s60_music" />
+    <item drawable="s60_navigator" />
+    <item drawable="s60_notepad" />
+    <item drawable="s60_remote_control" />
+    <item drawable="s60_sdcard" />
+    <item drawable="s60_search" />
+    <item drawable="s60_settings" />
+    <item drawable="s60_settings_alt" />
+    <item drawable="s60_sim" />
+    <item drawable="s60_skype" />
+    <item drawable="s60_sound_recorder" />
+    <item drawable="s60_sync" />
+    <item drawable="s60_themes" />
+    <item drawable="s60_video_player" />
+    <item drawable="s60_viber" />
+    <item drawable="s60_voice_dialer" />
+    <item drawable="s60_weather" />
+    <item drawable="s60_whatsapp" />
+    <item drawable="s60_youtube" />
+    <item drawable="s60_books" />
+    <item drawable="s60_com_android_documentsui" />
+
+</resources>

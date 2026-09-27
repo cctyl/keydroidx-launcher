@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  内置 S60 图标包映射表（ADW 标准格式，纯包名写法）
+
+  说明：
+  · 本文件是「内置 S60 图标包」唯一的匹配依据，取代原先 KeydroidxS60IconMap 中的
+    「精确包名表 + 名称关键词表 + 意图探测」三层 Java 逻辑（后两层已随本次改造下线）。
+  · component 允许写成纯包名（本项目扩展写法，表示「该包任意启动入口都用此图标」）；
+    标准写法 ComponentInfo{pkg/cls} 同样被解析器支持，用于外部图标包。
+  · drawable 名与 res/drawable-nodpi/s60_*.png 的资源名一一对应，
+    经 KeydroidxS60Icons 的显式资源表反查（不使用 getIdentifier 反射，避免资源被 R8 裁掉）。
+  · 收录范围 = 原精确包名表 108 条 + 功能表「固定槽位」候选包名补齐项。
+-->
+<resources>
+
+    <!-- ══ 系统功能类 ══ -->
+    <item component="com.android.calendar" drawable="s60_calendar" />
+    <item component="com.google.android.calendar" drawable="s60_calendar" />
+    <item component="com.miui.calendar" drawable="s60_calendar" />
+    <item component="com.samsung.android.calendar" drawable="s60_calendar" />
+    <item component="com.huawei.calendar" drawable="s60_calendar" />
+
+    <item component="com.android.contacts" drawable="s60_contacts" />
+    <item component="com.google.android.contacts" drawable="s60_contacts" />
+    <item component="com.samsung.android.app.contacts" drawable="s60_contacts" />
+
+    <item component="com.android.dialer" drawable="s60_call_log" />
+    <item component="com.google.android.dialer" drawable="s60_call_log" />
+    <item component="com.samsung.android.dialer" drawable="s60_call_log" />
+
+    <item component="com.android.mms" drawable="s60_mms" />
+    <item component="com.google.android.apps.messaging" drawable="s60_mms" />
+    <item component="com.samsung.android.messaging" drawable="s60_mms" />
+    <item component="com.android.messaging" drawable="s60_mms" />
+
+    <item component="com.android.camera" drawable="s60_camera" />
+    <item component="com.android.camera2" drawable="s60_camera" />
+    <item component="com.google.android.GoogleCamera" drawable="s60_camera" />
+    <item component="com.huawei.camera" drawable="s60_camera" />
+    <item component="com.samsung.android.camera" drawable="s60_camera" />
+    <item component="com.intsig.camscanner" drawable="s60_camera" />
+
+    <item component="com.android.settings" drawable="s60_settings" />
+
+    <item component="com.android.calculator2" drawable="s60_calculator" />
+    <item component="com.miui.calculator" drawable="s60_calculator" />
+    <item component="com.huawei.calculator" drawable="s60_calculator" />
+
+    <item component="com.android.deskclock" drawable="s60_clock" />
+    <item component="com.google.android.deskclock" drawable="s60_clock" />
+    <item component="com.huawei.deskclock" drawable="s60_clock" />
+
+    <item component="com.android.soundrecorder" drawable="s60_sound_recorder" />
+    <item component="com.miui.soundrecorder" drawable="s60_sound_recorder" />
+
+    <item component="com.android.fmradio" drawable="s60_fm_radio" />
+    <item component="com.miui.fmradio" drawable="s60_fm_radio" />
+    <item component="com.miui.fm" drawable="s60_fm_radio" />
+    <item component="com.miui.fmservice" drawable="s60_fm_radio" />
+
+    <item component="com.android.providers.downloads.ui" drawable="s60_downloads" />
+    <item component="com.xiaomi.scanner" drawable="s60_search" />
+
+    <!-- ══ 浏览器 ══ -->
+    <item component="com.android.browser" drawable="s60_browser" />
+    <item component="com.android.chrome" drawable="s60_browser" />
+    <item component="com.mi.globalbrowser" drawable="s60_browser" />
+    <item component="com.huawei.browser" drawable="s60_browser" />
+    <item component="com.UCMobile" drawable="s60_browser" />
+    <item component="com.tencent.mtt" drawable="s60_browser" />
+    <item component="org.mozilla.firefox" drawable="s60_browser" />
+    <item component="alook.browser" drawable="s60_browser" />
+
+    <!-- ══ 图库 / 相册 ══ -->
+    <item component="com.android.gallery3d" drawable="s60_gallery" />
+    <item component="com.miui.gallery" drawable="s60_gallery" />
+    <item component="com.google.android.apps.photos" drawable="s60_gallery" />
+    <item component="com.huawei.photos" drawable="s60_gallery" />
+    <item component="com.samsung.android.gallery" drawable="s60_gallery" />
+
+    <!-- ══ 文件管理 ══ -->
+    <item component="com.android.fileexplorer" drawable="s60_files" />
+    <item component="com.mi.android.globalFileexplorer" drawable="s60_files" />
+    <item component="com.android.documentsui" drawable="s60_files" />
+    <item component="com.google.android.documentsui" drawable="s60_files" />
+    <item component="com.huawei.hidisk" drawable="s60_files" />
+    <item component="com.estrongs.android.pop" drawable="s60_files" />
+    <item component="com.rarlab.rar" drawable="s60_files" />
+
+    <!-- ══ 应用商店 / 电商 / 支付 ══ -->
+    <item component="com.android.vending" drawable="s60_app" />
+    <item component="com.xiaomi.market" drawable="s60_app" />
+    <item component="com.huawei.appmarket" drawable="s60_app" />
+    <item component="com.heytap.market" drawable="s60_app" />
+    <item component="com.oppo.market" drawable="s60_app" />
+    <item component="com.bbk.appstore" drawable="s60_app" />
+    <item component="com.tencent.android.qqdownloader" drawable="s60_app" />
+    <item component="com.coolapk.market" drawable="s60_app" />
+    <item component="com.taobao.taobao" drawable="s60_app" />
+    <item component="com.jingdong.app.mall" drawable="s60_app" />
+    <item component="com.xunmeng.pinduoduo" drawable="s60_app" />
+    <item component="com.eg.android.AlipayGphone" drawable="s60_app" />
+    <item component="com.xiachufang" drawable="s60_app" />
+    <item component="com.xiaomi.smarthome" drawable="s60_app" />
+    <item component="com.deepseek.chat" drawable="s60_app" />
+    <item component="com.chinamworld.main" drawable="s60_app" />
+    <item component="com.ct.client" drawable="s60_app" />
+    <item component="com.MobileTicket" drawable="s60_app" />
+
+    <!-- ══ 邮件 ══ -->
+    <item component="com.android.email" drawable="s60_email" />
+    <item component="com.google.android.gm" drawable="s60_email" />
+    <item component="com.microsoft.office.outlook" drawable="s60_email" />
+    <item component="com.tencent.androidqqmail" drawable="s60_email" />
+
+    <!-- ══ 音乐 ══ -->
+    <item component="com.android.music" drawable="s60_music" />
+    <item component="com.miui.player" drawable="s60_music" />
+    <item component="com.tencent.qqmusic" drawable="s60_music" />
+    <item component="com.netease.cloudmusic" drawable="s60_music" />
+    <item component="com.kugou.android" drawable="s60_music" />
+    <item component="com.spotify.music" drawable="s60_music" />
+    <item component="com.xiaomi.miplay_client" drawable="s60_music" />
+
+    <!-- ══ 天气 ══ -->
+    <item component="com.miui.weather2" drawable="s60_weather" />
+    <item component="com.huawei.weather" drawable="s60_weather" />
+
+    <!-- ══ 导航 / 地图 / 出行 ══ -->
+    <item component="com.google.android.apps.maps" drawable="s60_navigator" />
+    <item component="com.baidu.BaiduMap" drawable="s60_navigator" />
+    <item component="com.autonavi.minimap" drawable="s60_navigator" />
+    <item component="com.tencent.map" drawable="s60_navigator" />
+    <item component="com.miui.smarttravel" drawable="s60_navigator" />
+    <item component="com.miui.compass" drawable="s60_navigator" />
+
+    <!-- ══ 笔记 / 办公 ══ -->
+    <item component="com.miui.notes" drawable="s60_notepad" />
+    <item component="com.huawei.notepad" drawable="s60_notepad" />
+    <item component="com.google.android.apps.docs" drawable="s60_notepad" />
+    <item component="com.evernote" drawable="s60_notepad" />
+    <item component="cn.wps.moffice_eng.xiaomi.lite" drawable="s60_notepad" />
+    <item component="cn.wps.moffice_eng" drawable="s60_notepad" />
+    <item component="com.fenbi.android.servant" drawable="s60_notepad" />
+
+    <!-- ══ 视频播放 ══ -->
+    <item component="com.mxtech.videoplayer.ad" drawable="s60_video_player" />
+    <item component="com.mxtech.videoplayer.pro" drawable="s60_video_player" />
+    <item component="com.ss.android.ugc.aweme.mobile" drawable="s60_video_player" />
+    <item component="com.ss.android.ugc.livelite" drawable="s60_video_player" />
+    <item component="com.bilibili.app.in" drawable="s60_video_player" />
+    <item component="air.tv.douyu.android" drawable="s60_video_player" />
+
+    <!-- ══ 社交通讯 ══ -->
+    <item component="com.tencent.mm" drawable="s60_mms" />
+    <item component="com.tencent.tim" drawable="s60_mms" />
+    <item component="io.github.cctyl.wechat" drawable="s60_mms" />
+    <item component="com.whatsapp" drawable="s60_whatsapp" />
+    <item component="com.whatsapp.w4b" drawable="s60_whatsapp" />
+    <item component="com.google.android.youtube" drawable="s60_youtube" />
+    <item component="com.skype.raider" drawable="s60_skype" />
+    <item component="com.skype.android" drawable="s60_skype" />
+
+    <!-- ══ 阅读 ══ -->
+    <item component="com.google.android.apps.books" drawable="s60_books" />
+    <item component="com.amazon.kindle" drawable="s60_books" />
+    <item component="io.legado.app.release" drawable="s60_books" />
+    <item component="com.iflytek.readassistant" drawable="s60_books" />
+
+    <!-- ══ 远程控制 ══ -->
+    <item component="com.duokan.phone.remotecontroller" drawable="s60_remote_control" />
+    <item component="com.microsoft.rdc.androidx" drawable="s60_remote_control" />
+
+</resources>

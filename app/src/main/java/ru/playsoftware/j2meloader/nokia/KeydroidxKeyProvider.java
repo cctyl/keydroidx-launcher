@@ -83,6 +83,8 @@ public class KeydroidxKeyProvider extends ContentProvider {
 			cursor.addRow(new Object[]{"theme_id", storage.getThemeId()});
 			cursor.addRow(new Object[]{"font_id", storage.getFontId()});
 			cursor.addRow(new Object[]{"font_scale", String.valueOf(KeydroidxSettingsStorage.getFontScale(getContext()))});
+			// 图标包 ID（生态内应用对齐桌面图标外观用；none = 桌面未启用图标包）
+			cursor.addRow(new Object[]{"icon_pack_id", KeydroidxSettingsStorage.getIconPackId(getContext())});
 
 			cursor.setNotificationUri(getContext().getContentResolver(), uri);
 			KeydroidxLog.i("KeyProvider", "成功返回 settings 数据，共 " + cursor.getCount() + " 项");

@@ -20,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 
 /**
  * 通知中心数据仓储（进程内单例）。
@@ -283,6 +284,16 @@ public final class KeydroidxNotificationRepository {
 		return label;
 	}
 
+	/**
+	 * 清空应用图标缓存：切换图标包 / 改单应用覆盖后调用，
+	 * 否则通知条与通知中心会继续显示旧图标（图标本就随图标包变化）。
+	 */
+	public void clearIconCache() {
+		synchronized (iconCache) {
+			iconCache.clear();
+		}
+	}
+
 	private Drawable resolveIcon(Context appCtx, String pkg, String appName) {
 		synchronized (iconCache) {
 			Drawable cached = iconCache.get(pkg);
@@ -290,11 +301,8 @@ public final class KeydroidxNotificationRepository {
 		}
 		Drawable icon = null;
 		try {
-			// 优先 S60 风格图标，与功能表观感一致
-			int resId = KeydroidxS60IconMap.getIcon(pkg, appName);
-			if (resId != 0) {
-				icon = appCtx.getResources().getDrawable(resId);
-			}
+			// 优先图标包解析（单应用覆盖 → 全局图标包），与功能表观感一致；未命中用应用原图标
+			icon = KeydroidxIconResolver.resolvePackIcon(appCtx, pkg, null, appName);
 			if (icon == null) {
 				icon = appCtx.getPackageManager().getApplicationIcon(pkg);
 			}

@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import ru.playsoftware.j2meloader.config.Config;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 import ru.playsoftware.j2meloader.util.MidletStateStore;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
@@ -423,7 +424,9 @@ public final class KeydroidxRecentTasksHelper {
 					CharSequence label = pm.getApplicationLabel(ai);
 					name = label != null ? label.toString() : pkg;
 					try {
-						icon = pm.getApplicationIcon(ai);
+						// 图标包优先（单应用覆盖 → 全局图标包），未命中再用应用自身图标
+						icon = KeydroidxIconResolver.resolvePackIcon(ctx, pkg, null, name);
+						if (icon == null) icon = pm.getApplicationIcon(ai);
 					} catch (Exception ie) {
 						KeydroidxLog.w(TAG, "加载图标失败 " + pkg + ": " + ie.getMessage());
 					}

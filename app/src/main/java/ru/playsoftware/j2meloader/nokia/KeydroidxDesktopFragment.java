@@ -3,6 +3,7 @@ import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxIcons;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -428,9 +429,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		Context c = getContext();
 		if (c == null) return;
 		long loadStart = System.currentTimeMillis();
-		KeydroidxS60IconMap.loadFromDisk(c);
-		long loadElapsed = System.currentTimeMillis() - loadStart;
-		KeydroidxLog.i("Desktop", "S60 图标磁盘缓存加载耗时 " + loadElapsed + "ms");
+		// 图标包映射表后台预热（主线程不解析 XML；完成后回调里再刷新图标）
+		KeydroidxIconResolver.warmUpAsync(c, null);
+		KeydroidxLog.i("Desktop", "图标包预热已触发，耗时 " + (System.currentTimeMillis() - loadStart) + "ms");
 
 		settingsStorage.getShortcutAppsAsync(new KeydroidxSettingsStorage.OnShortcutAppsLoaded() {
 			@Override
@@ -590,12 +591,13 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			}
 		});
 
-		// 冻结角标不依赖 S60 图标扫描，先单独刷一次（后台查 PackageManager）
+		// 冻结角标不依赖图标包解析，先单独刷一次（后台查 PackageManager）
 		refreshShortcutCellsAsync(container, false);
 
 		Context ctx = getContext();
 		if (ctx != null) {
-			KeydroidxS60IconMap.initAsync(ctx, () -> {
+			// 图标包映射表若尚未就绪则后台预热，完成后回主线程补一次图标刷新
+			KeydroidxIconResolver.warmUpAsync(ctx, () -> {
 				if (!isAdded() || getView() == null) return;
 				refreshShortcutCellsAsync(container, true);
 			});
@@ -2037,18 +2039,12 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			if (app.type == ShortcutApp.TYPE_ANDROID) {
 				Intent intent = app.getLaunchIntent();
 				if (intent != null && intent.getComponent() != null) {
-					String pkg = intent.getComponent().getPackageName();
-					int s60Res = KeydroidxS60IconMap.getIcon(pkg, app.label);
-					if (s60Res != 0) {
-						try {
-							Context ctx = getContext();
-							if (ctx != null) {
-								Drawable s60Icon = ContextCompat.getDrawable(ctx, s60Res);
-								if (s60Icon != null) return s60Icon.mutate();
-							}
-						} catch (Exception ignored) {
-							KeydroidxLog.w("Desktop", "load s60 icon failed: " + ignored.getMessage());
-						}
+					Context ctx = getContext();
+					if (ctx != null) {
+						// 图标包命中（单应用覆盖 → 全局图标包）时直接返回，未命中返回 null 走后台加载
+						Drawable d = KeydroidxIconResolver.resolvePackIcon(ctx,
+								intent.getComponent().getPackageName(), intent.getComponent(), app.label);
+						if (d != null) return d;
 					}
 				}
 			}
@@ -2068,21 +2064,21 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				Intent intent = app.getLaunchIntent();
 				if (intent != null && intent.getComponent() != null) {
 					String pkg = intent.getComponent().getPackageName();
-					int s60Res = KeydroidxS60IconMap.getIcon(pkg, app.label);
-					if (s60Res != 0) {
-						try {
-							Context ctx = getContext();
-							if (ctx != null) {
-								Drawable s60Icon = ContextCompat.getDrawable(ctx, s60Res);
-								if (s60Icon != null) return s60Icon.mutate();
-							}
-						} catch (Exception ignored) {
-							KeydroidxLog.w("Desktop", "load s60 icon drawable failed: " + ignored.getMessage());
+					try {
+						Context ctx = getContext();
+						if (ctx != null) {
+							// 图标包优先（单应用覆盖 → 全局图标包）
+							Drawable packIcon = KeydroidxIconResolver.resolvePackIcon(
+									ctx, pkg, intent.getComponent(), app.label);
+							if (packIcon != null) return packIcon;
 						}
+					} catch (Exception ignored) {
+						KeydroidxLog.w("Desktop", "load pack icon failed: " + ignored.getMessage());
 					}
 					try {
 						if (getActivity() != null) {
-							// 冻结（停用）应用的 Activity 图标取不到（NameNotFoundException）→ 统一降级
+							// 未命中图标包 → 应用原图标；冻结（停用）应用取 Activity 图标会抛
+							// NameNotFoundException，统一降级到应用级图标
 							return KeydroidxAppIconCache.loadIconWithFallback(
 									getActivity().getPackageManager(), pkg,
 									intent.getComponent(), null);
@@ -2108,6 +2104,16 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 	 * @param withIcons 是否同时重新加载图标；false 表示只刷新冻结角标
 	 *                  （冻结状态广播后调用，不必重解码图标）
 	 */
+	/**
+	 * 图标包 / 单应用图标覆盖变化后的外部刷新入口（图标包设置页、更换图标流程调用）。
+	 * 冻结角标一并重算，不做图标以外的重建。
+	 */
+	public void onIconPackChanged() {
+		View v = getView();
+		if (v == null) return;
+		refreshShortcutCellsAsync(v.findViewById(R.id.shortcutContainer), true);
+	}
+
 	private void refreshShortcutCellsAsync(final LinearLayout container, final boolean withIcons) {
 		if (container == null || shortcutApps.isEmpty()) return;
 		final Handler mainHandler = new Handler(Looper.getMainLooper());

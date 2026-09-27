@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconPack;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconPackManager;
 
 /**
  * 桌面设置二级分组页。同一套纵向列表结构，按传入的分组 ID 展示不同细项：
@@ -67,6 +69,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 						KeydroidxIcons.ICON_FONT,         // 界面字体（像素字体/自定义字体）
 						KeydroidxIcons.ICON_PALETTE,      // 主题设置
 						KeydroidxIcons.ICON_WALLPAPER,    // 壁纸设置
+						KeydroidxIcons.ICON_PALETTE,      // 图标包
 				};
 			case GROUP_KEYS:
 				return new String[]{
@@ -95,7 +98,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 	private static String[] namesOf(int group) {
 		switch (group) {
 			case GROUP_APPEARANCE:
-				return new String[]{"字体大小", "字体选择", "主题设置", "壁纸设置"};
+				return new String[]{"字体大小", "字体选择", "主题设置", "壁纸设置", "图标包"};
 			case GROUP_KEYS:
 				return new String[]{"按键绑定", "应用向导"};
 			case GROUP_CONTENT:
@@ -222,6 +225,9 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			}
 			return "字体大小：" + label;
 		}
+		if (group == GROUP_APPEARANCE && index == 4) {
+			return "图标包：" + iconPackDisplayName();
+		}
 		if (group == GROUP_SYSTEM && index == 0) {
 			return KeydroidxSettingsStorage.isFileLogEnabled(requireContext())
 					? "日志记录：开启" : "日志记录：关闭";
@@ -248,6 +254,16 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			return text;
 		}
 		return itemNames[index];
+	}
+
+	/** 当前全局图标包展示名（设置项文案；纯内存查询，未知外部包回退为包名） */
+	private String iconPackDisplayName() {
+		String id = KeydroidxSettingsStorage.getIconPackId(requireContext());
+		if (KeydroidxIconPackManager.isNone(id)) {
+			return "不使用图标包";
+		}
+		KeydroidxIconPack pack = KeydroidxIconPackManager.get().findPack(id);
+		return pack != null ? pack.getDisplayName() : id;
 	}
 
 	@Override
@@ -286,6 +302,10 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			case 3:
 				KeydroidxLog.i("SettingsGroup", "进入壁纸设置");
 				host.openFragment(new KeydroidxWallpaperSettingsFragment());
+				return true;
+			case 4:
+				KeydroidxLog.i("SettingsGroup", "进入图标包设置");
+				host.openFragment(KeydroidxIconPackSettingsFragment.newInstance());
 				return true;
 			default:
 				return false;

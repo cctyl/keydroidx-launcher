@@ -23,6 +23,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -805,6 +806,158 @@ public class KeydroidxSettingsStorage {
 			case POWER_INTERCEPTOR_MODE_3:   return "方案3：root";
 			default: return "未知(" + mode + ")";
 		}
+	}
+
+	// ── 图标包与单应用图标覆盖（桌面设置 → 外观与显示 → 图标包；功能表 → 选项 → 更换图标） ──
+
+	/** 默认图标包：内置 S60 */
+	public static final String ICON_PACK_DEFAULT = "s60_builtin";
+
+	private static final String KEY_ICON_PACK_ID = "icon_pack_id";
+	private static final String KEY_ICON_OVERRIDES = "icon_overrides";
+
+	/** 覆盖表内存缓存：{pkg -> [packId, iconName]}；写入即失效，避免网格逐项解析 JSON */
+	private static volatile Map<String, String[]> iconOverrideCache;
+
+	/** 当前全局图标包 ID；未设置或为空时返回默认的内置 S60 包 */
+	public static String getIconPackId(Context ctx) {
+		String id = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getString(KEY_ICON_PACK_ID, ICON_PACK_DEFAULT);
+		return (id == null || id.isEmpty()) ? ICON_PACK_DEFAULT : id;
+	}
+
+	/** 保存全局图标包 ID（{@code none} 表示不使用图标包，全部用应用原图标） */
+	public static void setIconPackId(Context ctx, String packId) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putString(KEY_ICON_PACK_ID, packId).apply();
+		notifySettingsChanged(ctx);
+		KeydroidxLog.i("SettingsStorage", "setIconPackId: " + packId);
+	}
+
+	/** 该应用是否存在单应用图标覆盖 */
+	public static boolean hasIconOverride(Context ctx, String pkg) {
+		return overrides(ctx).containsKey(pkg);
+	}
+
+	/** 单应用覆盖所属的图标包 ID；无覆盖返回 null */
+	public static String getIconOverridePack(Context ctx, String pkg) {
+		String[] v = overrides(ctx).get(pkg);
+		return v != null ? v[0] : null;
+	}
+
+	/** 单应用覆盖的图标名；无覆盖返回 null */
+	public static String getIconOverrideName(Context ctx, String pkg) {
+		String[] v = overrides(ctx).get(pkg);
+		return v != null ? v[1] : null;
+	}
+
+	/** 写入单应用图标覆盖（覆盖同包旧值） */
+	public static void setIconOverride(Context ctx, String pkg, String packId, String iconName) {
+		if (pkg == null || packId == null || iconName == null) return;
+		Map<String, String[]> map = new HashMap<>(overrides(ctx));
+		map.put(pkg, new String[]{packId, iconName});
+		writeOverrides(ctx, map);
+		KeydroidxLog.i("SettingsStorage", "setIconOverride: " + pkg + " → " + packId + "/" + iconName);
+	}
+
+	/**
+	 * 清空<b>全部</b>单应用图标覆盖（图标包设置页的「重置全部图标」）。
+	 * 调用方通常还需把全局图标包一并设为 {@link KeydroidxIconPackManager#PACK_NONE}，
+	 * 才能让所有图标都回到应用原图标。
+	 *
+	 * @return 被清除的覆盖条数（0 表示本来就没有覆盖）
+	 */
+	public static int clearAllIconOverrides(Context ctx) {
+		Map<String, String[]> map = overrides(ctx);
+		if (map.isEmpty()) return 0;
+		int count = map.size();
+		writeOverrides(ctx, new HashMap<>());
+		KeydroidxLog.i("SettingsStorage", "clearAllIconOverrides: 清除 " + count + " 条覆盖");
+		return count;
+	}
+
+	/** 清除单应用图标覆盖（恢复为按全局图标包解析） */
+	public static void clearIconOverride(Context ctx, String pkg) {
+		Map<String, String[]> map = new HashMap<>(overrides(ctx));
+		if (map.remove(pkg) == null) return;
+		writeOverrides(ctx, map);
+		KeydroidxLog.i("SettingsStorage", "clearIconOverride: " + pkg);
+	}
+
+	/** 被单应用覆盖过的包名集合 */
+	public static Set<String> getIconOverriddenPackages(Context ctx) {
+		return new HashSet<>(overrides(ctx).keySet());
+	}
+
+	/**
+	 * 图标外观状态指纹：全局图标包 ID + 全部单应用覆盖的紧凑摘要。
+	 * <p>用途：功能表把「已解析图标」连同指纹一起缓存，指纹变化（切换图标包 / 改覆盖）时
+	 * 缓存自动失效重建，避免返回功能表时仍显示旧图标。</p>
+	 */
+	public static String getIconStateFingerprint(Context ctx) {
+		String packId = getIconPackId(ctx);
+		Map<String, String[]> map = overrides(ctx);
+		if (map.isEmpty()) {
+			return packId;
+		}
+		int hash = 0;
+		for (Map.Entry<String, String[]> e : map.entrySet()) {
+			hash = hash * 31 + e.getKey().hashCode();
+			hash = hash * 31 + e.getValue()[0].hashCode();
+			hash = hash * 31 + e.getValue()[1].hashCode();
+		}
+		return packId + "#" + map.size() + "#" + Integer.toHexString(hash);
+	}
+
+	/** 覆盖表（带进程内缓存，命中为纯内存操作） */
+	private static Map<String, String[]> overrides(Context ctx) {
+		Map<String, String[]> cached = iconOverrideCache;
+		if (cached != null) return cached;
+		synchronized (KeydroidxSettingsStorage.class) {
+			if (iconOverrideCache != null) return iconOverrideCache;
+			Map<String, String[]> map = new HashMap<>();
+			try {
+				String json = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+						.getString(KEY_ICON_OVERRIDES, null);
+				if (json != null && !json.isEmpty()) {
+					JSONObject obj = new JSONObject(json);
+					java.util.Iterator<String> keys = obj.keys();
+					while (keys.hasNext()) {
+						String pkg = keys.next();
+						JSONObject item = obj.optJSONObject(pkg);
+						if (item == null) continue;
+						String pack = item.optString("pack", null);
+						String icon = item.optString("icon", null);
+						if (pack == null || pack.isEmpty() || icon == null || icon.isEmpty()) continue;
+						map.put(pkg, new String[]{pack, icon});
+					}
+				}
+			} catch (Exception e) {
+				// 历史脏数据：忽略整表，退化为「无覆盖」而不是崩溃
+				KeydroidxLog.w("SettingsStorage", "icon_overrides 解析失败: " + e.getMessage());
+			}
+			map = java.util.Collections.unmodifiableMap(map);
+			iconOverrideCache = map;
+			return map;
+		}
+	}
+
+	private static void writeOverrides(Context ctx, Map<String, String[]> map) {
+		JSONObject obj = new JSONObject();
+		for (Map.Entry<String, String[]> e : map.entrySet()) {
+			try {
+				JSONObject item = new JSONObject();
+				item.put("pack", e.getValue()[0]);
+				item.put("icon", e.getValue()[1]);
+				obj.put(e.getKey(), item);
+			} catch (JSONException ex) {
+				KeydroidxLog.e("SettingsStorage", "序列化图标覆盖失败: " + e.getKey(), ex);
+			}
+		}
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putString(KEY_ICON_OVERRIDES, obj.toString()).apply();
+		iconOverrideCache = null;
+		notifySettingsChanged(ctx);
 	}
 
 	// ── 主题设置 ──

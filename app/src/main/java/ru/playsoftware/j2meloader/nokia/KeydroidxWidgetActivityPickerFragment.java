@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Set;
 
 import ru.playsoftware.j2meloader.R;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 
 /**
  * 桌面组件设置 → 添加Activity快捷 → 步骤2：选择 Activity。
@@ -235,7 +236,9 @@ public class KeydroidxWidgetActivityPickerFragment extends KeydroidxPageFragment
 
 				Drawable icon = null;
 				try {
-					icon = pm.getApplicationIcon(packageName);
+					// 图标包优先（单应用覆盖 → 全局图标包），未命中再用应用自身图标
+					icon = KeydroidxIconResolver.resolvePackIcon(requireContext(), packageName, null, label);
+					if (icon == null) icon = pm.getApplicationIcon(packageName);
 				} catch (Exception e) {
 					KeydroidxLog.w(TAG, "加载应用图标失败: " + packageName);
 				}

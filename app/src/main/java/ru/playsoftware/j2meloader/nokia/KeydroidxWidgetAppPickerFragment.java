@@ -50,6 +50,7 @@ import ru.playsoftware.j2meloader.applist.AppItem;
 import ru.playsoftware.j2meloader.appsdb.AppDatabase;
 import ru.playsoftware.j2meloader.appsdb.AppItemDao;
 import ru.playsoftware.j2meloader.config.Config;
+import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
 
 /**
  * 桌面组件设置 → 添加组件 → 应用选择页（应用类组件添加/编辑 + Activity快捷选应用）。
@@ -371,7 +372,14 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 			if (!seenPkgs.add(ai.packageName)) continue;
 			CharSequence labelCs = ri.loadLabel(pm);
 			String label = (labelCs != null && labelCs.length() > 0) ? labelCs.toString() : ai.name;
-			Drawable icon = ri.loadIcon(pm);
+			// 图标包优先（单应用覆盖 → 全局图标包），未命中再用应用自身图标
+			Drawable icon = null;
+			try {
+				icon = KeydroidxIconResolver.resolvePackIcon(requireContext(), ai.packageName, null, label);
+			} catch (Exception ignored) {
+				KeydroidxLog.w(TAG, "解析图标包图标失败: " + ignored.getMessage());
+			}
+			if (icon == null) icon = ri.loadIcon(pm);
 			String key = ai.packageName + "/" + ai.name;
 			allApps.add(new AppEntry(label, icon, key));
 		}
