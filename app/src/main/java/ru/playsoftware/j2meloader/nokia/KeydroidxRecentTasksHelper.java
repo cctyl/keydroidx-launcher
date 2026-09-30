@@ -196,7 +196,13 @@ public final class KeydroidxRecentTasksHelper {
 			KeydroidxLog.w(TAG, "枚举最近任务失败（降级为空列表）: " + e.getMessage());
 		}
 
-		buildTasks(ctx, cands, out, mode, loadUi);
+		try {
+			buildTasks(ctx, cands, out, mode, loadUi);
+		} catch (Exception e) {
+			// 兜底：展锐平台 CTA 权限服务偶发在 system_server 内 NPE，
+			// 会以 RuntimeException 经 Binder 抛回调用方，绝不能让它杀死后台线程
+			KeydroidxLog.w(TAG, "构建最近任务失败（降级为部分结果）: " + e);
+		}
 
 		// 挂机 jar 固定置顶：它是唯一"确定还活着"的条目，且自身进程可枚举、不依赖任何特权
 		RecentTask midlet = buildMidletTask(ctx, loadUi);
@@ -393,9 +399,9 @@ public final class KeydroidxRecentTasksHelper {
 		Set<String> alive = mode == MODE_REAL_TASK
 				? KeydroidxBgManagerHelper.getAlivePackages(ctx) : null;
 
-		for (Map.Entry<String, Cand> e : unique.entrySet()) {
-			String pkg = e.getKey();
-			Cand c = e.getValue();
+		for (Map.Entry<String, Cand> entry : unique.entrySet()) {
+			String pkg = entry.getKey();
+			Cand c = entry.getValue();
 			if (alive != null) {
 				if (!alive.contains(pkg)) {
 					// 进程已死：只有「本应用清的」才隐去；系统回收的照样显示
@@ -432,9 +438,14 @@ public final class KeydroidxRecentTasksHelper {
 					}
 				}
 				out.add(new RecentTask(pkg, name, pkg, c.taskId, c.agoMs, icon));
-			} catch (PackageManager.NameNotFoundException nfe) {
+				} catch (PackageManager.NameNotFoundException nfe) {
 				KeydroidxLog.w(TAG, "包不可用，跳过: " + pkg);
-			}
+				} catch (Exception e) {
+				// 单包查询失败只跳过该包：展锐 ROM 的 CTA 服务偶发在 system_server 内
+				// NPE 后以 RuntimeException 抛回（queryIntentActivities 路径），
+				// 不能让它穿透到后台线程导致整个进程崩溃
+				KeydroidxLog.w(TAG, "查询任务条目失败，跳过 " + pkg + ": " + e);
+				}
 			if (out.size() >= MAX_TASKS) break;
 		}
 	}
