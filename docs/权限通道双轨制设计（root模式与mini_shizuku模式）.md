@@ -35,7 +35,7 @@
 | 2 | `nativeDropToShell` 降权拉起 shell 服务端的 exec 设计有误（嵌套 exec 复杂且无必要） | **整节砍掉**（原 v1 §5）：有 root 用户直接用 root 模式，mini_shizuku 模式只保留电脑 adb 激活 |
 | 3 | `nativeSetSuppGroups` 是 JNI 方法，v1 未定义库加载时序 | **补充**：`prepareLibrary + loadLibrary` 必须在 `AdbProcess.main()` 最前完成，补组在任何网络操作之前调用；部署失败有明确降级行为（§4.2.1） |
 | 4 | 模式选择 ≠ 服务真实身份（旧服务残留、激活失败会造成 UI 与实际不符） | **新增 WHOAMI 身份校验**：PING 扩展返回服务端 uid，UI 校验"所选模式 = 服务端真实 uid"（§3.4） |
-| 5 | root 服务端泄露 K = 任意 root 命令执行（`ShellUtil.execute` 是通用 exec） | **root 模式服务端 EXEC 白名单**：只接受冻结/解冻/注入等预定义模板命令，包名 `^[a-zA-Z0-9_.]+$`（§6） |
+| 5 | root 服务端泄露 K = 任意 root 命令执行（`ShellUtil.execute` 是通用 exec） | **root 模式服务端 EXEC 白名单**：只接受预定义模板命令（v2 初稿只列了冻结/解冻/注入；**2026-09-30 已扩为全量命令模板表**，见 §6.2） |
 | 6 | v1 步骤 0 要写 app_process 测试程序，成本高 | **简化**：独立 ndk-build 测试二进制（~20 行 C）直接实测补组（§7 步骤 0） |
 
 **用户拍板的 4 项决策**：
@@ -166,7 +166,7 @@ pm list packages -d | grep keymappermouse  → 空（没进 disabled 列表）
 4. **职责清晰**：两种模式互斥，命令执行身份唯一、可预测；模式选择由用户在设置页做出。冻结/解冻的路由是**固定两级**（服务端 → libsu），不是任意操作的动态降级链。
 5. **复用最大化**：root 模式复用现有 mini_shizuku 服务端 + 拦截器整套代码（服务端以 root 身份跑即可），不另起一套常驻承载。
 6. **安全边界**：
-   - root 模式服务端 **EXEC 白名单**：root 服务端一旦泄露 K，等价于"任意 root 命令执行"，因此服务端只接受预定义模板命令（冻结/解冻/注入等），包名参数 `^[a-zA-Z0-9_.]+$`，见 §6。
+   - root 模式服务端 **EXEC 白名单**：root 服务端一旦泄露 K，等价于"任意 root 命令执行"，因此服务端只接受 §6.2 **全量登记**的命令模板（命令骨架 + 受限参数占位），见 §6。
    - libsu 兜底路径在 App 进程内直执，不走 TCP、不需要 K 鉴权，靠"app 已获 root 授权"本身；命令同样走模板替换 + 白名单。
 
 > **v1 矛盾消除说明**：v1 目标 6 说"root 直执不走 TCP"，与 §3.2"所有命令走 TCP"矛盾。v2 明确为：**常驻能力（拦截、注入快路径）始终走服务端；一次性命令（冻结/解冻）服务端优先、libsu 兜底**。libsu 是风险隔离与可达性兜底，不是能力缺失的补偿（root 身份服务端在 4.4 能冻结，实测已验证）。
@@ -491,24 +491,111 @@ freeze(pkg) / unfreeze(pkg):
 
 root 服务端泄露 K（鉴权密钥）的后果 = **任意 root 命令执行**：当前 `MsgProcess.dispatch()` → `ShellUtil.execute()` 是通用 exec，任何拿到 K 的本地进程都能让 root 服务端跑任意 shell 命令。shell 身份服务端泄露 K 的爆炸半径有限（shell 权限），root 身份不是。
 
-### 6.2 白名单设计
+### 6.2 白名单设计（✅ 已实施，2026-09-30 修订为全量表）
 
-root 服务端只接受**预定义模板命令**（服务端侧硬编码命令骨架 + 参数占位）：
+**落地形态**：白名单是**服务端侧的一张正则模板表**（`MsgProcess.ALLOWED_TEMPLATES`）。
+客户端仍按原样发送完整 shell 串（`<K>|EXEC_OUT|<cmd>`），服务端把命令按 `;` / `&&` / `||`
+**拆段**，逐段做**整串正则全匹配**，任一段命中不了任何模板 → 整条命令拒绝。
 
-| 模板 | 参数约束 |
-|---|---|
-| `force-stop:` | 包名 `^[a-zA-Z0-9_.]+$` |
-| `freeze:` / `unfreeze:` | 包名同上 |
-| 注入类（tap/swipe，进程内直写 uinput） | 数值范围校验 |
-| `ping` / `whoami` | 无参数 |
+> 与 v2 初稿的差异：初稿写的是 `force-stop:` / `freeze:` 这种「命名命令 + 参数占位」，
+> 落地采用等价但改动更小的「完整 shell 串 + 整串正则」——安全性相同（模板里只允许出现具体
+> 命令骨架与受限参数，反引号 / `$(` / 管道 / 重定向等 shell 语法一律匹配不上），且无需改动
+> 已有行协议与客户端。
+
+**参数占位符**：
+
+| 占位符 | 正则 | 用于 |
+|---|---|---|
+| `PKG` | `[a-zA-Z0-9_.]+` | 包名（杜绝包名参数注入） |
+| `INT` | `-?[0-9]+` | taskId / 坐标 / 时长 |
+| `COMPONENT` | `[a-zA-Z0-9_.$-]+/[a-zA-Z0-9_.$-]+` | QS Tile 的 `ComponentName`（`pkg/.Cls`、`pkg/Cls$Inner`） |
+
+**模板清单（与 `ALLOWED_TEMPLATES` 一一对应，新增能力必须同步登记，见 §6.3）**：
+
+| # | 模板 | 由谁使用 |
+|---|---|---|
+| 1 | `dumpsys activity recents` | 最近任务（`KeydroidxRecentTasksHelper`） |
+| 2 | `dumpsys activity activities` | 最近任务（recents 无输出时的兜底） |
+| 3 | `ps -A` | 后台管理：存活应用枚举（`KeydroidxBgManagerHelper`） |
+| 4 | `am force-stop <PKG>` | 清理后台 / 冻结前置（也是批量拼接的组成段） |
+| 5 | `am stack remove <INT>` | 最近任务：抹掉任务卡片（`am force-stop` 杀进程后任务记录仍在） |
+| 6 | `pm disable-user --user 0 <PKG>` | 冻结（7.0+） |
+| 7 | `pm disable <PKG>` | 冻结（4.x，实测 `enabled=2` 生效） |
+| 8 | `pm enable <PKG>` | 解冻 |
+| 9 | `pm unhide <PKG>` | 解冻（7.0+，覆盖曾被 hide 的包） |
+| 10 | `svc wifi (enable\|disable)` | 快捷开关：WiFi |
+| 11 | `svc data (enable\|disable)` | 快捷开关：数据网络 |
+| 12 | `svc bluetooth (enable\|disable)` | 快捷开关：蓝牙 |
+| 13 | `cmd bluetooth_manager (enable\|disable)` | 快捷开关：蓝牙（第二条通道） |
+| 14 | `cmd location set-location-enabled (true\|false)` | 快捷开关：定位（API 24+） |
+| 15 | `cmd power set-mode [01]` | 快捷开关：省电模式 |
+| 16 | `settings put global (mobile_data\|airplane_mode_on\|low_power) [01]` | 快捷开关：数据 / 飞行 / 省电 |
+| 17 | `settings put system accelerometer_rotation [01]` | 快捷开关：自动旋转 |
+| 18 | `settings put system screen_brightness_mode [01]` | 快捷开关：亮度（自动档） |
+| 19 | `settings put system screen_brightness [0-9]{1,3}` | 快捷开关：亮度（档位） |
+| 20 | `settings put secure location_mode [0-3]` | 快捷开关：定位 |
+| 21 | `settings put secure location_providers_allowed "[a-zA-Z_,]*"` | 快捷开关：定位（provider 列表，可空串） |
+| 22 | `am broadcast -a android.intent.action.AIRPLANE_MODE --ez state (true\|false)` | 快捷开关：飞行模式广播 |
+| 23 | `cmd statusbar expand-settings` | 桌面「快捷开关」组件（展开状态栏磁贴面板） |
+| 24 | `cmd statusbar click-tile <COMPONENT>` | 桌面「快捷开关」组件（点击磁贴） |
+| 25 | `sleep [0-9]{1,3}(\.[0-9]{1,3})?` | 磁贴复合命令里 expand 之后的等待 |
+| 26 | `input tap <INT> <INT>` | 注入快路径未接管时的 shell 回退 |
+| 27 | `input swipe <INT> <INT> <INT> <INT> [<INT>]` | 同上（焦点框架手势也走这里） |
+| 28 | `input keyevent <INT>` | 同上 |
+| 29 | `reboot( -p\| recovery\| bootloader)?` | 电源：重启 / 关机 / Recovery / Fastboot |
+| 30 | `setprop sys.powerctl (shutdown\|reboot(,recovery\|,bootloader)?)` | 电源：部分 ROM `reboot` 不接受参数时的回退 |
 
 - 包名参数服务端侧**再校验一次**（不信任客户端），不匹配直接拒绝并记日志。
-- root 服务端收到白名单外的 `EXEC|`/`EXEC_OUT|` → 拒绝执行 + `KeydroidxLog.w` 记录来源。
+- root 服务端收到白名单外的 `EXEC|`/`EXEC_OUT|` → 拒绝执行 + `Log.w` 记录来源。
 - mini_shizuku（shell）服务端暂不加白名单（爆炸半径有限，保持兼容），后续可统一。
+- `PING` / `WHOAMI` / `INTERCEPTOR_START` / `INTERCEPTOR_STOP` / `PAGE_STATE|` / `SERVER_STOP`
+  是协议命令（非 shell 命令），在 `MsgProcess.dispatch()` 前段直接处理，不走本表。
+- 校验实现：`MsgProcess.isAllowedShellCommand()`（拆分 + 逐段）+ `isAllowedSegment()`（逐个模板全匹配）。
 
-### 6.3 实施归属
+### 6.3 维护契约（⚠️ 新增/改动走该通道的功能前必读）
 
-白名单属**服务端改动**，与补组、WHOAMI 同属步骤 0 通过后的下一阶段，本轮只定设计。
+> **任何要经 mini_shizuku 下发的 shell 命令，都必须在 `ALLOWED_TEMPLATES` 里登记一条模板。**
+
+漏登记不会抛任何异常，且**只在 root 模式下失效**（shell 服务端不加白名单）——表现为
+「点了没反应 / 列表为空 / 开关不生效」，而切到 mini_shizuku（adb）模式又一切正常：
+
+- 客户端 `Shizuku.exec()` 是**即发即忘**（连上、写出、`return true`），服务端拒绝时回的那行
+  `ERR:not allowed` 没有任何人读；
+- 于是既没有客户端日志、也没有 UI 提示，**唯一的现场**是服务端 logcat 里的一行警告。
+
+**排查入口**（命中即白名单缺口，不是服务端没起来、也不是网络问题）：
+
+```
+adb logcat -d -v time | grep "rejected by whitelist"
+# 或
+adb logcat -s MiniShizuku:* | grep "rejected by whitelist"
+```
+
+#### 踩坑记录：2026-09-30「root 模式最近任务显示为空」
+
+- **现象**：root 模式下最近任务页恒为空（徽标仍显示「实时」），切到 adb 模式后数量正常。
+- **根因**：白名单按 §6.2 初稿落地时，只登记了「本轮要动的冻结/解冻那条线」（`am force-stop`
+  + 4 个 `pm`），而最近任务 / 后台管理要用的 `dumpsys activity recents`、
+  `dumpsys activity activities`、`ps -A` 与清任务的 `am stack remove` 从未登记 → 服务端整条拒绝；
+  `KeydroidxRecentTasksHelper` 拿到 `null` 后降级为空列表，而 `getMode()` 因为「服务端在线」
+  仍返回 `MODE_REAL_TASK`，UI 于是渲染成「实时 + 暂无最近任务」，把真因盖住了。
+- **日志实证**：
+  ```
+  W/MiniShizuku(27675): root server: command rejected by whitelist: ps -A
+  W/MiniShizuku(27675): root server: command rejected by whitelist: dumpsys activity recents
+  I/RecentTasks(26940): 最近任务枚举完成: 条目=0
+  ```
+  （pid 27675 = root 服务端 uid 0；同一时刻 adb 服务端 uid 2000 不受影响，故「切 adb 就好」。）
+- **教训**：白名单是**按新增能力增量登记**的，但它的生效范围是**整条通道**——桌面上任何
+  **既有的**、复用 `Shizuku.exec()` 的功能，都会在 root 模式下被一并挡掉。因此 §6.2 的表必须是
+  **全量清单**：新增或改动任何走该通道的命令时同步补表，并在设备上按 §6.3 的排查入口自查一次。
+- **修复**：`ALLOWED_TEMPLATES` 由 5 条扩到 30 条（覆盖全生态真实命令）；分段符由 `" ; "`
+  改为 `;` / `&&` / `||`，兼容 `am force-stop a;am force-stop b;` 这类批量拼接形态。
+
+### 6.4 实施归属（已实施）
+
+白名单与补组、WHOAMI 同属「步骤 0 通过后的下一阶段」，已于 2026-09-26 随**步骤 2** 落地；
+2026-09-30 又按 §6.3 的踩坑记录扩为**全量模板表**。文件：`mini_shizuku/.../server/MsgProcess.java`。
 
 ---
 
@@ -559,6 +646,7 @@ int main() {
 - root 服务端 EXEC 白名单（§6）。
 - WHOAMI 独立无 K 命令返回 uid，客户端身份校验（§3.4）。
 - 激活链路实测通过：`su -cn u:r:shell:s0` 拉起 app_process（root uid 保留）+ 脚本 cat 部署 so + 补组 + K 鉴权 + WHOAMI=0 + 白名单拒绝任意命令/放行冻结解冻模板（详见 §4.3 实施补充）。
+- 后续修订（2026-09-30）：白名单**扩为全量命令模板表**——初稿只登记冻结/解冻那条线，导致最近任务/后台管理在 root 模式下被整条拒绝，详见 §6.2 / §6.3 踩坑记录。
 
 > **实现备注（uid 自检替代 -Dapp.privMode）**：服务端以 `Process.myUid()==0` 自检身份决定是否补组，无需激活脚本注入 `-Dapp.privMode=root|shizuku`——服务端身份在进程启动时即已确定，自检比外部注入更不容易失真，且 shell（adb）激活路径零改动。原 `-Dapp.privMode` 设想作废。
 
@@ -575,7 +663,7 @@ int main() {
 | 风险 | 等级 | 对策 |
 |---|---|---|
 | 步骤 0 验证不通过（补组后 socket 仍 EACCES 且 SELinux 拦） | 中 | 激活脚本 `su -cn u:r:shell:s0` 切 context 兜底；再不行退 LocalSocket 迁移（仅文档备选） |
-| root 服务端 K 泄露 = 任意 root 执行 | 高 | §6 EXEC 白名单 + 包名正则 + 服务端侧二次校验；下一阶段随补组一起落地 |
+| root 服务端 K 泄露 = 任意 root 执行 | 高 | §6 EXEC 白名单 + 参数正则 + 服务端侧二次校验；已落地，**模板表须为全量**（§6.2/§6.3） |
 | libsu 兜底被滥用为任意命令通道 | 中 | libsu 路径同样只走模板替换 + 白名单，不接受任意拼接 |
 | root 直执参数注入（`pm disable $(rm -rf ...)`） | 中 | 同上：白名单 + 模板替换，双通道同规 |
 | 成功判据逐命令定义不全 | 中 | §5.4 判据表 + `isAppFrozen()` 真实状态为准；新操作落地时先实测补表 |
@@ -615,7 +703,7 @@ int main() {
 | `nokia/KeydroidxFreezeManager.java` | `executeFreeze`/`executeUnfreeze` 改 `execWithOutput` + 真实状态校验 + 版本分流模板 + libsu 兜底路由 | 本轮 |
 | `mini_shizuku/server/AdbProcess.java` | `main` 头部 `prepareLibrary + loadLibrary` + 调 `nativeSetSuppGroups`（root 模式） | 下一阶段 |
 | `mini_shizuku/server/`（native） | 新增 `nativeSetSuppGroups(int[])` JNI | 下一阶段 |
-| `mini_shizuku/server/MsgProcess.java` | root 身份下 EXEC 白名单 + WHOAMI 响应 | 下一阶段 |
+| `mini_shizuku/server/MsgProcess.java` | root 身份下 EXEC 白名单（2026-09-30 扩为全量模板表，见 §6.2）+ WHOAMI 响应 | ✅ 已实施 |
 | `nokia/ShizukuRootFragment.java` | root 模式激活入口（复用现有逻辑） | 下一阶段 |
 | `nokia/KeydroidxSettingsStorage.java` | 新增"授权模式"偏好（root / shizuku，默认 shizuku） | 下一阶段 |
 | 设置页 Fragment | 新增"授权模式"单选项 + 状态展示拆两行 | 下一阶段 |

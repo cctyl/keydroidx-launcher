@@ -40,9 +40,88 @@ public class MsgProcess implements Runnable {
      * 以 myUid 自检为准，与客户端"模式选择"无关。
      */
     private static final boolean ROOT_SERVER = android.os.Process.myUid() == 0;
-    /** 包名白名单：只允许字母/数字/下划线/点，杜绝包名参数注入。 */
-    private static final java.util.regex.Pattern PKG_PATTERN =
-            java.util.regex.Pattern.compile("^[a-zA-Z0-9_.]+$");
+    // ==================== root 服务端 shell 命令白名单 ====================
+    //
+    // 为什么必须做：root 服务端（app_process, uid 0）一旦泄露 K，等价于「任意 root 命令
+    // 执行」，因此只放行下面登记过的命令骨架（见 docs/权限通道双轨制设计 §6）。
+    //
+    // ⚠️ 维护契约（新增能力前必读）：任何要经 mini_shizuku 下发的 shell 命令，都必须在这里
+    //    登记一条模板；漏登记不会抛任何异常，只在 root 模式下被服务端静默拒绝——客户端
+    //    `Shizuku.exec()` 是「即发即忘」（写成功即返回 true），表现为「点了没反应/列表为空」。
+    //    2026-09「root 模式最近任务显示为空」的根因就是 dumpsys / ps -A 没登记。
+    //    排查入口：`adb logcat -s MiniShizuku:* | grep "rejected by whitelist"`。
+    //
+    // 参数注入防线：模板 = 具体命令骨架 + 受限参数（包名/整数/枚举/组件），因此分段内一旦
+    // 出现反引号、$(、管道、重定向、注入用的引号等 shell 语法，就匹配不上任何模板 → 拒绝。
+
+    /** 包名参数：只允许字母/数字/下划线/点，杜绝包名参数注入。 */
+    private static final String P_PKG = "[a-zA-Z0-9_.]+";
+    /** 整数参数（taskId / 坐标 / 时长等），允许负号。 */
+    private static final String P_INT = "-?[0-9]+";
+    /** 组件参数：{@code pkg/.Cls} 或 {@code pkg/Cls$Inner}（QS Tile 的 ComponentName 形态）。 */
+    private static final String P_COMPONENT = "[a-zA-Z0-9_.$-]+/[a-zA-Z0-9_.$-]+";
+
+    /**
+     * 白名单模板表：命令被 {@code ;} / {@code &&} / {@code ||} 拆段后，
+     * 每一段都必须<b>完整匹配</b>其中一条。
+     */
+    private static final String[] ALLOWED_TEMPLATES = {
+            // —— 只读查询 ——
+            "dumpsys activity recents",                                   // 最近任务
+            "dumpsys activity activities",                                // 最近任务（recents 无输出时的兜底）
+            "ps -A",                                                      // 后台管理：存活应用枚举
+            // —— 进程 / 任务 ——
+            "am force-stop " + P_PKG,
+            "am stack remove " + P_INT,                                   // 最近任务：抹掉任务卡片
+            // —— 冻结 / 解冻（KeydroidxFreezeManager）——
+            "pm disable-user --user 0 " + P_PKG,
+            "pm disable " + P_PKG,
+            "pm enable " + P_PKG,
+            "pm unhide " + P_PKG,
+            // —— 快捷开关（KeydroidxQuickToggleManager）——
+            "svc wifi (?:enable|disable)",
+            "svc data (?:enable|disable)",
+            "svc bluetooth (?:enable|disable)",
+            "cmd bluetooth_manager (?:enable|disable)",
+            "cmd location set-location-enabled (?:true|false)",
+            "cmd power set-mode [01]",
+            "settings put global (?:mobile_data|airplane_mode_on|low_power) [01]",
+            "settings put system accelerometer_rotation [01]",
+            "settings put system screen_brightness_mode [01]",
+            "settings put system screen_brightness [0-9]{1,3}",
+            "settings put secure location_mode [0-3]",
+            "settings put secure location_providers_allowed \"[a-zA-Z_,]*\"",
+            "am broadcast -a android\\.intent\\.action\\.AIRPLANE_MODE --ez state (?:true|false)",
+            // —— 状态栏磁贴（桌面「快捷开关」组件）——
+            "cmd statusbar expand-settings",
+            "cmd statusbar click-tile " + P_COMPONENT,
+            "sleep [0-9]{1,3}(?:\\.[0-9]{1,3})?",                         // 复合命令里的等待（expand-settings 之后）
+            // —— 输入注入（InputInjector 快路径未接管时的 shell 回退）——
+            "input tap " + P_INT + " " + P_INT,
+            "input swipe " + P_INT + " " + P_INT + " " + P_INT + " " + P_INT + "(?: " + P_INT + ")?",
+            "input keyevent " + P_INT,
+            // —— 电源（KeydroidxQuickToggleManager.execPowerCommand）——
+            "reboot(?: -p| recovery| bootloader)?",
+            "setprop sys\\.powerctl (?:shutdown|reboot(?:,recovery|,bootloader)?)",
+    };
+
+    /** 编译后的模板（静态初始化一次，避免每条命令重复编译正则）。 */
+    private static final java.util.regex.Pattern[] ALLOWED_SEGMENTS = compileTemplates();
+
+    /**
+     * 复合命令分隔符：{@code ;} / {@code &&} / {@code ||}。
+     * 单个 {@code |} 是管道、不在此列——它会留在分段里，从而匹配不上任何模板被拒绝。
+     */
+    private static final java.util.regex.Pattern SEGMENT_SEPARATOR =
+            java.util.regex.Pattern.compile("\\s*(?:;|&&|\\|\\|)\\s*");
+
+    private static java.util.regex.Pattern[] compileTemplates() {
+        java.util.regex.Pattern[] patterns = new java.util.regex.Pattern[ALLOWED_TEMPLATES.length];
+        for (int i = 0; i < ALLOWED_TEMPLATES.length; i++) {
+            patterns[i] = java.util.regex.Pattern.compile(ALLOWED_TEMPLATES[i]);
+        }
+        return patterns;
+    }
 
     private final Socket socket;
 
@@ -126,6 +205,7 @@ public class MsgProcess implements Runnable {
             if (!InputInjector.handle(cmd)) {
                 // root 服务端：InputInjector 处理不了的命令必须过白名单才允许以 root 身份执行，
                 // 否则 K 泄露 = 任意 root 命令执行。shell 服务端爆炸半径有限，保持原行为。
+                // 注意：被拒时只回 ERR（客户端 exec() 即发即忘不会读），真实表现是「静默无效果」。
                 if (ROOT_SERVER && !isAllowedShellCommand(cmd)) {
                     Log.w(TAG, "root server: command rejected by whitelist: " + cmd);
                     reply("ERR:not allowed");
@@ -214,7 +294,7 @@ public class MsgProcess implements Runnable {
      */
     private void handleExecWithOutput(String command) {
         String cmd = command.trim();
-        // root 服务端白名单：只放行冻结/解冻/force-stop 预定义模板（见 isAllowedShellCommand），
+        // root 服务端白名单：只放行 ALLOWED_TEMPLATES 登记过的命令骨架，
         // 防止 K 泄露被升级为任意 root 命令执行。shell 服务端不加白名单，行为不变。
         if (ROOT_SERVER && !isAllowedShellCommand(cmd)) {
             Log.w(TAG, "root server: command rejected by whitelist: " + cmd);
@@ -233,36 +313,36 @@ public class MsgProcess implements Runnable {
     }
 
     /**
-     * root 服务端 shell 命令白名单：整条命令按 " ; " 拆段后，每一段必须完整匹配
-     * 预定义模板之一且包名过 {@link #PKG_PATTERN}，与客户端冻结/解冻命令模板严格对应：
-     * <pre>
-     *   am force-stop &lt;pkg&gt; | pm disable &lt;pkg&gt; | pm disable-user --user 0 &lt;pkg&gt;
-     *   pm enable &lt;pkg&gt;      | pm unhide &lt;pkg&gt;
-     * </pre>
-     * 任何白名单外的段（如管道、反引号、任意 shell 语法）都会导致整条命令被拒绝。
+     * root 服务端 shell 命令白名单：整条命令按 {@code ;} / {@code &&} / {@code ||} 拆段
+     * （同时兼容 {@code "a ; b"} 与批量拼接的 {@code "a;b;"} 两种形态），
+     * 每一段必须完整匹配 {@link #ALLOWED_TEMPLATES} 之一。
+     * <p>
+     * 任何白名单外的段（管道、重定向、反引号、任意 shell 语法）都会导致整条命令被拒绝。
      */
     private static boolean isAllowedShellCommand(String cmd) {
-        for (String segment : cmd.split(" ; ")) {
-            if (!isAllowedSegment(segment.trim())) {
+        String[] segments = SEGMENT_SEPARATOR.split(cmd.trim());
+        boolean hasSegment = false;
+        for (String segment : segments) {
+            String s = segment.trim();
+            if (s.isEmpty()) {
+                // 批量拼接命令（"am force-stop a;am force-stop b;"）会切出空段，跳过
+                continue;
+            }
+            hasSegment = true;
+            if (!isAllowedSegment(s)) {
                 return false;
             }
         }
-        return true;
+        return hasSegment;
     }
 
+    /** 单段命令是否完整命中白名单模板。 */
     private static boolean isAllowedSegment(String segment) {
-        String pkg = null;
-        if (segment.startsWith("am force-stop ")) {
-            pkg = segment.substring("am force-stop ".length());
-        } else if (segment.startsWith("pm disable-user --user 0 ")) {
-            pkg = segment.substring("pm disable-user --user 0 ".length());
-        } else if (segment.startsWith("pm disable ")) {
-            pkg = segment.substring("pm disable ".length());
-        } else if (segment.startsWith("pm enable ")) {
-            pkg = segment.substring("pm enable ".length());
-        } else if (segment.startsWith("pm unhide ")) {
-            pkg = segment.substring("pm unhide ".length());
+        for (java.util.regex.Pattern pattern : ALLOWED_SEGMENTS) {
+            if (pattern.matcher(segment).matches()) {
+                return true;
+            }
         }
-        return pkg != null && PKG_PATTERN.matcher(pkg).matches();
+        return false;
     }
 }
