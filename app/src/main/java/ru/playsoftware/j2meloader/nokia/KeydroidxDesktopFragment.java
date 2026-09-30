@@ -1763,7 +1763,13 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 							if (retryWithLaunchIntent(ctx, pkg, item.label)) {
 								return;
 							}
-							KeydroidxLog.e("Desktop", "打开应用失败: " + pkgAndCls, e);
+							if (e instanceof android.content.ActivityNotFoundException) {
+								KeydroidxLog.w("Desktop", "打开应用未找到或已被卸载: " + pkgAndCls, e);
+								Toast.makeText(ctx, "未找到应用「" + item.label + "」，可能已被卸载", Toast.LENGTH_SHORT).show();
+							} else {
+								KeydroidxLog.e("Desktop", "打开应用失败: " + pkgAndCls, e);
+								Toast.makeText(ctx, "打开应用失败: " + item.label, Toast.LENGTH_SHORT).show();
+							}
 						}
 					}
 				});
@@ -1894,7 +1900,8 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			if (retryWithLaunchIntent(ctx, MUSIC_PKG, "音乐")) {
 				return;
 			}
-			KeydroidxLog.e("Desktop", "打开音乐播放器失败", e);
+			// 未安装 / 被停用属外部环境问题（Toast 文案本身就是「未安装」）：用 w，不烧上报配额
+			KeydroidxLog.w("Desktop", "打开音乐播放器失败: " + e.getMessage(), e);
 			Toast.makeText(ctx, "未安装音乐播放器", Toast.LENGTH_SHORT).show();
 		}
 	}
@@ -1909,7 +1916,8 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			KeydroidxLog.i("Desktop", "兜底启动成功 " + label + " -> " + retry.getComponent());
 			return true;
 		} catch (Exception e2) {
-			KeydroidxLog.e("Desktop", "兜底启动也失败 " + label, e2);
+			// 兜底路径失败同样是外部应用被卸载/停用的环境问题：用 w，不触发自动上报
+			KeydroidxLog.w("Desktop", "兜底启动也失败 " + label + ": " + e2.getMessage(), e2);
 			return false;
 		}
 	}
@@ -2250,16 +2258,32 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 						// 兜底：缓存的组件可能因应用更新/停用而失效，
 						// 重新解析当前「启用」入口再试，成功则修正存储的 intentUri
 						if (pkg != null) {
-							Intent retry = ctx.getPackageManager().getLaunchIntentForPackage(pkg);
+							Intent retry = null;
+							try {
+								retry = ctx.getPackageManager().getLaunchIntentForPackage(pkg);
+							} catch (Exception pmEx) {
+								KeydroidxLog.w("Desktop", "快捷栏应用查询启动入口失败(" + app.label + "): " + pmEx.getMessage());
+							}
 							if (retry != null) {
 								retry.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-								startActivity(retry);
-								app.intentUri = retry.toUri(Intent.URI_INTENT_SCHEME);
-								settingsStorage.setShortcutApps(new ArrayList<>(shortcutApps));
-								KeydroidxLog.i("Desktop", "快捷栏应用兜底启动成功并修正缓存: "
-										+ app.label + " -> " + retry.getComponent());
-								return;
+								try {
+									startActivity(retry);
+									app.intentUri = retry.toUri(Intent.URI_INTENT_SCHEME);
+									settingsStorage.setShortcutApps(new ArrayList<>(shortcutApps));
+									KeydroidxLog.i("Desktop", "快捷栏应用兜底启动成功并修正缓存: "
+											+ app.label + " -> " + retry.getComponent());
+									return;
+								} catch (Exception retryEx) {
+									KeydroidxLog.w("Desktop", "快捷栏应用兜底启动异常(" + app.label + "): " + retryEx.getMessage());
+								}
 							}
+						}
+						// 兜底失败或未找到可用入口：属于外部应用被卸载/停用等环境问题，非启动器自身缺陷
+						if (e instanceof android.content.ActivityNotFoundException) {
+							KeydroidxLog.w("Desktop", "启动快捷栏应用未找到或已被卸载: " + app.label
+									+ (pkg != null ? " (" + pkg + ")" : ""), e);
+							Toast.makeText(ctx, "未找到应用「" + app.label + "」，可能已被卸载", Toast.LENGTH_SHORT).show();
+							return;
 						}
 						throw e;
 					}
@@ -2269,8 +2293,12 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			if (app.type == ShortcutApp.TYPE_J2ME) {
 				KeydroidxJarLauncher.launch(requireActivity(), app.label, app.appKey);
 			}
+		} catch (android.content.ActivityNotFoundException e) {
+			KeydroidxLog.w("Desktop", "启动快捷栏应用未找到或已被卸载: " + app.label, e);
+			Toast.makeText(ctx, "未找到应用「" + app.label + "」，可能已被卸载", Toast.LENGTH_SHORT).show();
 		} catch (Exception e) {
 			KeydroidxLog.e("Desktop", "启动快捷栏应用失败: " + app.label, e);
+			Toast.makeText(ctx, "启动失败: " + app.label, Toast.LENGTH_SHORT).show();
 		}
 	}
 
