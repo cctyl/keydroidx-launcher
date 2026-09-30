@@ -48,7 +48,7 @@ public class SocketService {
      */
     private static ServerSocket bindWithTakeover(int port) throws IOException {
         try {
-            return new ServerSocket(port);
+            return bind(port);
         } catch (BindException be) {
             Log.i(TAG, "port " + port + " in use, asking existing server to stop");
             if (askExistingServerToStop()) {
@@ -58,7 +58,7 @@ public class SocketService {
                     } catch (InterruptedException ignored) {
                     }
                     try {
-                        return new ServerSocket(port);
+                        return bind(port);
                     } catch (BindException stillBusy) {
                         // 旧实例尚未退出释放端口，继续等
                     }
@@ -68,6 +68,23 @@ public class SocketService {
             // 旧实例没退 / 不响应 IPC：抛原异常，调用方应退出进程，避免僵尸
             throw be;
         }
+    }
+
+    /**
+     * 绑定监听端口。
+     * <p>
+     * <b>必须先开 SO_REUSEADDR 再 bind：</b>Java 的 {@code new ServerSocket(port)} 不带该选项
+     * （与 App 内 10501 的 KeydroidxLockServer 是同一类问题）。服务端每接受一个连接就在
+     * 本地端口 10500 上留下一条 TCP 连接，它被关闭后该端口进入 TIME_WAIT（约 60s）；
+     * 此时新实例 bind 会直接 EADDRINUSE 抛 BindException——而启动脚本第一句就是
+     * {@code kill -9} 掉旧实例（旧实例刚被 App 探活连过），正好制造这个窗口，
+     * 于是「端口被占 → 新服务端起不来 → 20 秒内一直离线」，且 1.3.2 上完全无现场可查。
+     */
+    private static ServerSocket bind(int port) throws IOException {
+        ServerSocket server = new ServerSocket();
+        server.setReuseAddress(true);
+        server.bind(new InetSocketAddress(port), 50);
+        return server;
     }
 
     /**

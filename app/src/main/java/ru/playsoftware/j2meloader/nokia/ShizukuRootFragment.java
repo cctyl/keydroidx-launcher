@@ -16,8 +16,6 @@ import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
 import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -27,8 +25,6 @@ import androidx.annotation.Nullable;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.mini_shizuku.Shizuku;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 /**
  * mini_shizuku → root 激活页。
@@ -279,122 +275,15 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	}
 
 	/**
-	 * 通过 {@link KeydroidxRootShell}（su -c 直执）以 root 身份拉起 mini_shizuku 服务端：
-	 * 先杀掉旧的 app_process（shell/root 均杀），再以 root 启动新服务端。
-	 * 启动参数与 {@code mini_shizuku.sh} 一致，并注入 {@code -Dapp.package}，
-	 * 供 APK 重装后服务端通过 pm path 重新定位。
+	 * 以 root 身份拉起 mini_shizuku 服务端（先杀旧 app_process，再启动新服务端）。
 	 * <p>
-	 * 注意：app_process 后台化前先 {@code trap '' 1} 忽略 SIGHUP，避免 su 进程退出后被回收；
-	 * stdin 重定向 /dev/null，防止后台进程持有 su 的 stdin 管道干扰排空。
-	 * <p>
-	 * <b>历史教训：</b>曾用 libsu 持久 root shell 提交此脚本，exec() 标记回显收不到而
-	 * 无限期挂起（脚本实际已执行），4.4 + SuperSU 2.76 上必现——已整体替换为 su -c 直执。
+	 * 脚本构建与执行统一在 {@link KeydroidxShizukuActivator#execRootStartScript(Context)}
+	 * ——本类原先自己复制了一份，两份脚本各自漂移正是 1.3.2「服务端日志写死 /data/local/tmp、
+	 * 启动失败却毫无现场」能长期存在的原因之一，故合并为一处。
 	 */
 	private boolean startServerAsRoot() {
-		try {
-			if (Build.VERSION.SDK_INT < 19) {
-				KeydroidxLog.w("ShizukuRoot", "root 启动跳过: SDK < 19");
-				return false;
-			}
-			String apk = requireContext().getApplicationInfo().sourceDir;
-			String pkg = requireContext().getPackageName();
-			// root 身份的 Java 进程（app_process 所在 SELinux 域）无权写 /data/local/tmp，
-			// 服务端自己部署 so 会 EACCES。改为：App 侧从 APK 解出最新 so 到 cache，
-			// 由本 root 脚本 cat 到 /data/local/tmp——保证服务端加载的永远是当前 APK 的
-			// so 版本（旧 so 可能缺少新 JNI 方法，如 nativeSetSuppGroups）。
-			String deployLib = "";
-			File soInCache = extractInterceptorLibToCache();
-			if (soInCache != null) {
-				deployLib = "cat '" + soInCache.getAbsolutePath()
-						+ "' > /data/local/tmp/libnokiainterceptor.so; "
-						+ "chmod 755 /data/local/tmp/libnokiainterceptor.so; ";
-			} else {
-				KeydroidxLog.w(TAG, "so 解出失败，服务端将尝试使用 /data/local/tmp 已有库");
-			}
-			// 与 assets/mini_shizuku.sh 保持一致：日志先试固定名，写不动（被其它 uid 占用）
-			// 则退到带 uid 后缀的专属文件，避免 root/adb 混用激活时 app_process 因
-			// "can't create ...: Permission denied" 根本不启动。
-			// 关键：app_process 必须用 su -cn u:r:shell:s0 切到 shell SELinux 域拉起（root uid 保留）。
-			// 4.4 真机实测：SuperSU 默认 context=u:r:init:s0 下，root 身份的 app_process 无法
-			// 访问 /data/local/tmp（stat 不可见、create EACCES），so 部署与加载全部失败；
-			// shell 域无此限制，且 root uid + CAP_SETGID 保留（setgroups 补组实测成功）。
-			String script = "trap '' 1; "
-					+ "ps | grep app_process | grep -v grep | while read -r line; do set -- $line; kill -9 $2 2>/dev/null; done; "
-					+ deployLib
-					+ "LOG=/data/local/tmp/minishizuku.log; "
-					+ ": > \"$LOG\" 2>/dev/null; "
-					+ "su -cn u:r:shell:s0 -c \"trap '' 1; app_process -Djava.class.path=" + apk
-					+ " -Dapp.package=" + pkg
-					+ " /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess"
-					+ " >> /data/local/tmp/minishizuku.log 2>&1 </dev/null &\"";
-			KeydroidxLog.i("ShizukuRoot", "执行 root 启动: " + script);
-			// su -c 直执（libsu 在 4.4 + SuperSU 2.76 上 exec() 会挂死，见类注释）
-			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(requireContext(), script, 15000);
-			KeydroidxLog.i("ShizukuRoot", "root 启动服务端退出码: " + r.code + " out=" + r.out.trim());
-			return r.isSuccess();
-		} catch (Exception e) {
-			KeydroidxLog.e("ShizukuRoot", "root 启动服务端异常", e);
-			return false;
-		}
-	}
-
-	/**
-	 * 从本应用 APK 中解出 libnokiainterceptor.so 到 cacheDir，供 root 激活脚本
-	 * cat 部署到 /data/local/tmp（root shell 可写；root 身份的 Java 服务进程不可写）。
-	 * ABI 选择与 {@code InterceptorNative.getSupportedAbis} 一致：
-	 * API 21+ 读 SUPPORTED_ABIS，4.4 降级 CPU_ABI/CPU_ABI2。失败返回 null（不抛异常）。
-	 */
-	@Nullable
-	private File extractInterceptorLibToCache() {
-		ZipFile zip = null;
-		try {
-			String apkPath = requireContext().getApplicationInfo().sourceDir;
-			zip = new ZipFile(apkPath);
-			String[] abis;
-			try {
-				Object o = Build.class.getField("SUPPORTED_ABIS").get(null);
-				abis = (o instanceof String[] && ((String[]) o).length > 0)
-						? (String[]) o : new String[]{Build.CPU_ABI, Build.CPU_ABI2};
-			} catch (Throwable t) {
-				abis = new String[]{Build.CPU_ABI, Build.CPU_ABI2};
-			}
-			ZipEntry entry = null;
-			for (String abi : abis) {
-				if (abi == null || abi.isEmpty()) continue;
-				entry = zip.getEntry("lib/" + abi + "/libnokiainterceptor.so");
-				if (entry != null) break;
-			}
-			if (entry == null) {
-				return null;
-			}
-			File out = new File(requireContext().getCacheDir(), "libnokiainterceptor.so");
-			InputStream in = zip.getInputStream(entry);
-			try {
-				FileOutputStream fos = new FileOutputStream(out);
-				try {
-					byte[] buf = new byte[8192];
-					int n;
-					while ((n = in.read(buf)) > 0) {
-						fos.write(buf, 0, n);
-					}
-				} finally {
-					fos.close();
-				}
-			} finally {
-				in.close();
-			}
-			return out;
-		} catch (Throwable t) {
-			KeydroidxLog.w(TAG, "解出 libnokiainterceptor.so 失败: " + t.getMessage());
-			return null;
-		} finally {
-			if (zip != null) {
-				try {
-					zip.close();
-				} catch (Exception ignored) {
-				}
-			}
-		}
+		return KeydroidxShizukuActivator.execRootStartScript(
+				requireContext().getApplicationContext());
 	}
 
 	/**
@@ -410,28 +299,39 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	 *   <li>{@code proc= / listen10500= / enforce=} —— 服务端进程是否还活着、
 	 *       10500（{@code 0x2904}）是否已有人 LISTEN（被占则新服务端必定 BindException 退出）、
 	 *       SELinux 模式；</li>
-	 *   <li>{@code log_tail= / log=} —— minishizuku.log 的最后两行与大小/时间
+	 *   <li>{@code wlog=} —— 与启动脚本同一份候选表里，哪个路径真的能写；为 {@code none}
+	 *       即说明「服务端日志无处可写」，这正是 app_process 因重定向失败而根本不启动的形态；</li>
+	 *   <li>{@code tail=} —— 服务端实际用的那份日志（第一个非空候选）的最后两行
 	 *       （app_process 崩溃栈、BindException、EACCES 都在这里）；</li>
-	 *   <li>详述：app_process 全表、minishizuku*.log tail 80、
-	 *       logcat 里的 MiniShizuku（服务端 Java 层错误只进 logcat，不落 minishizuku.log）。</li>
+	 *   <li>详述：app_process 全表、每个候选日志的 tail 80、
+	 *       logcat 里的 MiniShizuku（服务端 Java 层错误只进 logcat，不落日志文件）。</li>
 	 * </ul>
 	 * 根 shell 不可用时只记一行；任何情况都不抛异常。
 	 */
 	private void collectActivationDiagnostics() {
 		try {
+			// 与启动脚本共用同一份候选表，避免「诊断查的路径」和「启动写的路径」不是一回事
+			String cands = KeydroidxShizukuActivator.logPathCandidatesShell(requireContext());
 			String diag = "echo '=== SUMMARY ==='; "
 					// 进程是否还在 + 端口是否被占（10500 = 0x2904，/proc/net/tcp 里 st=0A 为 LISTEN）+ SELinux
 					+ "echo \"proc=$( (ps -A 2>/dev/null || ps) | grep -c app_process ) "
 					+ "listen10500=$(cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep ':2904 ' | grep -c ' 0A ') "
 					+ "enforce=$(getenforce 2>&1)\"; "
-					// log_tail 是决定性的那一行，必须排在 log= 之前：上报注释只有 160 字节，
-					// ls -l 的完整路径能吃掉 80 字节，排在前面会把真正的死因挤出可视范围
-					+ "echo \"log_tail=$(tail -n 2 /data/local/tmp/minishizuku*.log 2>&1 | while read -r l; do printf '%s | ' \"$l\"; done)\"; "
-					+ "echo \"log=$(ls -l /data/local/tmp/minishizuku*.log 2>&1)\"; "
+					// W=第一个真能写的候选（真实建文件探针，不用 [ -w ]：root 的 DAC 判定会掩盖 SELinux 拒绝）
+					// F=第一个非空的候选，即服务端实际用的那份日志。
+					// wlog 只回显候选序号 c1/c2/c3（完整路径在详述块里给出）——上报注释只有 160 字节，
+					// 一个 /storage/emulated/0/Android/data/... 的完整路径就能吃掉 80 字节，
+					// 会把真正的原因（tail=）挤出可视范围。
+					+ "W=none; F=none; i=0; for c in " + cands + "; do i=$((i+1)); "
+					+ "if [ \"$W\" = none ] && ( : >> \"$c\" ) 2>/dev/null; then W=\"c$i\"; fi; "
+					+ "if [ \"$F\" = none ] && [ -s \"$c\" ]; then F=\"$c\"; fi; done; "
+					+ "echo \"wlog=$W\"; "
+					// tail 是决定性的那一行，紧跟在 wlog 之后（只 tail 单个文件，不带多文件 ==> 头）
+					+ "echo \"tail=$(tail -n 2 \"$F\" 2>&1 | while read -r l; do printf '%s | ' \"$l\"; done)\"; "
 					+ "echo '=== app_process procs ==='; "
 					+ "(ps -A 2>/dev/null || ps) | grep -i app_process; "
-					+ "echo '=== minishizuku.log (tail 80) ==='; "
-					+ "tail -n 80 /data/local/tmp/minishizuku*.log 2>&1; "
+					+ "echo '=== server log candidates (#n 序号对应 wlog=cn) ==='; "
+					+ "i=0; for c in " + cands + "; do i=$((i+1)); echo \"#$i $c\"; ls -l \"$c\" 2>&1; tail -n 80 \"$c\" 2>&1; done; "
 					+ "echo '=== logcat MiniShizuku (tail 60) ==='; "
 					// logcat -t 是后加的选项，4.4（本上报的设备）上拿不到内容；空了就退回全量 dump + grep
 					+ "L=$(logcat -d -t 500 -s MiniShizuku:* 2>/dev/null | tail -n 60); "
@@ -453,6 +353,10 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
  * 日志目录下，文件名带时间戳。app 自身 uid 无权读 /data/local/tmp，必须经 root；
  * 目标目录是 app 私有外存（/sdcard/Android/data/&lt;pkg&gt;/files/log），root 可写，
 	 * 复制后用户/我们可直接取走完整原始日志。
+	 * <p>
+	 * 源按启动脚本的候选顺序取第一个<strong>非空</strong>的：历史位置
+	 * {@code /data/local/tmp/minishizuku*.log}，以及 App 自身日志目录下的
+	 * {@code minishizuku_server.log}（后者已在日志目录里，随上报 zip 一起走）。
 	 */
 	private void copyMinishizukuLog() {
 		File logDir = KeydroidxLog.getLogDir();
@@ -465,8 +369,11 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 				+ ".log";
 		File target = new File(logDir, name);
 		String targetPath = target.getAbsolutePath().replace(" ", "\\ ");
-		String cmd = "cp -f /data/local/tmp/minishizuku.log " + targetPath + " 2>&1; "
-				+ "ls -l " + targetPath + " 2>&1";
+		String appLog = KeydroidxShizukuActivator.appLogCandidatePath(requireContext());
+		// -s：源为空（0 字节）也算失败，免得把空文件当成功（空文件恰好还会被 zip 的 size>0 过滤掉）
+		String cmd = "for s in /data/local/tmp/minishizuku.log /data/local/tmp/minishizuku.*.log '"
+				+ appLog + "'; do if [ -s \"$s\" ]; then cp -f \"$s\" " + targetPath
+				+ " 2>&1; break; fi; done; ls -l " + targetPath + " 2>&1";
 		try {
 			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(requireContext(), cmd, 8000);
 			// 显式校验落盘结果：cp 失败（源不存在 / 目标目录不可写）时 target 不会存在。

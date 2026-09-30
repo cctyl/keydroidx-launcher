@@ -371,22 +371,59 @@ E/MiniShizuku: java.io.FileNotFoundException: /data/local/tmp/libnokiaintercepto
 ### 4.4 激活流程（root 模式，✅ 已按此实施）
 
 ```
-ShizukuRootFragment.startServerAsRoot()  →  libsu Shell.getShell()（root shell）
+KeydroidxShizukuActivator.execRootStartScript()（ShizukuRootFragment 与设置页一键激活共用同一份）
   → App 侧从 APK 解出最新 libnokiainterceptor.so 到 cacheDir（root Java 进程无权写 /data/local/tmp）
-  → rootShell.newJob().add(启动脚本).exec()，脚本：
+  → KeydroidxRootShell.exec()：脚本写 cache 文件后 su -c sh <file> 直执，脚本：
        kill 旧 app_process
        cat <cache>/libnokiainterceptor.so > /data/local/tmp/libnokiainterceptor.so; chmod 755
+       按候选表探测服务端日志路径（见 §4.5），echo "SERVER_LOG=<选中路径>"
        su -cn u:r:shell:s0 -c "trap '' 1; app_process -Djava.class.path=<apk> \
            -Dapp.package=<pkg> /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess \
-           >> /data/local/tmp/minishizuku.log 2>&1 &"
+           >> "<选中路径>" 2>&1 </dev/null &"
        （-cn 切 shell 域：规避 init:s0 域对 /data/local/tmp 的访问限制，root uid 保留）
   → app_process main() 最早：
-       lib 存在 → loadLibrary；ServerPrivileges.nativeSetSuppGroups(GIDS)  ← 补 inet 组
+       lib 存在 → loadLibrary；InterceptorNative.nativeSetSuppGroups(GIDS)  ← 补 inet 组
        （之后 SocketService.bindWithTakeover(10500) 才 socket() 成功）
   → 轮询 Shizuku.isRunning() → true → WHOAMI 校验 uid==0（§3.4）
 ```
 
-与现状的区别：激活脚本增加 so 部署与 `su -cn` 包裹；`AdbProcess.main()` 头部加载库 + 补组。服务端协议、拦截器、客户端协议不动。
+与 §4.3 之前的区别：激活脚本增加 so 部署与 `su -cn` 包裹；`AdbProcess.main()` 头部加载库 + 补组。服务端协议、拦截器、客户端协议不动。
+
+### 4.5 实施补充（2026-09-30：让"起不来"必须留下现场）
+
+背景：2026-09-29 21:23:54 的自动上报（Android 4.4.2 / MT6572 / alps V6）正文完全为空——
+`root activation failure diagnostics (exit 0):` 后面什么都没有，附件里也没有 `minishizuku_*.log`。
+复核结论：那次跑的是 **1.3.2（09-12 发布）**，即 §4.3 之前的形态，三处缺陷叠加导致"失败且零现场"：
+
+1. **服务端日志写死 `/data/local/tmp`（1.3.2）**：固定名写不动时只退到 `/data/local/tmp/minishizuku.<uid>.log`
+   ——**仍在同一目录**。一旦该目录不可写（SELinux 域/被别的 uid 以不可覆盖的标签占用），
+   `app_process ... >> "$LOG"` 的重定向就打不开，`app_process` 根本不启动；而命令以 `&` 后台化，
+   脚本**照样 exit 0**。→ 现改为候选表：`/data/local/tmp/minishizuku.log` →
+   `/data/local/tmp/minishizuku.<uid>.log` → **App 自身日志目录下的 `minishizuku_server.log`**（该目录
+   随自动上报 zip 一起上传，是唯一"不依赖复制也能寄回"的位置）→ 全不可写则退 `/dev/null`
+   （宁可没有日志，也必须把服务端拉起来）。
+2. **启动脚本零回显（1.3.2 走 libsu，stdout 拿不到）**：现由 `su -c` 直执并回显
+   `SERVER_LOG=<选中路径>`；**刻意不在关键路径加 `sleep` 自证块**——那会吃掉 `KeydroidxRootShell`
+   15 秒超时预算，在慢设备上把"服务端其实起来了"误判成 exec 超时。
+   "启动后进程在不在/日志写了什么"交给失败后 20 秒运行的诊断（`collectActivationDiagnostics`）。
+3. **诊断正文被截断**：「待上传」标记只留 detail 前 200 字符、上报注释只留前 160 字节（UTF-8），
+   而现场有上百行。现按预算排序输出：`proc= / listen10500= / enforce=` → `wlog=c1|c2|c3|none`
+   （同一份候选表里哪个真能写，**真实建文件探针**，不用 `[ -w ]`：root 的 DAC 判定会掩盖 SELinux 拒绝）
+   → `tail=`（服务端日志最后两行）；候选完整路径与各自 tail 80 放详述块，随当天日志一起上传。
+   另：`logcat -d -t 500` 在 4.4 上取不到内容，现已加回退 `logcat -d | grep -i minishizuku`
+   ——服务端 Java 层错误（`socket failed: EACCES` / `UnsatisfiedLinkError`）只进 logcat、不落日志文件。
+
+同批加固（与 09-26 的补组修复无关，属长期存在的缺陷）：
+
+- **服务端 bind 补 `SO_REUSEADDR`**（`SocketService.bindWithTakeover` → 新增 `bind()`）：
+  `new ServerSocket(10500)` 不带该选项，TIME_WAIT 压着本地端口时新实例直接 `BindException` →
+  `System.exit(1)` → 20 秒全程离线；而启动脚本第一句 `kill -9` 掉的正是刚被 App 探活连过的旧实例，
+  等于自己制造这个窗口。与 App 内 10501 的 `KeydroidxLockServer` 是同一类问题（见
+  `docs/保活与高耗电排查方案.md` A4 行）。
+- **激活入口互斥**：启动脚本会 kill 掉**所有** `app_process`，两次激活并发必然互相拆台。
+  2026-09-28 日志里 20:25:32.704 与 20:25:36.698（以及 20:26:48.619/20:26:54.559/20:27:03.549）
+  两次/三次并发，双双在 20 秒后判失败。现由 `KeydroidxShizukuActivator.tryLockActivation()`
+  串行化，等待期间再点只提示"正在激活中"。
 
 ---
 

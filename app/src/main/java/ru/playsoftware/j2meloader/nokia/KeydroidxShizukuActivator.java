@@ -124,8 +124,34 @@ public final class KeydroidxShizukuActivator {
 		}
 	}
 
-	/** 构建并 su -c 直执 root 启动脚本。 */
-	private static boolean execRootStartScript(Context ctx) {
+	/**
+	 * 服务端日志候选路径表（shell 片段，启动脚本与诊断脚本共用同一份，避免两处漂移）：
+	 * 1) {@code /data/local/tmp/minishizuku.log} —— 历史位置，旧包与 adb 脚本都写这里；
+	 * 2) {@code /data/local/tmp/minishizuku.<uid>.log} —— 固定名被别的 uid 以不可覆盖的
+	 *    标签占用时的退路（旧 mini_shizuku.sh 的同名约定）；
+	 * 3) App 自身日志目录下的 {@code minishizuku_server.log} —— 该目录里的文件会随
+	 *    自动上报 zip 一起上传，是唯一「不依赖复制也能寄回」的位置。
+	 */
+	public static String logPathCandidatesShell(Context ctx) {
+		return "/data/local/tmp/minishizuku.log "
+				+ "\"/data/local/tmp/minishizuku.$(id -u).log\" "
+				+ "'" + appLogCandidatePath(ctx) + "'";
+	}
+
+	/** App 自身日志目录下的服务端日志候选路径（日志未初始化时退到外存默认目录）。 */
+	public static String appLogCandidatePath(Context ctx) {
+		File logDir = KeydroidxLog.getLogDir();
+		if (logDir == null) {
+			logDir = KeydroidxLog.getDefaultLogDir(ctx);
+		}
+		if (logDir == null) {
+			return "/dev/null";
+		}
+		return new File(logDir, "minishizuku_server.log").getAbsolutePath();
+	}
+
+	/** 构建并 su -c 直执 root 启动脚本（脚本构建对两条激活入口共用，避免两处漂移）。 */
+	public static boolean execRootStartScript(Context ctx) {
 		try {
 			if (Build.VERSION.SDK_INT < 19) {
 				KeydroidxLog.w(TAG, "root 启动跳过: SDK < 19");
@@ -144,17 +170,29 @@ public final class KeydroidxShizukuActivator {
 			} else {
 				KeydroidxLog.w(TAG, "so 解出失败，服务端将尝试使用 /data/local/tmp 已有库");
 			}
+			// 服务端日志候选路径：/data/local/tmp 是历史位置（旧包/旧 adb 脚本都写这里），
+			// 但它可能不可写（SELinux 域/被别的 uid 以不可覆盖的标签占用），此时退到 App 自己
+			// 的日志目录——该目录下的文件会随自动上报 zip 一起上传；最后退 /dev/null。
+			// 关键：绝不能像 1.3.2 那样把重定向写死 /data/local/tmp —— 重定向打不开时
+			// app_process 根本不启动，而命令以 & 后台化会让脚本照样 exit 0，
+			// 于是「激活失败但完全没有现场」（2026-09-29 上报即为此形态）。
+			String candidates = logPathCandidatesShell(ctx);
 			// 关键：app_process 用 su -cn u:r:shell:s0 切 shell SELinux 域拉起（root uid 保留）。
 			// 4.4 实测：init:s0 域无法访问 /data/local/tmp；shell 域无此限制。
+			// 只回显 SERVER_LOG（瞬时、零延迟）：启动那一刻选了哪条日志路径，直接进 App 日志。
+			// 「启动后进程在不在 / 日志里写了什么」留给 collectActivationDiagnostics —— 它在
+			// 20 秒轮询失败后采集同样的事实，且不占用本脚本的 15 秒超时预算（往关键路径塞 sleep
+			// 会让慢设备上「服务端其实起来了」被误判成 exec 超时）。
 			String script = "trap '' 1; "
 					+ "ps | grep app_process | grep -v grep | while read -r line; do set -- $line; kill -9 $2 2>/dev/null; done; "
 					+ deployLib
-					+ "LOG=/data/local/tmp/minishizuku.log; "
-					+ ": > \"$LOG\" 2>/dev/null; "
-					+ "su -cn u:r:shell:s0 -c \"trap '' 1; app_process -Djava.class.path=" + apk
-					+ " -Dapp.package=" + pkg
-					+ " /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess"
-					+ " >> /data/local/tmp/minishizuku.log 2>&1 </dev/null &\"";
+					+ "LOG=; for c in " + candidates + "; do if ( : >> \"$c\" ) 2>/dev/null; then LOG=\"$c\"; break; fi; done; "
+					+ "[ -z \"$LOG\" ] && LOG=/dev/null; "
+					+ "echo \"SERVER_LOG=$LOG\"; "
+					+ "su -cn u:r:shell:s0 -c \"trap '' 1; app_process -Djava.class.path='" + apk
+					+ "' -Dapp.package='" + pkg
+					+ "' /system/bin ru.playsoftware.mini_shizuku.server.AdbProcess"
+					+ " >> \\\"$LOG\\\" 2>&1 </dev/null &\"";
 			KeydroidxLog.i(TAG, "执行 root 启动: " + script);
 			// su -c 直执（libsu 在 4.4 + SuperSU 2.76 上 exec() 会挂死，见 ShizukuRootFragment 注释）
 			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(ctx, script, 15000);
