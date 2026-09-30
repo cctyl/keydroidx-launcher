@@ -5,6 +5,7 @@ import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxIcons;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -37,6 +38,13 @@ import ru.playsoftware.j2meloader.R;
 public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 
 	private static final int REQUEST_CODE_PICK_FONT = 1001;
+
+	private static final String TAG = "KeydroidxFontSettingsFragment";
+
+	/** 字体文件 MIME 白名单（部分文件管理器按 MIME 过滤，缺一档就选不中 .ttf）。 */
+	private static final String[] FONT_MIME_TYPES = {
+			"font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream"
+	};
 
 	private KeydroidxSettingsStorage storage;
 	private String currentFontId;
@@ -82,42 +90,100 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 
 	@Override
 	public boolean onSoftLeft() {
-		// 调用系统文件选择器导入 .ttf 或 .otf
+		pickFontFile();
+		return true;
+	}
+
+	/**
+	 * 调起字体文件选择器。
+	 * <p>
+	 * 优先 {@code ACTION_OPEN_DOCUMENT}（SAF，API 19+ 起契约明确：授予可持久化读权限），
+	 * 没有可用 Activity 时降级 {@code ACTION_GET_CONTENT}。两种路径都在原始 Intent 与
+	 * Chooser Intent 上显式声明 grant flag——{@code Intent.createChooser()} 不会继承原始
+	 * Intent 的 flags，漏了就会在读取时抛 {@code SecurityException}。
+	 * <p>
+	 * 为什么优先 SAF：{@code ACTION_GET_CONTENT} 会把第三方文件管理器（如 ES 文件浏览器）
+	 * 列进候选，它们可能返回自家未 exported 的 Provider Uri，任何授权都读不到流
+	 * （见 2026-09-28 上报：{@code com.estrongs.files} → Permission Denial）。
+	 */
+	private void pickFontFile() {
 		try {
-			Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+			Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
 			intent.setType("*/*");
-			String[] mimeTypes = {"font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream"};
-			intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+			intent.putExtra(Intent.EXTRA_MIME_TYPES, FONT_MIME_TYPES);
 			intent.addCategory(Intent.CATEGORY_OPENABLE);
-			startActivityForResult(Intent.createChooser(intent, "选择字体文件 (.ttf / .otf)"), REQUEST_CODE_PICK_FONT);
+			addGrantFlags(intent);
+
+			if (intent.resolveActivity(requireActivity().getPackageManager()) == null) {
+				KeydroidxLog.w(TAG, "无可用 SAF 文档选择器，降级 ACTION_GET_CONTENT");
+				intent = new Intent(Intent.ACTION_GET_CONTENT);
+				intent.setType("*/*");
+				intent.putExtra(Intent.EXTRA_MIME_TYPES, FONT_MIME_TYPES);
+				intent.addCategory(Intent.CATEGORY_OPENABLE);
+				addGrantFlags(intent);
+			}
+
+			Intent chooser = Intent.createChooser(intent, "选择字体文件 (.ttf / .otf)");
+			addGrantFlags(chooser);
+			startActivityForResult(chooser, REQUEST_CODE_PICK_FONT);
 		} catch (Exception e) {
-			KeydroidxLog.e("KeydroidxFontSettingsFragment", "打开文件选择器失败", e);
+			// 设备没有可用文件选择器属外部环境问题：按规范用 w，不触发自动上报
+			KeydroidxLog.w(TAG, "打开文件选择器失败: " + e.getMessage(), e);
 			Toast.makeText(requireContext(), "无法打开文件选择器", Toast.LENGTH_SHORT).show();
 		}
-		return true;
+	}
+
+	/** 声明对返回 Uri 的读权限（含可持久化），避免读取时抛 SecurityException。 */
+	private static void addGrantFlags(Intent intent) {
+		intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+		intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
 	}
 
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
 		super.onActivityResult(requestCode, resultCode, data);
-		if (requestCode == REQUEST_CODE_PICK_FONT && resultCode == Activity.RESULT_OK && data != null) {
-			Uri uri = data.getData();
-			if (uri != null) {
-				String newFontId = KeydroidxFontManager.importFontFromUri(requireContext(), uri);
-				if (newFontId != null) {
-					storage.setFontId(newFontId);
-					currentFontId = newFontId;
-					KeydroidxFontManager.invalidate();
-					rebuildList();
-					Toast.makeText(requireContext(), "字体导入成功并已应用！", Toast.LENGTH_SHORT).show();
-					if (getActivity() instanceof KeydroidxBaseActivity) {
-						((KeydroidxBaseActivity) getActivity()).recreate();
-					}
-				} else {
-					Toast.makeText(requireContext(), "字体导入失败，请检查文件格式是否为合法 .ttf / .otf", Toast.LENGTH_LONG).show();
-				}
-			}
+		if (requestCode != REQUEST_CODE_PICK_FONT || resultCode != Activity.RESULT_OK || data == null) {
+			return;
 		}
+		Uri uri = data.getData();
+		if (uri == null) {
+			return;
+		}
+
+		// 1) 尽量把读权限固化下来（仅 SAF 契约有效，GET_CONTENT 返回的 Uri 会抛异常，忽略即可）
+		try {
+			requireActivity().getContentResolver()
+					.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "持久化字体 Uri 读权限失败（本次仍走临时授权）: " + e.getMessage());
+		}
+
+		// 2) 关键：Uri 的临时读权限只在 onActivityResult 期间可靠，
+		//    importFontFromUriAsync 会在此同步打开输入流，再把拷贝/解析交给后台线程，
+		//    避免大字体文件（数 MB）阻塞主线程。
+		final Context appCtx = requireContext().getApplicationContext();
+		Toast.makeText(requireContext(), "正在导入字体...", Toast.LENGTH_SHORT).show();
+		KeydroidxFontManager.importFontFromUriAsync(appCtx, uri, fontId -> {
+			if (!isAdded() || getView() == null) {
+				return;
+			}
+			if (fontId == null) {
+				// 读取失败绝大多数是第三方文件管理器给出的 Uri 未授权（或文件不是合法字体）：
+				// 外部环境问题，日志已由 importFontFromUriAsync 以 w 记录，这里只给可执行的提示
+				Toast.makeText(requireContext(),
+						"字体导入失败：请改用系统「文件」选择器，或先把字体复制到本机存储再导入",
+						Toast.LENGTH_LONG).show();
+				return;
+			}
+			storage.setFontId(fontId);
+			currentFontId = fontId;
+			KeydroidxFontManager.invalidate();
+			rebuildList();
+			Toast.makeText(requireContext(), "字体导入成功并已应用！", Toast.LENGTH_SHORT).show();
+			if (getActivity() instanceof KeydroidxBaseActivity) {
+				((KeydroidxBaseActivity) getActivity()).recreate();
+			}
+		});
 	}
 
 	@Override

@@ -182,7 +182,8 @@ public final class KeydroidxWallpaper {
 	 * {@code SecurityException: ... has no access to content://media/external/...}
 	 * （Android 13 实测必现）。因此 IO 必须在权限有效期内完成；
 	 * 解码 / 压缩 / 落盘等 CPU 密集步骤仍交给后台线程（见 {@link #finalizeImport}）。
-	 * 字体导入（{@code KeydroidxFontManager.importFontFromUri}）正是因为全程同步才没踩这个坑。
+	 * 字体导入同理：{@code KeydroidxFontManager.importFontFromUriAsync} 在调用线程同步
+	 * {@code openInputStream}，只把拷贝落盘与 Typeface 解析放到后台线程。
 	 *
 	 * @return 缓存文件（调用方在 {@link #finalizeImport} 返回后无需再处理，内部会删除）；
 	 *         失败返回 null
