@@ -25,8 +25,7 @@ import ru.playsoftware.j2meloader.R;
  * 通知中心列表页（screenId: notifications.center）。
  * <p>
  * 展示桌面读取到的系统通知，支持方向键逐条聚焦、确认键打开、选项弹窗清除/全部清除。
- * 软键约定：左软键「选项」、右软键「返回」，破坏性操作（全部清除）先二次确认且默认
- * 焦点在「取消」（规范 §15/§16/§41/§42）。
+ * 软键约定：左软键「选项」、右软键「返回」；「清除」与「全部清除」均直接执行，无二次确认。
  * <p>
  * 复用 {@link KeydroidxListPageFragment} 的循环导航/焦点/滚动跟随三件套，本类只负责：
  * <ul>
@@ -359,7 +358,7 @@ public class KeydroidxNotificationCenterFragment extends KeydroidxListPageFragme
 					false, () -> clearOne(item)));
 		}
 		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_CLEAR_ALL, "全部清除",
-				granted && !current.isEmpty(), false, this::confirmClearAll));
+				granted && !current.isEmpty(), false, this::clearAll));
 		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_SETTINGS, "通知设置", true, false,
 				() -> ((KeydroidxDesktopActivity) requireActivity()).openFragment(
 						new KeydroidxNotificationSettingsFragment())));
@@ -382,28 +381,18 @@ public class KeydroidxNotificationCenterFragment extends KeydroidxListPageFragme
 		}
 	}
 
-	/**
-	 * 全部清除二次确认（规范 §41/§42）：默认焦点在「取消」，动作文案用明确动词。
-	 * KeydroidxOptionsDialog 默认聚焦第一项，因此把「取消」放第一位。
-	 */
-	private void confirmClearAll() {
+	/** 全部清除：直接执行，不再二次确认。 */
+	private void clearAll() {
 		int count = current.size();
 		if (count == 0) return;
-		List<KeydroidxOptionsDialog.OptionItem> items = new ArrayList<>();
-		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_CLOSE, "取消", true, false, null));
-		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_DELETE, "清除", true, false,
-				() -> {
-					KeydroidxNotificationListenerService service =
-							KeydroidxNotificationListenerService.getInstance();
-					boolean ok = service != null && service.cancelAll();
-					if (ok) {
-						KeydroidxLog.i("NotifCenter", "已清除全部通知，共 " + count + " 条");
-						KeydroidxNotificationRepository.get().refreshFromService();
-					} else {
-						Toast.makeText(requireContext(), "清除失败：通知服务未连接",
-								Toast.LENGTH_SHORT).show();
-					}
-				}));
-		KeydroidxOptionsDialog.show(getParentFragmentManager(), "全部清除？（" + count + " 条，无法撤销）", items);
+		KeydroidxNotificationListenerService service = KeydroidxNotificationListenerService.getInstance();
+		boolean ok = service != null && service.cancelAll();
+		if (ok) {
+			KeydroidxLog.i("NotifCenter", "已清除全部通知，共 " + count + " 条");
+			// 系统实际列表是唯一事实来源：移除回调可能延迟或丢失，主动同步避免幽灵行
+			KeydroidxNotificationRepository.get().refreshFromService();
+		} else {
+			Toast.makeText(requireContext(), "清除失败：通知服务未连接", Toast.LENGTH_SHORT).show();
+		}
 	}
 }
