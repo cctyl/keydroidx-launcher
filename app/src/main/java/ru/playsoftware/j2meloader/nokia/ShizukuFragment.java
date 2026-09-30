@@ -251,7 +251,12 @@ public class ShizukuFragment extends KeydroidxListPageFragment {
 						if (!isAdded()) return;
 						refreshStatus();
 						String msg;
-						if (!r.execOk) {
+						if (r.busy) {
+							// 另一次激活（本页或 root 激活详情页）正在进行：它同样会 kill 所有
+							// app_process，再起一次只会互相拆台，这里直接放弃并回滚模式
+							KeydroidxSettingsStorage.setAuthMode(appCtx, prevMode);
+							msg = "正在激活中，请稍候…";
+						} else if (!r.execOk) {
 							// su 不可用/被拒：回滚模式并明确告知
 							KeydroidxSettingsStorage.setAuthMode(appCtx, prevMode);
 							msg = "root 激活失败：无 root 或 su 授权被拒，已保持原模式";

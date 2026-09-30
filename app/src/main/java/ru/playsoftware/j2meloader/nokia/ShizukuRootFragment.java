@@ -153,8 +153,18 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	 * 注意：绝不能先轮询再启动——服务可能本来就在线（如 adb shell 方式启动的旧服务），
 	 * 轮询会立即命中造成「已激活」误报，掩盖真实的 su 授权弹窗。
 	 * root 启动脚本会先 kill 旧 app_process，因此服务会短暂离线后由新 root 进程接管。
+	 * <p>
+	 * 并发保护：启动脚本会 kill 掉<strong>所有</strong> app_process，两次激活并发执行必然互相拆台
+	 * （后一次杀掉前一次刚拉起的服务端，双双等满 20 秒超时）。故用
+	 * {@link KeydroidxShizukuActivator#tryLockActivation()} 串行化——等待期间再点「root 激活」
+	 * 只会提示正在激活，不会另起一次。
 	 */
 	private void activateRoot() {
+		if (!KeydroidxShizukuActivator.tryLockActivation()) {
+			KeydroidxLog.w("ShizukuRoot", "已有 root 激活正在进行，忽略重复点击");
+			Toast.makeText(requireContext(), "正在激活中，请稍候…", Toast.LENGTH_SHORT).show();
+			return;
+		}
 		KeydroidxLog.i("ShizukuRoot", "开始 root 激活");
 		if (statusText != null) {
 			statusText.setText("正在通过 root 激活...");
@@ -163,83 +173,85 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				// 1) 执行 root 启动：libsu 内部获取 root shell 会弹 su 授权窗并阻塞等待
-				//    （Builder 默认超时 20s），用户在弹窗中允许后才继续。
-				boolean execOk = startServerAsRoot();
-				if (!execOk) {
-					KeydroidxLog.e("ShizukuRoot", "root 激活失败：无 root 或 su 授权被拒");
+				try {
+					// 1) 执行 root 启动：su -c 直执；SuperSU 策略为 prompt 时会弹授权窗，
+					//    用户允许后脚本才真正执行（超时 15s，见 KeydroidxRootShell）。
+					boolean execOk = startServerAsRoot();
+					if (!execOk) {
+						KeydroidxLog.e("ShizukuRoot", "root 激活失败：无 root 或 su 授权被拒");
+						mainHandler.post(new Runnable() {
+							@Override
+							public void run() {
+								if (!isAdded()) return;
+								refreshStatus();
+								Toast.makeText(requireContext(),
+										"root 激活失败：无 root 或 su 授权被拒",
+										Toast.LENGTH_SHORT).show();
+							}
+						});
+						return;
+					}
+					// 2) root 启动命令已成功执行（旧服务端已被杀），轮询等待新 root 服务上线
+					long deadline = System.currentTimeMillis() + ACTIVATE_TIMEOUT_MS;
+					boolean online = false;
+					while (System.currentTimeMillis() < deadline) {
+						if (Shizuku.isRunning()) {
+							online = true;
+							break;
+						}
+						try {
+							Thread.sleep(POLL_INTERVAL_MS);
+						} catch (InterruptedException e) {
+							KeydroidxLog.w(TAG, "sleep failed: " + e.getMessage());
+							break;
+						}
+					}
+					final boolean ok = online;
+					// WHOAMI 身份校验：模式选择 ≠ 服务真实身份。root 激活要求服务端 uid==0；
+					// 不一致（如旧 shell 服务未被杀干净）或无法确认（旧版服务端）时明确提示，
+					// 避免后续命令以错误身份执行（设计文档 §3.4）。
+					int serverUid = ru.playsoftware.mini_shizuku.ServerIdentity.UID_UNKNOWN;
+					boolean uidOk = false;
+					if (ok) {
+						serverUid = Shizuku.serverUid();
+						uidOk = serverUid == 0;
+						KeydroidxLog.i(TAG, "WHOAMI 校验: serverUid=" + serverUid + " ok=" + uidOk);
+					}
+					final int finalServerUid = serverUid;
+					final boolean finalUidOk = uidOk;
+					// 失败时复用 root 通道抓现场写进日志：启动脚本以 & 后台化，
+					// 退出码 0 只代表 root shell 把命令发出去了，不代表服务端真的起来了。
+					// 真正的原因在 minishizuku*.log 与 logcat 的 MiniShizuku（详见诊断摘要）。
+					if (!ok) {
+						collectActivationDiagnostics();
+					}
+					KeydroidxLog.i("ShizukuRoot", "root 激活结果: online=" + online + " execOk=true"
+							+ (ok ? " serverUid=" + finalServerUid : ""));
 					mainHandler.post(new Runnable() {
 						@Override
 						public void run() {
 							if (!isAdded()) return;
 							refreshStatus();
-							Toast.makeText(requireContext(),
-									"root 激活失败：无 root 或 su 授权被拒",
-									Toast.LENGTH_SHORT).show();
-						}
-					});
-					return;
-				}
-				// 2) root 启动命令已成功执行（旧 shell 服务已被杀），轮询等待新 root 服务上线
-				long deadline = System.currentTimeMillis() + ACTIVATE_TIMEOUT_MS;
-				boolean online = false;
-				while (System.currentTimeMillis() < deadline) {
-					if (Shizuku.isRunning()) {
-						online = true;
-						break;
-					}
-					try {
-						Thread.sleep(POLL_INTERVAL_MS);
-					} catch (InterruptedException e) {
-						KeydroidxLog.w(TAG, "sleep failed: " + e.getMessage());
-						break;
-					}
-				}
-				final boolean ok = online;
-				// WHOAMI 身份校验：模式选择 ≠ 服务真实身份。root 激活要求服务端 uid==0；
-				// 不一致（如旧 shell 服务未被杀干净）或无法确认（旧版服务端）时明确提示，
-				// 避免后续命令以错误身份执行（设计文档 §3.4）。
-				int serverUid = ru.playsoftware.mini_shizuku.ServerIdentity.UID_UNKNOWN;
-				boolean uidOk = false;
-				if (ok) {
-					serverUid = Shizuku.serverUid();
-					uidOk = serverUid == 0;
-					KeydroidxLog.i(TAG, "WHOAMI 校验: serverUid=" + serverUid + " ok=" + uidOk);
-				}
-				final int finalServerUid = serverUid;
-				final boolean finalUidOk = uidOk;
-				// On failure, reuse the root shell to dump diagnostics into KeydroidxLog.
-				// app_process is backgrounded with &, so exit code 0 only means the root
-				// shell dispatched the command - not that the server actually came up.
-				// The real failure reason lives in minishizuku.log / logcat MiniShizuku.
-				if (!ok) {
-					collectActivationDiagnostics();
-				}
-				KeydroidxLog.i("ShizukuRoot", "root 激活结果: online=" + online + " execOk=true"
-						+ (ok ? " serverUid=" + finalServerUid : ""));
-				mainHandler.post(new Runnable() {
-					@Override
-					public void run() {
-						if (!isAdded()) return;
-						refreshStatus();
-						String msg;
-						if (!ok) {
-							msg = "root 启动命令已执行，但服务未上线，请查看 mini_shizuku 日志";
-						} else if (!finalUidOk) {
-							msg = "服务已上线，但服务端身份异常 (uid=" + finalServerUid
-									+ " ≠ 0)，请重新激活";
-						} else {
-							// root 激活成功且身份校验通过：服务端已是 root 身份，
-							// 同步授权模式偏好为 root 模式，保持设置页状态一致
-							if (finalUidOk) {
+							String msg;
+							if (!ok) {
+								msg = "root 启动命令已执行，但服务未上线，请查看 mini_shizuku 日志";
+							} else if (!finalUidOk) {
+								msg = "服务已上线，但服务端身份异常 (uid=" + finalServerUid
+										+ " ≠ 0)，请重新激活";
+							} else {
+								// root 激活成功且身份校验通过：服务端已是 root 身份，
+								// 同步授权模式偏好为 root 模式，保持设置页状态一致
 								KeydroidxSettingsStorage.setAuthMode(requireContext(),
 										KeydroidxSettingsStorage.AUTH_MODE_ROOT);
+								msg = "root 激活成功，方案1 将获得完整回放能力";
 							}
-							msg = "root 激活成功，方案1 将获得完整回放能力";
+							Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
 						}
-						Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
-					}
-				});
+					});
+				} finally {
+					// 任何出口（含上面的提前 return）都必须放闸，否则激活入口会被永久拒绝
+					KeydroidxShizukuActivator.unlockActivation();
+				}
 			}
 		}, "shizuku-root-activate").start();
 	}
@@ -386,32 +398,48 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	}
 
 	/**
-	 * On activation failure, collect diagnostics via the already-acquired root shell and
-	 * write them into {@link KeydroidxLog}, so 'root command ran but server never came online'
-	 * cases are self-documenting (user just sends back the app log).
-	 *
+	 * 激活失败时用已到手的 root 通道采集现场，写进 {@link KeydroidxLog}，
+	 * 让「root 命令执行成功但服务端始终没上线」这类只能靠用户回传日志定位的问题自证。
+	 * <p>
+	 * <b>顺序要求：摘要块必须放最前。</b>「待上传」标记只保留 detail 前 200 字符、
+	 * 上报注释只保留前 160 字节（UTF-8），而完整现场有上百行——2026-09-29 21:23:54 那次
+	 * 自动上报（Android 4.4.2 / MT6572）正文完全为空，退一步讲，即便有内容，
+	 * 排在末尾的「服务端日志尾巴 / 端口是否被占」也一定被截掉。故先输出两行可判读摘要，
+	 * 再输出详述块（详述块完整落在当天日志里，随上传 zip 一起走）。
 	 * <ul>
-	 *   <li>{@code getenforce} - SELinux mode;</li>
-	 *   <li>list {@code app_process} procs (is the server alive? as which uid?);</li>
-	 *   <li>{@code tail /data/local/tmp/minishizuku*.log} - where the startup script
-	 *       redirects stdout/stderr (脚本可能因 root/adb 混用而退到带 uid 后缀的日志);
-	 *       app_process crash stacks / SELinux denials land here;</li>
-	 *   <li>{@code logcat -s MiniShizuku} - server-side Log output (Java-level errors).</li>
+	 *   <li>{@code proc= / listen10500= / enforce=} —— 服务端进程是否还活着、
+	 *       10500（{@code 0x2904}）是否已有人 LISTEN（被占则新服务端必定 BindException 退出）、
+	 *       SELinux 模式；</li>
+	 *   <li>{@code log_tail= / log=} —— minishizuku.log 的最后两行与大小/时间
+	 *       （app_process 崩溃栈、BindException、EACCES 都在这里）；</li>
+	 *   <li>详述：app_process 全表、minishizuku*.log tail 80、
+	 *       logcat 里的 MiniShizuku（服务端 Java 层错误只进 logcat，不落 minishizuku.log）。</li>
 	 * </ul>
-	 * Silently records a single line if the root shell is unavailable; never throws.
+	 * 根 shell 不可用时只记一行；任何情况都不抛异常。
 	 */
 	private void collectActivationDiagnostics() {
 		try {
-			String diag = "echo '=== getenforce ==='; getenforce 2>&1; "
+			String diag = "echo '=== SUMMARY ==='; "
+					// 进程是否还在 + 端口是否被占（10500 = 0x2904，/proc/net/tcp 里 st=0A 为 LISTEN）+ SELinux
+					+ "echo \"proc=$( (ps -A 2>/dev/null || ps) | grep -c app_process ) "
+					+ "listen10500=$(cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep ':2904 ' | grep -c ' 0A ') "
+					+ "enforce=$(getenforce 2>&1)\"; "
+					// log_tail 是决定性的那一行，必须排在 log= 之前：上报注释只有 160 字节，
+					// ls -l 的完整路径能吃掉 80 字节，排在前面会把真正的死因挤出可视范围
+					+ "echo \"log_tail=$(tail -n 2 /data/local/tmp/minishizuku*.log 2>&1 | while read -r l; do printf '%s | ' \"$l\"; done)\"; "
+					+ "echo \"log=$(ls -l /data/local/tmp/minishizuku*.log 2>&1)\"; "
 					+ "echo '=== app_process procs ==='; "
 					+ "(ps -A 2>/dev/null || ps) | grep -i app_process; "
 					+ "echo '=== minishizuku.log (tail 80) ==='; "
-					+ "tail -n 80 /data/local/tmp/minishizuku.log 2>&1; "
+					+ "tail -n 80 /data/local/tmp/minishizuku*.log 2>&1; "
 					+ "echo '=== logcat MiniShizuku (tail 60) ==='; "
-					+ "logcat -d -t 500 -s MiniShizuku:* 2>&1 | tail -n 60; "
+					// logcat -t 是后加的选项，4.4（本上报的设备）上拿不到内容；空了就退回全量 dump + grep
+					+ "L=$(logcat -d -t 500 -s MiniShizuku:* 2>/dev/null | tail -n 60); "
+					+ "[ -z \"$L\" ] && L=$(logcat -d 2>/dev/null | grep -i minishizuku | tail -n 60); "
+					+ "echo \"$L\"; "
 					+ "echo '=== END ==='";
 			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(requireContext(), diag, 10000);
-			KeydroidxLog.e("ShizukuRoot", "root activation failure diagnostics (exit " + r.code + "):\n" + r.out);
+			KeydroidxLog.e("ShizukuRoot", "root 激活失败诊断(exit " + r.code + "):\n" + r.out);
 			// 保险起见多一步：把整个 minishizuku.log 原样复制到 KeydroidxLog 日志目录，
 			// 保留完整原始文件（内联 tail 只截了 80 行），方便事后排查 / 寄回。
 			copyMinishizukuLog();
@@ -441,10 +469,18 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 				+ "ls -l " + targetPath + " 2>&1";
 		try {
 			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(requireContext(), cmd, 8000);
-			KeydroidxLog.i("ShizukuRoot", "copied minishizuku.log -> " + target.getAbsolutePath()
-					+ " (exit " + r.code + ") " + r.out.trim());
+			// 显式校验落盘结果：cp 失败（源不存在 / 目标目录不可写）时 target 不会存在。
+			// 旧写法无论成败都只记一句 i，事后无法判断「原始服务端日志到底有没有随包寄回」——
+			// 2026-09-29 那份上报里就没有 minishizuku_*.log，只能反推复制没生效。
+			if (target.isFile() && target.length() > 0) {
+				KeydroidxLog.i("ShizukuRoot", "copied minishizuku.log -> " + target.getAbsolutePath()
+						+ " (" + target.length() + " bytes, exit " + r.code + ") " + r.out.trim());
+			} else {
+				// 诊断链路自身的失败按规范记 w（e 会再落一次上报标记）
+				KeydroidxLog.w("ShizukuRoot", "复制 minishizuku.log 失败(exit " + r.code + "): " + r.out.trim());
+			}
 		} catch (Exception e) {
-			KeydroidxLog.e("ShizukuRoot", "copy minishizuku.log failed", e);
+			KeydroidxLog.w("ShizukuRoot", "copy minishizuku.log failed", e);
 		}
 	}
 

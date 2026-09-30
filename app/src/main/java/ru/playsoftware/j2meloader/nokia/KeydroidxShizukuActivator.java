@@ -39,11 +39,14 @@ public final class KeydroidxShizukuActivator {
 		public final boolean online;
 		/** 上线服务端 uid（WHOAMI），未上线为 {@link ServerIdentity#UID_UNKNOWN} */
 		public final int serverUid;
+		/** 是否因为已有一次激活正在进行而被拒绝（此时 execOk/online 均为 false） */
+		public final boolean busy;
 
-		Result(boolean execOk, boolean online, int serverUid) {
+		Result(boolean execOk, boolean online, int serverUid, boolean busy) {
 			this.execOk = execOk;
 			this.online = online;
 			this.serverUid = serverUid;
+			this.busy = busy;
 		}
 
 		/** 激活完全成功：脚本执行 + 服务上线 + 身份为 root */
@@ -53,32 +56,72 @@ public final class KeydroidxShizukuActivator {
 	}
 
 	/**
+	 * 「服务端启动」互斥闸。
+	 * <p>
+	 * 启动脚本第一句就是 {@code kill -9} 掉<strong>所有</strong> app_process 进程，因此两次激活
+	 * 并发执行等于互相拆台：后一次会把前一次刚拉起来的服务端杀掉，两边都等满 20 秒超时。
+	 * 2026-09-28 的日志即为此形态（20:25:32.704 与 20:25:36.698 两次并发启动，
+	 * 20:25:53.178 / 20:25:57.158 双双判失败），而当天唯一一次成功（09-29 18:23）是单次点击、
+	 * 无并发。故整个「kill → 启动 → 轮询上线」过程必须串行。
+	 */
+	private static final java.util.concurrent.atomic.AtomicBoolean sActivating =
+			new java.util.concurrent.atomic.AtomicBoolean(false);
+
+	/**
+	 * 尝试占用激活闸。自定义激活流程（{@link ShizukuRootFragment}）应在发起前调用，
+	 * 并在流程结束时（{@code finally}）调用 {@link #unlockActivation()} 释放。
+	 * <p>
+	 * {@link #activateRootServer(Context)} 内部已自带本互斥，其调用方<strong>不要</strong>再自行加锁，
+	 * 只需处理 {@link Result#busy}。
+	 *
+	 * @return true=已占用，可以开始；false=已有激活正在进行
+	 */
+	public static boolean tryLockActivation() {
+		return sActivating.compareAndSet(false, true);
+	}
+
+	/** 释放激活闸（必须在 finally 中调用，否则激活入口会永久被拒）。 */
+	public static void unlockActivation() {
+		sActivating.set(false);
+	}
+
+	/**
 	 * 以 root 拉起 mini_shizuku 服务端（阻塞，须在后台线程调用）。
 	 * 启动细节与失败原因见 {@link ShizukuRootFragment} 类注释与 minishizuku.log。
+	 * <p>
+	 * 自带 {@link #tryLockActivation()} 互斥：已有激活在进行时立刻返回 {@link Result#busy}。
 	 */
 	public static Result activateRootServer(Context ctx) {
-		boolean execOk = execRootStartScript(ctx);
-		if (!execOk) {
-			return new Result(false, false, ServerIdentity.UID_UNKNOWN);
+		if (!tryLockActivation()) {
+			KeydroidxLog.w(TAG, "已有 root 激活正在进行，忽略本次请求");
+			return new Result(false, false, ServerIdentity.UID_UNKNOWN, true);
 		}
-		// 轮询等待新 root 服务上线（脚本已 kill 旧服务端，不会误报旧服务在线）
-		long deadline = System.currentTimeMillis() + ACTIVATE_TIMEOUT_MS;
-		boolean online = false;
-		while (System.currentTimeMillis() < deadline) {
-			if (Shizuku.isRunning()) {
-				online = true;
-				break;
+		try {
+			boolean execOk = execRootStartScript(ctx);
+			if (!execOk) {
+				return new Result(false, false, ServerIdentity.UID_UNKNOWN, false);
 			}
-			try {
-				Thread.sleep(POLL_INTERVAL_MS);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				break;
+			// 轮询等待新 root 服务上线（脚本已 kill 旧服务端，不会误报旧服务在线）
+			long deadline = System.currentTimeMillis() + ACTIVATE_TIMEOUT_MS;
+			boolean online = false;
+			while (System.currentTimeMillis() < deadline) {
+				if (Shizuku.isRunning()) {
+					online = true;
+					break;
+				}
+				try {
+					Thread.sleep(POLL_INTERVAL_MS);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					break;
+				}
 			}
+			int uid = online ? Shizuku.serverUid() : ServerIdentity.UID_UNKNOWN;
+			KeydroidxLog.i(TAG, "激活结果: online=" + online + " serverUid=" + uid);
+			return new Result(true, online, uid, false);
+		} finally {
+			unlockActivation();
 		}
-		int uid = online ? Shizuku.serverUid() : ServerIdentity.UID_UNKNOWN;
-		KeydroidxLog.i(TAG, "激活结果: online=" + online + " serverUid=" + uid);
-		return new Result(true, online, uid);
 	}
 
 	/** 构建并 su -c 直执 root 启动脚本。 */
