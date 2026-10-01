@@ -122,7 +122,13 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			// 曾引发「Application does not have a focused window」ANR → 展讯看门狗强杀进程 →
 			// 系统自动 Clearing preferred home → 按 HOME 弹出桌面选择器。
 			// 在 onCreate 启动时桌面处于前台态，服务早已常驻，息屏过渡期不再有任何 FGS 启动动作。
-			KeydroidxDesktopKeepAliveService.start(this);
+			// 用户可在「桌面设置 → 系统与权限 → 保活服务」关闭；关闭时本次不启动
+			// （已在运行的服务由设置页在切换瞬间 stopService 停掉）。
+			if (KeydroidxSettingsStorage.isDesktopKeepAliveEnabled(this)) {
+				KeydroidxDesktopKeepAliveService.start(this);
+			} else {
+				KeydroidxLog.i("Desktop", "保活服务已按用户设置关闭，本次不启动");
+			}
 		}
 	}
 

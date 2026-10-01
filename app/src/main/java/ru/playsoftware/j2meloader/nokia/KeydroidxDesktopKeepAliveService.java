@@ -20,7 +20,9 @@ import ru.playsoftware.j2meloader.R;
 /**
  * 原键桌面主进程保活前台 Service（主进程，manifest 未声明 android:process）。
  * <p>
- * <b>常驻策略</b>：桌面 onCreate（向导完成后）即拉起，之后【永不主动停止】，通知长期常驻。
+ * <b>常驻策略</b>：桌面 onCreate（向导完成后）即拉起，之后默认【永不主动停止】，通知长期常驻。
+ * 唯一例外是用户在「桌面设置 → 系统与权限 → 保活服务」关掉开关：此时由设置页 {@link #stop} 停掉本服务
+ * 并撤下通知，且之后桌面启动不再拉起（见 KeydroidxSettingsStorage#isDesktopKeepAliveEnabled）。
  * <p>
  * <b>为何在 onCreate 而非 onStop 启动</b>：早期版本在 {@code KeydroidxDesktopActivity.onStop()}
  * 里启动本服务，但 onStop 往往就是息屏/锁屏发生的瞬间。那时启动前台服务会把它
@@ -125,6 +127,21 @@ public class KeydroidxDesktopKeepAliveService extends Service {
 	@Override
 	public IBinder onBind(Intent intent) {
 		return null;
+	}
+
+	/**
+	 * 停止保活并撤下常驻通知（用户关闭「保活服务」开关时调用）。
+	 * <p>用 stopService 而非 stopSelf：显式停止后系统不会按 START_STICKY 重新拉起，
+	 * 关闭状态得以保持；下次桌面 onCreate 读到开关为关闭也不会再启动。
+	 */
+	public static void stop(Context context) {
+		try {
+			context.stopService(new Intent(context, KeydroidxDesktopKeepAliveService.class));
+			KeydroidxLog.i(TAG, "保活服务已按用户开关停止");
+		} catch (Exception e) {
+			// 停不掉也不影响桌面本身，仅保活继续（用户可再次关闭）
+			KeydroidxLog.w(TAG, "停止保活服务失败（忽略，桌面不受影响）: " + e);
+		}
 	}
 
 	/** 拉起常驻保活（KeydroidxDesktopActivity.onStop 调用；已运行时重复调用无副作用）。 */

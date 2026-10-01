@@ -37,7 +37,8 @@ import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconPackManager;
  *     <li>{@link #GROUP_APPEARANCE} 外观与显示：字体大小、界面字体、主题设置、壁纸设置；</li>
  *     <li>{@link #GROUP_KEYS} 按键与操作：按键绑定、应用向导；</li>
  *     <li>{@link #GROUP_CONTENT} 桌面内容：顶部快捷栏设置、桌面组件设置；</li>
- *     <li>{@link #GROUP_SYSTEM} 系统与权限：日志记录、默认桌面设置。</li>
+ *     <li>{@link #GROUP_SYSTEM} 系统与权限：日志记录、默认桌面设置、通知中心、
+ *         系统权限自检、自动检查更新、保活服务。</li>
  * </ul>
  * 由 {@link KeydroidxDesktopSettingsFragment} 通过 {@link #newInstance(int)} 打开。
  */
@@ -89,6 +90,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 						KeydroidxIcons.ICON_NOTIFICATIONS, // 通知中心
 						KeydroidxIcons.ICON_SETTINGS,     // 核心权限管理
 						KeydroidxIcons.ICON_DOWNLOAD,     // 自动检查更新
+						KeydroidxIcons.ICON_SHIELD,       // 保活服务
 				};
 			default:
 				return new String[0];
@@ -104,7 +106,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			case GROUP_CONTENT:
 				return new String[]{"顶部快捷栏设置", "桌面组件设置", "快捷开关"};
 			case GROUP_SYSTEM:
-				return new String[]{"日志记录", "默认桌面设置", "通知中心", "系统权限自检", "自动检查更新"};
+				return new String[]{"日志记录", "默认桌面设置", "通知中心", "系统权限自检", "自动检查更新", "保活服务"};
 			default:
 				return new String[0];
 		}
@@ -253,6 +255,10 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			}
 			return text;
 		}
+		if (group == GROUP_SYSTEM && index == 5) {
+			return KeydroidxSettingsStorage.isDesktopKeepAliveEnabled(requireContext())
+					? "保活服务：开启" : "保活服务：关闭";
+		}
 		return itemNames[index];
 	}
 
@@ -371,6 +377,10 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 				KeydroidxLog.i("SettingsGroup", "自动检查更新开关");
 				toggleAutoUpdateCheck();
 				return true;
+			case 5:
+				KeydroidxLog.i("SettingsGroup", "保活服务开关");
+				toggleDesktopKeepAlive();
+				return true;
 			default:
 				return false;
 		}
@@ -400,6 +410,26 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 		KeydroidxLog.i("SettingsGroup", "自动检查更新切换为: " + (next ? "每日" : "关闭"));
 		if (tvNames != null && tvNames.length > 4 && tvNames[4] != null) {
 			tvNames[4].setText(getItemDisplayName(4));
+		}
+	}
+
+	/**
+	 * 切换桌面常驻保活开关并立即生效：
+	 * 开启=拉起 {@link KeydroidxDesktopKeepAliveService}（通知栏出现常驻通知）；
+	 * 关闭=停掉该服务并撤下通知，桌面进程失去前台优先级（更易被系统回收，按 HOME 需冷启动）。
+	 * 默认开启，关闭状态在下次桌面 onCreate 同样生效（见 KeydroidxDesktopActivity）。
+	 */
+	private void toggleDesktopKeepAlive() {
+		boolean next = !KeydroidxSettingsStorage.isDesktopKeepAliveEnabled(requireContext());
+		KeydroidxSettingsStorage.setDesktopKeepAliveEnabled(requireContext(), next);
+		if (next) {
+			KeydroidxDesktopKeepAliveService.start(requireContext());
+		} else {
+			KeydroidxDesktopKeepAliveService.stop(requireContext());
+		}
+		KeydroidxLog.i("SettingsGroup", "保活服务切换为: " + (next ? "开启" : "关闭"));
+		if (tvNames != null && tvNames.length > 5 && tvNames[5] != null) {
+			tvNames[5].setText(getItemDisplayName(5));
 		}
 	}
 

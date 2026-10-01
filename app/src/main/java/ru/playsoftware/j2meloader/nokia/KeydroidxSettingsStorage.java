@@ -727,6 +727,30 @@ public class KeydroidxSettingsStorage {
                 KeydroidxLog.i("SettingsStorage", "setNotificationShowOngoing: " + show);
         }
 
+	// ── 桌面保活开关（桌面设置 → 系统与权限 → 保活服务） ──
+
+	private static final String KEY_DESKTOP_KEEPALIVE = "desktop_keepalive_enabled";
+
+	/**
+	 * 是否启用桌面常驻保活前台服务，默认开启。
+	 * <p>开启：桌面 onCreate 拉起 {@link KeydroidxDesktopKeepAliveService} 常驻前台，
+	 * 进程拿到前台优先级（adj），按 HOME 秒回、拦截器 socket 不易断；
+	 * 代价是通知栏长期占用一条常驻通知。
+	 * <p>关闭：不再拉起该服务；关闭瞬间由设置页停掉正在运行的服务并撤下通知。
+	 * 桌面功能不受影响，只是进程更容易被系统回收（按 HOME 需冷启动）。
+	 */
+	public static boolean isDesktopKeepAliveEnabled(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getBoolean(KEY_DESKTOP_KEEPALIVE, true);
+	}
+
+	/** 保存桌面保活开关（切换瞬间的 start/stop 由设置页负责）。 */
+	public static void setDesktopKeepAliveEnabled(Context ctx, boolean enabled) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putBoolean(KEY_DESKTOP_KEEPALIVE, enabled).apply();
+		KeydroidxLog.i("SettingsStorage", "setDesktopKeepAliveEnabled: " + enabled);
+	}
+
 	// ── 授权模式（mini_shizuku 设置页：root 模式 / mini_shizuku 模式，双轨制） ──
 
 	/** 授权模式：mini_shizuku 模式（shell 身份，电脑 adb 激活）。默认值，兼容最广。 */
