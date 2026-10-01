@@ -24,7 +24,10 @@ import javax.microedition.lcdui.event.Event;
 import javax.microedition.lcdui.event.EventQueue;
 import javax.microedition.lcdui.event.RunnableEvent;
 import javax.microedition.midlet.MIDlet;
+import javax.microedition.shell.MicroActivity;
 import javax.microedition.util.ContextHolder;
+
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
 import ru.woesss.j2me.jar.Descriptor;
 
@@ -133,10 +136,22 @@ public class Display {
 
 	private void showAlert(Alert alert) {
 		ViewHandler.postEvent(() -> {
-			AlertDialog alertDialog = alert.prepareDialog();
-			alertDialog.show();
-			if (alert.finiteTimeout()) {
-				ViewHandler.postDelayed(alert::dismiss, alert.getTimeout());
+			// 防竞态：消息延迟到主线程执行时，宿主 Activity 可能已被销毁/退出，
+			// 此时 Dialog.show() 会抛 BadTokenException（崩溃上报 #84）
+			MicroActivity activity = ContextHolder.getActivity();
+			if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+				KeydroidxLog.w("Display", "skip alert: host activity is not running");
+				return;
+			}
+			try {
+				AlertDialog alertDialog = alert.prepareDialog();
+				alertDialog.show();
+				if (alert.finiteTimeout()) {
+					ViewHandler.postDelayed(alert::dismiss, alert.getTimeout());
+				}
+			} catch (Exception e) {
+				// 校验通过后 Activity 仍可能在 show() 前一瞬间被销毁，属预期内降级，不 crash
+				KeydroidxLog.w("Display", "show alert failed", e);
 			}
 		});
 	}
