@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * 桌面组件的 SharedPreferences 持久化。
  * 组件列表上限 {@link #MAX_COUNT} 项，以 JSON 数组形式存储。
- * 首次启动时自动写入默认组件（日历、网址、内存、使用时长、音乐播放器）。
+ * 首次启动时自动写入默认组件（日历、后台管理、音乐播放器）。
  */
 public class KeydroidxWidgetStorage {
 	private static final String TAG = "KeydroidxWidgetStorage";
@@ -122,11 +122,7 @@ public class KeydroidxWidgetStorage {
 		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_BG_MANAGER, "最近任务", ""));
 		KeydroidxLog.i("WidgetStorage", "默认组件: 后台管理（最近任务）");
 
-		// 3. 使用时长组件
-		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_USAGE, "使用时长", ""));
-		KeydroidxLog.i("WidgetStorage", "默认组件: 使用时长");
-
-		// 4. 应用组件：默认音乐播放器（取第一个已安装的）
+		// 3. 应用组件：默认音乐播放器（取第一个已安装的）
 		String musicAppKey = findMusicApp(ctx);
 		if (musicAppKey != null) {
 			String musicLabel = findMusicLabel(ctx, musicAppKey);
