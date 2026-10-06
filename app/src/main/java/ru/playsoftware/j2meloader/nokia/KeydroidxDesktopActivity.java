@@ -25,11 +25,13 @@ import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import io.github.cctyl.nokia.common.model.KeyResolver;
 import io.github.cctyl.nokia.common.model.KeydroidxKeyAction;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
+import io.github.cctyl.nokia.common.ui.focus.KeydroidxDialogFocus;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
 import io.github.cctyl.nokia.common.ui.page.KeydroidxPageHost;
 import ru.playsoftware.j2meloader.R;
@@ -128,6 +130,9 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 
 		// 确保全局 JAR 设置 profile 存在并设为默认
 		KeydroidxGlobalProfile.ensureGlobalProfile(this);
+
+		// 注册通用 Dialog 窗口适配器：将 common 库（如权限申请、更新提醒等通用弹窗）自动吸附在上半屏并接入事件调度
+		KeydroidxDialogFocus.setDialogWindowAdjuster(this::applyDialogWindowBounds);
 
 		// 首次启动：若按键绑定向导未完成，则进入向导（清数据后 isWizardDone 复位会再次弹出）
 		Fragment existing = getSupportFragmentManager().findFragmentById(R.id.midPanel);
@@ -504,6 +509,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	}
 
 	protected void onDestroy() {
+		KeydroidxDialogFocus.setDialogWindowAdjuster(null);
 		if (sInstance == this) {
 			sInstance = null;
 		}
@@ -628,10 +634,10 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			}
 			// 返回键未绑定时优先交给活跃弹窗处理，其次兜底为导航返回（非桌面 Fragment），否则交给系统。
 			if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-				DialogFragment activeDialog = findActiveDialogFragment();
-				if (activeDialog != null && activeDialog.getDialog() != null && activeDialog.getDialog().isShowing()) {
+				Dialog activeDialog = findActiveDialogTarget();
+				if (activeDialog != null && activeDialog.isShowing()) {
 					KeydroidxLog.d("Desktop", "返回键优先交给活跃弹窗处理");
-					activeDialog.getDialog().dispatchKeyEvent(event);
+					activeDialog.dispatchKeyEvent(event);
 					lastHandledDownKeyCode = event.getKeyCode();
 					return true;
 				}
@@ -730,12 +736,12 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	 * @return 是否被 Fragment 消费
 	 */
 	private boolean dispatchActionToHost(int action) {
-		// 1. 若当前有正在展示的弹窗（含子 Fragment 弹窗），优先分发给弹窗并消费，绝不泄漏给底层宿主页面
-		DialogFragment activeDialog = findActiveDialogFragment();
-		if (activeDialog != null && activeDialog.getDialog() != null && activeDialog.getDialog().isShowing()) {
+		// 1. 若当前有正在展示的弹窗（含通用 Dialog 与 DialogFragment），优先分发给弹窗并消费，绝不泄漏给底层宿主页面
+		Dialog activeDialog = findActiveDialogTarget();
+		if (activeDialog != null && activeDialog.isShowing()) {
 			KeydroidxLog.d("Desktop", "dispatchActionToHost: 优先由活跃弹窗处理 action="
 					+ KeydroidxKeyBinding.getActionName(action));
-			return dispatchActionToDialog(activeDialog.getDialog(), action);
+			return dispatchActionToDialog(activeDialog, action);
 		}
 
 		Fragment current = getSupportFragmentManager().findFragmentById(R.id.midPanel);
@@ -1060,18 +1066,35 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		KeydroidxLog.i("Desktop", "updateTouchModeUi enabled=" + enabled);
 	}
 
+	private final List<Dialog> mActiveCustomDialogs = new ArrayList<>();
+
 	/**
 	 * 将虚拟按键事件分发给当前处于活跃状态的目标：
-	 * 若当前有可见的 DialogFragment（如选项弹窗、卸载确认等独立 Window），优先分发给它；
+	 * 若当前有可见的 Dialog（如权限申请、选项弹窗、卸载确认等独立 Window），优先分发给它；
 	 * 否则分发给 Activity 自身走标准 dispatchKeyEvent。
 	 */
 	private void dispatchToActiveTarget(KeyEvent event) {
-		DialogFragment activeDialog = findActiveDialogFragment();
-		if (activeDialog != null && activeDialog.getDialog() != null && activeDialog.getDialog().isShowing()) {
-			activeDialog.getDialog().dispatchKeyEvent(event);
+		Dialog activeDialog = findActiveDialogTarget();
+		if (activeDialog != null && activeDialog.isShowing()) {
+			activeDialog.dispatchKeyEvent(event);
 		} else {
 			dispatchKeyEvent(event);
 		}
+	}
+
+	/** 查找当前最顶层处于显示状态的 Dialog（兼顾通用 Dialog 与 DialogFragment） */
+	private Dialog findActiveDialogTarget() {
+		for (int i = mActiveCustomDialogs.size() - 1; i >= 0; i--) {
+			Dialog d = mActiveCustomDialogs.get(i);
+			if (d != null && d.isShowing()) {
+				return d;
+			}
+		}
+		DialogFragment df = findActiveDialogFragment();
+		if (df != null && df.getDialog() != null && df.getDialog().isShowing()) {
+			return df.getDialog();
+		}
+		return null;
 	}
 
 	/** 查找当前最顶层处于显示状态的 DialogFragment（递归支持子 Fragment 弹出的 Dialog） */
@@ -1126,36 +1149,68 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	}
 
 	/**
-	 * 将 DialogFragment 窗口边界精准限制在上半部桌面屏幕内：
+	 * 将 Dialog 窗口边界精准限制在上半部桌面屏幕内：
 	 * 1. 窗口底部吸附在虚拟键盘上沿（params.y = keypadHeight）；
 	 * 2. 清除全屏 Window 的 Dim 遮罩（避免覆盖虚拟键盘，由 desktopScreenDimOverlay 替代）；
 	 * 3. 添加 FLAG_NOT_TOUCH_MODAL 允许触摸穿透直达键盘。
 	 */
-	public void applyDialogWindowBounds(DialogFragment df) {
-		if (df == null) return;
-		Dialog dialog = df.getDialog();
+	public void applyDialogWindowBounds(Dialog dialog) {
 		if (dialog == null || dialog.getWindow() == null) return;
+		if (!mActiveCustomDialogs.contains(dialog)) {
+			mActiveCustomDialogs.add(dialog);
+		}
+		Window window = dialog.getWindow();
+		View decor = window.getDecorView();
+		if (decor != null) {
+			decor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+				@Override
+				public void onViewAttachedToWindow(View v) {
+					if (isTouchModeEnabled()) {
+						setScreenDimOverlayVisible(true);
+					}
+				}
+
+				@Override
+				public void onViewDetachedFromWindow(View v) {
+					mActiveCustomDialogs.remove(dialog);
+					if (findActiveDialogTarget() == null) {
+						setScreenDimOverlayVisible(false);
+					}
+				}
+			});
+		}
 		if (isTouchModeEnabled()) {
 			int keypadH = getKeypadHeight();
 			if (keypadH > 0) {
-				Window window = dialog.getWindow();
+				window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
 				WindowManager.LayoutParams params = window.getAttributes();
 				params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
 				params.y = keypadH;
 				window.setAttributes(params);
 				window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
 				window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
-				window.getDecorView().post(() -> {
-					if (dialog.isShowing() && isTouchModeEnabled()) {
-						WindowManager.LayoutParams p = window.getAttributes();
-						p.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-						p.y = keypadH;
-						window.setAttributes(p);
-						window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-						window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
-					}
-				});
+				setScreenDimOverlayVisible(true);
+				if (decor != null) {
+					decor.post(() -> {
+						if (dialog.isShowing() && isTouchModeEnabled()) {
+							WindowManager.LayoutParams p = window.getAttributes();
+							p.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+							p.y = keypadH;
+							window.setAttributes(p);
+							window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+							window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
+						}
+					});
+				}
 			}
+		}
+	}
+
+	public void applyDialogWindowBounds(DialogFragment df) {
+		if (df == null) return;
+		Dialog dialog = df.getDialog();
+		if (dialog != null) {
+			applyDialogWindowBounds(dialog);
 		}
 	}
 }
