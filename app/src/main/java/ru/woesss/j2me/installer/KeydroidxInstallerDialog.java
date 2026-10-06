@@ -143,6 +143,9 @@ public class KeydroidxInstallerDialog extends DialogFragment {
 	@Override
 	public void onStart() {
 		super.onStart();
+		if (getActivity() instanceof ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity) {
+			((ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity) getActivity()).applyDialogWindowBounds(this);
+		}
 		if (installer == null) {
 			startLoadInfo();
 		}

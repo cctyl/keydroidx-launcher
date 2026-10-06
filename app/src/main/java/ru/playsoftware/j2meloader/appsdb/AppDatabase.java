@@ -30,10 +30,14 @@ public abstract class AppDatabase extends RoomDatabase {
 	public abstract AppItemDao appItemDao();
 
 	public static synchronized AppDatabase open(Context context, String dir) {
+		java.io.File d = new java.io.File(dir);
+		if (!d.exists()) {
+			d.mkdirs();
+		}
 		return Room.databaseBuilder(
 				context.getApplicationContext(),
 				AppDatabase.class,
-				dir + "/J2ME-apps.db")
+				new java.io.File(d, "J2ME-apps.db").getAbsolutePath())
 				.build();
 	}
 }

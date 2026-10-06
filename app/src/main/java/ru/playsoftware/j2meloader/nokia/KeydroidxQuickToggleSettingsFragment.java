@@ -371,6 +371,10 @@ public class KeydroidxQuickToggleSettingsFragment extends KeydroidxPageFragment 
 			updateBottomBar();
 			return true;
 		}
+		if (getActivity() instanceof KeydroidxDesktopActivity) {
+			((KeydroidxDesktopActivity) getActivity()).exitCurrent();
+			return true;
+		}
 		return false;
 	}
 

@@ -751,6 +751,32 @@ public class KeydroidxSettingsStorage {
 		KeydroidxLog.i("SettingsStorage", "setDesktopKeepAliveEnabled: " + enabled);
 	}
 
+	// ── 触屏模式（屏幕分为两部分：上半部桌面内容，下半部虚拟触摸按键） ──
+
+	private static final String KEY_TOUCH_MODE = "touch_mode_enabled";
+
+	/** 是否开启触屏模式。默认关闭（实体按键机模式）。 */
+	public static boolean isTouchMode(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getBoolean(KEY_TOUCH_MODE, false);
+	}
+
+	/** 设置触屏模式开关。 */
+	public static void setTouchMode(Context ctx, boolean enabled) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putBoolean(KEY_TOUCH_MODE, enabled).apply();
+		KeydroidxLog.i(TAG, "setTouchMode: " + enabled);
+	}
+
+	public boolean isTouchModeEnabled() {
+		return prefs.getBoolean(KEY_TOUCH_MODE, false);
+	}
+
+	public void setTouchModeEnabled(boolean enabled) {
+		prefs.edit().putBoolean(KEY_TOUCH_MODE, enabled).apply();
+		KeydroidxLog.i(TAG, "setTouchModeEnabled: " + enabled);
+	}
+
 	// ── 授权模式（mini_shizuku 设置页：root 模式 / mini_shizuku 模式，双轨制） ──
 
 	/** 授权模式：mini_shizuku 模式（shell 身份，电脑 adb 激活）。默认值，兼容最广。 */

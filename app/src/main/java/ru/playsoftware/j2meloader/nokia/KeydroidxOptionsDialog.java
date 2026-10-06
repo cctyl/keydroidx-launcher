@@ -272,6 +272,14 @@ public class KeydroidxOptionsDialog extends DialogFragment {
 		return dialog;
 	}
 
+	@Override
+	public void onStart() {
+		super.onStart();
+		if (getActivity() instanceof KeydroidxDesktopActivity) {
+			((KeydroidxDesktopActivity) getActivity()).applyDialogWindowBounds(this);
+		}
+	}
+
 	/** 重建列表容器（onCreateDialog 首次构建 / setItems 动态刷新共用）。 */
 	private void rebuildList() {
 		if (listContainer == null) return;

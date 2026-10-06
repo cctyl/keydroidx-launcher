@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>KeydroidX 触屏模式 (Touch Screen Keypad Mode) — 设计原型与审核方案</title>
+<style>
+  :root {
+    --bg-page: #0f141c;
+    --card-bg: #18202c;
+    --card-border: #263345;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b9bb4;
+    --accent: #2f7cf6;
+    --accent-glow: rgba(47, 124, 246, 0.35);
+    --call-green: #25d366;
+    --call-green-glow: rgba(37, 211, 102, 0.4);
+    --end-red: #ff3b30;
+    --end-red-glow: rgba(255, 59, 48, 0.4);
+
+    /* 手机机身 & 键盘默认材质（黑曜石哑光） */
+    --phone-chassis: #12151b;
+    --chassis-rim: #2d3748;
+    --screen-bezel: #080a0e;
+    --key-base: linear-gradient(180deg, #2a313d 0%, #1a1e27 100%);
+    --key-pressed: linear-gradient(180deg, #161a22 0%, #202632 100%);
+    --key-border: #3c4656;
+    --key-text: #f0f4f8;
+    --key-subtext: #8e9cae;
+    --key-glow-color: rgba(255, 255, 255, 0.7);
+    --dpad-ring: linear-gradient(145deg, #384252 0%, #1e2430 100%);
+    --dpad-center: radial-gradient(circle, #3e4859 0%, #1b202a 100%);
+  }
+
+  /* 主题变体：复古银白金属 (Nokia 6300/E71 风格) */
+  body.theme-silver {
+    --phone-chassis: #d6dbdf;
+    --chassis-rim: #9aa0a6;
+    --screen-bezel: #1b1e22;
+    --key-base: linear-gradient(180deg, #ffffff 0%, #d8dde3 100%);
+    --key-pressed: linear-gradient(180deg, #c2c7ce 0%, #dfe3e8 100%);
+    --key-border: #abb3bd;
+    --key-text: #1b2430;
+    --key-subtext: #596575;
+    --key-glow-color: rgba(47, 124, 246, 0.8);
+    --dpad-ring: linear-gradient(145deg, #f5f7fa 0%, #b8c0ca 100%);
+    --dpad-center: radial-gradient(circle, #eef1f6 0%, #bcc5d0 100%);
+  }
+
+  /* 主题变体：芬兰极光冰蓝 */
+  body.theme-iceblue {
+    --phone-chassis: #0b1a2a;
+    --chassis-rim: #1b3858;
+    --screen-bezel: #060e17;
+    --key-base: linear-gradient(180deg, #18334f 0%, #0c2035 100%);
+    --key-pressed: linear-gradient(180deg, #091726 0%, #142a42 100%);
+    --key-border: #29537d;
+    --key-text: #d8eeff;
+    --key-subtext: #6ea4d4;
+    --key-glow-color: rgba(94, 186, 255, 0.85);
+    --dpad-ring: linear-gradient(145deg, #22456c 0%, #10273f 100%);
+    --dpad-center: radial-gradient(circle, #2d5888 0%, #0d2138 100%);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* 顶部全局标题栏 */
+  .header-bar {
+    max-width: 1200px;
+    width: 100%;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .header-bar .title-group h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .badge-spec {
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(47, 124, 246, 0.18);
+    color: #5da0ff;
+    border: 1px solid rgba(47, 124, 246, 0.4);
+    padding: 2px 8px;
+    border-radius: 12px;
+    letter-spacing: 0.2px;
+  }
+
+  .header-bar .title-group p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  .top-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .control-chip {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .control-chip:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+
+  .control-chip select {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* 主工作区布局：左侧交互模拟机 + 右侧审核设计文档与映射规范 */
+  .workspace {
+    max-width: 1280px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 430px 1fr;
+    gap: 36px;
+    align-items: start;
+  }
+
+  @media (max-width: 980px) {
+    .workspace {
+      grid-template-columns: 1fr;
+      justify-items: center;
+    }
+  }
+
+  /* ========================================================
+     触屏手机外壳容器（模拟 19.5:9 现代触屏手机比例）
+     ======================================================== */
+  .phone-frame {
+    width: 390px;
+    background: var(--phone-chassis);
+    border-radius: 46px;
+    padding: 14px 12px 18px 12px;
+    box-shadow:
+      0 0 0 3px var(--chassis-rim),
+      0 20px 50px rgba(0, 0, 0, 0.7),
+      inset 0 1px 2px rgba(255, 255, 255, 0.25);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    user-select: none;
+    border: 2px solid rgba(255,255,255,0.06);
+  }
+
+  /* 听筒扬声器小开孔 */
+  .phone-earpiece {
+    width: 54px;
+    height: 4px;
+    background: #2a313d;
+    border-radius: 2px;
+    margin: 4px auto 10px auto;
+    box-shadow: inset 0 1px 1px rgba(0,0,0,0.8);
+  }
+
+  /* ========================================================
+     上半部分：功能机屏幕显示区 (Display Canvas)
+     ======================================================== */
+  .screen-container {
+    width: 100%;
+    height: 380px;
+    background: #000;
+    border-radius: 22px;
+    overflow: hidden;
+    position: relative;
+    border: 3px solid var(--screen-bezel);
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 模拟 S60 / 原键桌面壁纸 */
+  .screen-wallpaper {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(175deg, #0d2146 0%, #183e78 45%, #081734 100%);
+    z-index: 1;
+    transition: background 0.3s;
+  }
+
+  /* 壁纸微噪点与光影，增强复古质感 */
+  .screen-wallpaper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 15%, rgba(68, 142, 246, 0.28) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* 屏幕内部核心视口 (240x320 比例等比渲染层) */
+  .screen-viewport {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    color: #ffffff;
+    font-size: 13px;
+  }
+
+  /* 1. 状态栏 (Status Bar: 信号、运营商、时间、电池) */
+  .screen-statusbar {
+    height: 22px;
+    padding: 0 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .status-left-icons {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* 阶梯信号条 */
+  .signal-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 1.5px;
+    height: 10px;
+  }
+  .signal-bar {
+    width: 2.5px;
+    background: #fff;
+    border-radius: 0.5px;
+  }
+  .signal-bar:nth-child(1) { height: 3px; }
+  .signal-bar:nth-child(2) { height: 5px; }
+  .signal-bar:nth-child(3) { height: 7px; }
+  .signal-bar:nth-child(4) { height: 9px; }
+  .signal-bar:nth-child(5) { height: 11px; }
+
+  .status-operator {
+    font-size: 10px;
+    color: #cbd5e1;
+    margin-left: 3px;
+    letter-spacing: 0.2px;
+  }
+
+  .status-right-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .battery-pill {
+    width: 17px;
+    height: 9px;
+    border: 1px solid #ffffff;
+    border-radius: 2px;
+    padding: 1px;
+    position: relative;
+    display: flex;
+  }
+  .battery-pill::after {
+    content: '';
+    position: absolute;
+    right: -3px;
+    top: 2px;
+    width: 2px;
+    height: 3px;
+    background: #ffffff;
+    border-radius: 0 1px 1px 0;
+  }
+  .battery-level {
+    height: 100%;
+    width: 80%;
+    background: #34c759;
+    border-radius: 1px;
+  }
+
+  /* 2. 屏幕主内容区 (Desktop Content) */
+  .screen-content {
+    flex: 1;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  /* 时钟与日期大部件 */
+  .widget-clock-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 8px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: background 0.15s;
+  }
+  .widget-clock-banner.focused {
+    background: rgba(47, 124, 246, 0.45);
+    outline: 1.5px solid #64b5f6;
+  }
+
+  .clock-big {
+    font-size: 34px;
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -1px;
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  .clock-date {
+    font-size: 11px;
+    color: #93c5fd;
+    text-align: right;
+    line-height: 1.3;
+  }
+
+  /* 横向快捷应用组件条 (Toolbar Widget) */
+  .widget-quick-bar {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    padding: 6px 4px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin-bottom: 8px;
+    backdrop-filter: blur(6px);
+  }
+
+  .quick-app-item {
+    width: 44px;
+    height: 44px;
+    border-radius: 7px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 9px;
+    color: #e2e8f0;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .quick-app-item svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+  }
+
+  /* 选中高亮状态 (规范 6.3 焦点要求) */
+  .quick-app-item.focused {
+    background: #1e5aa8;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(47, 124, 246, 0.7);
+    outline: 1.5px solid #ffffff;
+    transform: scale(1.06);
+  }
+
+  /* 桌面列表组件 (如日程、音乐、最近使用) */
+  .widget-list-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
+  .widget-row-card {
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    transition: all 0.15s;
+  }
+
+  .widget-row-card.focused {
+    background: #1e5aa8;
+    outline: 1.5px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+
+  .widget-row-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .widget-row-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+  }
+
+  .widget-row-texts {
+    flex: 1;
+    overflow: hidden;
+  }
+  .widget-row-title {
+    font-weight: 600;
+    font-size: 11px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+  .widget-row-sub {
+    font-size: 9.5px;
+    color: #cbd5e1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+
+  /* 模拟视图模式：拨号输入浮层 */
+  .dialer-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 18, 32, 0.94);
+    z-index: 10;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 16px;
+    text-align: center;
+  }
+  .dialer-overlay.active {
+    display: flex;
+  }
+  .dialer-number-display {
+    font-size: 26px;
+    letter-spacing: 2px;
+    color: #60a5fa;
+    font-family: monospace;
+    min-height: 36px;
+    word-break: break-all;
+    border-bottom: 2px solid rgba(255,255,255,0.2);
+    width: 100%;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+  }
+  .dialer-hint {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  /* 模拟视图模式：选项弹窗 (Options Modal) */
+  .modal-options-sheet {
+    position: absolute;
+    bottom: 26px;
+    left: 8px;
+    right: 8px;
+    background: #182234;
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    padding: 6px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+    z-index: 20;
+    display: none;
+  }
+  .modal-options-sheet.active {
+    display: block;
+  }
+  .modal-option-item {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    color: #e2e8f0;
+  }
+  .modal-option-item.focused {
+    background: #2563eb;
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  /* 模拟视图模式：向导首界面 (Setup Wizard) */
+  .wizard-preview-overlay {
+    position: absolute;
+    inset: 0;
+    background: #0f172a;
+    z-index: 15;
+    display: none;
+    flex-direction: column;
+    padding: 16px 14px;
+    text-align: center;
+    justify-content: center;
+  }
+  .wizard-preview-overlay.active {
+    display: flex;
+  }
+  .wizard-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .wizard-desc {
+    font-size: 10.5px;
+    color: #94a3b8;
+    line-height: 1.4;
+    margin-bottom: 16px;
+  }
+  .wizard-btn-card {
+    padding: 9px 12px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 12px;
+    color: #cbd5e1;
+    transition: all 0.15s;
+  }
+  .wizard-btn-card.highlight {
+    background: #1e5aa8;
+    border-color: #60a5fa;
+    color: #fff;
+    font-weight: bold;
+  }
+  .wizard-btn-card.active-target {
+    background: rgba(47, 124, 246, 0.25);
+    border: 1.5px dashed #60a5fa;
+    color: #93c5fd;
+  }
+
+  /* 3. 屏幕底部软键栏 (Softkey Bar - 规范 4.1 / 8.2) */
+  .screen-softkeybar {
+    height: 26px;
+    background: rgba(8, 14, 24, 0.92);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #f1f5f9;
+  }
+  .softkey-lsk { text-align: left; min-width: 50px; }
+  .softkey-center { text-align: center; color: #93c5fd; }
+  .softkey-rsk { text-align: right; min-width: 50px; }
+
+  /* ========================================================
+     机身中部分割装饰线 (Hinged Bezel Accent)
+     ======================================================== */
+  .phone-divider-bezel {
+    height: 8px;
+    margin: 8px 6px 10px 6px;
+    background: linear-gradient(180deg, #1b2029 0%, #323b49 50%, #171b23 100%);
+    border-radius: 3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .divider-brand {
+    font-size: 8px;
+    letter-spacing: 2px;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+
+  /* ========================================================
+     下半部分：虚拟物理按键区 (Virtual Keypad Area)
+     ======================================================== */
+  .keypad-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 2px;
+  }
+
+  /* 通用按键外框与 3D 浮雕按压手感 */
+  .phone-key {
+    background: var(--key-base);
+    border: 1px solid var(--key-border);
+    border-radius: 9px;
+    box-shadow:
+      0 3px 0 rgba(0, 0, 0, 0.45),
+      0 4px 6px rgba(0, 0, 0, 0.3),
+      inset 0 1px 1px rgba(255, 255, 255, 0.22);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background 0.05s ease;
+    touch-action: manipulation;
+  }
+
+  /* 物理按压反馈动画 (Pressed State) */
+  .phone-key:active,
+  .phone-key.is-pressed {
+    transform: translateY(2px);
+    background: var(--key-pressed);
+    box-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.6),
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  /* 夜间背光点亮光晕 (Backlight glow effect) */
+  body.backlight-active .phone-key {
+    box-shadow:
+      0 3px 0 rgba(0, 0, 0, 0.45),
+      0 0 12px var(--key-glow-color),
+      inset 0 1px 1.5px rgba(255, 255, 255, 0.35);
+  }
+
+  /* ----------------------------------------------------
+     功能与导航键岛 (Control & Navigation Island)
+     ---------------------------------------------------- */
+  .nav-island-row {
+    display: grid;
+    grid-template-columns: 1fr 150px 1fr;
+    gap: 10px;
+    align-items: center;
+    height: 110px;
+  }
+
+  /* 侧翼双层功能键组合 (左翼: LSK + CALL, 右翼: RSK + END) */
+  .wing-key-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+  }
+
+  .key-lsk, .key-rsk {
+    flex: 1;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--key-text);
+    letter-spacing: 0.5px;
+  }
+
+  .key-call {
+    flex: 1.1;
+    color: var(--call-green);
+    background: linear-gradient(180deg, #22362b 0%, #15241b 100%);
+    border-color: #2e573d;
+  }
+  .key-call svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+  .key-call:active, .key-call.is-pressed {
+    box-shadow: 0 0 12px var(--call-green-glow);
+  }
+
+  .key-end {
+    flex: 1.1;
+    color: var(--end-red);
+    background: linear-gradient(180deg, #3d2325 0%, #281416 100%);
+    border-color: #632e32;
+  }
+  .key-end svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+  .key-end:active, .key-end.is-pressed {
+    box-shadow: 0 0 12px var(--end-red-glow);
+  }
+
+  /* ----------------------------------------------------
+     中央 5向五位导航键岛 (5-Way D-Pad Ring)
+     ---------------------------------------------------- */
+  .dpad-cluster-outer {
+    width: 142px;
+    height: 110px;
+    background: var(--dpad-ring);
+    border-radius: 26px;
+    border: 1.5px solid var(--key-border);
+    box-shadow:
+      0 4px 0 rgba(0, 0, 0, 0.5),
+      0 6px 12px rgba(0, 0, 0, 0.4),
+      inset 0 1px 2px rgba(255, 255, 255, 0.3);
+    position: relative;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 四个方向按键触碰靶区 */
+  .dpad-direction-btn {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--key-text);
+    cursor: pointer;
+    transition: opacity 0.1s, transform 0.05s;
+    user-select: none;
+  }
+  .dpad-direction-btn:active,
+  .dpad-direction-btn.is-pressed {
+    opacity: 0.6;
+    transform: scale(0.92);
+  }
+
+  .dpad-direction-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
+  }
+
+  .dpad-btn-up {
+    top: 5px;
+    left: 40px;
+    right: 40px;
+    height: 26px;
+  }
+  .dpad-btn-down {
+    bottom: 5px;
+    left: 40px;
+    right: 40px;
+    height: 26px;
+  }
+  .dpad-btn-left {
+    left: 6px;
+    top: 25px;
+    bottom: 25px;
+    width: 28px;
+  }
+  .dpad-btn-right {
+    right: 6px;
+    top: 25px;
+    bottom: 25px;
+    width: 28px;
+  }
+
+  /* 核心中央 OK 确认键 (Center Button) */
+  .dpad-center-ok {
+    width: 58px;
+    height: 48px;
+    background: var(--dpad-center);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    border-radius: 15px;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.6),
+      inset 0 1px 2px rgba(255, 255, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+    transition: all 0.05s;
+    z-index: 2;
+  }
+  .dpad-center-ok:active,
+  .dpad-center-ok.is-pressed {
+    transform: scale(0.92);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+  }
+
+  /* ----------------------------------------------------
+     九宫格经典数字键盘 (3×4 T9 Numeric Keypad Grid)
+     ---------------------------------------------------- */
+  .t9-grid-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px 9px;
+  }
+
+  .t9-num-key {
+    height: 44px;
+    padding: 2px 4px;
+  }
+
+  .t9-primary-num {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--key-text);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+
+  .t9-alpha-subtext {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--key-subtext);
+    margin-top: -1px;
+  }
+
+  /* 规范 5 键盲打定位凸起小条 (Tactile Bump) */
+  .key-tactile-bump {
+    position: absolute;
+    width: 9px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 1px;
+    bottom: 3px;
+    box-shadow: 0 0.5px 0.5px rgba(0,0,0,0.6);
+  }
+
+  /* ========================================================
+     右侧面板：设计规格审计与交互方案审核说明
+     ======================================================== */
+  .spec-audit-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .audit-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  }
+
+  .audit-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+  }
+
+  .audit-card h3 svg {
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+  }
+
+  .audit-card p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  .entry-comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 10px;
+  }
+
+  .entry-comparison-table th,
+  .entry-comparison-table td {
+    padding: 8px 10px;
+    border: 1px solid var(--card-border);
+    text-align: left;
+  }
+
+  .entry-comparison-table th {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+  }
+
+  .pill-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .pill-tag.origin {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  .pill-tag.new {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+
+  .code-keymap-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .keymap-item {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+  }
+
+  .keymap-name {
+    font-family: monospace;
+    color: #60a5fa;
+    font-weight: 600;
+  }
+
+  .keymap-code {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* 实时交互日志 Console */
+  .interactive-log-box {
+    background: #090c10;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 11.5px;
+    color: #38bdf8;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  .log-line {
+    margin-bottom: 3px;
+    line-height: 1.4;
+  }
+  .log-line .timestamp {
+    color: #64748b;
+    margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 顶部控制条 -->
+  <header class="header-bar">
+    <div class="title-group">
+      <h1>
+        KeydroidX 触屏模式 (Touch Screen Keypad Mode)
+        <span class="badge-spec">FEATURE_PHONE_UI_SPEC 对齐</span>
+      </h1>
+      <p>触屏设备双区分割设计：上半部经典桌面内容 + 下半部实体触觉按键区 · HTML高保真原型</p>
+    </div>
+
+    <div class="top-toolbar">
+      <div class="control-chip">
+        <span>机身材质：</span>
+        <select id="themeSelector" onchange="changeTheme(this.value)">
+          <option value="default">黑曜石哑光 (N86经典)</option>
+          <option value="theme-silver">复古金属银 (E71/6300)</option>
+          <option value="theme-iceblue">芬兰极光冰蓝</option>
+        </select>
+      </div>
+
+      <div class="control-chip">
+        <span>按键背光：</span>
+        <select id="backlightSelector" onchange="toggleBacklight(this.value)">
+          <option value="on">暖白背光 (点亮)</option>
+          <option value="off">关闭背光</option>
+        </select>
+      </div>
+
+      <div class="control-chip" onclick="toggleSound()">
+        <span id="soundStatusText">🔊 按键音：已开启</span>
+      </div>
+
+      <div class="control-chip" onclick="toggleVibration()">
+        <span id="vibrateStatusText">📳 触觉震动：已开启</span>
+      </div>
+
+      <div class="control-chip">
+        <span>演示场景：</span>
+        <select id="sceneSelector" onchange="switchDemoScene(this.value)">
+          <option value="desktop">① 桌面主页联动</option>
+          <option value="wizard">② 安装向导首屏入口</option>
+          <option value="settings">③ 设置-按键与操作入口</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主体工作区 -->
+  <div class="workspace">
+
+    <!-- ==================== 左侧：交互模拟器 ==================== -->
+    <div class="phone-frame">
+      <!-- 听筒开孔 -->
+      <div class="phone-earpiece"></div>
+
+      <!-- 上半部分：屏幕显示区 (Display Canvas) -->
+      <div class="screen-container">
+        <div class="screen-wallpaper" id="screenWallpaper"></div>
+
+        <div class="screen-viewport">
+          <!-- 状态栏 -->
+          <div class="screen-statusbar">
+            <div class="status-left-icons">
+              <div class="signal-bars">
+                <span class="signal-bar"></span>
+                <span class="signal-bar"></span>
+                <span class="signal-bar"></span>
+                <span class="signal-bar"></span>
+                <span class="signal-bar"></span>
+              </div>
+              <span class="status-operator">中国移动 4G</span>
+            </div>
+            <div class="status-right-icons">
+              <span id="liveClockDisplay">12:30</span>
+              <div class="battery-pill">
+                <div class="battery-level"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 屏幕主内容区 (三种场景切换展示) -->
+          <div class="screen-content" id="screenContent">
+
+            <!-- 场景 1：默认桌面 -->
+            <div id="sceneDesktopView">
+              <!-- 时钟组件 -->
+              <div class="widget-clock-banner" id="widgetClock">
+                <div class="clock-big" id="clockBigText">12:30</div>
+                <div class="clock-date">
+                  2026年10月6日<br>
+                  星期二 · 农历八月廿六
+                </div>
+              </div>
+
+              <!-- 快捷应用条 (D-Pad 可聚焦) -->
+              <div class="widget-quick-bar">
+                <div class="quick-app-item focused" data-name="电话" id="app0">
+                  <svg viewBox="0 0 24 24"><path d="M6 3h3l2 5-2.4 1.4a12 12 0 0 0 5.9 5.9L16 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>
+                  <span>电话</span>
+                </div>
+                <div class="quick-app-item" data-name="信息" id="app1">
+                  <svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>
+                  <span>信息</span>
+                </div>
+                <div class="quick-app-item" data-name="音乐" id="app2">
+                  <svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+                  <span>音乐</span>
+                </div>
+                <div class="quick-app-item" data-name="拍照" id="app3">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="12" cy="13" r="3.2"/><path d="M8.5 7l1.4-2h4.2L15.5 7"/></svg>
+                  <span>拍照</span>
+                </div>
+                <div class="quick-app-item" data-name="功能表" id="app4">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                  <span>功能表</span>
+                </div>
+              </div>
+
+              <!-- 桌面组件列表 -->
+              <div class="widget-list-section">
+                <div class="widget-row-card" id="widgetRowMusic">
+                  <div class="widget-row-icon">
+                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </div>
+                  <div class="widget-row-texts">
+                    <div class="widget-row-title">周杰伦 - 晴天</div>
+                    <div class="widget-row-sub">正在播放 · 按确认暂停</div>
+                  </div>
+                </div>
+
+                <div class="widget-row-card" id="widgetRowCalendar">
+                  <div class="widget-row-icon">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  </div>
+                  <div class="widget-row-texts">
+                    <div class="widget-row-title">今天暂无待办日程</div>
+                    <div class="widget-row-sub">按确认新建日程</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 场景 2：拨号面板 -->
+            <div class="dialer-overlay" id="dialerOverlay">
+              <div class="dialer-number-display" id="dialerNumberText"></div>
+              <div class="dialer-hint">按 [CALL拨号] 呼出 · [END挂断] 清除返回</div>
+            </div>
+
+            <!-- 场景 3：选项弹窗 -->
+            <div class="modal-options-sheet" id="modalOptionsSheet">
+              <div class="modal-option-item focused" id="opt0">1. 打开选定应用</div>
+              <div class="modal-option-item" id="opt1">2. 桌面组件设置</div>
+              <div class="modal-option-item" id="opt2">3. 切换主题壁纸</div>
+              <div class="modal-option-item" id="opt3">4. 桌面设置</div>
+            </div>
+
+            <!-- 场景 4：安装向导首界面 (替换“跳过，稍后设置”为“触屏模式”) -->
+            <div class="wizard-preview-overlay" id="wizardOverlay">
+              <div class="wizard-title">欢迎使用 KeydroidX 原键桌面</div>
+              <div class="wizard-desc">
+                是否需要绑定实体按键？<br>
+                （绑定后可完全用物理方向键操作）
+              </div>
+              <div class="wizard-btn-card" id="wizBtnBind">
+                立即绑定实体按键
+              </div>
+              <div class="wizard-btn-card active-target highlight" id="wizBtnTouch">
+                ✨ 触屏模式（推荐触屏设备开启）
+              </div>
+              <div style="font-size: 10px; color: #64b5f6; margin-top: 6px;">
+                原『跳过，稍后设置』已升级为『触屏模式』
+              </div>
+            </div>
+
+            <!-- 场景 5：设置 -> 按键与操作 列表 -->
+            <div class="wizard-preview-overlay" id="settingsOverlay">
+              <div class="wizard-title" style="text-align: left; font-size: 13px; margin-bottom: 10px;">
+                桌面设置 &gt; 按键与操作
+              </div>
+              <div class="wizard-btn-card" style="text-align: left; display: flex; justify-content: space-between;">
+                <span>按键绑定</span>
+                <span style="color:#94a3b8;">&gt;</span>
+              </div>
+              <div class="wizard-btn-card" style="text-align: left; display: flex; justify-content: space-between;">
+                <span>应用向导</span>
+                <span style="color:#94a3b8;">&gt;</span>
+              </div>
+              <div class="wizard-btn-card highlight" style="text-align: left; display: flex; justify-content: space-between;">
+                <span>触屏模式（下方显示虚拟按键）</span>
+                <span style="color:#34c759; font-weight:bold;">已开启 [ON]</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 软键栏 -->
+          <div class="screen-softkeybar">
+            <span class="softkey-lsk" id="screenLskLabel">选项</span>
+            <span class="softkey-center" id="screenCenterLabel">打开</span>
+            <span class="softkey-rsk" id="screenRskLabel">通讯录</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 机身装饰中框 -->
+      <div class="phone-divider-bezel">
+        <span class="divider-brand">KeydroidX Core</span>
+      </div>
+
+      <!-- 下半部分：虚拟物理按键区 (Virtual Keypad Area) -->
+      <div class="keypad-container">
+
+        <!-- 1. 功能导航岛 (LSK, RSK, CALL, END, 5-Way D-Pad) -->
+        <div class="nav-island-row">
+          <!-- 左侧翼：左软键 + 拨号键 -->
+          <div class="wing-key-pair">
+            <button class="phone-key key-lsk" id="btnKeyLsk" onclick="handleKey('LSK')">
+              <span>LSK</span>
+            </button>
+            <button class="phone-key key-call" id="btnKeyCall" onclick="handleKey('CALL')">
+              <svg viewBox="0 0 24 24"><path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.02-.24 11.72 11.72 0 003.68.59 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.72 11.72 0 00.59 3.68 1 1 0 01-.24 1.02l-2.23 2.09z"/></svg>
+            </button>
+          </div>
+
+          <!-- 中央 5向 D-Pad 圆环与确认键 -->
+          <div class="dpad-cluster-outer">
+            <!-- 向上键 -->
+            <div class="dpad-direction-btn dpad-btn-up" id="btnKeyUp" onclick="handleKey('UP')">
+              <svg viewBox="0 0 24 24"><path d="M12 4l-8 8h16z"/></svg>
+            </div>
+            <!-- 向左键 -->
+            <div class="dpad-direction-btn dpad-btn-left" id="btnKeyLeft" onclick="handleKey('LEFT')">
+              <svg viewBox="0 0 24 24"><path d="M4 12l8-8v16z"/></svg>
+            </div>
+            <!-- 中央 OK 确认键 -->
+            <button class="dpad-center-ok" id="btnKeyCenter" onclick="handleKey('CENTER')">
+              OK
+            </button>
+            <!-- 向右键 -->
+            <div class="dpad-direction-btn dpad-btn-right" id="btnKeyRight" onclick="handleKey('RIGHT')">
+              <svg viewBox="0 0 24 24"><path d="M20 12l-8 8V4z"/></svg>
+            </div>
+            <!-- 向下键 -->
+            <div class="dpad-direction-btn dpad-btn-down" id="btnKeyDown" onclick="handleKey('DOWN')">
+              <svg viewBox="0 0 24 24"><path d="M12 20l8-8H4z"/></svg>
+            </div>
+          </div>
+
+          <!-- 右侧翼：右软键 + 挂机键 -->
+          <div class="wing-key-pair">
+            <button class="phone-key key-rsk" id="btnKeyRsk" onclick="handleKey('RSK')">
+              <span>RSK</span>
+            </button>
+            <button class="phone-key key-end" id="btnKeyEnd" onclick="handleKey('END')">
+              <svg viewBox="0 0 24 24"><path d="M12 9c-3.1 0-5.9 1.1-8.2 3l1.8 2.2c1.7-1.3 3.9-2.2 6.4-2.2s4.7.9 6.4 2.2l1.8-2.2C17.9 10.1 15.1 9 12 9z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. 九宫格经典数字键盘 (3×4 T9 Grid) -->
+        <div class="t9-grid-container">
+          <!-- 1 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('1')">
+            <span class="t9-primary-num">1</span>
+            <span class="t9-alpha-subtext">. , - ?</span>
+          </button>
+          <!-- 2 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('2')">
+            <span class="t9-primary-num">2</span>
+            <span class="t9-alpha-subtext">ABC</span>
+          </button>
+          <!-- 3 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('3')">
+            <span class="t9-primary-num">3</span>
+            <span class="t9-alpha-subtext">DEF</span>
+          </button>
+
+          <!-- 4 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('4')">
+            <span class="t9-primary-num">4</span>
+            <span class="t9-alpha-subtext">GHI</span>
+          </button>
+          <!-- 5 键 (带盲打定位小凸点) -->
+          <button class="phone-key t9-num-key" onclick="handleKey('5')">
+            <span class="t9-primary-num">5</span>
+            <span class="t9-alpha-subtext">JKL</span>
+            <span class="key-tactile-bump"></span>
+          </button>
+          <!-- 6 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('6')">
+            <span class="t9-primary-num">6</span>
+            <span class="t9-alpha-subtext">MNO</span>
+          </button>
+
+          <!-- 7 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('7')">
+            <span class="t9-primary-num">7</span>
+            <span class="t9-alpha-subtext">PQRS</span>
+          </button>
+          <!-- 8 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('8')">
+            <span class="t9-primary-num">8</span>
+            <span class="t9-alpha-subtext">TUV</span>
+          </button>
+          <!-- 9 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('9')">
+            <span class="t9-primary-num">9</span>
+            <span class="t9-alpha-subtext">WXYZ</span>
+          </button>
+
+          <!-- * 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('*')">
+            <span class="t9-primary-num">*</span>
+            <span class="t9-alpha-subtext">符号 / +</span>
+          </button>
+          <!-- 0 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('0')">
+            <span class="t9-primary-num">0</span>
+            <span class="t9-alpha-subtext">空格 / +</span>
+          </button>
+          <!-- # 键 -->
+          <button class="phone-key t9-num-key" onclick="handleKey('#')">
+            <span class="t9-primary-num">#</span>
+            <span class="t9-alpha-subtext">输入法 / 🔕</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ==================== 右侧：设计规格审核面板 ==================== -->
+    <div class="spec-audit-panel">
+
+      <!-- 卡片 1：触屏模式架构与设计理念 -->
+      <div class="audit-card">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          一、触摸屏模式核心架构设计 (Split-Screen Ergonomics)
+        </h3>
+        <p>
+          在全触屏设备（18:9 ~ 20:9 比例智能机）上使用 <strong>KeydroidX 原键桌面</strong> 时，屏幕纵向空间充裕。开启“触屏模式”后：
+        </p>
+        <ul style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.8; margin-left: 18px; margin-bottom: 12px;">
+          <li><strong>上半部 (Display Area)：</strong>严格遵循 <code>FEATURE_PHONE_UI_SPEC.md</code> 规范，按 240×320 比例完整呈现经典功能机视口（状态栏 + 桌面内容 + 软键栏），焦点和层级清晰，零触摸盲区。</li>
+          <li><strong>下半部 (Virtual Keypad Area)：</strong>呈现 1:1 还原的实体按键手感面板。包含 <strong>LSK / RSK 软键</strong>、<strong>CALL / END 通话挂机键</strong>、<strong>五向 D-Pad 导航环</strong> 以及 <strong>标准 3×4 T9 九宫格键盘</strong>。</li>
+          <li><strong>物理触感模拟：</strong>内置高精度 3D 浮雕光影、毫秒级按压位移、5 键盲打凸条定位、背光透光、原生按键音（<code>按键音.mp3</code>）与触觉震动反馈。</li>
+        </ul>
+      </div>
+
+      <!-- 卡片 2：两个指定设置入口对比与落地规范 -->
+      <div class="audit-card">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          二、用户需求的两个入口设计
+        </h3>
+        <table class="entry-comparison-table">
+          <thead>
+            <tr>
+              <th style="width: 25%;">入口位置</th>
+              <th style="width: 35%;">原逻辑 / 现状</th>
+              <th style="width: 40%;">触屏模式新方案</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>入口 1：安装向导首页</strong></td>
+              <td>原本为：<span class="pill-tag origin">跳过，稍后设置</span><br><small style="color:#64748b;">(引导用户跳过物理按键绑定)</small></td>
+              <td>升级为：<span class="pill-tag new">触屏模式</span><br><small style="color:#4ade80;">触屏用户一键启用触屏按键模式并进入桌面</small></td>
+            </tr>
+            <tr>
+              <td><strong>入口 2：桌面设置</strong></td>
+              <td>『按键与操作』分组下仅有：<br><span class="pill-tag origin">按键绑定</span> <span class="pill-tag origin">应用向导</span></td>
+              <td>新增第 3 项：<br><span class="pill-tag new">触屏模式 (开启/关闭)</span><br><small style="color:#4ade80;">提供显式开关与持久化存储</small></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 卡片 3：按键映射与 Android KeyEvent 规范对照 -->
+      <div class="audit-card">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="6" y2="8"/><line x1="10" y1="8" x2="10" y2="8"/><line x1="14" y1="8" x2="14" y2="8"/><line x1="18" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="18" y2="12"/><line x1="6" y1="16" x2="18" y2="16"/></svg>
+          三、规范按键映射表 (对齐 FEATURE_PHONE_UI_SPEC 2.2 节)
+        </h3>
+        <div class="code-keymap-list">
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_UP</span>
+            <span class="keymap-code">KEYCODE_DPAD_UP (19)</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_DOWN</span>
+            <span class="keymap-code">KEYCODE_DPAD_DOWN (20)</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_LEFT</span>
+            <span class="keymap-code">KEYCODE_DPAD_LEFT (21)</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_RIGHT</span>
+            <span class="keymap-code">KEYCODE_DPAD_RIGHT (22)</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_CENTER</span>
+            <span class="keymap-code">KEYCODE_DPAD_CENTER (23)</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_LSK</span>
+            <span class="keymap-code">KEYCODE_SOFT_LEFT (1) / 菜单</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_RSK</span>
+            <span class="keymap-code">KEYCODE_BACK (4) / 返回</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_CALL</span>
+            <span class="keymap-code">KEYCODE_CALL (5) / 拨号</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_END</span>
+            <span class="keymap-code">KEYCODE_ENDCALL (6) / 回桌面</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_0 ~ KEY_9</span>
+            <span class="keymap-code">KEYCODE_0 ~ KEYCODE_9</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_STAR (*)</span>
+            <span class="keymap-code">KEYCODE_STAR (17)</span>
+          </div>
+          <div class="keymap-item">
+            <span class="keymap-name">KEY_HASH (#)</span>
+            <span class="keymap-code">KEYCODE_POUND (18)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡片 4：实时交互反馈控制台 -->
+      <div class="audit-card">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          四、实时按键与屏幕联动日志 (Event & Focus Trace)
+        </h3>
+        <p>可在左侧点击任意按键，观察屏幕焦点移动、弹窗唤起或输入响应：</p>
+        <div class="interactive-log-box" id="interactionLogBox">
+          <div class="log-line"><span class="timestamp">[12:30:00]</span> 触屏模式原型就绪。当前焦点：快捷栏[电话]。</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+<!-- 真实按键音音频资源 -->
+<audio id="nativeKeySound" src="../音频/按键音.mp3" preload="auto"></audio>
+
+<script>
+  // ================= 状态管理 =================
+  let currentFocusIndex = 0; // 0~4 为快捷栏图标
+  let isDialerOpen = false;
+  let isOptionsOpen = false;
+  let currentOptionIndex = 0;
+  let dialerInput = "";
+  let soundEnabled = true;
+  let vibrationEnabled = true;
+
+  const quickApps = [
+    { id: 'app0', name: '电话' },
+    { id: 'app1', name: '信息' },
+    { id: 'app2', name: '音乐' },
+    { id: 'app3', name: '拍照' },
+    { id: 'app4', name: '功能表' }
+  ];
+
+  // ================= 音效合成与回放 =================
+  let audioCtx = null;
+  function playClickAudio() {
+    if (!soundEnabled) return;
+
+    // 优先尝试使用项目本地的 按键音.mp3
+    const nativeAudio = document.getElementById('nativeKeySound');
+    if (nativeAudio && nativeAudio.readyState >= 2) {
+      nativeAudio.currentTime = 0;
+      nativeAudio.play().catch(() => playSyntheticBeep());
+      return;
+    }
+    // 备用：Web Audio API 真实物理微咔哒声 (Mechanical Key Click)
+    playSyntheticBeep();
+  }
+
+  function playSyntheticBeep() {
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.04);
+
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.045);
+    } catch (e) {}
+  }
+
+  // ================= 触觉震动反馈 =================
+  function triggerVibrate(ms = 25) {
+    if (vibrationEnabled && navigator.vibrate) {
+      navigator.vibrate(ms);
+    }
+  }
+
+  // ================= 交互日志记录 =================
+  function logEvent(action, detail) {
+    const box = document.getElementById('interactionLogBox');
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0];
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="timestamp">[${timeStr}]</span> <strong>${action}</strong>: ${detail}`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ================= 核心按键分发器 =================
+  function handleKey(key) {
+    playClickAudio();
+    triggerVibrate();
+
+    // 视觉反馈高亮
+    const btnElem = document.getElementById('btnKey' + key);
+    if (btnElem) {
+      btnElem.classList.add('is-pressed');
+      setTimeout(() => btnElem.classList.remove('is-pressed'), 120);
+    }
+
+    logEvent('按下按键', `KEY_${key}`);
+
+    // 如果处于拨号盘中
+    if (isDialerOpen) {
+      handleDialerKey(key);
+      return;
+    }
+
+    // 如果处于选项弹窗中
+    if (isOptionsOpen) {
+      handleOptionsKey(key);
+      return;
+    }
+
+    // 默认桌面视图下的按键响应
+    handleDesktopKey(key);
+  }
+
+  // 1. 桌面状态按键逻辑
+  function handleDesktopKey(key) {
+    // 数字键：输入立即激活拨号盘
+    if (/[0-9*#]/.test(key)) {
+      openDialer(key);
+      return;
+    }
+
+    switch(key) {
+      case 'LEFT':
+        if (currentFocusIndex > 0) {
+          currentFocusIndex--;
+          updateQuickBarFocus();
+        }
+        break;
+      case 'RIGHT':
+        if (currentFocusIndex < quickApps.length - 1) {
+          currentFocusIndex++;
+          updateQuickBarFocus();
+        }
+        break;
+      case 'UP':
+        logEvent('移动焦点', '上移至大时钟组件');
+        document.getElementById('widgetClock').classList.add('focused');
+        document.querySelectorAll('.widget-row-card').forEach(c => c.classList.remove('focused'));
+        break;
+      case 'DOWN':
+        logEvent('移动焦点', '下移至桌面动态卡片组件');
+        document.getElementById('widgetClock').classList.remove('focused');
+        document.getElementById('widgetRowMusic').classList.add('focused');
+        break;
+      case 'CENTER':
+        const curApp = quickApps[currentFocusIndex];
+        logEvent('激活操作 (OK)', `打开『${curApp.name}』应用`);
+        alert(`【模拟执行】打开『${curApp.name}』应用\n(规范: KEY_CENTER 激活选定项)`);
+        break;
+      case 'LSK':
+        openOptionsModal();
+        break;
+      case 'RSK':
+        logEvent('右软键', '打开通讯录');
+        alert('【模拟执行】打开通讯录');
+        break;
+      case 'CALL':
+        openDialer('');
+        break;
+      case 'END':
+        logEvent('挂机键 (END)', '重置回桌面根节点');
+        document.getElementById('widgetClock').classList.remove('focused');
+        document.querySelectorAll('.widget-row-card').forEach(c => c.classList.remove('focused'));
+        currentFocusIndex = 0;
+        updateQuickBarFocus();
+        break;
+    }
+  }
+
+  // 快捷栏焦点更新
+  function updateQuickBarFocus() {
+    quickApps.forEach((app, idx) => {
+      const el = document.getElementById(app.id);
+      if (idx === currentFocusIndex) {
+        el.classList.add('focused');
+        logEvent('焦点移动', `切换至快捷栏[${app.name}]`);
+      } else {
+        el.classList.remove('focused');
+      }
+    });
+  }
+
+  // 2. 拨号盘按键逻辑
+  function openDialer(initialChar) {
+    isDialerOpen = true;
+    dialerInput = initialChar;
+    document.getElementById('dialerOverlay').classList.add('active');
+    document.getElementById('dialerNumberText').textContent = dialerInput;
+    document.getElementById('screenLskLabel').textContent = "选项";
+    document.getElementById('screenCenterLabel').textContent = "呼叫";
+    document.getElementById('screenRskLabel').textContent = "清除";
+    logEvent('视图切换', '进入拨号盘');
+  }
+
+  function handleDialerKey(key) {
+    if (/[0-9*#]/.test(key)) {
+      dialerInput += key;
+      document.getElementById('dialerNumberText').textContent = dialerInput;
+      logEvent('拨号输入', dialerInput);
+    } else if (key === 'RSK') {
+      if (dialerInput.length > 0) {
+        dialerInput = dialerInput.slice(0, -1);
+        document.getElementById('dialerNumberText').textContent = dialerInput;
+        logEvent('退格删除', dialerInput || '(空)');
+      } else {
+        closeDialer();
+      }
+    } else if (key === 'CALL' || key === 'CENTER') {
+      if (dialerInput) {
+        logEvent('呼叫拨号', `拨打号码: ${dialerInput}`);
+        alert(`【模拟拨号】正在呼叫：${dialerInput}...`);
+      }
+    } else if (key === 'END') {
+      closeDialer();
+    }
+  }
+
+  function closeDialer() {
+    isDialerOpen = false;
+    dialerInput = "";
+    document.getElementById('dialerOverlay').classList.remove('active');
+    document.getElementById('screenLskLabel').textContent = "选项";
+    document.getElementById('screenCenterLabel').textContent = "打开";
+    document.getElementById('screenRskLabel').textContent = "通讯录";
+    logEvent('退出拨号', '返回桌面');
+  }
+
+  // 3. 选项菜单弹窗逻辑
+  function openOptionsModal() {
+    isOptionsOpen = true;
+    currentOptionIndex = 0;
+    document.getElementById('modalOptionsSheet').classList.add('active');
+    document.getElementById('screenLskLabel').textContent = "选择";
+    document.getElementById('screenCenterLabel').textContent = "确定";
+    document.getElementById('screenRskLabel').textContent = "返回";
+    updateOptionsFocus();
+    logEvent('弹出弹窗', '呼出选项菜单 (LSK)');
+  }
+
+  function handleOptionsKey(key) {
+    if (key === 'UP') {
+      if (currentOptionIndex > 0) currentOptionIndex--;
+      updateOptionsFocus();
+    } else if (key === 'DOWN') {
+      if (currentOptionIndex < 3) currentOptionIndex++;
+      updateOptionsFocus();
+    } else if (key === 'CENTER' || key === 'LSK') {
+      const optName = document.getElementById('opt' + currentOptionIndex).textContent;
+      logEvent('确认选项', optName);
+      alert(`【执行选项】${optName}`);
+      closeOptionsModal();
+    } else if (key === 'RSK' || key === 'END') {
+      closeOptionsModal();
+    }
+  }
+
+  function updateOptionsFocus() {
+    for (let i = 0; i < 4; i++) {
+      const el = document.getElementById('opt' + i);
+      if (i === currentOptionIndex) {
+        el.classList.add('focused');
+      } else {
+        el.classList.remove('focused');
+      }
+    }
+  }
+
+  function closeOptionsModal() {
+    isOptionsOpen = false;
+    document.getElementById('modalOptionsSheet').classList.remove('active');
+    document.getElementById('screenLskLabel').textContent = "选项";
+    document.getElementById('screenCenterLabel').textContent = "打开";
+    document.getElementById('screenRskLabel').textContent = "通讯录";
+    logEvent('关闭弹窗', '返回上级');
+  }
+
+  // ================= 场景演示切换 =================
+  function switchDemoScene(scene) {
+    // 隐藏全部场景
+    document.getElementById('sceneDesktopView').style.display = 'none';
+    document.getElementById('wizardOverlay').classList.remove('active');
+    document.getElementById('settingsOverlay').classList.remove('active');
+    closeDialer();
+    closeOptionsModal();
+
+    if (scene === 'desktop') {
+      document.getElementById('sceneDesktopView').style.display = 'block';
+      logEvent('场景切换', '切换到 ① 桌面主页联动场景');
+    } else if (scene === 'wizard') {
+      document.getElementById('wizardOverlay').classList.add('active');
+      logEvent('场景切换', '切换到 ② 安装向导首屏（原跳过替换为触屏模式）');
+    } else if (scene === 'settings') {
+      document.getElementById('settingsOverlay').classList.add('active');
+      logEvent('场景切换', '切换到 ③ 桌面设置-按键与操作新增项');
+    }
+  }
+
+  // ================= 主题与背光设置 =================
+  function changeTheme(theme) {
+    document.body.className = '';
+    if (theme !== 'default') {
+      document.body.classList.add(theme);
+    }
+    // 同步背光状态
+    if (document.getElementById('backlightSelector').value === 'on') {
+      document.body.classList.add('backlight-active');
+    }
+    logEvent('更改主题', `切换材质为: ${theme}`);
+  }
+
+  function toggleBacklight(status) {
+    if (status === 'on') {
+      document.body.classList.add('backlight-active');
+      logEvent('背光调整', '开启键盘微光夜间照明');
+    } else {
+      document.body.classList.remove('backlight-active');
+      logEvent('背光调整', '关闭键盘背光');
+    }
+  }
+
+  function toggleSound() {
+    soundEnabled = !soundEnabled;
+    document.getElementById('soundStatusText').textContent = soundEnabled ? '🔊 按键音：已开启' : '🔇 按键音：已静音';
+    logEvent('按键音切换', soundEnabled ? '已开启' : '已静音');
+  }
+
+  function toggleVibration() {
+    vibrationEnabled = !vibrationEnabled;
+    document.getElementById('vibrateStatusText').textContent = vibrationEnabled ? '📳 触觉震动：已开启' : '📳 触觉震动：已禁用';
+    logEvent('震动切换', vibrationEnabled ? '已开启' : '已禁用');
+  }
+
+  // 物理键盘联动监听（方便 PC 浏览器审核时直接按真实键盘测试）
+  window.addEventListener('keydown', (e) => {
+    const code = e.key;
+    if (code === 'ArrowUp') handleKey('UP');
+    else if (code === 'ArrowDown') handleKey('DOWN');
+    else if (code === 'ArrowLeft') handleKey('LEFT');
+    else if (code === 'ArrowRight') handleKey('RIGHT');
+    else if (code === 'Enter') handleKey('CENTER');
+    else if (code === 'Backspace' || code === 'Escape') handleKey('RSK');
+    else if (/[0-9*#]/.test(code)) handleKey(code);
+  });
+
+  // 时钟每分钟刷新
+  function updateTime() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const t = `${h}:${m}`;
+    document.getElementById('liveClockDisplay').textContent = t;
+    const big = document.getElementById('clockBigText');
+    if (big) big.textContent = t;
+  }
+  updateTime();
+  setInterval(updateTime, 10000);
+
+  // 默认开启背光
+  toggleBacklight('on');
+</script>
+
+</body>
+</html>

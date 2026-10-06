@@ -148,20 +148,20 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		appScroll = view.findViewById(R.id.appScroll);
 		appContainer = view.findViewById(R.id.appContainer);
 
-		// 有进程内缓存时同步构建一版：零查询、零磁盘 IO，首帧直接出图。
+		// 首帧无条件构建一版：有缓存带缓存，无缓存也必须展示"安装"与"JAR全局设置"基础入口。
 		// Room 订阅仍在 view.post 里照常进行，数据回来后内容一致则不重建。
 		if (!cachedAppItems.isEmpty()) {
 			appItems = new ArrayList<>(cachedAppItems);
-			buildGrid();
-			KeydroidxLog.i("Box", "复用进程内 JAR 列表缓存，首帧直接构建：" + appItems.size() + " 个应用");
 		}
+		buildGrid();
+		KeydroidxLog.i("Box", "首帧同步构建网格完成，应用数：" + appItems.size());
 
 		// 延迟到 midPanel 布局完成后再计算行数并订阅数据（panelH 需要实测反推）
 		view.post(() -> {
 			if (!isAdded()) return;
 			int oldRows = rowsPerPage;
 			computeRowsPerPage();
-			if (rowsPerPage != oldRows && !appItems.isEmpty()) {
+			if (rowsPerPage != oldRows) {
 				// 行数变化影响行高均分结果，重建一次（纯 View 操作，无 IO）
 				buildGrid();
 			}
@@ -212,10 +212,10 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	private void onDbUpdated(List<AppItem> items) {
 		List<AppItem> fresh = items != null ? items : new ArrayList<>();
 		KeydroidxLog.i("Box", "onDbUpdated 收到 " + fresh.size() + " 个应用");
-		// 内容与缓存一致时跳过重建：避免「先显示缓存版、Room 回调后又闪一次」
+		// 内容与缓存一致且网格已正常渲染时跳过重建：避免「先显示缓存版、Room 回调后又闪一次」
 		// 的多余重排（安装/卸载/重命名才会走到重建分支）。
-		if (isSameAppList(fresh, appItems)) {
-			// 覆盖安装同一 JAR：列表三项字段全同，但图标文件被重写（mtime 变化），
+		if (gridCellViews != null && isSameAppList(fresh, appItems)) {
+			// 覆盖安装同一 JAR：列表三项字段同，但图标文件被重写（mtime 变化），
 			// 缓存 key 随之改变 → 检测到任一图标缓存失效即重建，让新图标上屏。
 			if (hasStaleIconCache()) {
 				KeydroidxLog.i("Box", "列表未变但图标文件已更新（覆盖安装），重建网格");

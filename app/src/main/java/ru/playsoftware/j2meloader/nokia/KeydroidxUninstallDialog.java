@@ -133,6 +133,14 @@ public class KeydroidxUninstallDialog extends DialogFragment {
 		return dialog;
 	}
 
+	@Override
+	public void onStart() {
+		super.onStart();
+		if (getActivity() instanceof KeydroidxDesktopActivity) {
+			((KeydroidxDesktopActivity) getActivity()).applyDialogWindowBounds(this);
+		}
+	}
+
 	private void trigger(int index) {
 		if (index == 0) {
 			KeydroidxLog.i(TAG, "确认卸载");

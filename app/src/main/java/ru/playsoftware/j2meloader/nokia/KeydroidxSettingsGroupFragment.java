@@ -76,6 +76,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 				return new String[]{
 						KeydroidxIcons.ICON_KEYPAD,       // 按键绑定
 						KeydroidxIcons.ICON_ACTIVITY,     // 应用向导
+						KeydroidxIcons.ICON_KEYPAD,       // 触屏模式
 				};
 			case GROUP_CONTENT:
 				return new String[]{
@@ -102,7 +103,7 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			case GROUP_APPEARANCE:
 				return new String[]{"字体大小", "字体选择", "主题设置", "壁纸设置", "图标包"};
 			case GROUP_KEYS:
-				return new String[]{"按键绑定", "应用向导"};
+				return new String[]{"按键绑定", "应用向导", "触屏模式"};
 			case GROUP_CONTENT:
 				return new String[]{"顶部快捷栏设置", "桌面组件设置", "快捷开关"};
 			case GROUP_SYSTEM:
@@ -230,6 +231,10 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 		if (group == GROUP_APPEARANCE && index == 4) {
 			return "图标包：" + iconPackDisplayName();
 		}
+		if (group == GROUP_KEYS && index == 2) {
+			return KeydroidxSettingsStorage.isTouchMode(requireContext())
+					? "触屏模式：开启" : "触屏模式：关闭";
+		}
 		if (group == GROUP_SYSTEM && index == 0) {
 			return KeydroidxSettingsStorage.isFileLogEnabled(requireContext())
 					? "日志记录：开启" : "日志记录：关闭";
@@ -331,6 +336,9 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 						.addToBackStack(null)
 						.commit();
 				return true;
+			case 2:
+				toggleTouchMode(host);
+				return true;
 			default:
 				return false;
 		}
@@ -383,6 +391,16 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 				return true;
 			default:
 				return false;
+		}
+	}
+
+	/** 切换触屏模式开关并立即生效。 */
+	private void toggleTouchMode(KeydroidxDesktopActivity host) {
+		boolean next = !KeydroidxSettingsStorage.isTouchMode(requireContext());
+		host.setTouchModeEnabled(next);
+		KeydroidxLog.i("SettingsGroup", "触屏模式切换为: " + (next ? "开启" : "关闭"));
+		if (tvNames != null && tvNames.length > 2 && tvNames[2] != null) {
+			tvNames[2].setText(getItemDisplayName(2));
 		}
 	}
 

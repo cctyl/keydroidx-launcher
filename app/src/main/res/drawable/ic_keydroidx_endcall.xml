@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 挂机键图标（API 19 兼容：横置电话筒/挂断状态，红色） -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 横向机身 20×8 -->
+    <item android:left="1dp" android:top="7dp" android:right="1dp" android:bottom="7dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#ef4444" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+    <!-- 左听筒微突起 -->
+    <item android:left="1dp" android:top="5dp" android:right="15dp" android:bottom="5dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#ef4444" />
+            <corners android:radius="3dp" />
+        </shape>
+    </item>
+    <!-- 右话筒微突起 -->
+    <item android:left="15dp" android:top="5dp" android:right="1dp" android:bottom="5dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#ef4444" />
+            <corners android:radius="3dp" />
+        </shape>
+    </item>
+</layer-list>

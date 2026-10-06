@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 虚拟拨号通话键背景（经典微绿强调，API 19 兼容） -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#14532d" />
+            <stroke android:width="1.5dp" android:color="#4ade80" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#1e3a2b"
+                android:endColor="#14261c" />
+            <stroke android:width="1dp" android:color="#2d6a44" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+</selector>

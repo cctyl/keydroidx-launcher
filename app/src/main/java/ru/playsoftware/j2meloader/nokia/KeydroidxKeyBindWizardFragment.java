@@ -103,7 +103,11 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 			updateIntroHighlight();
 			startRecording();
 		});
-		introSkip.setOnClickListener(v -> finishWizard(false));
+		introSkip.setOnClickListener(v -> {
+			introChoice = 1;
+			updateIntroHighlight();
+			chooseTouchMode();
+		});
 
 		View doneBtn = view.findViewById(R.id.doneBtn);
 		if (doneBtn != null) {
@@ -285,6 +289,16 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		host.openFragment(new KeydroidxPermissionCheckFragment());
 	}
 
+	private void chooseTouchMode() {
+		KeydroidxLog.i("KeyWizard", "选择开启触屏模式");
+		if (getActivity() instanceof KeydroidxDesktopActivity) {
+			((KeydroidxDesktopActivity) getActivity()).setTouchModeEnabled(true);
+		} else {
+			KeydroidxSettingsStorage.setTouchMode(requireContext(), true);
+		}
+		finishWizard(false);
+	}
+
 	// ---- KeydroidxFocusHost（INTRO / DONE 状态使用）----
 
 	@Override
@@ -292,7 +306,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		if (state == STATE_INTRO) {
 			introChoice = (introChoice == 0) ? 1 : 0;
 			updateIntroHighlight();
-			KeydroidxLog.d("KeyWizard", "INTRO 切换选择 -> " + (introChoice == 0 ? "绑定" : "跳过"));
+			KeydroidxLog.d("KeyWizard", "INTRO 切换选择 -> " + (introChoice == 0 ? "绑定" : "触屏模式"));
 			return true;
 		}
 		return true;
@@ -305,8 +319,8 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 				KeydroidxLog.i("KeyWizard", "INTRO 选择 绑定");
 				startRecording();
 			} else {
-				KeydroidxLog.i("KeyWizard", "INTRO 选择 跳过");
-				finishWizard(false);
+				KeydroidxLog.i("KeyWizard", "INTRO 选择 触屏模式");
+				chooseTouchMode();
 			}
 			return true;
 		}
@@ -336,8 +350,8 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	@Override
 	public boolean onSoftRight() {
 		if (state == STATE_INTRO) {
-			KeydroidxLog.i("KeyWizard", "右软键 -> 跳过");
-			finishWizard(false);
+			KeydroidxLog.i("KeyWizard", "右软键 -> 触屏模式");
+			chooseTouchMode();
 			return true;
 		}
 		if (state == STATE_DONE) {
@@ -352,8 +366,8 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	public boolean onBack() {
 		// 录制态的 BACK 由 onKeyRecorded 处理（将其绑定为当前动作）；此处仅 INTRO / DONE 生效
 		if (state == STATE_INTRO) {
-			KeydroidxLog.i("KeyWizard", "返回键 -> 跳过");
-			finishWizard(false);
+			KeydroidxLog.i("KeyWizard", "返回键 -> 触屏模式");
+			chooseTouchMode();
 			return true;
 		}
 		if (state == STATE_DONE) {
@@ -380,7 +394,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 
 	@Override
 	public String getSoftRightText() {
-		if (state == STATE_INTRO) return "跳过";
+		if (state == STATE_INTRO) return "触屏模式";
 		return null;
 	}
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 虚拟按键标准背景（API 19 兼容，支持正常/按压两态） -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 按下态 -->
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#161a22" />
+            <stroke android:width="1dp" android:color="#4b5563" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    <!-- 默认正常态 -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#2d3542"
+                android:endColor="#1e242d" />
+            <stroke android:width="1dp" android:color="#3e4856" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+</selector>

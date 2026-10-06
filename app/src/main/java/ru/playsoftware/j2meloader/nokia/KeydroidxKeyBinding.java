@@ -258,6 +258,16 @@ public class KeydroidxKeyBinding {
 			return ACTION_SOFT_LEFT;
 		}
 
+		// 标准键码兜底（FEATURE_PHONE_UI_SPEC / 03-key-model 规范：未绑定时按标准 Android 键码兜底）
+		if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return ACTION_UP;
+		if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) return ACTION_DOWN;
+		if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return ACTION_LEFT;
+		if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) return ACTION_RIGHT;
+		if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT) return ACTION_SOFT_LEFT;
+		if (keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) return ACTION_SOFT_RIGHT;
+		if (keyCode == KeyEvent.KEYCODE_CALL) return ACTION_HANGUP;
+		if (keyCode == KeyEvent.KEYCODE_ENDCALL) return ACTION_LOCK_SCREEN;
+
 		KeydroidxLog.d("KeyBinding", "resolveAction " + keyName(keyCode)
 				+ " -> 未绑定(-1)");
 		return -1;
@@ -288,6 +298,14 @@ public class KeydroidxKeyBinding {
 		if (keyCode == KeyEvent.KEYCODE_MENU) {
 			return ACTION_SOFT_LEFT;
 		}
+		if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return ACTION_UP;
+		if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) return ACTION_DOWN;
+		if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return ACTION_LEFT;
+		if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) return ACTION_RIGHT;
+		if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT) return ACTION_SOFT_LEFT;
+		if (keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) return ACTION_SOFT_RIGHT;
+		if (keyCode == KeyEvent.KEYCODE_CALL) return ACTION_HANGUP;
+		if (keyCode == KeyEvent.KEYCODE_ENDCALL) return ACTION_LOCK_SCREEN;
 		return -1;
 	}
 
