@@ -638,9 +638,18 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 		binding.fontSizeLarge.setText(Integer.toString(params.fontSizeLarge));
 		binding.showFontSizesInScaledPixelsToggle.setChecked(params.fontApplyDimensions);
 		binding.enableAntiAliasingToggle.setChecked(params.fontAA);
+
+		boolean touchModeActive = ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage.isTouchMode(this);
 		boolean showVk = params.showKeyboard;
+		if (touchModeActive) {
+			showVk = false; // 触屏模式下由全局独立键盘接管，J2ME 浮层键盘开关强制展示为关闭
+		}
 		binding.showVirtualKeyboardToggle.setChecked(showVk);
 		binding.virtualKeyboardConfigGroup.setVisibility(showVk ? View.VISIBLE : View.GONE);
+		if (touchModeActive) {
+			binding.showVirtualKeyboardToggle.setEnabled(false);
+			binding.showVirtualKeyboardToggle.setText(binding.showVirtualKeyboardToggle.getText() + " (已由触屏按键接管)");
+		}
 		binding.enableHapticFeedbackToggle.setChecked(params.vkFeedback);
 		binding.forceOpacityForOffscreenKeysToggle.setChecked(params.vkForceOpacity);
 		binding.enableTouchInputToggle.setChecked(params.touchInput);
@@ -726,6 +735,9 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 			params.fontApplyDimensions = binding.showFontSizesInScaledPixelsToggle.isChecked();
 			params.fontAA = binding.enableAntiAliasingToggle.isChecked();
 			params.showKeyboard = binding.showVirtualKeyboardToggle.isChecked();
+			if (ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage.isTouchMode(this)) {
+				params.showKeyboard = false;
+			}
 			params.vkFeedback = binding.enableHapticFeedbackToggle.isChecked();
 			params.vkForceOpacity = binding.forceOpacityForOffscreenKeysToggle.isChecked();
 			params.touchInput = binding.enableTouchInputToggle.isChecked();

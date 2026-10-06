@@ -1,60 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 单一宿主界面：共用顶部栏 + 中间碎片容器 + 共用底部栏。
-     触屏模式开启时：分为上半部分（桌面内容显示区）与下半部分（虚拟物理按键区）。 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    tools:context=".nokia.KeydroidxDesktopActivity">
 
-    <View
+    <!-- 全屏壁纸层（位于底层，覆盖整个物理屏幕） -->
+    <ImageView
         android:id="@+id/wallpaper"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:contentDescription="@null" />
 
+    <!-- 诺基亚标准布局：顶栏 + 中间可变面板 + 底部软键栏 -->
     <LinearLayout
-        android:id="@+id/mainSplitLayout"
+        android:id="@+id/desktopContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- 上半部分：桌面屏幕内容容器（包含顶栏、midPanel、底栏与上半屏专属遮罩） -->
+        <include layout="@layout/keydroidx_top_bar" />
+
         <FrameLayout
-            android:id="@+id/desktopScreenFrame"
+            android:id="@+id/midPanel"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:visibility="invisible" />
 
-            <LinearLayout
-                android:id="@+id/desktopScreenContainer"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
-
-                <include layout="@layout/keydroidx_top_bar" />
-
-                <FrameLayout
-                    android:id="@+id/midPanel"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:visibility="invisible" />
-
-                <include layout="@layout/keydroidx_bottom_bar" />
-            </LinearLayout>
-
-            <!-- 仅遮盖上半屏桌面内容的半透明层（Dialog 弹出时使用） -->
-            <View
-                android:id="@+id/desktopScreenDimOverlay"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#66000000"
-                android:visibility="gone" />
-        </FrameLayout>
-
-        <!-- 下半部分：触屏模式虚拟物理按键面板（默认 GONE） -->
-        <include
-            android:id="@+id/virtualKeypadPanel"
-            layout="@layout/keydroidx_virtual_keypad"
-            android:visibility="gone" />
-
+        <include layout="@layout/keydroidx_bottom_bar" />
     </LinearLayout>
 </FrameLayout>

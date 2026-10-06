@@ -86,9 +86,6 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		setupKeydroidxUi();
 		findViewById(R.id.midPanel).setVisibility(View.VISIBLE);
 
-		// 触屏模式虚拟键盘初始化与事件分发绑定
-		setupVirtualKeypad();
-
 		// 底部软键触摸点击：等效于对应物理软键（修复「桌面设置」等页触摸返回无效）
 		bindBottomBarTouch();
 
@@ -103,36 +100,8 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		// 监听返回栈变化，自动上报页面状态给拦截器（覆盖 goHome/switchFragment/exitCurrent）
 		getSupportFragmentManager().addOnBackStackChangedListener(() -> postReportPageState());
 
-		// 监听 DialogFragment 生命周期：触屏模式下将弹窗精确限制在上半屏，并联动上半屏遮罩（递归支持子 Fragment 弹窗）
-		getSupportFragmentManager().registerFragmentLifecycleCallbacks(new FragmentManager.FragmentLifecycleCallbacks() {
-			@Override
-			public void onFragmentStarted(@NonNull FragmentManager fm, @NonNull Fragment f) {
-				super.onFragmentStarted(fm, f);
-				if (f instanceof DialogFragment) {
-					DialogFragment df = (DialogFragment) f;
-					applyDialogWindowBounds(df);
-					if (isTouchModeEnabled()) {
-						setScreenDimOverlayVisible(true);
-					}
-				}
-			}
-
-			@Override
-			public void onFragmentStopped(@NonNull FragmentManager fm, @NonNull Fragment f) {
-				super.onFragmentStopped(fm, f);
-				if (f instanceof DialogFragment) {
-					if (findActiveDialogFragment() == null) {
-						setScreenDimOverlayVisible(false);
-					}
-				}
-			}
-		}, true);
-
 		// 确保全局 JAR 设置 profile 存在并设为默认
 		KeydroidxGlobalProfile.ensureGlobalProfile(this);
-
-		// 注册通用 Dialog 窗口适配器：将 common 库（如权限申请、更新提醒等通用弹窗）自动吸附在上半屏并接入事件调度
-		KeydroidxDialogFocus.setDialogWindowAdjuster(this::applyDialogWindowBounds);
 
 		// 首次启动：若按键绑定向导未完成，则进入向导（清数据后 isWizardDone 复位会再次弹出）
 		Fragment existing = getSupportFragmentManager().findFragmentById(R.id.midPanel);
@@ -394,8 +363,9 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		if (keyBinding != null) {
 			keyBinding.reload();
 		}
-		// 触屏模式按键区可见性刷新
-		updateTouchModeUi(KeydroidxSettingsStorage.isTouchMode(this));
+		// 触屏模式双窗口联动：调整主窗口尺寸并挂载独立虚拟按键
+		KeydroidxTouchWindowController.applyActivityWindowBounds(this);
+		KeydroidxTouchWindowController.attachKeypadWindow(this);
 		// 状态栏系统信息（信号/运营商/WiFi/电池等）查询延迟到首帧渲染后执行，
 		// 避免冷启动时同步 Binder 调用阻塞首帧；延迟回调前若已 pause 则跳过（防重复注册）。
 		scheduleStatusBarStart();
@@ -448,6 +418,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	protected void onPause() {
 		resumedFlag = false;
 		resetLastHandledKeyCode();
+		KeydroidxTouchWindowController.detachKeypadWindow(this);
 		super.onPause();
 		if (statusBarController != null) {
 			statusBarController.stop();
@@ -1003,93 +974,26 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		postReportPageState();
 	}
 
-	// ── 触屏模式与虚拟按键事件分发 ──
+	// ── 触屏模式与独立按键窗口联动 ──
 
-	/** 初始化虚拟键盘，绑定按键监听与初始可见性 */
-	private void setupVirtualKeypad() {
-		KeydroidxVirtualKeypadView keypad = findViewById(R.id.virtualKeypadView);
-		if (keypad == null) {
-			View panel = findViewById(R.id.virtualKeypadPanel);
-			if (panel instanceof KeydroidxVirtualKeypadView) {
-				keypad = (KeydroidxVirtualKeypadView) panel;
-			}
-		}
-		if (keypad != null) {
-			keypad.setOnVirtualKeyEventListener(new KeydroidxVirtualKeypadView.OnVirtualKeyEventListener() {
-				@Override
-				public void onVirtualKeyDown(int action, int defaultKeyCode) {
-					int keyCode = resolveVirtualKeyCode(action, defaultKeyCode);
-					long now = SystemClock.uptimeMillis();
-					KeyEvent down = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0);
-					dispatchToActiveTarget(down);
-				}
-
-				@Override
-				public void onVirtualKeyUp(int action, int defaultKeyCode) {
-					int keyCode = resolveVirtualKeyCode(action, defaultKeyCode);
-					long now = SystemClock.uptimeMillis();
-					KeyEvent up = new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0);
-					dispatchToActiveTarget(up);
-				}
-			});
-		}
-		updateTouchModeUi(KeydroidxSettingsStorage.isTouchMode(this));
-	}
-
-	/** 根据动作或默认键码解析当前生效的 KeyCode（遵循按键绑定） */
-	private int resolveVirtualKeyCode(int action, int defaultKeyCode) {
-		if (action >= 0 && keyBinding != null) {
-			int bound = keyBinding.getKeyCode(action);
-			if (KeydroidxKeyBinding.isBound(bound)) {
-				return bound;
-			}
-		}
-		return defaultKeyCode;
-	}
-
-	/** 设置触屏模式开关并实时刷新布局 */
+	/** 设置触屏模式开关并实时刷新独立窗口与配置 */
 	public void setTouchModeEnabled(boolean enabled) {
 		KeydroidxSettingsStorage.setTouchMode(this, enabled);
-		updateTouchModeUi(enabled);
+		KeydroidxTouchWindowController.applyActivityWindowBounds(this);
+		if (enabled) {
+			KeydroidxTouchWindowController.attachKeypadWindow(this);
+		} else {
+			KeydroidxTouchWindowController.detachKeypadWindow(this);
+		}
+		KeydroidxTouchWindowController.syncTouchModeToJ2meProfiles(this, enabled);
 	}
 
 	public boolean isTouchModeEnabled() {
 		return KeydroidxSettingsStorage.isTouchMode(this);
 	}
 
-	/** 刷新虚拟键盘可见性 */
-	private void updateTouchModeUi(boolean enabled) {
-		View keypad = findViewById(R.id.virtualKeypadPanel);
-		if (keypad != null) {
-			keypad.setVisibility(enabled ? View.VISIBLE : View.GONE);
-		}
-		KeydroidxLog.i("Desktop", "updateTouchModeUi enabled=" + enabled);
-	}
-
-	private final List<Dialog> mActiveCustomDialogs = new ArrayList<>();
-
-	/**
-	 * 将虚拟按键事件分发给当前处于活跃状态的目标：
-	 * 若当前有可见的 Dialog（如权限申请、选项弹窗、卸载确认等独立 Window），优先分发给它；
-	 * 否则分发给 Activity 自身走标准 dispatchKeyEvent。
-	 */
-	private void dispatchToActiveTarget(KeyEvent event) {
-		Dialog activeDialog = findActiveDialogTarget();
-		if (activeDialog != null && activeDialog.isShowing()) {
-			activeDialog.dispatchKeyEvent(event);
-		} else {
-			dispatchKeyEvent(event);
-		}
-	}
-
 	/** 查找当前最顶层处于显示状态的 Dialog（兼顾通用 Dialog 与 DialogFragment） */
 	private Dialog findActiveDialogTarget() {
-		for (int i = mActiveCustomDialogs.size() - 1; i >= 0; i--) {
-			Dialog d = mActiveCustomDialogs.get(i);
-			if (d != null && d.isShowing()) {
-				return d;
-			}
-		}
 		DialogFragment df = findActiveDialogFragment();
 		if (df != null && df.getDialog() != null && df.getDialog().isShowing()) {
 			return df.getDialog();
@@ -1125,92 +1029,6 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		return null;
 	}
 
-	/** 获取当前触屏模式下虚拟按键面板的高度（像素） */
-	public int getKeypadHeight() {
-		View keypad = findViewById(R.id.virtualKeypadPanel);
-		if (keypad != null && keypad.getVisibility() == View.VISIBLE) {
-			int h = keypad.getHeight();
-			if (h > 0) return h;
-			keypad.measure(
-					View.MeasureSpec.makeMeasureSpec(getResources().getDisplayMetrics().widthPixels, View.MeasureSpec.EXACTLY),
-					View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-			);
-			return keypad.getMeasuredHeight();
-		}
-		return 0;
-	}
-
-	/** 控制仅覆盖上半部桌面屏幕的暗色遮罩层 */
-	public void setScreenDimOverlayVisible(boolean visible) {
-		View overlay = findViewById(R.id.desktopScreenDimOverlay);
-		if (overlay != null) {
-			overlay.setVisibility(visible ? View.VISIBLE : View.GONE);
-		}
-	}
-
-	/**
-	 * 将 Dialog 窗口边界精准限制在上半部桌面屏幕内：
-	 * 1. 窗口底部吸附在虚拟键盘上沿（params.y = keypadHeight）；
-	 * 2. 清除全屏 Window 的 Dim 遮罩（避免覆盖虚拟键盘，由 desktopScreenDimOverlay 替代）；
-	 * 3. 添加 FLAG_NOT_TOUCH_MODAL 允许触摸穿透直达键盘。
-	 */
-	public void applyDialogWindowBounds(Dialog dialog) {
-		if (dialog == null || dialog.getWindow() == null) return;
-		if (!mActiveCustomDialogs.contains(dialog)) {
-			mActiveCustomDialogs.add(dialog);
-		}
-		Window window = dialog.getWindow();
-		View decor = window.getDecorView();
-		if (decor != null) {
-			decor.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-				@Override
-				public void onViewAttachedToWindow(View v) {
-					if (isTouchModeEnabled()) {
-						setScreenDimOverlayVisible(true);
-					}
-				}
-
-				@Override
-				public void onViewDetachedFromWindow(View v) {
-					mActiveCustomDialogs.remove(dialog);
-					if (findActiveDialogTarget() == null) {
-						setScreenDimOverlayVisible(false);
-					}
-				}
-			});
-		}
-		if (isTouchModeEnabled()) {
-			int keypadH = getKeypadHeight();
-			if (keypadH > 0) {
-				window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-				WindowManager.LayoutParams params = window.getAttributes();
-				params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-				params.y = keypadH;
-				window.setAttributes(params);
-				window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-				window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
-				setScreenDimOverlayVisible(true);
-				if (decor != null) {
-					decor.post(() -> {
-						if (dialog.isShowing() && isTouchModeEnabled()) {
-							WindowManager.LayoutParams p = window.getAttributes();
-							p.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-							p.y = keypadH;
-							window.setAttributes(p);
-							window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-							window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
-						}
-					});
-				}
-			}
-		}
-	}
-
-	public void applyDialogWindowBounds(DialogFragment df) {
-		if (df == null) return;
-		Dialog dialog = df.getDialog();
-		if (dialog != null) {
-			applyDialogWindowBounds(dialog);
-		}
-	}
+	/** 兼容方法：双窗口解耦后主窗口已由 WMS 自然约束在上半屏，无需手动调整子弹窗 */
+	public void applyDialogWindowBounds(DialogFragment df) {}
 }

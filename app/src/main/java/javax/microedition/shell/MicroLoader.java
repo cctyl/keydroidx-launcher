@@ -237,7 +237,11 @@ public class MicroLoader {
 	void applyConfiguration() {
 		try {
 			// Apply configuration to the launching MIDlet
-			if (params.showKeyboard) {
+			boolean showVk = params.showKeyboard;
+			if (ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage.isTouchMode(context)) {
+				showVk = false; // 触屏模式下由独立物理风格按键接管，禁止显示J2ME浮层虚拟键盘
+			}
+			if (showVk) {
 				ContextHolder.setVk(new VirtualKeyboard(params));
 			} else {
 				ContextHolder.setVk(null);

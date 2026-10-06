@@ -103,6 +103,8 @@ import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.databinding.ActivityMicroBinding;
 import ru.playsoftware.j2meloader.util.Constants;
+import ru.playsoftware.j2meloader.nokia.KeydroidxTouchWindowController;
+import ru.playsoftware.j2meloader.util.FileUtils;
 import ru.playsoftware.j2meloader.util.LogUtils;
 
 public class MicroActivity extends AppCompatActivity {
@@ -338,6 +340,8 @@ public class MicroActivity extends AppCompatActivity {
 	public void onResume() {
 		super.onResume();
 		visible = true;
+		KeydroidxTouchWindowController.applyActivityWindowBounds(this);
+		KeydroidxTouchWindowController.attachKeypadWindow(this);
 		KeydroidxBgEcoEngine.onForegroundResumed();
 		MidletThread.resumeApp();
 		// Nokia S40 v5/v6 私有 API 兼容（com.nokia.mid.ui.lcdui）：通知 MIDlet 已回到前台
@@ -350,6 +354,7 @@ public class MicroActivity extends AppCompatActivity {
 	public void onPause() {
 		visible = false;
 		hideSoftInput();
+		KeydroidxTouchWindowController.detachKeypadWindow(this);
 		// Nokia S40 v5/v6 私有 API 兼容（com.nokia.mid.ui.lcdui）：先通知 MIDlet 退到后台，
 		// 再走原有 pauseApp 流程（与真机 displayInactive 早于 pauseApp 的顺序一致）
 		LCDUIUtils.fireDisplayState(false);
