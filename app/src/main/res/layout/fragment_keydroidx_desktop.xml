@@ -17,12 +17,17 @@
         android:layout_marginStart="6dp"
         android:layout_marginEnd="6dp" />
 
+    <!-- 注意：这里不要加 android:layerType="software"。
+         软件层会把滚动内容缓存进一张位图，滚动/内容重建（图标异步替换、rebuildShortcutBar）
+         后该缓存与真实内容不同步，屏幕上会出现「旧一层图标 + 新一层图标」错位叠加的残影
+         （冷启动/全量重绘才恢复）。原先加软件层是为了解决「低端机快速滚动叠影」，
+         但该叠加的根因（每帧把大图缩小绘制）已由 scaleShortcutIcon 预缩放为显示尺寸解决，
+         因此这里改用硬件加速绘制。 -->
     <HorizontalScrollView
         android:id="@+id/shortcutBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/shortcutDividerTop"
-        android:layerType="software"
         android:scrollbars="none">
 
         <LinearLayout
@@ -144,7 +149,6 @@
         android:layout_alignParentBottom="true"
         android:layout_marginBottom="0dp"
         android:fillViewport="true"
-        android:layerType="software"
         android:scrollbars="none">
 
         <LinearLayout
