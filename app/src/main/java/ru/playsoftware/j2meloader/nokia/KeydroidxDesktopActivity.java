@@ -101,7 +101,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		// 监听返回栈变化，自动上报页面状态给拦截器（覆盖 goHome/switchFragment/exitCurrent）
 		getSupportFragmentManager().addOnBackStackChangedListener(() -> postReportPageState());
 
-		// 监听 DialogFragment 生命周期：触屏模式下将弹窗精确限制在上半屏，并联动上半屏遮罩
+		// 监听 DialogFragment 生命周期：触屏模式下将弹窗精确限制在上半屏，并联动上半屏遮罩（递归支持子 Fragment 弹窗）
 		getSupportFragmentManager().registerFragmentLifecycleCallbacks(new FragmentManager.FragmentLifecycleCallbacks() {
 			@Override
 			public void onFragmentStarted(@NonNull FragmentManager fm, @NonNull Fragment f) {
@@ -124,7 +124,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 					}
 				}
 			}
-		}, false);
+		}, true);
 
 		// 确保全局 JAR 设置 profile 存在并设为默认
 		KeydroidxGlobalProfile.ensureGlobalProfile(this);
@@ -626,8 +626,15 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 					return true;
 				}
 			}
-			// 返回键未绑定时兜底为导航返回（非桌面 Fragment），否则交给系统。
+			// 返回键未绑定时优先交给活跃弹窗处理，其次兜底为导航返回（非桌面 Fragment），否则交给系统。
 			if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+				DialogFragment activeDialog = findActiveDialogFragment();
+				if (activeDialog != null && activeDialog.getDialog() != null && activeDialog.getDialog().isShowing()) {
+					KeydroidxLog.d("Desktop", "返回键优先交给活跃弹窗处理");
+					activeDialog.getDialog().dispatchKeyEvent(event);
+					lastHandledDownKeyCode = event.getKeyCode();
+					return true;
+				}
 				Fragment backHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 				if (backHost instanceof KeydroidxFocusHost
 						&& !(backHost instanceof KeydroidxDesktopFragment)) {
@@ -723,6 +730,14 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	 * @return 是否被 Fragment 消费
 	 */
 	private boolean dispatchActionToHost(int action) {
+		// 1. 若当前有正在展示的弹窗（含子 Fragment 弹窗），优先分发给弹窗并消费，绝不泄漏给底层宿主页面
+		DialogFragment activeDialog = findActiveDialogFragment();
+		if (activeDialog != null && activeDialog.getDialog() != null && activeDialog.getDialog().isShowing()) {
+			KeydroidxLog.d("Desktop", "dispatchActionToHost: 优先由活跃弹窗处理 action="
+					+ KeydroidxKeyBinding.getActionName(action));
+			return dispatchActionToDialog(activeDialog.getDialog(), action);
+		}
+
 		Fragment current = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 		if (!(current instanceof KeydroidxFocusHost)) {
 			KeydroidxLog.d("Desktop", "dispatchActionToHost: 当前非 FocusHost，忽略 action="
@@ -753,6 +768,42 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		KeydroidxLog.d("Desktop", "dispatchActionToHost action="
 				+ KeydroidxKeyBinding.getActionName(action) + " handled=" + handled);
 		return handled;
+	}
+
+	/** 将语义动作转换为对应键码送达 Dialog，并永远返回 true 拦截泄漏 */
+	private boolean dispatchActionToDialog(Dialog dialog, int action) {
+		int keyCode = KeyEvent.KEYCODE_UNKNOWN;
+		switch (action) {
+			case KeydroidxKeyBinding.ACTION_UP:
+				keyCode = KeyEvent.KEYCODE_DPAD_UP;
+				break;
+			case KeydroidxKeyBinding.ACTION_DOWN:
+				keyCode = KeyEvent.KEYCODE_DPAD_DOWN;
+				break;
+			case KeydroidxKeyBinding.ACTION_LEFT:
+				keyCode = KeyEvent.KEYCODE_DPAD_LEFT;
+				break;
+			case KeydroidxKeyBinding.ACTION_RIGHT:
+				keyCode = KeyEvent.KEYCODE_DPAD_RIGHT;
+				break;
+			case KeydroidxKeyBinding.ACTION_SELECT:
+				keyCode = KeyEvent.KEYCODE_DPAD_CENTER;
+				break;
+			case KeydroidxKeyBinding.ACTION_SOFT_LEFT:
+				keyCode = KeyEvent.KEYCODE_SOFT_LEFT;
+				break;
+			case KeydroidxKeyBinding.ACTION_SOFT_RIGHT:
+			case KeydroidxKeyBinding.ACTION_HANGUP:
+			case KeydroidxKeyBinding.ACTION_LOCK_SCREEN:
+				keyCode = KeyEvent.KEYCODE_BACK;
+				break;
+		}
+		if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
+			long now = SystemClock.uptimeMillis();
+			dialog.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0));
+			dialog.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0));
+		}
+		return true;
 	}
 
 	/** 底部软键按下时的视觉反馈（左/确认/右软键），触摸与物理按键共用。 */
@@ -1023,16 +1074,27 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		}
 	}
 
-	/** 查找当前最顶层处于显示状态的 DialogFragment */
+	/** 查找当前最顶层处于显示状态的 DialogFragment（递归支持子 Fragment 弹出的 Dialog） */
 	private DialogFragment findActiveDialogFragment() {
-		List<Fragment> fragments = getSupportFragmentManager().getFragments();
+		return findActiveDialogFragment(getSupportFragmentManager());
+	}
+
+	private DialogFragment findActiveDialogFragment(FragmentManager fm) {
+		if (fm == null) return null;
+		List<Fragment> fragments = fm.getFragments();
 		if (fragments != null) {
 			for (int i = fragments.size() - 1; i >= 0; i--) {
 				Fragment f = fragments.get(i);
-				if (f instanceof DialogFragment) {
-					DialogFragment df = (DialogFragment) f;
-					if (df.getDialog() != null && df.getDialog().isShowing()) {
-						return df;
+				if (f != null) {
+					if (f instanceof DialogFragment) {
+						DialogFragment df = (DialogFragment) f;
+						if (df.getDialog() != null && df.getDialog().isShowing()) {
+							return df;
+						}
+					}
+					DialogFragment childActive = findActiveDialogFragment(f.getChildFragmentManager());
+					if (childActive != null) {
+						return childActive;
 					}
 				}
 			}
