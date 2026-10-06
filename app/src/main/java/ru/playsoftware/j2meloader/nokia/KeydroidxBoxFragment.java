@@ -4,8 +4,13 @@ import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxIcons;
 
+import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -27,14 +32,19 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.PreferenceManager;
 
+import io.github.cctyl.nokia.common.permission.KeydroidxPermissionManager;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
+import io.github.cctyl.nokia.common.ui.dialog.KeydroidxConfirmDialog;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
 import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.hjq.permissions.OnPermissionCallback;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.applist.AppItem;
@@ -125,6 +135,10 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		// 获取 AppRepository
 		AppListModel appListModel = new ViewModelProvider(requireActivity()).get(AppListModel.class);
 		appRepository = appListModel.getAppRepository();
+
+		// 自愈一次：存储权限可能在别处被授予（系统懒提示、设置页），此时工作目录已可写，
+		// 但仓库仍停在「未初始化」状态。若不重试，安装流程会直接空指针。
+		appRepository.ensureReady();
 	}
 
 	@Override
@@ -462,6 +476,131 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	// 文件选择与安装
 	// ============================
 
+	/**
+	 * 安装前确保「存储权限 + 工作目录数据库」真正可用。
+	 *
+	 * <p><b>背景（实测）</b>：模拟器工作目录位于外部存储，而存储权限按设计是首次使用相关功能时
+	 * 才申请的（见 {@code KeydroidxPermissionManager} 核心权限全集说明）。权限授予发生在进程
+	 * 启动之后，而 {@link AppRepository} 只在构造时判定过一次目录可写性，于是出现
+	 * 「授权后不重启应用就不生效」：目录其实已经可写，但仓库仍是未初始化状态，
+	 * 一进安装流程就 {@code AppItemDao.get(...) on a null object reference}。
+	 *
+	 * <p>因此这里做三件事：
+	 * <ol>
+	 *   <li>权限缺失 → 诺基亚风格说明框 + 系统权限框（不依赖 ROM 的懒提示时机）；</li>
+	 *   <li>授权成功 → 重建工作目录 + 重新初始化数据库，然后自动继续安装流程（无需重启）；</li>
+	 *   <li>授权后目录仍不可写（当前进程未拿到新的存储视图）→ 明确提示需重启应用，而不是放任崩溃。</li>
+	 * </ol>
+	 *
+	 * @return true 表示已就绪，可继续安装流程
+	 */
+	private boolean ensureStorageReady() {
+		Context context = getContext();
+		if (context == null) {
+			return false;
+		}
+		// 先自愈一次：权限可能已在别处授予，此时目录已可写，直接补齐数据库初始化
+		appRepository.ensureReady();
+		if (appRepository.isReady()) {
+			return true;
+		}
+		if (needsStoragePermission(context)) {
+			requestStoragePermission();
+			return false;
+		}
+		// 无权限诉求却仍未就绪：目录确实不可写（权限已授予但本进程未生效 / 路径不可用）
+		showStorageUnavailableDialog();
+		return false;
+	}
+
+	/**
+	 * 申请「存储读写」权限；授予后重建工作目录并重新初始化数据库，再自动继续安装流程。
+	 */
+	private void requestStoragePermission() {
+		KeydroidxLog.i("Box", "存储权限缺失，安装前发起申请");
+		KeydroidxPermissionManager.requestWithNokiaDialog(requireActivity(),
+				"存储权限申请",
+				"安装 JAR 需要读写手机存储权限：用于读取您选择的安装包，并把应用数据写入模拟器工作目录。",
+				Collections.singletonList(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+				new OnPermissionCallback() {
+					@Override
+					public void onGranted(@NonNull List<String> permissions, boolean allGranted) {
+						KeydroidxLog.i("Box", "存储权限已授予，重建工作目录并重新初始化数据库");
+						FileUtils.initWorkDir(new File(Config.getEmulatorDir()));
+						appRepository.ensureReady();
+						if (appRepository.isReady()) {
+							launchFilePicker();
+						} else {
+							// 授权已生效但当前进程仍未拿到可写视图：只能靠重启进程
+							showStorageUnavailableDialog();
+						}
+					}
+
+					@Override
+					public void onDenied(@NonNull List<String> permissions, boolean quick) {
+						KeydroidxLog.w("Box", "存储权限被拒绝，无法安装 JAR（quick=" + quick + "）");
+						if (isAdded()) {
+							Toast.makeText(requireContext(),
+									"没有存储权限，无法安装 JAR", Toast.LENGTH_SHORT).show();
+						}
+					}
+				});
+	}
+
+	/**
+	 * 当前系统是否需要「存储读写」运行时权限才能访问外部工作目录。
+	 *
+	 * <p>API 23 以下无运行时权限机制（安装即授予）；API 30（Android 11）起分区存储强制执行，
+	 * 该权限已失效、安装改走 SAF（见 {@code FileUtils.isExternalStorageLegacy()}），
+	 * 因此这两段区间都无需申请。
+	 */
+	private static boolean needsStoragePermission(Context context) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+				|| Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+			return false;
+		}
+		return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+				!= PackageManager.PERMISSION_GRANTED;
+	}
+
+	/**
+	 * 工作目录最终仍不可写时的显式提示。
+	 * <p>兜底路径：部分 ROM 在授予存储权限后不刷新已启动进程的存储视图，
+	 * 此时只能靠重启进程生效——提供一键重启，避免让用户自己去猜「为什么要重启」。
+	 */
+	private void showStorageUnavailableDialog() {
+		if (!isAdded()) {
+			return;
+		}
+		String path = Config.getEmulatorDir();
+		KeydroidxLog.w("Box", "工作目录不可写，无法进入安装流程: " + path);
+		new KeydroidxConfirmDialog(requireContext(), "无法访问存储",
+				"无法写入模拟器工作目录：\n" + path
+						+ "\n\n若刚刚授予了存储权限，需要重新启动应用才会生效。\n确定立即重启应用吗？")
+				.setPositiveButton("立即重启", this::restartApp)
+				.setNegativeButton("稍后", null)
+				.show();
+	}
+
+	/** 重新拉起自身并结束当前进程，使新的存储视图/权限在进程启动时生效。 */
+	private void restartApp() {
+		Context context = getContext();
+		if (context == null) {
+			return;
+		}
+		KeydroidxLog.i("Box", "重启应用以使存储权限生效");
+		try {
+			Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+			if (intent != null) {
+				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+				context.startActivity(intent);
+			}
+		} catch (Exception e) {
+			KeydroidxLog.w("Box", "重新拉起应用失败: " + e.getMessage());
+		}
+		android.os.Process.killProcess(android.os.Process.myPid());
+	}
+
 	private void launchFilePicker() {
 		KeydroidxLog.i("Box", "启动文件选择器");
 		String path = preferences.getString(Constants.PREF_LAST_PATH, null);
@@ -561,6 +700,9 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		if (focusIndex == 0) {
 			// 安装入口
 			KeydroidxLog.i("Box", "onSelect: 安装");
+			if (!ensureStorageReady()) {
+				return true;
+			}
 			launchFilePicker();
 			return true;
 		}
