@@ -86,6 +86,8 @@ import javax.microedition.lcdui.keyboard.VirtualKeyboard;
 import javax.microedition.location.LocationProviderImpl;
 import javax.microedition.util.ContextHolder;
 
+import com.nokia.mid.ui.lcdui.LCDUIUtils;
+
 import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
@@ -338,6 +340,8 @@ public class MicroActivity extends AppCompatActivity {
 		visible = true;
 		KeydroidxBgEcoEngine.onForegroundResumed();
 		MidletThread.resumeApp();
+		// Nokia S40 v5/v6 私有 API 兼容（com.nokia.mid.ui.lcdui）：通知 MIDlet 已回到前台
+		LCDUIUtils.fireDisplayState(true);
 		KeydroidxMidletKeepAliveService.stop(this);
 		reportMidletForeground();
 	}
@@ -346,6 +350,9 @@ public class MicroActivity extends AppCompatActivity {
 	public void onPause() {
 		visible = false;
 		hideSoftInput();
+		// Nokia S40 v5/v6 私有 API 兼容（com.nokia.mid.ui.lcdui）：先通知 MIDlet 退到后台，
+		// 再走原有 pauseApp 流程（与真机 displayInactive 早于 pauseApp 的顺序一致）
+		LCDUIUtils.fireDisplayState(false);
 		MidletThread.pauseApp();
 		super.onPause();
 	}
