@@ -44,7 +44,7 @@ import ru.playsoftware.j2meloader.base.BaseActivity;
 import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.util.FileUtils;
 import ru.playsoftware.j2meloader.util.PickDirResultContract;
-import ru.woesss.j2me.installer.InstallerDialog;
+import ru.woesss.j2me.installer.KeydroidxInstallerDialog;
 
 import static ru.playsoftware.j2meloader.util.Constants.PREF_EMULATOR_DIR;
 import static ru.playsoftware.j2meloader.util.Constants.PREF_STORAGE_WARNING_SHOWN;
@@ -192,7 +192,7 @@ public class J2meLoaderActivity extends BaseActivity {
 		super.onNewIntent(intent);
 		Uri uri = intent.getData();
 		if (uri != null) {
-			InstallerDialog.newInstance(uri).show(getSupportFragmentManager(), "installer");
+			KeydroidxInstallerDialog.newInstance(uri).show(getSupportFragmentManager(), "installer");
 		}
 	}
 }

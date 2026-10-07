@@ -92,7 +92,7 @@ import ru.playsoftware.j2meloader.util.AppUtils;
 import ru.playsoftware.j2meloader.util.Constants;
 import ru.playsoftware.j2meloader.util.FileUtils;
 import ru.playsoftware.j2meloader.util.LogUtils;
-import ru.woesss.j2me.installer.InstallerDialog;
+import ru.woesss.j2me.installer.KeydroidxInstallerDialog;
 
 public class AppsListFragment extends ListFragment {
 	private static final String TAG = AppsListFragment.class.getSimpleName();
@@ -179,7 +179,7 @@ public class AppsListFragment extends ListFragment {
 		preferences.edit()
 				.putString(Constants.PREF_LAST_PATH, FilteredFilePickerFragment.getLastPath())
 				.apply();
-		InstallerDialog.newInstance(uri).show(getParentFragmentManager(), "installer");
+		KeydroidxInstallerDialog.newInstance(uri).show(getParentFragmentManager(), "installer");
 	}
 
 	private void alertRename(final int id) {
@@ -261,7 +261,7 @@ public class AppsListFragment extends ListFragment {
 		} else if (itemId == R.id.action_context_settings) {
 			Config.startApp(requireActivity(), appItem.getTitle(), appItem.getPathExt(), true);
 		} else if (itemId == R.id.action_context_reinstall) {
-			InstallerDialog.newInstance(appItem.getId()).show(getParentFragmentManager(), "installer");
+			KeydroidxInstallerDialog.newInstance(appItem.getId()).show(getParentFragmentManager(), "installer");
 		} else if (itemId == R.id.action_context_delete) {
 			alertDelete(appItem);
 		} else {
@@ -388,7 +388,7 @@ public class AppsListFragment extends ListFragment {
 	private void onDbUpdated(List<AppItem> items) {
 		adapter.setItems(items);
 		if (appUri != null) {
-			InstallerDialog.newInstance(appUri).show(getParentFragmentManager(), "installer");
+			KeydroidxInstallerDialog.newInstance(appUri).show(getParentFragmentManager(), "installer");
 			appUri = null;
 		}
 	}
