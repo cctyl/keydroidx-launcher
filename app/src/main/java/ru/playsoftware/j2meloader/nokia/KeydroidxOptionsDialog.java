@@ -275,8 +275,8 @@ public class KeydroidxOptionsDialog extends DialogFragment {
 	@Override
 	public void onStart() {
 		super.onStart();
-		if (getActivity() instanceof KeydroidxDesktopActivity) {
-			((KeydroidxDesktopActivity) getActivity()).applyDialogWindowBounds(this);
+		if (getDialog() != null) {
+			KeydroidxTouchWindowController.applyDialogWindowBounds(getDialog());
 		}
 	}
 

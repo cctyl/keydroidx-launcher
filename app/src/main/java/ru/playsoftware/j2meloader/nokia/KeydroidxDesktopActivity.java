@@ -103,6 +103,9 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		// 确保全局 JAR 设置 profile 存在并设为默认
 		KeydroidxGlobalProfile.ensureGlobalProfile(this);
 
+		// 注册通用 Dialog 窗口适配器：将所有弹窗（权限申请、更新提醒等）自动吸附在上半屏底部
+		KeydroidxDialogFocus.setDialogWindowAdjuster(KeydroidxTouchWindowController::applyDialogWindowBounds);
+
 		// 首次启动：若按键绑定向导未完成，则进入向导（清数据后 isWizardDone 复位会再次弹出）
 		Fragment existing = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 		if (existing == null) {
@@ -1029,6 +1032,10 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		return null;
 	}
 
-	/** 兼容方法：双窗口解耦后主窗口已由 WMS 自然约束在上半屏，无需手动调整子弹窗 */
-	public void applyDialogWindowBounds(DialogFragment df) {}
+	/** 弹窗窗口抬升适配：触屏模式下将弹窗精确卡在虚拟键盘上沿，绝不遮挡按键 */
+	public void applyDialogWindowBounds(DialogFragment df) {
+		if (df != null && df.getDialog() != null) {
+			KeydroidxTouchWindowController.applyDialogWindowBounds(df.getDialog());
+		}
+	}
 }

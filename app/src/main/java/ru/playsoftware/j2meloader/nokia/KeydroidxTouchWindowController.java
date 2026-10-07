@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
@@ -72,6 +73,47 @@ public final class KeydroidxTouchWindowController {
 			KeydroidxLog.d(TAG, "applyActivityWindowBounds: 物理机模式，主窗口恢复全屏");
 		}
 		window.setAttributes(p);
+	}
+
+	/**
+	 * 调整 Dialog 窗口的坐标边界：
+	 * 触屏模式下将弹窗窗口底部吸附在虚拟键盘上沿（params.y = keypadHeightPx），
+	 * 保证弹窗始终处于上半屏，绝对不遮盖底部虚拟键盘；
+	 * 非触屏模式下贴底居中（params.y = 0）。
+	 */
+	public static void applyDialogWindowBounds(Dialog dialog) {
+		if (dialog == null) return;
+		Window window = dialog.getWindow();
+		if (window == null) return;
+		Context context = dialog.getContext();
+		boolean touchMode = KeydroidxSettingsStorage.isTouchMode(context);
+		if (touchMode) {
+			int keypadHeightPx = getKeypadHeightPx(context);
+			window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+			WindowManager.LayoutParams lp = window.getAttributes();
+			lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+			lp.y = keypadHeightPx;
+			window.setAttributes(lp);
+			View decor = window.getDecorView();
+			if (decor != null) {
+				decor.post(() -> {
+					if (dialog.isShowing() && KeydroidxSettingsStorage.isTouchMode(context)) {
+						WindowManager.LayoutParams p = window.getAttributes();
+						p.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+						p.y = keypadHeightPx;
+						window.setAttributes(p);
+					}
+				});
+			}
+			KeydroidxLog.d(TAG, "applyDialogWindowBounds: 触屏模式弹窗抬升 y=" + keypadHeightPx);
+		} else {
+			window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+			WindowManager.LayoutParams lp = window.getAttributes();
+			if (lp.y > 0) {
+				lp.y = 0;
+				window.setAttributes(lp);
+			}
+		}
 	}
 
 	/**
