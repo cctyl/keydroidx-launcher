@@ -764,8 +764,8 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	List<KeydroidxAppItem> result = new ArrayList<>();
 	result.addAll(pinned);
 
-	// 应用程序图标：优先用 S60 应用程序图标
-	Drawable boxIcon = safeDrawable(appCtx, R.drawable.s60_app);
+	// 应用程序图标：S60 2007 3D 时代的「应用程序文件夹」图标（黄文件夹 + 应用方块）
+	Drawable boxIcon = safeDrawable(appCtx, R.drawable.s60_box);
 	if (boxIcon == null) boxIcon = safeDrawable(appCtx, R.drawable.ic_keydroidx_box);
 	result.add(new KeydroidxAppItem(KeydroidxAppItem.TYPE_BOX, "应用程序", boxIcon, null));
 	// 原始 J2ME-Loader 主界面（启动器/文件选择器/应用列表）入口

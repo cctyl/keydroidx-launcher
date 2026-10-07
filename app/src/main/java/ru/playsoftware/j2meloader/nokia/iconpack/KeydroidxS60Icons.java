@@ -12,7 +12,7 @@ import ru.playsoftware.j2meloader.R;
  *
  * <p><b>为什么用显式数组而不是 {@code getIdentifier()} 反射</b>：
  * release 构建开启资源收缩（shrinkResources）后，只通过字符串名反射引用的资源会被判定为
- * 「未使用」而删除；R8 也可能重命名/剥离相关引用。显式 {@code int[]} 引用能保证 48 个
+ * 「未使用」而删除；R8 也可能重命名/剥离相关引用。显式 {@code int[]} 引用能保证 49 个
  * s60_* 位图始终打进包内，同时反查是纯内存 HashMap，命中 O(1)。</p>
  *
  * <p>图标名与 {@code assets/s60/appfilter.xml}、{@code assets/s60/drawable.xml} 中的
@@ -28,6 +28,7 @@ public final class KeydroidxS60Icons {
 			R.drawable.s60_app_alt,
 			R.drawable.s60_app_logo,
 			R.drawable.s60_books,
+			R.drawable.s60_box,
 			R.drawable.s60_browser,
 			R.drawable.s60_browser_alt,
 			R.drawable.s60_calculator,
@@ -80,6 +81,7 @@ public final class KeydroidxS60Icons {
 			"s60_app_alt",
 			"s60_app_logo",
 			"s60_books",
+			"s60_box",
 			"s60_browser",
 			"s60_browser_alt",
 			"s60_calculator",
@@ -132,6 +134,7 @@ public final class KeydroidxS60Icons {
 			"应用（风格2）",
 			"应用标志",
 			"阅读",
+			"百宝箱",
 			"浏览器",
 			"浏览器（风格2）",
 			"计算器",
