@@ -90,9 +90,13 @@ public final class KeydroidxTouchWindowController {
 		if (touchMode) {
 			int keypadHeightPx = getKeypadHeightPx(context);
 			window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+			window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+			window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
 			WindowManager.LayoutParams lp = window.getAttributes();
 			lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
 			lp.y = keypadHeightPx;
+			lp.flags &= ~WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+			lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
 			window.setAttributes(lp);
 			View decor = window.getDecorView();
 			if (decor != null) {
@@ -101,11 +105,15 @@ public final class KeydroidxTouchWindowController {
 						WindowManager.LayoutParams p = window.getAttributes();
 						p.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
 						p.y = keypadHeightPx;
+						p.flags &= ~WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+						p.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
 						window.setAttributes(p);
+						window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+						window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
 					}
 				});
 			}
-			KeydroidxLog.d(TAG, "applyDialogWindowBounds: 触屏模式弹窗抬升 y=" + keypadHeightPx);
+			KeydroidxLog.d(TAG, "applyDialogWindowBounds: 触屏模式弹窗抬升并穿透触摸 y=" + keypadHeightPx);
 		} else {
 			window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
 			WindowManager.LayoutParams lp = window.getAttributes();
