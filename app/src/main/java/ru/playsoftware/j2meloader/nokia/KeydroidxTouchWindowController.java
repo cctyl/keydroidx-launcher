@@ -3,6 +3,8 @@ package ru.playsoftware.j2meloader.nokia;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
+import android.graphics.Point;
+import android.os.Build;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
@@ -35,7 +37,7 @@ import ru.playsoftware.mini_shizuku.Shizuku;
 public final class KeydroidxTouchWindowController {
 
 	private static final String TAG = "TouchWindow";
-	private static final int KEYPAD_DP_HEIGHT = 240;
+	private static final int KEYPAD_DP_HEIGHT = 310;
 
 	private static View sCurrentKeypadView = null;
 	private static Activity sBoundActivity = null;
@@ -59,6 +61,76 @@ public final class KeydroidxTouchWindowController {
 		return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, KEYPAD_DP_HEIGHT, dm));
 	}
 
+	/** 获取整块物理屏幕的实际像素总高度（包含状态栏与导航栏区域） */
+	public static int getScreenTotalHeight(Context context) {
+		WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+		if (wm != null) {
+			Point point = new Point();
+			wm.getDefaultDisplay().getRealSize(point);
+			return point.y;
+		}
+		return context.getResources().getDisplayMetrics().heightPixels;
+	}
+
+	/**
+	 * 在触屏模式下沉浸式隐藏系统底部的三大按键（菜单/Home/返回），
+	 * 避免虚拟键盘被系统底部导航栏覆盖阻挡；
+	 * 非触屏模式下恢复系统默认导航栏。
+	 */
+	public static void applyImmersiveNavigationBars(Activity activity) {
+		if (activity == null || activity.isFinishing()) return;
+		boolean touchMode = KeydroidxSettingsStorage.isTouchMode(activity);
+		applyImmersiveNavigationBars(activity.getWindow(), touchMode);
+	}
+
+	/** 对指定 Window（Activity 窗口或 Dialog 窗口）应用全屏与沉浸式导航栏控制 */
+	public static void applyImmersiveNavigationBars(Window window, boolean touchMode) {
+		if (window == null) return;
+		// 无论何种模式，整个桌面与模拟器均全屏运行，绝不展示 Android 系统原生状态栏
+		window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+		if (touchMode) {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+				window.setDecorFitsSystemWindows(false);
+				android.view.WindowInsetsController controller = window.getInsetsController();
+				if (controller != null) {
+					controller.hide(android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars());
+					controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+				}
+			}
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+				View decor = window.getDecorView();
+				if (decor != null) {
+					int flags = View.SYSTEM_UI_FLAG_FULLSCREEN
+							| View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+							| View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+							| View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+							| View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+							| View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+					decor.setSystemUiVisibility(flags);
+				}
+			}
+		} else {
+			// 非触屏模式：依然隐藏状态栏，仅恢复系统导航栏
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+				android.view.WindowInsetsController controller = window.getInsetsController();
+				if (controller != null) {
+					controller.hide(android.view.WindowInsets.Type.statusBars());
+					controller.show(android.view.WindowInsets.Type.navigationBars());
+				}
+			}
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+				View decor = window.getDecorView();
+				if (decor != null) {
+					int flags = View.SYSTEM_UI_FLAG_FULLSCREEN
+							| View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+							| View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+					decor.setSystemUiVisibility(flags);
+				}
+			}
+		}
+	}
+
 	/**
 	 * 调整 Activity 主窗口的尺寸边界：
 	 * 触屏模式下将窗口压缩在上半屏，为底部独立键盘空出真实物理空间；
@@ -68,16 +140,19 @@ public final class KeydroidxTouchWindowController {
 		if (activity == null || activity.isFinishing()) return;
 		Window window = activity.getWindow();
 		if (window == null) return;
+
+		// 联动沉浸式控制系统底部三大导航键
+		applyImmersiveNavigationBars(activity);
+
 		WindowManager.LayoutParams p = window.getAttributes();
 		boolean touchMode = KeydroidxSettingsStorage.isTouchMode(activity);
 		if (touchMode) {
 			int keypadHeightPx = getKeypadHeightPx(activity);
-			DisplayMetrics dm = activity.getResources().getDisplayMetrics();
-			int screenHeight = dm.heightPixels;
+			int screenHeight = getScreenTotalHeight(activity);
 			p.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
 			p.width = WindowManager.LayoutParams.MATCH_PARENT;
 			p.height = Math.max(0, screenHeight - keypadHeightPx);
-			KeydroidxLog.d(TAG, "applyActivityWindowBounds: 触屏模式，主窗口高度设为 " + p.height);
+			KeydroidxLog.d(TAG, "applyActivityWindowBounds: 触屏模式，主窗口高度设为 " + p.height + " (全屏总高 " + screenHeight + ")");
 		} else {
 			p.gravity = Gravity.FILL;
 			p.width = WindowManager.LayoutParams.MATCH_PARENT;
@@ -114,6 +189,10 @@ public final class KeydroidxTouchWindowController {
 		}
 		Context context = dialog.getContext();
 		boolean touchMode = KeydroidxSettingsStorage.isTouchMode(context);
+
+		// 为 Dialog 窗口强制应用沉浸式隐藏系统导航栏，杜绝弹窗时底部金刚键闪现跳动
+		applyImmersiveNavigationBars(window, touchMode);
+
 		if (touchMode) {
 			int keypadHeightPx = getKeypadHeightPx(context);
 			window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
@@ -129,6 +208,7 @@ public final class KeydroidxTouchWindowController {
 			if (decor != null) {
 				decor.post(() -> {
 					if (dialog.isShowing() && KeydroidxSettingsStorage.isTouchMode(context)) {
+						applyImmersiveNavigationBars(window, true);
 						WindowManager.LayoutParams p = window.getAttributes();
 						p.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
 						p.y = keypadHeightPx;
@@ -170,8 +250,11 @@ public final class KeydroidxTouchWindowController {
 			if (activity.isFinishing() || activity.isDestroyed()) return;
 			if (!KeydroidxSettingsStorage.isTouchMode(activity)) return;
 
-			// 若已有挂载在旧 Activity 上的窗口，先清理
+			// 若已有挂载在旧 Activity 上的窗口，先清理；若已挂载在当前 Activity 则幂等保持，避免闪烁
 			if (sCurrentKeypadView != null) {
+				if (sBoundActivity == activity) {
+					return;
+				}
 				detachKeypadWindow(sBoundActivity);
 			}
 
@@ -209,6 +292,15 @@ public final class KeydroidxTouchWindowController {
 							sendKeyToForeground(activity, action, defaultKeyCode, KeyEvent.ACTION_UP);
 						}
 					});
+				}
+
+				keypadContainer.measure(
+						View.MeasureSpec.makeMeasureSpec(activity.getResources().getDisplayMetrics().widthPixels, View.MeasureSpec.EXACTLY),
+						View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+				);
+				int measuredH = keypadContainer.getMeasuredHeight();
+				if (measuredH > 0) {
+					lp.height = measuredH;
 				}
 
 				activity.getWindowManager().addView(keypadContainer, lp);

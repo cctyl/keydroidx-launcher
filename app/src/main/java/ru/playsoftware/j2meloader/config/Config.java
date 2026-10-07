@@ -168,7 +168,11 @@ public class Config {
 			intent.putExtra(KEY_START_ARGUMENTS, arguments);
 			// 键码表随 intent 传给 :midlet 进程（挂机菜单键/软键识别；extra 缺省时 MicroActivity 回退读 SP）
 			intent.putExtra(KEY_KEYCODES, new KeydroidxKeyBinding(context).toKeyCodeArray());
+			intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
 			context.startActivity(intent);
+			if (context instanceof android.app.Activity) {
+				((android.app.Activity) context).overridePendingTransition(0, 0);
+			}
 		} else {
 			// 没有任何兜底配置：仍走设置界面（保持原行为）
 			Log.i("Config", "startApp: 无默认配置，退回设置界面 -> " + name);

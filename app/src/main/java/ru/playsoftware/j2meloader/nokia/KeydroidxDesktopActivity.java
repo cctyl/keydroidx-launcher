@@ -106,6 +106,15 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		// 注册通用 Dialog 窗口适配器：将所有弹窗（权限申请、更新提醒等）自动吸附在上半屏底部
 		KeydroidxDialogFocus.setDialogWindowAdjuster(KeydroidxTouchWindowController::applyDialogWindowBounds);
 
+		// 监听 SystemUiVisibility 变化：触屏模式下只要系统尝试在弹窗关闭时弹出导航栏，立即在同帧内压回
+		if (getWindow() != null && getWindow().getDecorView() != null) {
+			getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(visibility -> {
+				if (isTouchModeEnabled() && (visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
+					KeydroidxTouchWindowController.applyImmersiveNavigationBars(this);
+				}
+			});
+		}
+
 		// 首次启动：若按键绑定向导未完成，则进入向导（清数据后 isWizardDone 复位会再次弹出）
 		Fragment existing = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 		if (existing == null) {
@@ -408,6 +417,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	public void onWindowFocusChanged(boolean hasFocus) {
 		super.onWindowFocusChanged(hasFocus);
 		if (hasFocus) {
+			KeydroidxTouchWindowController.applyImmersiveNavigationBars(this);
 			// onResume 时窗口尚未完全就绪，部分 ROM 会忽略 setRequestedOrientation，
 			// 改用窗口获得焦点的时机再次强制竖屏，作为可靠兜底。
 			int cur = getResources().getConfiguration().orientation;
@@ -421,11 +431,17 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	protected void onPause() {
 		resumedFlag = false;
 		resetLastHandledKeyCode();
-		KeydroidxTouchWindowController.detachKeypadWindow(this);
 		super.onPause();
 		if (statusBarController != null) {
 			statusBarController.stop();
 		}
+	}
+
+	@Override
+	protected void onStop() {
+		// 延迟到 onStop（新 Activity 已完全就绪覆盖前台）再移除键盘，避免切换过渡期键盘消失黑屏
+		KeydroidxTouchWindowController.detachKeypadWindow(this);
+		super.onStop();
 	}
 
 	/** 全局应用当前主题配色（更新背景壁纸、软键栏渐变及左右软键文字主题色） */

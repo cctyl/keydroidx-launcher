@@ -129,6 +129,7 @@ public class MicroActivity extends AppCompatActivity {
 
 	@Override
 	protected void attachBaseContext(Context newBase) {
+		Configuration config = newBase.getResources().getConfiguration();
 		try {
 			float userFontScale = KeydroidxSettingsStorage.getFontScale(newBase);
 			String fontId = KeydroidxSettingsStorage.getFontId(newBase);
@@ -138,9 +139,36 @@ public class MicroActivity extends AppCompatActivity {
 			KeydroidxFontManager.setCurrentFontId(fontId);
 		} catch (Exception ignored) {
 		}
-		Configuration config = newBase.getResources().getConfiguration();
-		if (config.fontScale != 1.0f) {
+
+		// 对齐 KeydroidxBaseActivity 标准 DPI 吸附逻辑，确保桌面与 JAR 进程拥有完全一致的 density，消除键盘高度跳变
+		int dpi = config.densityDpi;
+		int fixed = dpi;
+		int[] standards = {120, 160, 213, 240, 320, 480, 640};
+		boolean standard = false;
+		for (int s : standards) {
+			if (s == dpi) {
+				standard = true;
+				break;
+			}
+		}
+		if (dpi < 160) {
+			fixed = 160;
+		} else if (!standard) {
+			int nearest = standards[0];
+			int minDiff = Math.abs(dpi - nearest);
+			for (int s : standards) {
+				int diff = Math.abs(dpi - s);
+				if (diff < minDiff) {
+					minDiff = diff;
+					nearest = s;
+				}
+			}
+			fixed = nearest;
+		}
+
+		if (fixed != dpi || config.fontScale != 1.0f) {
 			Configuration newConfig = new Configuration(config);
+			newConfig.densityDpi = fixed;
 			newConfig.fontScale = 1.0f;
 			super.attachBaseContext(newBase.createConfigurationContext(newConfig));
 		} else {
@@ -157,6 +185,11 @@ public class MicroActivity extends AppCompatActivity {
 		binding = ActivityMicroBinding.inflate(getLayoutInflater());
 		View view = binding.getRoot();
 		setContentView(view);
+
+		// 触屏模式双窗口联动：在 onCreate 首帧第一时间将主窗口压缩在上半屏并挂载独立虚拟按键，避免黑屏与键盘消失真空期
+		KeydroidxTouchWindowController.applyActivityWindowBounds(this);
+		KeydroidxTouchWindowController.attachKeypadWindow(this);
+
 		setSupportActionBar(binding.toolbar);
 		if (getSupportActionBar() != null) {
 			getSupportActionBar().hide();
@@ -354,7 +387,6 @@ public class MicroActivity extends AppCompatActivity {
 	public void onPause() {
 		visible = false;
 		hideSoftInput();
-		KeydroidxTouchWindowController.detachKeypadWindow(this);
 		// Nokia S40 v5/v6 私有 API 兼容（com.nokia.mid.ui.lcdui）：先通知 MIDlet 退到后台，
 		// 再走原有 pauseApp 流程（与真机 displayInactive 早于 pauseApp 的顺序一致）
 		LCDUIUtils.fireDisplayState(false);
@@ -364,6 +396,8 @@ public class MicroActivity extends AppCompatActivity {
 
 	@Override
 	protected void onStop() {
+		// 延迟到 onStop（桌面或新界面已完全覆盖前台）再移除键盘，避免退到后台/回桌面过渡期键盘消失黑屏
+		KeydroidxTouchWindowController.detachKeypadWindow(this);
 		super.onStop();
 		// 挂机保活：Activity 不可见且 MIDlet 仍在运行（覆盖绿键/红键/Home 全部离开路径；
 		// 绿键「后台运行」路径已在动作内先行启动，此处幂等）
@@ -406,9 +440,12 @@ public class MicroActivity extends AppCompatActivity {
 	@Override
 	public void onWindowFocusChanged(boolean hasFocus) {
 		super.onWindowFocusChanged(hasFocus);
-		if (hasFocus && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT &&
-				current instanceof Canvas) {
-			hideSystemUI();
+		if (hasFocus) {
+			KeydroidxTouchWindowController.applyImmersiveNavigationBars(this);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT &&
+					current instanceof Canvas) {
+				hideSystemUI();
+			}
 		}
 	}
 
@@ -575,24 +612,42 @@ public class MicroActivity extends AppCompatActivity {
 
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
-		// 1. 挂机菜单键（绿键）拦截
-		int hangupKey = nokiaKeyCodes == null ? KeyEvent.KEYCODE_UNKNOWN
-				: nokiaKeyCodes[KeydroidxKeyBinding.ACTION_HANGUP];
-		if (hangupKey != KeyEvent.KEYCODE_UNKNOWN && event.getKeyCode() == hangupKey) {
+		int keyCode = event.getKeyCode();
+
+		// 1. 红键（挂机键 / KEYCODE_ENDCALL / 绑定为 ACTION_LOCK_SCREEN 的键）：
+		// 诺基亚功能机经典挂机行为：在 jar 游戏内按下直接挂机后台运行并一键返回桌面待机屏
+		int lockKey = nokiaKeyCodes == null ? KeyEvent.KEYCODE_UNKNOWN
+				: nokiaKeyCodes[KeydroidxKeyBinding.ACTION_LOCK_SCREEN];
+		if (keyCode == KeyEvent.KEYCODE_ENDCALL || (lockKey != KeyEvent.KEYCODE_UNKNOWN && keyCode == lockKey)) {
 			if (event.getAction() == KeyEvent.ACTION_UP
 					&& (event.getFlags() & KeyEvent.FLAG_CANCELED) == 0
 					&& !isFinishing()) {
+				Log.i("MicroActivity", "按下挂机红键 -> 一键挂机返回桌面待机屏");
+				runInBackground();
+			}
+			return true;
+		}
+
+		// 2. 绿键（拨号键 / KEYCODE_CALL / 绑定为 ACTION_HANGUP 的键）：
+		// 呼出挂机三菜单（继续 / 退出 / 后台运行）
+		int hangupKey = nokiaKeyCodes == null ? KeyEvent.KEYCODE_UNKNOWN
+				: nokiaKeyCodes[KeydroidxKeyBinding.ACTION_HANGUP];
+		if (keyCode == KeyEvent.KEYCODE_CALL || (hangupKey != KeyEvent.KEYCODE_UNKNOWN && keyCode == hangupKey)) {
+			if (event.getAction() == KeyEvent.ACTION_UP
+					&& (event.getFlags() & KeyEvent.FLAG_CANCELED) == 0
+					&& !isFinishing()) {
+				Log.i("MicroActivity", "按下拨号绿键 -> 呼出挂机三菜单");
 				showHangupMenu();
 			}
 			return true;
 		}
 
-		// 2. Screen 模式（TextBox、Form、List、Alert）：通过诺基亚键码表路由到底部软键栏
+		// 3. Screen 模式（TextBox、Form、List、Alert）：通过诺基亚键码表路由到底部软键栏
 		if (current instanceof Screen) {
 			return dispatchScreenKey(event);
 		}
 
-		// 3. Canvas 模式：KEYCODE_MENU 透传给 MIDlet，其余走系统
+		// 4. Canvas 模式：KEYCODE_MENU 透传给 MIDlet，其余走系统
 		if (event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
 			if (current instanceof Canvas && binding.displayableContainer.dispatchKeyEvent(event)) {
 				return true;

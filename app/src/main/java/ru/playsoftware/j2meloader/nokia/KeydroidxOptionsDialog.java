@@ -151,6 +151,17 @@ public class KeydroidxOptionsDialog extends DialogFragment {
 		dismiss();
 	}
 
+	@Override
+	public void dismiss() {
+		try {
+			Dialog d = getDialog();
+			if (d != null && d.getWindow() != null) {
+				d.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+			}
+		} catch (Exception ignored) {}
+		super.dismiss();
+	}
+
 	/**
 	 * 动态刷新整个选项列表（全选/取消全选后更新文案与可用状态）。
 	 * 重建列表容器并修正焦点（跳过禁用项），不重新膨胀整个布局。
@@ -283,6 +294,8 @@ public class KeydroidxOptionsDialog extends DialogFragment {
 
 		// Android 12+：Dialog 窗口首个导航键会被触摸模式吞掉，show 后强制退出该状态
 		dialog.setOnShowListener(d -> KeydroidxDialogFocus.forceNonTouchMode(dialog));
+
+		KeydroidxTouchWindowController.applyDialogWindowBounds(dialog);
 
 		return dialog;
 	}
