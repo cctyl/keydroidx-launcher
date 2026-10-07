@@ -22,30 +22,22 @@ public class KeydroidxKeyBinding {
 	public static final int ACTION_SOFT_LEFT = 5;
 	public static final int ACTION_SOFT_RIGHT = 6;
 	public static final int ACTION_LOCK_SCREEN = 7;
-	/** 挂机菜单键（绿键/拨号键）：仅在 jar 应用内生效，弹出 继续/退出/后台运行 三菜单 */
+	/** 拨号键（绿键）：桌面语境打开最近任务，jar 应用内弹出挂机三菜单 */
 	public static final int ACTION_HANGUP = 8;
-	/**
-	 * 最近任务：桌面主界面 / 功能表内按下即打开「最近任务」卡片页。
-	 * <p>绑定语义：复用拨号键（ACTION_HANGUP）——桌面语境下该键由
-	 * {@code KeydroidxDesktopActivity} 改写为本动作（jar 内的挂机菜单由 :midlet
-	 * 进程处理，不受影响），默认不占用独立按键，按键向导也不再引导绑定。</p>
-	 */
-	public static final int ACTION_RECENT_APPS = 9;
 
-	public static final int ACTION_COUNT = 10;
+	public static final int ACTION_COUNT = 9;
 
 	private static final String PREFS_NAME = "nokia_key_bindings";
 
 	private static final String[] PREF_KEYS = {
 			"up", "down", "left", "right",
-			"select", "soft_left", "soft_right", "lock_screen", "hangup",
-			"recent_apps"
+			"select", "soft_left", "soft_right", "lock_screen", "hangup"
 	};
 
 	// 首次启动按键绑定向导是否已完成（仅首次启动弹出，清数据后重置）
 	private static final String PREF_WIZARD_DONE = "key_bind_wizard_done";
 
-	// 默认按键码 — 方向键/确认/返回有通用默认值，左右软键默认未绑定（需用户自行绑定）
+	// 默认物理实体按键码（实体按键机使用）
 	private static final int[] DEFAULT_KEYCODES = {
 			KeyEvent.KEYCODE_DPAD_UP,               // up
 			KeyEvent.KEYCODE_DPAD_DOWN,             // down
@@ -55,8 +47,20 @@ public class KeydroidxKeyBinding {
 			KeyEvent.KEYCODE_SOFT_LEFT,             // soft_left
 			KeyEvent.KEYCODE_SOFT_RIGHT,            // soft_right
 			KeyEvent.KEYCODE_ENDCALL,               // lock_screen（默认挂机键）
-			KeyEvent.KEYCODE_CALL,                  // hangup 挂机菜单键（默认绿色拨号键）
-			KeyEvent.KEYCODE_UNKNOWN,               // recent_apps（默认未绑定，用户按需在按键绑定里指定）
+			KeyEvent.KEYCODE_CALL,                  // hangup 拨号键（默认绿色拨号键）
+	};
+
+	// 触屏模式虚拟键盘专属预设（按键完全确定，无需用户手动绑定：* 号键锁屏，拨号键最近任务）
+	private static final int[] TOUCH_KEYCODES = {
+			KeyEvent.KEYCODE_DPAD_UP,               // up
+			KeyEvent.KEYCODE_DPAD_DOWN,             // down
+			KeyEvent.KEYCODE_DPAD_LEFT,             // left
+			KeyEvent.KEYCODE_DPAD_RIGHT,            // right
+			KeyEvent.KEYCODE_DPAD_CENTER,           // select
+			KeyEvent.KEYCODE_SOFT_LEFT,             // soft_left
+			KeyEvent.KEYCODE_SOFT_RIGHT,            // soft_right
+			KeyEvent.KEYCODE_STAR,                  // lock_screen（虚拟键盘 * 号键锁屏）
+			KeyEvent.KEYCODE_CALL,                  // hangup 拨号键
 	};
 
 	public static String getActionName(int action) {
@@ -70,7 +74,6 @@ public class KeydroidxKeyBinding {
 			case ACTION_SOFT_RIGHT: return "右软键";
 			case ACTION_LOCK_SCREEN: return "锁屏";
 			case ACTION_HANGUP: return "拨号键";
-			case ACTION_RECENT_APPS: return "最近任务";
 			default: return "未知";
 		}
 	}
@@ -84,8 +87,11 @@ public class KeydroidxKeyBinding {
 		return getActionName(action);
 	}
 
-	/** 首次启动向导是否已完成（已完成则不再弹出）。 */
+	/** 首次启动向导是否已完成（已完成则不再弹出；触屏模式下预设按键已完全确定，无需向导）。 */
 	public boolean isWizardDone() {
+		if (context != null && KeydroidxSettingsStorage.isTouchMode(context)) {
+			return true;
+		}
 		boolean done = prefs.getBoolean(PREF_WIZARD_DONE, false);
 		KeydroidxLog.i("KeyBinding", "isWizardDone=" + done);
 		return done;
@@ -189,22 +195,31 @@ public class KeydroidxKeyBinding {
 		}
 	}
 
-	/** 获取指定动作的按键码。 */
+	/** 获取指定动作的按键码（触屏模式下直接使用虚拟键盘专属预设）。 */
 	public int getKeyCode(int action) {
 		if (action < 0 || action >= ACTION_COUNT) return KeyEvent.KEYCODE_UNKNOWN;
+		if (context != null && KeydroidxSettingsStorage.isTouchMode(context)) {
+			return TOUCH_KEYCODES[action];
+		}
 		return keycodes[action];
 	}
 
 	/** 序列化当前全部绑定为 int[]（跨进程经 Intent extra 传给 :midlet 进程使用）。 */
 	public int[] toKeyCodeArray() {
+		if (context != null && KeydroidxSettingsStorage.isTouchMode(context)) {
+			return TOUCH_KEYCODES.clone();
+		}
 		return keycodes.clone();
 	}
 
 	/**
 	 * 直接从 SharedPreferences 读取全部绑定（不走实例缓存）。
-	 * 供 :midlet 进程兜底使用：新进程首次加载 SP 必然读到最新文件值，无跨进程缓存陈旧问题。
+	 * 供 :midlet 进程兜底使用：触屏模式下直接使用专属预设。
 	 */
 	public static int[] loadKeyCodes(Context context) {
+		if (context != null && KeydroidxSettingsStorage.isTouchMode(context)) {
+			return TOUCH_KEYCODES.clone();
+		}
 		SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 		int[] out = new int[ACTION_COUNT];
 		for (int i = 0; i < ACTION_COUNT; i++) {
@@ -215,6 +230,12 @@ public class KeydroidxKeyBinding {
 
 	/** 根据 KeyCode 反查动作，找不到返回 -1。 */
 	public int getActionForKeyCode(int keycode) {
+		if (context != null && KeydroidxSettingsStorage.isTouchMode(context)) {
+			for (int i = 0; i < ACTION_COUNT; i++) {
+				if (TOUCH_KEYCODES[i] == keycode) return i;
+			}
+			return -1;
+		}
 		for (int i = 0; i < ACTION_COUNT; i++) {
 			if (keycodes[i] == keycode) return i;
 		}
@@ -267,6 +288,10 @@ public class KeydroidxKeyBinding {
 		if (keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) return ACTION_SOFT_RIGHT;
 		if (keyCode == KeyEvent.KEYCODE_CALL) return ACTION_HANGUP;
 		if (keyCode == KeyEvent.KEYCODE_ENDCALL) return ACTION_LOCK_SCREEN;
+		// 星号键兜底锁屏仅在触屏模式下生效，实体按键机未绑定时不拦截星号键
+		if (keyCode == KeyEvent.KEYCODE_STAR && context != null && KeydroidxSettingsStorage.isTouchMode(context)) {
+			return ACTION_LOCK_SCREEN;
+		}
 
 		KeydroidxLog.d("KeyBinding", "resolveAction " + keyName(keyCode)
 				+ " -> 未绑定(-1)");

@@ -333,6 +333,15 @@ public final class KeydroidxTouchWindowController {
 	/** 向前台 Activity 发送虚拟按键事件 */
 	private static void sendKeyToForeground(Activity activity, int action, int defaultKeyCode, int keyAction) {
 		if (activity == null || activity.isFinishing()) return;
+
+		// 挂机键（红键）：赋予真正的 Home 功能（关闭弹窗、退出子界面回待机屏、jar挂机后台运行）
+		if (action == KeydroidxVirtualKeypadView.ACTION_HOME || defaultKeyCode == KeyEvent.KEYCODE_HOME || defaultKeyCode == KeyEvent.KEYCODE_ENDCALL) {
+			if (keyAction == KeyEvent.ACTION_UP) {
+				performHomeAction(activity);
+			}
+			return;
+		}
+
 		long now = SystemClock.uptimeMillis();
 		int keyCode = defaultKeyCode;
 
@@ -358,6 +367,36 @@ public final class KeydroidxTouchWindowController {
 		}
 
 		activity.dispatchKeyEvent(event);
+	}
+
+	/** 虚拟键盘红键触发的经典 Home 功能 */
+	private static void performHomeAction(Activity activity) {
+		if (activity == null || activity.isFinishing()) return;
+		KeydroidxLog.i(TAG, "虚拟挂机键触发 Home 动作");
+		// 1. 若有前台弹窗，优先关闭弹窗
+		Dialog activeDialog = getActiveDialog();
+		if (activeDialog != null && activeDialog.isShowing()) {
+			try {
+				activeDialog.dismiss();
+			} catch (Exception ignored) {}
+		}
+		// 2. 若前台是 MicroActivity（JAR 应用），一键挂机后台运行并返回桌面
+		if (activity instanceof javax.microedition.shell.MicroActivity) {
+			((javax.microedition.shell.MicroActivity) activity).runInBackground();
+			return;
+		}
+		// 3. 若前台是 KeydroidxDesktopActivity，清空返回栈回待机屏
+		if (activity instanceof KeydroidxDesktopActivity) {
+			((KeydroidxDesktopActivity) activity).goHome();
+			return;
+		}
+		// 4. 其他场景兜底：启动系统 Home Intent
+		try {
+			android.content.Intent homeIntent = new android.content.Intent(android.content.Intent.ACTION_MAIN);
+			homeIntent.addCategory(android.content.Intent.CATEGORY_HOME);
+			homeIntent.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+			activity.startActivity(homeIntent);
+		} catch (Exception ignored) {}
 	}
 
 	/**

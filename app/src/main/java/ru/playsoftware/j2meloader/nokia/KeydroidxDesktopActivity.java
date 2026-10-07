@@ -647,10 +647,22 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			return super.dispatchKeyEvent(event);
 		}
 
+		// 挂机键 / Home 键（物理机挂机键或虚拟 Home 键）：在任意子页面按下直接返回待机屏
+		int keyCode = event.getKeyCode();
+		if (keyCode == KeyEvent.KEYCODE_ENDCALL || keyCode == KeyEvent.KEYCODE_HOME) {
+			Fragment curHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+			if (!(curHost instanceof KeydroidxDesktopFragment)) {
+				KeydroidxLog.i("Desktop", "挂机/Home键按下：从子页面返回桌面待机屏");
+				goHome();
+				lastHandledDownKeyCode = event.getKeyCode();
+				return true;
+			}
+		}
+
 		KeydroidxLog.d("Desktop", "解析动作 " + KeydroidxKeyBinding.getActionName(action)
 				+ "(" + action + ")");
 
-		// 锁屏动作：仅在桌面待机屏生效。
+		// 锁屏动作（* 号键 / 锁屏键）：仅在桌面待机屏生效。
 		// 关键：DOWN 阶段只记录 keyCode 并拦截，绝不在 DOWN 阶段调用 lockScreen()！
 		// 必须等待用户手指抬起（UP）时才调用 lockNow()，确保输入事件成对闭环。
 		if (action == KeydroidxKeyBinding.ACTION_LOCK_SCREEN) {
@@ -661,27 +673,20 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 				lastHandledDownKeyCode = event.getKeyCode();
 				return true;
 			}
-			KeydroidxLog.d("Desktop", "锁屏动作当前非桌面待机屏，返回桌面");
-			goHome();
-			lastHandledDownKeyCode = event.getKeyCode();
-			return true;
+			KeydroidxLog.d("Desktop", "锁屏动作当前非桌面待机屏，放行给子界面处理");
+			resetLastHandledKeyCode();
+			return super.dispatchKeyEvent(event);
 		}
 
-		// 拨号键（ACTION_HANGUP）在桌面语境按「最近任务」处理：
-		// 挂机菜单（继续/退出/后台运行）只在 jar 应用内生效，由 :midlet 进程自行处理，
-		// 桌面侧拨号键空闲；按键向导也不单独引导绑定「最近任务」键，统一走拨号键。
+		// 拨号键（ACTION_HANGUP）在桌面语境统一按「最近任务」处理：
+		// 挂机菜单（继续/退出/后台运行）只在 jar 应用内生效，由 :midlet 进程自行处理；
+		// 桌面主界面 / 功能表 / 各子页面内按下拨号键即打开最近任务卡片页。
 		if (action == KeydroidxKeyBinding.ACTION_HANGUP) {
-			action = KeydroidxKeyBinding.ACTION_RECENT_APPS;
-		}
-
-		// 「最近任务」动作：桌面主界面 / 功能表 / 各子页面内按下即打开卡片页。
-		// 已经停留在该页时忽略（避免重复入栈）。非破坏性动作，DOWN 阶段直接执行即可。
-		if (action == KeydroidxKeyBinding.ACTION_RECENT_APPS) {
 			Fragment recentHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
 			if (recentHost instanceof KeydroidxRecentTasksFragment) {
-				KeydroidxLog.i("Desktop", "最近任务按键：已在该页，忽略");
+				KeydroidxLog.i("Desktop", "拨号键（最近任务）：已在该页，忽略");
 			} else {
-				KeydroidxLog.i("Desktop", "最近任务按键：打开最近任务页");
+				KeydroidxLog.i("Desktop", "拨号键（最近任务）：打开最近任务页");
 				openFragment(new KeydroidxRecentTasksFragment());
 			}
 			lastHandledDownKeyCode = event.getKeyCode();
@@ -950,7 +955,7 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 
 	// ---- 内部方法 ----
 
-	private void goHome() {
+	public void goHome() {
 		KeydroidxLog.i("Desktop", "goHome 清空返回栈并加载桌面");
 		FragmentManager fm = getSupportFragmentManager();
 		if (fm.getBackStackEntryCount() > 0) {

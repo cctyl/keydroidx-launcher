@@ -22,6 +22,7 @@ import ru.playsoftware.j2meloader.R;
 public class KeydroidxVirtualKeypadView extends LinearLayout {
 
 	private static final String TAG = "VirtualKeypad";
+	public static final int ACTION_HOME = 100;
 
 	public interface OnVirtualKeyEventListener {
 		void onVirtualKeyDown(int action, int keyCode);
@@ -53,7 +54,7 @@ public class KeydroidxVirtualKeypadView extends LinearLayout {
 	}
 
 	private void setupKeys() {
-		// 1. 语义动作按键（D-Pad、软键、通话、挂机）
+		// 1. 语义动作按键（D-Pad、软键、通话、挂机/Home）
 		bindKey(R.id.btn_key_up, KeydroidxKeyBinding.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP);
 		bindKey(R.id.btn_key_down, KeydroidxKeyBinding.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN);
 		bindKey(R.id.btn_key_left, KeydroidxKeyBinding.ACTION_LEFT, KeyEvent.KEYCODE_DPAD_LEFT);
@@ -64,9 +65,9 @@ public class KeydroidxVirtualKeypadView extends LinearLayout {
 		bindKey(R.id.btn_key_rsk, KeydroidxKeyBinding.ACTION_SOFT_RIGHT, KeyEvent.KEYCODE_SOFT_RIGHT);
 
 		bindKey(R.id.btn_key_call, KeydroidxKeyBinding.ACTION_HANGUP, KeyEvent.KEYCODE_CALL);
-		bindKey(R.id.btn_key_end, KeydroidxKeyBinding.ACTION_LOCK_SCREEN, KeyEvent.KEYCODE_ENDCALL);
+		bindKey(R.id.btn_key_end, ACTION_HOME, KeyEvent.KEYCODE_HOME);
 
-		// 2. 九宫格数字及特殊键（action = -1，直接使用标准 KeyCode）
+		// 2. 九宫格数字及特殊键（* 号键确定绑定为锁屏）
 		bindKey(R.id.btn_key_1, -1, KeyEvent.KEYCODE_1);
 		bindKey(R.id.btn_key_2, -1, KeyEvent.KEYCODE_2);
 		bindKey(R.id.btn_key_3, -1, KeyEvent.KEYCODE_3);
@@ -77,7 +78,7 @@ public class KeydroidxVirtualKeypadView extends LinearLayout {
 		bindKey(R.id.btn_key_8, -1, KeyEvent.KEYCODE_8);
 		bindKey(R.id.btn_key_9, -1, KeyEvent.KEYCODE_9);
 		bindKey(R.id.btn_key_0, -1, KeyEvent.KEYCODE_0);
-		bindKey(R.id.btn_key_star, -1, KeyEvent.KEYCODE_STAR);
+		bindKey(R.id.btn_key_star, KeydroidxKeyBinding.ACTION_LOCK_SCREEN, KeyEvent.KEYCODE_STAR);
 		bindKey(R.id.btn_key_pound, -1, KeyEvent.KEYCODE_POUND);
 	}
 

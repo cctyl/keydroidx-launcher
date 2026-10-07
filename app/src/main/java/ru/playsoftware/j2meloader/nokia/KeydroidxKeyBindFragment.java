@@ -163,6 +163,10 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 			case KeyEvent.KEYCODE_DPAD_RIGHT: return "KEYCODE_DPAD_RIGHT";
 			case KeyEvent.KEYCODE_DPAD_CENTER: return "KEYCODE_DPAD_CENTER";
 			case KeyEvent.KEYCODE_ENTER: return "KEYCODE_ENTER";
+			case KeyEvent.KEYCODE_STAR: return "KEYCODE_STAR";
+			case KeyEvent.KEYCODE_POUND: return "KEYCODE_POUND";
+			case KeyEvent.KEYCODE_CALL: return "KEYCODE_CALL";
+			case KeyEvent.KEYCODE_ENDCALL: return "KEYCODE_ENDCALL";
 			case KeyEvent.KEYCODE_VOLUME_UP: return "KEYCODE_VOLUME_UP";
 			case KeyEvent.KEYCODE_VOLUME_DOWN: return "KEYCODE_VOLUME_DOWN";
 			case KeyEvent.KEYCODE_BACK: return "KEYCODE_BACK";

@@ -599,7 +599,7 @@ public class MicroActivity extends AppCompatActivity {
 	 * 三菜单「后台运行」：回到原键桌面（默认桌面时走原生桌面动画，非默认桌面平滑切回），
 	 * 本 Activity 保持 stopped（singleTask 不销毁），jar 转挂机，下次进入走 R1 快速续跑。
 	 */
-	private void runInBackground() {
+	public void runInBackground() {
 		hideSoftInput();
 		// 挂机动作发生时 Activity 仍前台：立即起保活通知（规避 Android 12+ 后台 FGS 限制）
 		if (MidletThread.hasInstance() && MidletThread.getRunningAppPath() != null) {
@@ -614,11 +614,9 @@ public class MicroActivity extends AppCompatActivity {
 	public boolean dispatchKeyEvent(KeyEvent event) {
 		int keyCode = event.getKeyCode();
 
-		// 1. 红键（挂机键 / KEYCODE_ENDCALL / 绑定为 ACTION_LOCK_SCREEN 的键）：
+		// 1. 红键（挂机键 / KEYCODE_ENDCALL / KEYCODE_HOME）：
 		// 诺基亚功能机经典挂机行为：在 jar 游戏内按下直接挂机后台运行并一键返回桌面待机屏
-		int lockKey = nokiaKeyCodes == null ? KeyEvent.KEYCODE_UNKNOWN
-				: nokiaKeyCodes[KeydroidxKeyBinding.ACTION_LOCK_SCREEN];
-		if (keyCode == KeyEvent.KEYCODE_ENDCALL || (lockKey != KeyEvent.KEYCODE_UNKNOWN && keyCode == lockKey)) {
+		if (keyCode == KeyEvent.KEYCODE_ENDCALL || keyCode == KeyEvent.KEYCODE_HOME) {
 			if (event.getAction() == KeyEvent.ACTION_UP
 					&& (event.getFlags() & KeyEvent.FLAG_CANCELED) == 0
 					&& !isFinishing()) {
