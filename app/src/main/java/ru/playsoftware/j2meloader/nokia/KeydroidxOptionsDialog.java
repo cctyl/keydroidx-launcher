@@ -226,10 +226,25 @@ public class KeydroidxOptionsDialog extends DialogFragment {
 					return true;
 				}
 			}
-			// 返回键由弹窗自己处理（KeydroidxKeyBinding 不管 BACK）
-			if (keyCode == KeyEvent.KEYCODE_BACK) {
-				KeydroidxLog.i(TAG, "返回键：关闭选项弹窗");
+			// 返回键与右软键由弹窗直接关闭
+			if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SOFT_RIGHT) {
+				KeydroidxLog.i(TAG, "返回键/右软键：关闭选项弹窗");
 				dismissWithCancelAction();
+				return true;
+			}
+			// 确认键与左软键直接执行选中项
+			if (keyCode == KeyEvent.KEYCODE_SOFT_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+				KeydroidxLog.i(TAG, "左软键/确认键：执行选项");
+				trigger(focusIndex);
+				return true;
+			}
+			// 方向键直接移动焦点
+			if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+				moveFocus(-1);
+				return true;
+			}
+			if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+				moveFocus(1);
 				return true;
 			}
 			int action = resolveActionSafe(event);

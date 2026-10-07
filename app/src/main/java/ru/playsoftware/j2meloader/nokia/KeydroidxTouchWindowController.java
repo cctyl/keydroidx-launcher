@@ -14,6 +14,7 @@ import android.view.Window;
 import android.view.WindowManager;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import ru.playsoftware.j2meloader.R;
@@ -38,8 +39,19 @@ public final class KeydroidxTouchWindowController {
 
 	private static View sCurrentKeypadView = null;
 	private static Activity sBoundActivity = null;
+	private static WeakReference<Dialog> sActiveDialog = null;
 
 	private KeydroidxTouchWindowController() {}
+
+	public static Dialog getActiveDialog() {
+		if (sActiveDialog != null) {
+			Dialog d = sActiveDialog.get();
+			if (d != null && d.isShowing()) {
+				return d;
+			}
+		}
+		return null;
+	}
 
 	/** 计算虚拟按键的标准物理像素高度（240dp） */
 	public static int getKeypadHeightPx(Context context) {
@@ -83,8 +95,23 @@ public final class KeydroidxTouchWindowController {
 	 */
 	public static void applyDialogWindowBounds(Dialog dialog) {
 		if (dialog == null) return;
+		sActiveDialog = new WeakReference<>(dialog);
 		Window window = dialog.getWindow();
 		if (window == null) return;
+		View decorView = window.getDecorView();
+		if (decorView != null) {
+			decorView.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+				@Override
+				public void onViewAttachedToWindow(View v) {}
+
+				@Override
+				public void onViewDetachedFromWindow(View v) {
+					if (sActiveDialog != null && sActiveDialog.get() == dialog) {
+						sActiveDialog = null;
+					}
+				}
+			});
+		}
 		Context context = dialog.getContext();
 		boolean touchMode = KeydroidxSettingsStorage.isTouchMode(context);
 		if (touchMode) {
@@ -229,6 +256,15 @@ public final class KeydroidxTouchWindowController {
 		}
 
 		KeyEvent event = new KeyEvent(now, now, keyAction, keyCode, 0);
+
+		// 若当前正有弹窗显示在前台，直接将按键投递给该弹窗，确保弹窗能够直接响应软键/返回/方向键
+		Dialog activeDialog = getActiveDialog();
+		if (activeDialog != null && activeDialog.isShowing()) {
+			KeydroidxLog.i(TAG, "前台有活跃弹窗，直接投递按键 keyCode=" + keyCode + " action=" + keyAction);
+			activeDialog.dispatchKeyEvent(event);
+			return;
+		}
+
 		activity.dispatchKeyEvent(event);
 	}
 

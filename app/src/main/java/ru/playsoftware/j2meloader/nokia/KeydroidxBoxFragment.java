@@ -66,6 +66,13 @@ import ru.woesss.j2me.installer.KeydroidxInstallerDialog;
 public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	private static final String TAG = "KeydroidxBoxFragment";
 
+	/**
+	 * 本进程是否已在本页「进入时」自动申请过存储权限。
+	 * <p>只拦自动申请这一条路径：用户若拒绝，不再每次进页都弹窗打扰，
+	 * 改由「安装」入口按需再申请（那时是用户明确的动作，弹窗不突兀）。
+	 */
+	private static boolean storagePermissionRequestedOnEnter;
+
 
 	// ---- 网格常量 ----
 	private static final int COLS = 3;
@@ -181,6 +188,9 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			}
 			// 订阅已安装 JAR 应用数据（数据回调会触发 onDbUpdated）
 			appRepository.observeApps(getViewLifecycleOwner(), this::onDbUpdated);
+			// 本页一切功能都依赖外部工作目录：首次进入就补齐存储权限，
+			// 而不是等用户点了「安装」才把人拦在操作中途。
+			requestStoragePermissionOnEnter();
 			KeydroidxLog.i("Box", "应用程序初始化完成（延迟到 panelH 可用），等待数据加载…");
 		});
 	}
@@ -487,10 +497,13 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	 *
 	 * <p>因此这里做三件事：
 	 * <ol>
-	 *   <li>权限缺失 → 诺基亚风格说明框 + 系统权限框（不依赖 ROM 的懒提示时机）；</li>
+	 *   <li>权限缺失 → 诺基亚风格说明框 + 系统权限框（不依赖 ROM 的懒提示时机）；
 	 *   <li>授权成功 → 重建工作目录 + 重新初始化数据库，然后自动继续安装流程（无需重启）；</li>
 	 *   <li>授权后目录仍不可写（当前进程未拿到新的存储视图）→ 明确提示需重启应用，而不是放任崩溃。</li>
 	 * </ol>
+	 *
+	 * <p>注：正常情况下权限在进入本页时就已被 {@link #requestStoragePermissionOnEnter()} 申请掉，
+	 * 这里只是兜底——用户此前拒绝过、或权限被系统/用户收回时，安装入口仍要拦一道。
 	 *
 	 * @return true 表示已就绪，可继续安装流程
 	 */
@@ -505,7 +518,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			return true;
 		}
 		if (needsStoragePermission(context)) {
-			requestStoragePermission();
+			requestStoragePermission(true);
 			return false;
 		}
 		// 无权限诉求却仍未就绪：目录确实不可写（权限已授予但本进程未生效 / 路径不可用）
@@ -514,13 +527,36 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	}
 
 	/**
-	 * 申请「存储读写」权限；授予后重建工作目录并重新初始化数据库，再自动继续安装流程。
+	 * 进入「应用程序」页即主动补齐存储权限（每进程只自动申请一次）。
+	 *
+	 * <p>为什么不等用户点「安装」：本页的一切——已装 JAR 列表、安装、启动——都依赖外部工作目录。
+	 * 权限缺失时进来只看到一个空列表，用户点「安装」才弹权限，等于把人拦在操作中途。
+	 * 因此首次进入本页就申请，授予后立刻重建目录并初始化数据库，列表直接出数据。
 	 */
-	private void requestStoragePermission() {
-		KeydroidxLog.i("Box", "存储权限缺失，安装前发起申请");
+	private void requestStoragePermissionOnEnter() {
+		if (storagePermissionRequestedOnEnter) {
+			return;
+		}
+		Context context = getContext();
+		if (context == null || !needsStoragePermission(context)) {
+			return;
+		}
+		storagePermissionRequestedOnEnter = true;
+		KeydroidxLog.i("Box", "进入应用程序页，主动申请存储权限");
+		requestStoragePermission(false);
+	}
+
+	/**
+	 * 申请「存储读写」权限；授予后重建工作目录并重新初始化数据库。
+	 *
+	 * @param continueInstall true 表示申请来自「安装」入口，授予后自动继续打开文件选择器；
+	 *                        false 表示申请来自页面进入时的主动申请，授予后只需把列表数据刷出来
+	 */
+	private void requestStoragePermission(boolean continueInstall) {
+		KeydroidxLog.i("Box", "存储权限缺失，发起申请（授予后继续安装=" + continueInstall + "）");
 		KeydroidxPermissionManager.requestWithNokiaDialog(requireActivity(),
 				"存储权限申请",
-				"安装 JAR 需要读写手机存储权限：用于读取您选择的安装包，并把应用数据写入模拟器工作目录。",
+				"运行 J2ME 应用需要读写手机存储权限：用于读取安装包，并把应用数据写入模拟器工作目录。",
 				Collections.singletonList(Manifest.permission.WRITE_EXTERNAL_STORAGE),
 				new OnPermissionCallback() {
 					@Override
@@ -528,11 +564,11 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 						KeydroidxLog.i("Box", "存储权限已授予，重建工作目录并重新初始化数据库");
 						FileUtils.initWorkDir(new File(Config.getEmulatorDir()));
 						appRepository.ensureReady();
-						if (appRepository.isReady()) {
-							launchFilePicker();
-						} else {
+						if (!appRepository.isReady()) {
 							// 授权已生效但当前进程仍未拿到可写视图：只能靠重启进程
 							showStorageUnavailableDialog();
+						} else if (continueInstall) {
+							launchFilePicker();
 						}
 					}
 
@@ -541,7 +577,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 						KeydroidxLog.w("Box", "存储权限被拒绝，无法安装 JAR（quick=" + quick + "）");
 						if (isAdded()) {
 							Toast.makeText(requireContext(),
-									"没有存储权限，无法安装 JAR", Toast.LENGTH_SHORT).show();
+									"没有存储权限，无法运行 JAR 应用", Toast.LENGTH_SHORT).show();
 						}
 					}
 				});
@@ -573,7 +609,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			return;
 		}
 		String path = Config.getEmulatorDir();
-		KeydroidxLog.w("Box", "工作目录不可写，无法进入安装流程: " + path);
+		KeydroidxLog.w("Box", "工作目录不可写，JAR 列表/安装均不可用: " + path);
 		new KeydroidxConfirmDialog(requireContext(), "无法访问存储",
 				"无法写入模拟器工作目录：\n" + path
 						+ "\n\n若刚刚授予了存储权限，需要重新启动应用才会生效。\n确定立即重启应用吗？")
