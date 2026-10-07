@@ -290,6 +290,27 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	/** 下一次后台枚举完成后是否恢复原页码与焦点（包变化刷新场景）。 */
 	private boolean refreshKeepPosition = false;
 
+	/**
+	 * 图标外观（全局图标包 / 单应用覆盖）已变化，待按新指纹就地重算图标。
+	 * <p>置位期间<b>保留 pageIndex 与 focusPos</b>：图标外观变化只影响「图标长什么样」，
+	 * 不影响列表内容与顺序，若照旧实现整表判失效，用户给第 3 页的应用换个图标后
+	 * 就会被扔回第 1 页，连续换多个图标时每次都要重新翻页。
+	 */
+	private boolean iconAppearanceChanged = false;
+
+	/** 轻量图标刷新进行中标记，防止重复提交。 */
+	private boolean iconRefreshRunning = false;
+
+	/** 检测到图标外观变化时的旧指纹（用于区分「全局换图标包」与「单应用覆盖」）。 */
+	private String staleIconState;
+
+	/**
+	 * 「图标外观已变化、但还没被轻量刷新确认落地」的强制重建标记。
+	 * 轻量刷新成功回包即清除；若它没跑成（异常 / 取不到图标包），
+	 * 由后台校准判定列表不一致后重建兜底（见 loadAppsAsync）。
+	 */
+	private boolean forceIconRebuild = false;
+
 	/** 系统图标未加载完成前的占位图标（懒加载） */
 	private Drawable placeholderIcon;
 
@@ -377,7 +398,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		boolean hadCache = applyCachedItems();
 		if (hadCache && panelReady) {
 			buildCurrentPage();
-			setFocusPos(0);
+			applyInitialFocus();
 			KeydroidxLog.i("Menu", "复用进程内应用列表缓存，首帧直接构建：" + items.size() + " 项");
 		}
 		final boolean builtFirstPage = hadCache && panelReady;
@@ -397,11 +418,16 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				// 首帧已按正确行数构建且行数未变 → 跳过重建，消除闪烁
 				if (!builtFirstPage || rowsChanged) {
 					buildCurrentPage();
-					setFocusPos(0);
+					applyInitialFocus();
 				}
 				KeydroidxLog.i("Menu", "功能表初始化完成：共 " + items.size()
 						+ " 项，" + totalPages + " 页，每页 " + perPage
 						+ " 格（" + COLS + "×" + rowsPerPage + "）");
+				// 图标外观变化（换图标 / 恢复默认图标返回）：只就地重算图标，
+				// 不重新枚举应用列表、不重建网格、不动页码与焦点。
+				if (iconAppearanceChanged) {
+					refreshIconsAsync();
+				}
 				// 缓存命中也要静默后台校准一次：Fragment View 销毁期间（在返回栈中）
 				// 包变化广播接收器已注销，期间安装/卸载的应用不会进缓存；
 				// 不校准的话新装应用会一直缺席，直到进程重启。
@@ -425,18 +451,17 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			if (cachedItems.isEmpty()) {
 				return false;
 			}
-			// 图标包 / 单应用覆盖变化 → 缓存里的图标已过期，直接判为无缓存走重建。
-			// 注意：本 Fragment 实例在返回栈中存活，成员 items 里仍是旧图标，
-			// 一并清掉，避免后台枚举时被误判为「列表无变化」而跳过重建（网格会空着）。
+			// 图标包 / 单应用覆盖变化 → 缓存里的图标已过期。
+			// 注意：这里刻意<b>不再</b>清空 items/cachedItems、也不再重置 pageIndex/totalPages。
+			// 旧实现把「图标外观变化」直接等同于「整表缓存失效」，导致用户给第 3 页的应用
+			// 换完图标返回时被扔回第 1 页（连续换多个图标每次都要重新翻页），且首帧是空网格。
+			// 现在只置待刷新标志：首帧沿用现有数据出图（页码、焦点都不动），
+			// 图标本身由 refreshIconsAsync() 就地重算替换。
 			String currentState = KeydroidxSettingsStorage.getIconStateFingerprint(requireContext());
 			if (!currentState.equals(cachedIconState)) {
 				KeydroidxLog.i("Menu", "图标外观已变化（" + cachedIconState + " → " + currentState
-						+ "），进程内应用列表缓存失效");
-				cachedItems.clear();
-				items.clear();
-				pageIndex = 0;
-				totalPages = 1;
-				return false;
+						+ "），保留当前页与焦点，改为就地刷新图标");
+				markIconAppearanceChanged();
 			}
 			items.clear();
 			items.addAll(cachedItems);
@@ -475,10 +500,18 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 						if (!isAdded() || getView() == null) return;
 						// 校准场景（缓存命中后后台重新枚举）：数据无变化时跳过重建，
 						// 避免每次进入功能表都白画一遍网格。
-						if (isSameMenuList(built, items)) {
+						// isSameItemSet：内容相同、仅顺序不同时同样不重建 —— 图标外观变化会让
+						// 应用在「已命中图标包 / 未命中」两个分组间移动从而改变顺序，
+						// 若照旧重建，用户刚改完图标的应用会在眼前跳到别处。
+						// forceIconRebuild：图标外观已变但轻量刷新还没确认落地（例如全局换包）
+						// 时，即使判不出差异也必须重建，否则会残留旧图标。
+						if (!forceIconRebuild && (isSameMenuList(built, items)
+								|| isSameItemSet(built, items))) {
+							forceIconRebuild = false;
 							KeydroidxLog.d("Menu", "后台校准：应用列表无变化，跳过重建");
 							return;
 						}
+						forceIconRebuild = false;
 						items.clear();
 						items.addAll(built);
 						totalPages = Math.max(1, (int) Math.ceil((double) items.size() / perPage));
@@ -541,6 +574,37 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * 两个列表是否「内容相同、仅顺序或图标外观不同」（按结构标识计数比对，与顺序无关）。
+	 * <p>用途：图标外观变化会让应用在 {@code buildAppList} 的「已命中图标包 / 未命中」
+	 * 两个分组之间移动，从而改变列表顺序（内容并未增删）。此时若照旧重建列表，
+	 * 用户刚改完图标的应用会在眼前跳到别处 —— 页码虽然保住了，但要找的应用跑了。
+	 * 因此顺序由图标外观派生的场景一律保留用户当前看到的顺序，
+	 * 等真正的内容变化（安装 / 卸载 / 改名）再回到标准顺序。
+	 */
+	private static boolean isSameItemSet(List<KeydroidxAppItem> a, List<KeydroidxAppItem> b) {
+		if (a.size() != b.size()) return false;
+		Map<String, Integer> counts = new HashMap<>();
+		for (KeydroidxAppItem x : a) {
+			String key = itemStructuralKey(x);
+			Integer c = counts.get(key);
+			counts.put(key, c == null ? 1 : c + 1);
+		}
+		for (KeydroidxAppItem y : b) {
+			Integer c = counts.get(itemStructuralKey(y));
+			if (c == null || c <= 0) return false;
+			counts.put(itemStructuralKey(y), c - 1);
+		}
+		return true;
+	}
+
+	/** 与图标外观无关的结构标识：类型 + 显示名 + 启动组件（用于 isSameItemSet 计数比对）。 */
+	private static String itemStructuralKey(KeydroidxAppItem item) {
+		if (item == null) return "null";
+		ComponentName cn = item.launchIntent != null ? item.launchIntent.getComponent() : null;
+		return item.type + "|" + item.label + "|" + (cn != null ? cn.flattenToString() : "");
 	}
 
 	/**
@@ -823,46 +887,185 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		}
 
 		/**
-		 * 图标包 / 单应用图标覆盖变化后的外部刷新入口（图标包设置页、更换图标流程调用）。
-		 * 保持当前页码与焦点，后台重新枚举并重建（图标不可变部分复用缓存）。
+		 * 图标包 / 单应用图标覆盖变化后的外部刷新入口（图标包设置页调用）。
+		 * <p>只重算图标外观，不重新枚举应用列表、不动页码与焦点；若此刻 View 尚未就绪
+		 * （功能表还在返回栈里），留给 {@link #applyCachedItems()} 的指纹检测处理。
 		 */
 		public void onIconPackChanged() {
-			refreshAppList();
+			if (!isAdded() || getView() == null) return;
+			markIconAppearanceChanged();
+			refreshIconsAsync();
 		}
 
 		/**
-		 * 图标包（或单应用覆盖）变化后重建当前页图标：仅替换 ImageView，不重建网格、不改变焦点。
-		 * 由图标包设置页 / 更换图标流程返回时调用。
+		 * 标记「图标外观已变化，待就地重算」，并记下变化前的指纹
+		 * （用于区分「全局换图标包」与「单应用覆盖」）。
 		 */
-		private void refreshAfterIconInit() {
-			if (!isAdded() || getView() == null) return;
-			long start = System.currentTimeMillis();
+		private void markIconAppearanceChanged() {
+			if (!iconAppearanceChanged) {
+				staleIconState = cachedIconState;
+			}
+			iconAppearanceChanged = true;
+			// 先假定需要重建；轻量刷新成功落地后会清掉它（见 refreshIconsAsync 的回包）
+			forceIconRebuild = true;
+		}
+
+		/**
+		 * 图标外观变化后的轻量刷新：只重算每个应用的图标来源并按需重新取图，
+		 * <b>不重新枚举应用列表、不重建网格、不动页码与焦点</b>。
+		 * <p>与旧的「清空缓存 + 后台全量重枚举」相比，代价从 2 次
+		 * {@code queryIntentActivities} + N 次 {@code loadLabel} 降为 O(N) 次内存查表 +
+		 * O(K) 次取图（K = 外观真正变化的项数，单应用换图标时通常为 1），
+		 * 因此返回功能表时既不空白也不闪烁。
+		 * <p>items 与静态 cachedItems 共享同一批 item 对象引用，原地改字段即等价于同步缓存。
+		 * <p>全局换图标包不走这条路：那种情况下所有命中应用的图标都变，而且
+		 * 「第一页固定槽位图标只属于内置 S60 包」的规则需要整表重建才能对齐，
+		 * 交给调用方的 loadAppsAsync 兜底（页码与焦点同样保持不变）。
+		 */
+		private void refreshIconsAsync() {
+			if (iconRefreshRunning) return;
+			final String newState = KeydroidxSettingsStorage.getIconStateFingerprint(requireContext());
+			if (!TextUtils.equals(packIdOf(staleIconState), packIdOf(newState))) {
+				KeydroidxLog.i("Menu", "检测到全局图标包切换（" + staleIconState + " → " + newState
+						+ "），改走后台重建（页码与焦点保持不变）");
+				// 本次交给后台重建负责：forceIconRebuild 保持置位（重建落地后才清），
+				// 这里先复位「待就地刷新」标记，避免每次进入功能表都重复走这个分支
+				iconAppearanceChanged = false;
+				staleIconState = null;
+				return;
+			}
+			iconRefreshRunning = true;
+			final Context appCtx = requireContext().getApplicationContext();
+			final List<KeydroidxAppItem> snapshot = new ArrayList<>(items);
+			LIST_EXECUTOR.execute(new Runnable() {
+				@Override
+				public void run() {
+					int changed = 0;
+					boolean ok = true;
+					try {
+						for (KeydroidxAppItem item : snapshot) {
+							if (item == null || item.type != KeydroidxAppItem.TYPE_APP
+									|| item.launchIntent == null
+									|| item.launchIntent.getComponent() == null) {
+								continue;
+							}
+							ComponentName cn = item.launchIntent.getComponent();
+							KeydroidxIconResolver.Hit hit = KeydroidxIconResolver.resolve(
+									appCtx, cn.getPackageName(), cn, item.label);
+							boolean wasPack = item.iconPackName != null;
+							if (hit != null) {
+								// 外观没变的项直接跳过，避免整表重新取图
+								// （单应用换图标时只有 1 项会变）
+								if (wasPack && TextUtils.equals(item.iconPackName, hit.iconName)
+										&& item.iconOverridden == hit.override) {
+									continue;
+								}
+								applyIconPackResult(item, hit, appCtx);
+							} else if (wasPack) {
+								// 覆盖被清除 / 换包后不再命中 → 回退应用原图标
+								// （applyIconPackResult 会清空 iconPackName/iconOverridden/icon，
+								//   icon 置空后由 updateCurrentPageIcons 走占位图 + 异步补图）
+								applyIconPackResult(item, null, appCtx);
+							} else {
+								continue;   // 本来就没有图标包图标，外观没变
+							}
+							// 被改动的应用若正好是「第一页固定槽位」，按 buildAppList 的规则套用
+							// 槽位专属 S60 图标（例如清掉覆盖后），否则会与整表重建结果不一致
+							applyPinnedSlotIcon(appCtx, item);
+							changed++;
+						}
+					} catch (Exception e) {
+						// 取图异常：保持 forceIconRebuild 置位，交给后台校准重建兜底
+						ok = false;
+						KeydroidxLog.w("Menu", "图标就地刷新异常，转由后台校准重建兜底", e);
+					}
+					final int fChanged = changed;
+					final boolean fOk = ok;
+					MAIN_HANDLER.post(new Runnable() {
+						@Override
+						public void run() {
+							iconRefreshRunning = false;
+							iconAppearanceChanged = false;
+							staleIconState = null;
+							if (fOk) {
+								forceIconRebuild = false;
+								// 指纹落定：本实例缓存已按新外观重算，后续进入不再判为过期。
+								// 若这次重算有遗漏（如列表刚被后台校准换成新对象），
+								// loadAppsAsync 仍会因 iconPackName 不一致而重建兜底。
+								cachedIconState = newState;
+							}
+							if (!isAdded() || getView() == null) return;
+							updateCurrentPageIcons();
+							KeydroidxLog.i("Menu", "图标就地刷新完成：扫描 " + snapshot.size()
+									+ " 项，外观变化 " + fChanged + " 项（未重新枚举应用列表）");
+						}
+					});
+				}
+			});
+		}
+
+		/** 指纹前缀 = 全局图标包 ID（见 KeydroidxSettingsStorage.getIconStateFingerprint）。 */
+		private static String packIdOf(String fingerprint) {
+			if (fingerprint == null) return null;
+			int sep = fingerprint.indexOf('#');
+			return sep >= 0 ? fingerprint.substring(0, sep) : fingerprint;
+		}
+
+		/**
+		 * 主线程就地替换当前页图标：不重建网格、不动页码与焦点，只把新的 Drawable 塞进 ImageView。
+		 * <p>取图路径必须与 {@code buildCurrentPage()} 一致：cell(LinearLayout) →
+		 * iconContainer(FrameLayout) → child0 = ImageView。（历史实现 refreshAfterIconInit
+		 * 直接取 cell.getChildAt(0) 再判 {@code instanceof ImageView}，拿到的是 iconContainer，
+		 * 恒不成立 —— 等于空操作，故重写。）
+		 * <p>{@code item.icon == null}（覆盖被清除 / 图标包未命中）时走占位图 + 异步补应用原图标，
+		 * 口径与 buildCurrentPage() 完全相同。
+		 */
+		private void updateCurrentPageIcons() {
+			if (cellViews == null || pageItems == null) return;
 			int updated = 0;
-			for (int i = 0; i < perPage; i++) {
-				KeydroidxAppItem item = pageItems[i];
+			for (int i = 0; i < perPage && i < cellViews.length; i++) {
+				KeydroidxAppItem item = i < pageItems.length ? pageItems[i] : null;
 				View cell = cellViews[i];
 				if (item == null || cell == null) continue;
-				if (item.type != KeydroidxAppItem.TYPE_APP) continue;
-				if (item.launchIntent == null || item.launchIntent.getComponent() == null) continue;
-				ComponentName cn = item.launchIntent.getComponent();
-				applyIconPackResult(item, KeydroidxIconResolver.resolve(
-						requireContext(), cn.getPackageName(), cn, item.label), requireContext());
-				Drawable icon = item.icon;
-				if (icon == null) icon = getPlaceholderIcon();
-				if (icon == null) continue;
-				updated++;
-				if (cell instanceof LinearLayout) {
-					View iv = ((LinearLayout) cell).getChildAt(0);
-					if (iv instanceof ImageView) {
-						((ImageView) iv).setImageDrawable(icon);
-					}
+				ImageView iv = findCellIconView(cell);
+				if (iv == null) continue;
+				if (item.icon != null) {
+					item.icon.setFilterBitmap(false);
+					iv.setImageDrawable(item.icon);
+					updated++;
+				} else if (item.type == KeydroidxAppItem.TYPE_APP && item.launchIntent != null
+						&& item.launchIntent.getComponent() != null) {
+					final String asyncPkg = item.launchIntent.getComponent().getPackageName();
+					final ComponentName cn = item.launchIntent.getComponent();
+					final KeydroidxAppItem fItem = item;
+					iv.setImageDrawable(getPlaceholderIcon());
+					iv.setTag(asyncPkg);
+					KeydroidxAppIconCache.loadAsync(requireContext(), asyncPkg, cn, item.label,
+							(loadedPkg, d) -> {
+								// 校验同 buildCurrentPage：cell 归属未变、且期间未被图标包替换
+								if (d == null || iv.getTag() == null
+										|| !iv.getTag().equals(loadedPkg)) return;
+								if (fItem.iconPackName != null) return;
+								d.setFilterBitmap(false);
+								iv.setImageDrawable(d);
+								fItem.icon = d;
+							});
+					updated++;
 				}
 			}
 			if (updated > 0) {
-				// 当前页的 item 与缓存中的是同一批对象（缓存存引用），原地已更新，无需重写缓存
-				KeydroidxLog.i("Menu", "S60 图标缓存更新后刷新当前页 " + updated + " 个图标，耗时 "
-						+ (System.currentTimeMillis() - start) + "ms");
+				KeydroidxLog.i("Menu", "图标外观变化：原地替换当前页 " + updated
+						+ " 个图标（未重建网格、页码与焦点不变）");
 			}
+		}
+
+		/** 从 cell 取出图标 ImageView：cell → iconContainer(FrameLayout) → child0（冻结冰块叠加层不算）。 */
+		private static ImageView findCellIconView(View cell) {
+			if (!(cell instanceof LinearLayout)) return null;
+			View first = ((LinearLayout) cell).getChildAt(0);
+			if (!(first instanceof FrameLayout)) return null;
+			View iv = ((FrameLayout) first).getChildAt(0);
+			return iv instanceof ImageView ? (ImageView) iv : null;
 		}
 
 	/** 在应用池中按包名查找第一个命中的项并移除，返回之；未命中返回 null。 */
@@ -959,14 +1162,25 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		if (item == null) return;
 		item.iconPackName = hit != null ? hit.iconName : null;
 		item.iconOverridden = hit != null && hit.override;
-		if (hit == null) return;
+		if (hit == null) {
+			// 未命中 → 回退应用原图标：必须把旧图标一并清掉。
+			// buildAppList 里 item 是新对象（icon 本来为 null）无影响；
+			// 但「就地刷新」场景（换图标后返回、清覆盖、换包）若不清理，
+			// item.icon 会残留上一个图标包的图，回退不到应用原图标。
+			item.icon = null;
+			return;
+		}
 		KeydroidxIconPack pack = KeydroidxIconPackManager.get().findPack(hit.packId);
-		if (pack == null) return;
+		if (pack == null) {
+			item.icon = null;
+			return;
+		}
 		Drawable icon = pack.getIconByName(appCtx, hit.iconName);
 		if (icon == null) {
 			// 图标包里取不到图（外部包被卸载 / 资源损坏）→ 视为未命中，回退应用原图标
 			item.iconPackName = null;
 			item.iconOverridden = false;
+			item.icon = null;
 			return;
 		}
 		icon.setFilterBitmap(false);
@@ -980,7 +1194,36 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		return KeydroidxAdwIconPack.ID_BUILTIN.equals(KeydroidxSettingsStorage.getIconPackId(ctx));
 	}
 
-	private Drawable safeDrawable(Context ctx, int resId) {
+	/**
+	 * 套用「第一页固定槽位」专属 S60 图标，规则与 {@code buildAppList} 完全一致：
+	 * 仅当使用内置 S60 图标包、且该应用没有被用户手动指定过图标时生效。
+	 * <p>就地刷新路径必须复用同一规则，否则「清掉覆盖 / 换图标」之后固定槽位的图标
+	 * 会与整表重建的结果不一致。
+	 *
+	 * @return true = 已套用槽位图标
+	 */
+	private static boolean applyPinnedSlotIcon(Context appCtx, KeydroidxAppItem item) {
+		if (item == null || item.type != KeydroidxAppItem.TYPE_APP
+				|| item.launchIntent == null || item.launchIntent.getComponent() == null) {
+			return false;
+		}
+		String pkg = item.launchIntent.getComponent().getPackageName();
+		if (KeydroidxSettingsStorage.hasIconOverride(appCtx, pkg)) return false;
+		if (!isBuiltinPackActive(appCtx)) return false;
+		for (int s = 0; s < PINNED_SLOTS.length; s++) {
+			for (String candidate : PINNED_SLOTS[s]) {
+				if (!candidate.equals(pkg)) continue;
+				Drawable s60icon = safeDrawable(appCtx, PINNED_SLOT_ICONS[s]);
+				if (s60icon == null) return false;
+				s60icon.setFilterBitmap(false);
+				item.icon = s60icon;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static Drawable safeDrawable(Context ctx, int resId) {
 		try {
 			Drawable d = ContextCompat.getDrawable(ctx, resId);
 			// API 19 上多个 ImageView 共享同一 Bitmap 时，硬件加速渲染可能触发
@@ -1487,7 +1730,9 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				KeydroidxIconResolver.invalidatePackage(requireContext(), pkg);
 				Toast.makeText(requireContext(), "已恢复默认图标", Toast.LENGTH_SHORT).show();
 				KeydroidxLog.i("Menu", "选项菜单-恢复默认图标: " + item.label + " pkg=" + pkg);
-				refreshAppList();
+				// 只重算图标外观，不再整表重新枚举：当前页、页码、焦点都不动
+				markIconAppearanceChanged();
+				refreshIconsAsync();
 			}));
 		}
 		options.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
@@ -1547,6 +1792,21 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	}
 
 	// ---- 内部逻辑 ----
+
+	/**
+	 * 首帧 / 重建后的焦点定位。
+	 * <p>图标外观变化（iconAppearanceChanged，即从「更换图标」等页面返回）时停在原来那一格，
+	 * 用户返回后高亮仍在刚才那个应用上，可以立刻再按「选项 → 更换图标」连续操作；
+	 * 其余场景沿用「定位到第一格」。焦点位置按本页实际项数收敛，避免落在空槽上。
+	 */
+	private void applyInitialFocus() {
+		int count = Math.min(perPage, Math.max(0, items.size() - pageIndex * perPage));
+		if (!iconAppearanceChanged || count <= 0) {
+			setFocusPos(0);
+			return;
+		}
+		setFocusPos(Math.min(focusPos, count - 1));
+	}
 
 	private void setFocusPos(int pos) {
 		if (pos < 0 || pos >= perPage) return;
