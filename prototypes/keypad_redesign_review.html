@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>KeydroidX 虚拟键盘重构评审原型 (Virtual Keypad Redesign Review)</title>
+<style>
+  :root {
+    --bg-page: #0a0d14;
+    --card-bg: #131924;
+    --card-border: #232d3f;
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-glow: rgba(56, 189, 248, 0.4);
+    --call-green: #22c55e;
+    --call-bg: linear-gradient(180deg, #163e26 0%, #0d2818 100%);
+    --call-border: #1f6f3a;
+    --end-red: #ef4444;
+    --end-bg: linear-gradient(180deg, #451a1c 0%, #290e10 100%);
+    --end-border: #7f2327;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* 顶部评审标题与说明 */
+  .review-header {
+    max-width: 960px;
+    width: 100%;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .title-group h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .title-group h1 span.badge {
+    font-size: 11px;
+    font-weight: 600;
+    background: #0369a1;
+    color: #e0f2fe;
+    padding: 2px 8px;
+    border-radius: 12px;
+    letter-spacing: 0;
+  }
+  .title-group p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* 方案切换 Tabs */
+  .scheme-selector {
+    display: flex;
+    background: #1e293b;
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    gap: 4px;
+  }
+  .scheme-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .scheme-btn.active {
+    background: #0284c7;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.4);
+  }
+
+  /* 主体双列布局：左侧真机模拟器，右侧评审解析 */
+  .workbench-container {
+    max-width: 1000px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  /* ================= 手机外壳模拟器 (1:1 原机比例) ================= */
+  .phone-frame {
+    width: 380px;
+    background: #0d1117;
+    border-radius: 28px;
+    border: 3px solid #2d3748;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* 状态栏 */
+  .sim-statusbar {
+    height: 24px;
+    background: #0a101b;
+    padding: 0 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #cbd5e1;
+    border-bottom: 1px dashed #23354d;
+  }
+  .sim-statusbar .status-icons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* 模拟上屏区域 (真机内容：系统权限申请窗口) */
+  .sim-screen {
+    height: 270px;
+    background: linear-gradient(180deg, #102544 0%, #0d1e37 100%);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    border-bottom: 2px solid #202b3d;
+  }
+
+  .screen-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #e2e8f0;
+    margin-bottom: 8px;
+  }
+  .screen-dialog {
+    margin-top: auto;
+    background: #0f1d31;
+    border: 1px solid #1e3a5f;
+    border-radius: 6px;
+    padding: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+  }
+  .dialog-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: #93c5fd;
+    margin-bottom: 6px;
+  }
+  .dialog-content {
+    font-size: 11px;
+    line-height: 1.4;
+    color: #cbd5e1;
+    margin-bottom: 10px;
+  }
+  .dialog-actions {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: bold;
+  }
+  .dialog-btn-lsk {
+    color: #38bdf8;
+  }
+  .dialog-btn-rsk {
+    color: #94a3b8;
+  }
+
+  /* 按键实时触发反馈 HUD 浮层 */
+  .key-event-hud {
+    position: absolute;
+    top: 36px;
+    left: 12px;
+    right: 12px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid #38bdf8;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: #7dd3fc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: monospace;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .key-event-hud.show {
+    opacity: 1;
+  }
+
+  /* ================= 虚拟按键区 (Virtual Keypad Area) ================= */
+  .sim-keypad-panel {
+    background: #11141b;
+    padding: 6px 8px 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  /* 分割饰条 */
+  .bezel-divider {
+    height: 1px;
+    background: #27303f;
+    margin-bottom: 2px;
+  }
+
+  /* 导航岛容器行 */
+  .nav-island-row {
+    display: flex;
+    height: 124px;
+    gap: 6px;
+    align-items: center;
+  }
+
+  /* 侧翼（左翼 LSK/CALL，右翼 RSK/END） */
+  .nav-wing {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 4px;
+  }
+
+  /* 基础按键风格 */
+  .vk-btn {
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 1px solid #3b4657;
+    background: linear-gradient(180deg, #2d3644 0%, #1c222b 100%);
+    color: #f1f5f9;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.15);
+    transition: all 0.05s ease;
+  }
+  .vk-btn:active, .vk-btn.is-down {
+    background: #141820 !important;
+    border-color: #38bdf8 !important;
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.6), 0 0 10px rgba(56, 189, 248, 0.4) !important;
+  }
+
+  /* 左右软键 */
+  .btn-softkey {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  /* 拨号绿键 */
+  .btn-call {
+    flex: 1;
+    background: var(--call-bg);
+    border-color: var(--call-border);
+    color: var(--call-green);
+  }
+  .btn-call svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+
+  /* 挂机红键 */
+  .btn-end {
+    flex: 1;
+    background: var(--end-bg);
+    border-color: var(--end-border);
+    color: var(--end-red);
+  }
+  .btn-end svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+
+  /* ================= 方案 1: 诺基亚一体化对角线无缝导航环 (首推，无死角) ================= */
+  .dpad-cluster-v1 {
+    width: 196px;
+    height: 100%;
+    background: #161a22;
+    border-radius: 22px;
+    border: 1.5px solid #2d3748;
+    position: relative;
+    padding: 3px;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.7), 0 2px 5px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+
+  /* 4 个方向键按扇区/梯形铺满整个盘面，彻底消除四个角留白死区！ */
+  .dpad-v1-btn {
+    position: absolute;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.06s ease;
+    background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+  }
+  .dpad-v1-btn:active, .dpad-v1-btn.is-down {
+    background: #0f172a !important;
+    color: #38bdf8 !important;
+  }
+
+  /* UP 键：梯形铺满顶部，完全覆盖左上角与右上角 */
+  .dpad-v1-up {
+    top: 3px;
+    left: 3px;
+    right: 3px;
+    height: 38px;
+    border-top-left-radius: 19px;
+    border-top-right-radius: 19px;
+    clip-path: polygon(0 0, 100% 0, 134px 100%, 56px 100%);
+    padding-bottom: 6px;
+    border-top: 1.5px solid #64748b;
+  }
+  /* DOWN 键：梯形铺满底部，完全覆盖左下角与右下角 */
+  .dpad-v1-down {
+    bottom: 3px;
+    left: 3px;
+    right: 3px;
+    height: 38px;
+    border-bottom-left-radius: 19px;
+    border-bottom-right-radius: 19px;
+    clip-path: polygon(56px 0, 134px 0, 100% 100%, 0 100%);
+    padding-top: 6px;
+    border-bottom: 1.5px solid #64748b;
+  }
+  /* LEFT 键：梯形铺满左侧，覆盖左上与左下斜角 */
+  .dpad-v1-left {
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: 60px;
+    border-top-left-radius: 19px;
+    border-bottom-left-radius: 19px;
+    clip-path: polygon(0 0, 100% 36px, 100% 82px, 0 100%);
+    padding-right: 14px;
+    border-left: 1.5px solid #64748b;
+  }
+  /* RIGHT 键：梯形铺满右侧，覆盖右上与右下斜角 */
+  .dpad-v1-right {
+    top: 3px;
+    bottom: 3px;
+    right: 3px;
+    width: 60px;
+    border-top-right-radius: 19px;
+    border-bottom-right-radius: 19px;
+    clip-path: polygon(0 36px, 100% 0, 100% 100%, 0 82px);
+    padding-left: 14px;
+    border-right: 1.5px solid #64748b;
+  }
+
+  /* 4 条对角线微光分割槽线 */
+  .dpad-v1-seam {
+    position: absolute;
+    width: 2px;
+    background: rgba(15, 23, 42, 0.95);
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: 0 0 2px rgba(0,0,0,0.8);
+  }
+  .seam-tl {
+    top: 0; left: 0; width: 62px; height: 42px;
+    background: linear-gradient(135deg, transparent 48%, #111827 49%, #111827 51%, transparent 52%);
+  }
+  .seam-tr {
+    top: 0; right: 0; width: 62px; height: 42px;
+    background: linear-gradient(225deg, transparent 48%, #111827 49%, #111827 51%, transparent 52%);
+  }
+  .seam-bl {
+    bottom: 0; left: 0; width: 62px; height: 42px;
+    background: linear-gradient(45deg, transparent 48%, #111827 49%, #111827 51%, transparent 52%);
+  }
+  .seam-br {
+    bottom: 0; right: 0; width: 62px; height: 42px;
+    background: linear-gradient(315deg, transparent 48%, #111827 49%, #111827 51%, transparent 52%);
+  }
+
+  /* 中央 OK 确认键 (完美环抱在 4 瓣中央) */
+  .dpad-v1-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 72px;
+    height: 48px;
+    background: radial-gradient(circle, #3b4657 0%, #1f2733 100%);
+    border: 1.8px solid #94a3b8;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffffff;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.7), inset 0 1px 1px rgba(255,255,255,0.4);
+    cursor: pointer;
+    z-index: 5;
+    transition: all 0.05s ease;
+  }
+  .dpad-v1-center:active, .dpad-v1-center.is-down {
+    transform: translate(-50%, -50%) scale(0.95);
+    background: #111827;
+    border-color: #38bdf8;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.8), 0 0 12px rgba(56, 189, 248, 0.5);
+  }
+
+  /* ================= 方案 2: 八边形宽边连体十字盘 (Beveled Solid Cross) ================= */
+  .dpad-cluster-v2 {
+    width: 196px;
+    height: 100%;
+    background: #131720;
+    border-radius: 20px;
+    border: 1.5px solid #2d3748;
+    position: relative;
+    padding: 2px;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.8);
+    display: none;
+  }
+  .dpad-v2-grid {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 58px 1fr 58px;
+    grid-template-rows: 36px 1fr 36px;
+    gap: 3px;
+  }
+  .dpad-v2-btn {
+    background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+    border: 1.5px solid #64748b;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #f1f5f9;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  .dpad-v2-btn:active, .dpad-v2-btn.is-down {
+    background: #0f172a;
+    border-color: #38bdf8;
+    color: #38bdf8;
+  }
+  .dpad-v2-corner {
+    background: #1c2330;
+    border-radius: 8px;
+    border: 1px solid #2e3848;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: #475569;
+    cursor: pointer;
+  }
+  .dpad-v2-corner:active {
+    background: #232d3d;
+  }
+
+  /* ================= 九宫格数字键区 (紧凑 28dp 高度) ================= */
+  .sim-num-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2.5px;
+  }
+  .num-key {
+    height: 28px;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #2b3340 0%, #1a1f28 100%);
+    border: 1px solid #3e4857;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 1.5px 3px rgba(0,0,0,0.4);
+  }
+  .num-key:active, .num-key.is-down {
+    background: #13171f;
+    border-color: #38bdf8;
+    transform: translateY(1px);
+  }
+  .num-key .main-char {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #f8fafc;
+    line-height: 1;
+  }
+  .num-key .sub-char {
+    font-size: 7px;
+    color: #8e9cae;
+    line-height: 1;
+    margin-top: 1px;
+  }
+
+  /* ================= 右侧评审对比与解析面板 ================= */
+  .review-panel {
+    flex: 1;
+    min-width: 320px;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .analysis-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .analysis-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .analysis-card p {
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1.55;
+    margin-bottom: 8px;
+  }
+  .analysis-card ul {
+    padding-left: 18px;
+    font-size: 12.5px;
+    color: #94a3b8;
+    line-height: 1.6;
+  }
+  .analysis-card ul li strong {
+    color: #f1f5f9;
+  }
+
+  /* 尺寸走查表格 */
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .spec-table th, .spec-table td {
+    padding: 6px 10px;
+    border: 1px solid #283548;
+    text-align: left;
+  }
+  .spec-table th {
+    background: #1e293b;
+    color: #93c5fd;
+    font-weight: 600;
+  }
+  .spec-table td {
+    color: #cbd5e1;
+  }
+
+  .tag-highlight {
+    background: #0284c7;
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 顶部评审栏 -->
+  <div class="review-header">
+    <div class="title-group">
+      <h1>
+        KeydroidX 虚拟键盘交互重构评审
+        <span class="badge">原型设计 v2.0</span>
+      </h1>
+      <p>解决原设计死角留白问题，打造 100% 空间利用率的诺基亚经典一体化无缝导航环</p>
+    </div>
+
+    <!-- 方案快速切换 -->
+    <div class="scheme-selector">
+      <button class="scheme-btn active" onclick="switchScheme('v1')">方案 A：经典四瓣无缝环 (首推)</button>
+      <button class="scheme-btn" onclick="switchScheme('v2')">方案 B：八边体全填充十字盘</button>
+    </div>
+  </div>
+
+  <!-- 工作区主体 -->
+  <div class="workbench-container">
+
+    <!-- 左侧：1:1 真机模拟器 -->
+    <div class="phone-frame">
+      <!-- 状态栏 -->
+      <div class="sim-statusbar">
+        <span>1: 无SIM 2: 无SIM</span>
+        <div class="status-icons">
+          <span>📶</span>
+          <span>98%⚡</span>
+          <span>07:07</span>
+        </div>
+      </div>
+
+      <!-- 模拟上屏内容 -->
+      <div class="sim-screen">
+        <div class="screen-card-row">
+          <span>📅 日历 (星期五 2026-06-19)</span>
+        </div>
+        <div class="screen-card-row">
+          <span>❖ 最近任务</span>
+          <span style="color:#64748b;">未激活</span>
+        </div>
+
+        <div class="screen-dialog">
+          <div class="dialog-title">系统权限申请</div>
+          <div class="dialog-content">检测到部分系统权限缺失，桌面需要电话状态、应用列表等权限以保证驻留通知。</div>
+          <div class="dialog-actions">
+            <span class="dialog-btn-lsk" id="hudLsk">授权 [LSK]</span>
+            <span class="dialog-btn-rsk" id="hudRsk">取消 [RSK]</span>
+          </div>
+        </div>
+
+        <!-- 实时触发事件 HUD 浮层 -->
+        <div class="key-event-hud" id="eventHud">
+          <span id="hudKeyName">KEY_UP</span>
+          <span id="hudKeyCode">KEYCODE_DPAD_UP (19)</span>
+        </div>
+      </div>
+
+      <!-- 虚拟按键区面板 -->
+      <div class="sim-keypad-panel">
+        <div class="bezel-divider"></div>
+
+        <!-- 功能导航岛 (Navigation Island) -->
+        <div class="nav-island-row">
+          <!-- 左翼：LSK + CALL -->
+          <div class="nav-wing">
+            <button class="vk-btn btn-softkey" onclick="triggerKey('LSK', 'ACTION_SOFT_LEFT', 1)">LSK</button>
+            <button class="vk-btn btn-call" onclick="triggerKey('CALL', 'ACTION_HANGUP', 5)">
+              <!-- 经典诺基亚倾斜听筒图标 -->
+              <svg viewBox="0 0 24 24"><path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2c.28-.28.36-.67.25-1.02-1.12-3.72-.59-7.74.59-11.72A1 1 0 0015 2H18.5a1 1 0 011 1A17 17 0 012.5 19.5a1 1 0 01-1-1V15a1 1 0 011-1c3.98-1.18 8-1.71 11.72-.59.35.11.74.03 1.02-.25l2.2-2.2z"/></svg>
+            </button>
+          </div>
+
+          <!-- 中央 D-Pad 导航群 (方案 A：四瓣无缝全覆盖圆环) -->
+          <div class="dpad-cluster-v1" id="clusterV1">
+            <!-- 向上键 (梯形宽边覆盖整个顶部及左右夹角) -->
+            <div class="dpad-v1-btn dpad-v1-up" onclick="triggerKey('UP', 'ACTION_UP', 19)">▲</div>
+            <!-- 向下键 (梯形宽边覆盖整个底部及左右夹角) -->
+            <div class="dpad-v1-btn dpad-v1-down" onclick="triggerKey('DOWN', 'ACTION_DOWN', 20)">▼</div>
+            <!-- 向左键 (梯形侧翼覆盖左侧上下夹角) -->
+            <div class="dpad-v1-btn dpad-v1-left" onclick="triggerKey('LEFT', 'ACTION_LEFT', 21)">◀</div>
+            <!-- 向右键 (梯形侧翼覆盖右侧上下夹角) -->
+            <div class="dpad-v1-btn dpad-v1-right" onclick="triggerKey('RIGHT', 'ACTION_RIGHT', 22)">▶</div>
+
+            <!-- 四角对角线极细微缝效果 -->
+            <div class="seam-tl"></div>
+            <div class="seam-tr"></div>
+            <div class="seam-bl"></div>
+            <div class="seam-br"></div>
+
+            <!-- 中央 OK 确认键 -->
+            <div class="dpad-v1-center" onclick="triggerKey('OK', 'ACTION_SELECT', 23)">OK</div>
+          </div>
+
+          <!-- 中央 D-Pad 导航群 (方案 B：八边体全填充十字盘) -->
+          <div class="dpad-cluster-v2" id="clusterV2">
+            <div class="dpad-v2-grid">
+              <div class="dpad-v2-corner" onclick="triggerKey('UP_LEFT', 'UP+LEFT', 0)">↖</div>
+              <div class="dpad-v2-btn" onclick="triggerKey('UP', 'ACTION_UP', 19)">▲</div>
+              <div class="dpad-v2-corner" onclick="triggerKey('UP_RIGHT', 'UP+RIGHT', 0)">↗</div>
+
+              <div class="dpad-v2-btn" onclick="triggerKey('LEFT', 'ACTION_LEFT', 21)">◀</div>
+              <div class="dpad-v2-btn" style="background:#283344; border-color:#94a3b8; color:#fff;" onclick="triggerKey('OK', 'ACTION_SELECT', 23)">OK</div>
+              <div class="dpad-v2-btn" onclick="triggerKey('RIGHT', 'ACTION_RIGHT', 22)">▶</div>
+
+              <div class="dpad-v2-corner" onclick="triggerKey('DOWN_LEFT', 'DOWN+LEFT', 0)">↙</div>
+              <div class="dpad-v2-btn" onclick="triggerKey('DOWN', 'ACTION_DOWN', 20)">▼</div>
+              <div class="dpad-v2-corner" onclick="triggerKey('DOWN_RIGHT', 'DOWN+RIGHT', 0)">↘</div>
+            </div>
+          </div>
+
+          <!-- 右翼：RSK + END -->
+          <div class="nav-wing">
+            <button class="vk-btn btn-softkey" onclick="triggerKey('RSK', 'ACTION_SOFT_RIGHT', 2)">RSK</button>
+            <button class="vk-btn btn-end" onclick="triggerKey('END', 'ACTION_HOME', 3)">
+              <!-- 经典挂断电话图标 -->
+              <svg viewBox="0 0 24 24"><path d="M12 9c-3.1 0-5.9 1.1-8.2 3l1.8 2.2c1.7-1.3 3.9-2.2 6.4-2.2s4.7.9 6.4 2.2l1.8-2.2C17.9 10.1 15.1 9 12 9z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 九宫格数字键区 (4行紧凑 28dp) -->
+        <div class="sim-num-grid">
+          <div class="num-key" onclick="triggerKey('1', 'KEYCODE_1', 8)"><span class="main-char">1</span><span class="sub-char">.,?</span></div>
+          <div class="num-key" onclick="triggerKey('2', 'KEYCODE_2', 9)"><span class="main-char">2</span><span class="sub-char">ABC</span></div>
+          <div class="num-key" onclick="triggerKey('3', 'KEYCODE_3', 10)"><span class="main-char">3</span><span class="sub-char">DEF</span></div>
+
+          <div class="num-key" onclick="triggerKey('4', 'KEYCODE_4', 11)"><span class="main-char">4</span><span class="sub-char">GHI</span></div>
+          <div class="num-key" onclick="triggerKey('5', 'KEYCODE_5', 12)"><span class="main-char">5</span><span class="sub-char">JKL</span></div>
+          <div class="num-key" onclick="triggerKey('6', 'KEYCODE_6', 13)"><span class="main-char">6</span><span class="sub-char">MNO</span></div>
+
+          <div class="num-key" onclick="triggerKey('7', 'KEYCODE_7', 14)"><span class="main-char">7</span><span class="sub-char">PQRS</span></div>
+          <div class="num-key" onclick="triggerKey('8', 'KEYCODE_8', 15)"><span class="main-char">8</span><span class="sub-char">TUV</span></div>
+          <div class="num-key" onclick="triggerKey('9', 'KEYCODE_9', 16)"><span class="main-char">9</span><span class="sub-char">WXYZ</span></div>
+
+          <div class="num-key" onclick="triggerKey('*', 'LOCK_SCREEN', 17)"><span class="main-char">*</span><span class="sub-char">🔒</span></div>
+          <div class="num-key" onclick="triggerKey('0', 'KEYCODE_0', 7)"><span class="main-char">0</span><span class="sub-char">空格</span></div>
+          <div class="num-key" onclick="triggerKey('#', 'KEYCODE_POUND', 18)"><span class="main-char">#</span><span class="sub-char">🔕</span></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 右侧：设计原理与对比走查解析 -->
+    <div class="review-panel">
+      <!-- 痛点与优化对比卡 -->
+      <div class="analysis-card">
+        <h3>🎯 痛点深度解决：消除夹角死区</h3>
+        <p>在此前的实机效果中，四向按键为 4 个离散矩形，导致四个夹角处留下大面积黑色死区，盲按容易点空，且视觉生硬拼凑。</p>
+        <ul>
+          <li><strong>100% 空间利用率</strong>：方案 A 采用经典诺基亚四瓣对角线无缝切割，将整个盘面 196×124dp 的所有像素完全分配给 4 个方向键与中央 OK 键。</li>
+          <li><strong>盲操无死区</strong>：拇指落在左上、右上、左下、右下任何对角位置，均会被相邻的方向键直接吸收触发，永不点空。</li>
+          <li><strong>经典工业质感</strong>：复刻 Nokia N86 8MP / N95 / E72 的金属拉丝整环机械质感，具备清晰的微缝分界线与饱满的按压光影。</li>
+        </ul>
+      </div>
+
+      <!-- 尺寸规划数据表 -->
+      <div class="analysis-card">
+        <h3>📐 工业尺寸规划表 (411dp 屏幕标准)</h3>
+        <table class="spec-table">
+          <tr>
+            <th>区域 / 按键</th>
+            <th>原尺寸 (受批评版本)</th>
+            <th>新设计 (方案 A)</th>
+          </tr>
+          <tr>
+            <td><strong>导航岛总宽度</strong></td>
+            <td>164dp</td>
+            <td><span class="tag-highlight">196dp</span> (拓宽 32dp)</td>
+          </tr>
+          <tr>
+            <td><strong>UP / DOWN 触控区</strong></td>
+            <td>96 × 36dp (夹角留空)</td>
+            <td><strong>196 × 38dp</strong> (顶部整宽无死角)</td>
+          </tr>
+          <tr>
+            <td><strong>LEFT / RIGHT 触控区</strong></td>
+            <td>60 × 56dp (夹角留空)</td>
+            <td><strong>60 × 124dp</strong> (侧边整高无死角)</td>
+          </tr>
+          <tr>
+            <td><strong>OK 确认键</strong></td>
+            <td>68 × 44dp</td>
+            <td><strong>72 × 48dp</strong> (饱满环抱核心)</td>
+          </tr>
+          <tr>
+            <td><strong>九宫格数字单行高</strong></td>
+            <td>41dp</td>
+            <td><strong>28dp</strong> (紧凑让出上方屏幕)</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- 通话挂机按键优化 -->
+      <div class="analysis-card">
+        <h3>📞 经典听筒图标修复</h3>
+        <p>真机截图中出现的“绿色小盾牌”与“红色横置杠铃”系低版本 layer-list 临时伪造图标导致的视觉失真。</p>
+        <p>新方案中全面回归<strong>正统诺基亚倾斜电话手柄 (CALL)</strong> 与<strong>横置扣断电话手柄 (END)</strong>，绿红对比纯正，心智直观明确。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let hudTimer = null;
+
+    function switchScheme(scheme) {
+      document.querySelectorAll('.scheme-btn').forEach(btn => btn.classList.remove('active'));
+      const c1 = document.getElementById('clusterV1');
+      const c2 = document.getElementById('clusterV2');
+
+      if (scheme === 'v1') {
+        document.querySelectorAll('.scheme-btn')[0].classList.add('active');
+        c1.style.display = 'block';
+        c2.style.display = 'none';
+      } else {
+        document.querySelectorAll('.scheme-btn')[1].classList.add('active');
+        c1.style.display = 'none';
+        c2.style.display = 'block';
+      }
+    }
+
+    function triggerKey(keyName, actionName, keyCode) {
+      const hud = document.getElementById('eventHud');
+      const keyNameEl = document.getElementById('hudKeyName');
+      const keyCodeEl = document.getElementById('hudKeyCode');
+
+      keyNameEl.textContent = 'KEY: ' + keyName;
+      keyCodeEl.textContent = actionName + ' (' + keyCode + ')';
+
+      hud.classList.add('show');
+      if (hudTimer) clearTimeout(hudTimer);
+      hudTimer = setTimeout(() => {
+        hud.classList.remove('show');
+      }, 1000);
+
+      // 上屏动态反馈
+      if (keyName === 'LSK') {
+        document.getElementById('hudLsk').style.color = '#fff';
+        setTimeout(() => document.getElementById('hudLsk').style.color = '#38bdf8', 300);
+      } else if (keyName === 'RSK') {
+        document.getElementById('hudRsk').style.color = '#fff';
+        setTimeout(() => document.getElementById('hudRsk').style.color = '#94a3b8', 300);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -37,7 +37,7 @@ import ru.playsoftware.mini_shizuku.Shizuku;
 public final class KeydroidxTouchWindowController {
 
 	private static final String TAG = "TouchWindow";
-	private static final int KEYPAD_DP_HEIGHT = 310;
+	private static int sDynamicKeypadHeightPx = 0;
 
 	private static View sCurrentKeypadView = null;
 	private static Activity sBoundActivity = null;
@@ -55,10 +55,27 @@ public final class KeydroidxTouchWindowController {
 		return null;
 	}
 
-	/** 计算虚拟按键的标准物理像素高度（240dp） */
+	/** 计算虚拟按键的标准物理像素高度（精确基于实际布局测量值） */
 	public static int getKeypadHeightPx(Context context) {
+		if (sDynamicKeypadHeightPx > 0) {
+			return sDynamicKeypadHeightPx;
+		}
+		try {
+			LayoutInflater inflater = LayoutInflater.from(context);
+			View tempView = inflater.inflate(R.layout.keydroidx_virtual_keypad, null);
+			int widthPx = context.getResources().getDisplayMetrics().widthPixels;
+			tempView.measure(
+					View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
+					View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+			);
+			int h = tempView.getMeasuredHeight();
+			if (h > 0) {
+				sDynamicKeypadHeightPx = h;
+				return sDynamicKeypadHeightPx;
+			}
+		} catch (Exception ignored) {}
 		DisplayMetrics dm = context.getResources().getDisplayMetrics();
-		return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, KEYPAD_DP_HEIGHT, dm));
+		return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 250, dm));
 	}
 
 	/** 获取整块物理屏幕的实际像素总高度（包含状态栏与导航栏区域） */

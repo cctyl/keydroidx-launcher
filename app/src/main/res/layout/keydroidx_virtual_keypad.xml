@@ -1,31 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Keydroidx 触屏模式虚拟按键面板（API 19 兼容，对齐 FEATURE_PHONE_UI_SPEC） -->
+<!-- Keydroidx 触屏模式虚拟按键面板（API 19 兼容，一体化四瓣无缝导航环方案 A） -->
 <ru.playsoftware.j2meloader.nokia.KeydroidxVirtualKeypadView
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/virtualKeypadView"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="#12151b"
-    android:paddingLeft="10dp"
-    android:paddingRight="10dp"
-    android:paddingTop="6dp"
-    android:paddingBottom="8dp">
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="5dp">
 
     <!-- 机身顶部分割线 -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginBottom="6dp"
+        android:layout_marginBottom="4dp"
         android:background="#2d3748" />
 
-    <!-- 1. 功能与导航岛 (Navigation Island) -->
+    <!-- 1. 功能与导航岛 (Navigation Island) - 100% 空间利用率无死角无缝全覆盖导航环 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="96dp"
+        android:layout_height="124dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="6dp">
+        android:layout_marginBottom="4dp">
 
         <!-- 左翼：LSK + CALL -->
         <LinearLayout
@@ -34,7 +35,7 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <!-- LSK 左软键 -->
+            <!-- LSK 左软键（最常用按键之一） -->
             <FrameLayout
                 android:id="@+id/btn_key_lsk"
                 android:layout_width="match_parent"
@@ -49,15 +50,15 @@
                     android:layout_gravity="center"
                     android:text="LSK"
                     android:textColor="#f0f4f8"
-                    android:textSize="12sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
             </FrameLayout>
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="6dp" />
+                android:layout_height="4dp" />
 
-            <!-- CALL 拨号/接听键 -->
+            <!-- CALL 拨号/接听键（正统诺基亚绿色倾斜听筒） -->
             <FrameLayout
                 android:id="@+id/btn_key_call"
                 android:layout_width="match_parent"
@@ -66,114 +67,21 @@
                 android:background="@drawable/bg_keydroidx_virtual_key_call"
                 android:clickable="true"
                 android:focusable="false">
-                <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:layout_gravity="center"
-                    android:src="@drawable/ic_keydroidx_phone" />
+                    app:srcCompat="@drawable/ic_keydroidx_phone" />
             </FrameLayout>
         </LinearLayout>
 
-        <!-- 中央 5 向 D-Pad 导航群 -->
-        <RelativeLayout
-            android:layout_width="126dp"
+        <!-- 中央 5 向 D-Pad 一体化四瓣无缝导航环 (方案 A：100% 空间利用率，对角线几何切割，无任何死角) -->
+        <ru.playsoftware.j2meloader.nokia.KeydroidxNaviWheelView
+            android:id="@+id/naviWheelView"
+            android:layout_width="196dp"
             android:layout_height="match_parent"
-            android:layout_marginLeft="8dp"
-            android:layout_marginRight="8dp"
-            android:background="@drawable/bg_keydroidx_virtual_dpad_ring">
-
-            <!-- UP 方向键 -->
-            <FrameLayout
-                android:id="@+id/btn_key_up"
-                android:layout_width="48dp"
-                android:layout_height="28dp"
-                android:layout_alignParentTop="true"
-                android:layout_centerHorizontal="true"
-                android:clickable="true"
-                android:focusable="false">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="▲"
-                    android:textColor="#cbd5e1"
-                    android:textSize="11sp" />
-            </FrameLayout>
-
-            <!-- DOWN 方向键 -->
-            <FrameLayout
-                android:id="@+id/btn_key_down"
-                android:layout_width="48dp"
-                android:layout_height="28dp"
-                android:layout_alignParentBottom="true"
-                android:layout_centerHorizontal="true"
-                android:clickable="true"
-                android:focusable="false">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="▼"
-                    android:textColor="#cbd5e1"
-                    android:textSize="11sp" />
-            </FrameLayout>
-
-            <!-- LEFT 方向键 -->
-            <FrameLayout
-                android:id="@+id/btn_key_left"
-                android:layout_width="28dp"
-                android:layout_height="40dp"
-                android:layout_alignParentLeft="true"
-                android:layout_centerVertical="true"
-                android:clickable="true"
-                android:focusable="false">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="◀"
-                    android:textColor="#cbd5e1"
-                    android:textSize="11sp" />
-            </FrameLayout>
-
-            <!-- RIGHT 方向键 -->
-            <FrameLayout
-                android:id="@+id/btn_key_right"
-                android:layout_width="28dp"
-                android:layout_height="40dp"
-                android:layout_alignParentRight="true"
-                android:layout_centerVertical="true"
-                android:clickable="true"
-                android:focusable="false">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="▶"
-                    android:textColor="#cbd5e1"
-                    android:textSize="11sp" />
-            </FrameLayout>
-
-            <!-- CENTER 确认键 (OK) -->
-            <FrameLayout
-                android:id="@+id/btn_key_center"
-                android:layout_width="48dp"
-                android:layout_height="38dp"
-                android:layout_centerInParent="true"
-                android:background="@drawable/bg_keydroidx_virtual_key_center"
-                android:clickable="true"
-                android:focusable="false">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="OK"
-                    android:textColor="#ffffff"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
-
-        </RelativeLayout>
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="6dp" />
 
         <!-- 右翼：RSK + END -->
         <LinearLayout
@@ -182,7 +90,7 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <!-- RSK 右软键 -->
+            <!-- RSK 右软键（最常用按键之一） -->
             <FrameLayout
                 android:id="@+id/btn_key_rsk"
                 android:layout_width="match_parent"
@@ -197,15 +105,15 @@
                     android:layout_gravity="center"
                     android:text="RSK"
                     android:textColor="#f0f4f8"
-                    android:textSize="12sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
             </FrameLayout>
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="6dp" />
+                android:layout_height="4dp" />
 
-            <!-- END 挂机/电源键 -->
+            <!-- END 挂机/Home键（正统诺基亚红色扣断听筒） -->
             <FrameLayout
                 android:id="@+id/btn_key_end"
                 android:layout_width="match_parent"
@@ -214,30 +122,30 @@
                 android:background="@drawable/bg_keydroidx_virtual_key_end"
                 android:clickable="true"
                 android:focusable="false">
-                <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:layout_gravity="center"
-                    android:src="@drawable/ic_keydroidx_endcall" />
+                    app:srcCompat="@drawable/ic_keydroidx_endcall" />
             </FrameLayout>
         </LinearLayout>
 
     </LinearLayout>
 
-    <!-- 2. 经典九宫格 T9 数字键区 (3×4 Keypad Grid) -->
+    <!-- 2. 经典九宫格 T9 数字键区 (紧凑压缩垂直空间至每行 28dp，间距 2.5dp) -->
     <!-- 第 1 行: 1, 2, 3 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="41dp"
+        android:layout_height="28dp"
         android:orientation="horizontal"
-        android:layout_marginBottom="5dp">
+        android:layout_marginBottom="2.5dp">
 
         <LinearLayout
             android:id="@+id/btn_key_1"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginRight="3dp"
+            android:layout_marginRight="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -248,7 +156,7 @@
                 android:layout_height="wrap_content"
                 android:text="1"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -256,7 +164,7 @@
                 android:layout_height="wrap_content"
                 android:text=".,?"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
 
@@ -265,8 +173,8 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginLeft="3dp"
-            android:layout_marginRight="3dp"
+            android:layout_marginLeft="2.5dp"
+            android:layout_marginRight="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -277,7 +185,7 @@
                 android:layout_height="wrap_content"
                 android:text="2"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -285,7 +193,7 @@
                 android:layout_height="wrap_content"
                 android:text="ABC"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
 
@@ -294,7 +202,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginLeft="3dp"
+            android:layout_marginLeft="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -305,7 +213,7 @@
                 android:layout_height="wrap_content"
                 android:text="3"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -313,7 +221,7 @@
                 android:layout_height="wrap_content"
                 android:text="DEF"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
     </LinearLayout>
@@ -321,16 +229,16 @@
     <!-- 第 2 行: 4, 5, 6 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="41dp"
+        android:layout_height="28dp"
         android:orientation="horizontal"
-        android:layout_marginBottom="5dp">
+        android:layout_marginBottom="2.5dp">
 
         <LinearLayout
             android:id="@+id/btn_key_4"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginRight="3dp"
+            android:layout_marginRight="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -341,7 +249,7 @@
                 android:layout_height="wrap_content"
                 android:text="4"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -349,7 +257,7 @@
                 android:layout_height="wrap_content"
                 android:text="GHI"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
 
@@ -358,8 +266,8 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginLeft="3dp"
-            android:layout_marginRight="3dp"
+            android:layout_marginLeft="2.5dp"
+            android:layout_marginRight="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -370,15 +278,15 @@
                 android:layout_height="wrap_content"
                 android:text="5"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="JKL·"
+                android:text="JKL"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
 
@@ -387,7 +295,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginLeft="3dp"
+            android:layout_marginLeft="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -398,7 +306,7 @@
                 android:layout_height="wrap_content"
                 android:text="6"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -406,7 +314,7 @@
                 android:layout_height="wrap_content"
                 android:text="MNO"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
     </LinearLayout>
@@ -414,16 +322,16 @@
     <!-- 第 3 行: 7, 8, 9 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="41dp"
+        android:layout_height="28dp"
         android:orientation="horizontal"
-        android:layout_marginBottom="5dp">
+        android:layout_marginBottom="2.5dp">
 
         <LinearLayout
             android:id="@+id/btn_key_7"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginRight="3dp"
+            android:layout_marginRight="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -434,7 +342,7 @@
                 android:layout_height="wrap_content"
                 android:text="7"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -442,7 +350,7 @@
                 android:layout_height="wrap_content"
                 android:text="PQRS"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
 
@@ -451,8 +359,8 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginLeft="3dp"
-            android:layout_marginRight="3dp"
+            android:layout_marginLeft="2.5dp"
+            android:layout_marginRight="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -463,7 +371,7 @@
                 android:layout_height="wrap_content"
                 android:text="8"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -471,7 +379,7 @@
                 android:layout_height="wrap_content"
                 android:text="TUV"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
 
@@ -480,7 +388,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginLeft="3dp"
+            android:layout_marginLeft="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -491,7 +399,7 @@
                 android:layout_height="wrap_content"
                 android:text="9"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -499,7 +407,7 @@
                 android:layout_height="wrap_content"
                 android:text="WXYZ"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
     </LinearLayout>
@@ -507,7 +415,7 @@
     <!-- 第 4 行: *, 0, # -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="41dp"
+        android:layout_height="28dp"
         android:orientation="horizontal">
 
         <LinearLayout
@@ -515,7 +423,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginRight="3dp"
+            android:layout_marginRight="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -526,15 +434,15 @@
                 android:layout_height="wrap_content"
                 android:text="*"
                 android:textColor="#f0f4f8"
-                android:textSize="18sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="+"
+                android:text="🔒"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
 
@@ -543,8 +451,8 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginLeft="3dp"
-            android:layout_marginRight="3dp"
+            android:layout_marginLeft="2.5dp"
+            android:layout_marginRight="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -555,7 +463,7 @@
                 android:layout_height="wrap_content"
                 android:text="0"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -563,7 +471,7 @@
                 android:layout_height="wrap_content"
                 android:text="空格"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
 
@@ -572,7 +480,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:layout_marginLeft="3dp"
+            android:layout_marginLeft="2.5dp"
             android:background="@drawable/bg_keydroidx_virtual_key"
             android:orientation="vertical"
             android:gravity="center"
@@ -583,7 +491,7 @@
                 android:layout_height="wrap_content"
                 android:text="#"
                 android:textColor="#f0f4f8"
-                android:textSize="16sp"
+                android:textSize="13.5sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false" />
             <TextView
@@ -591,7 +499,7 @@
                 android:layout_height="wrap_content"
                 android:text="🔕"
                 android:textColor="#8e9cae"
-                android:textSize="8sp"
+                android:textSize="7sp"
                 android:includeFontPadding="false" />
         </LinearLayout>
     </LinearLayout>

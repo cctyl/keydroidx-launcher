@@ -1,22 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- 电话图标。API 19 兼容：inset 控制 layer bounds。整体 22×22dp。 -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 天线 8×6 顶部居中 -->
-    <item android:left="7dp" android:top="0dp" android:right="7dp" android:bottom="16dp">
-        <shape android:shape="rectangle">
-            <solid android:color="#2196F3" />
-            <corners android:radius="2dp" />
-        </shape>
-    </item>
-    <!-- 机身 22×22 -->
-    <item android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp">
-        <shape android:shape="rectangle">
-            <solid android:color="#2196F3" />
-            <corners
-                android:bottomLeftRadius="10dp"
-                android:bottomRightRadius="10dp"
-                android:topLeftRadius="4dp"
-                android:topRightRadius="4dp" />
-        </shape>
-    </item>
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 正统经典诺基亚倾斜电话手柄图标 (接听 / 拨号) -->
+    <path
+        android:fillColor="#22c55e"
+        android:pathData="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1L21,20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1L7.5,3c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z" />
+</vector>

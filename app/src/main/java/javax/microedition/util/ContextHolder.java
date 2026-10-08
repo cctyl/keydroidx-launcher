@@ -82,7 +82,14 @@ public class ContextHolder {
 	}
 
 	public static int getDisplayHeight() {
-		return getDisplay().getHeight();
+		Context ctx = getAppContext();
+		int h = getDisplay().getHeight();
+		if (ctx != null && ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage.isTouchMode(ctx)) {
+			int keypadH = ru.playsoftware.j2meloader.nokia.KeydroidxTouchWindowController.getKeypadHeightPx(ctx);
+			int totalH = ru.playsoftware.j2meloader.nokia.KeydroidxTouchWindowController.getScreenTotalHeight(ctx);
+			return Math.max(0, totalH - keypadH);
+		}
+		return h;
 	}
 
 	public static void setCurrentActivity(MicroActivity activity) {

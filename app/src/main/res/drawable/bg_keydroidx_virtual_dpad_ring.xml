@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 虚拟五向导航键圆环底座背景（API 19 兼容） -->
+<!-- 虚拟五向导航键凹槽底座背景（API 19 兼容） -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <gradient
-        android:angle="135"
-        android:startColor="#333c4a"
-        android:endColor="#1c212a" />
-    <stroke android:width="1.5dp" android:color="#4b5563" />
-    <corners android:radius="24dp" />
+    <solid android:color="#141820" />
+    <stroke android:width="1.5dp" android:color="#2d3748" />
+    <corners android:radius="16dp" />
 </shape>

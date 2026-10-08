@@ -30,6 +30,7 @@ public class KeydroidxVirtualKeypadView extends LinearLayout {
 	}
 
 	private OnVirtualKeyEventListener listener;
+	private KeydroidxNaviWheelView naviWheelView;
 
 	public KeydroidxVirtualKeypadView(Context context) {
 		super(context);
@@ -45,6 +46,9 @@ public class KeydroidxVirtualKeypadView extends LinearLayout {
 
 	public void setOnVirtualKeyEventListener(OnVirtualKeyEventListener listener) {
 		this.listener = listener;
+		if (naviWheelView != null) {
+			naviWheelView.setOnVirtualKeyEventListener(listener);
+		}
 	}
 
 	@Override
@@ -54,12 +58,25 @@ public class KeydroidxVirtualKeypadView extends LinearLayout {
 	}
 
 	private void setupKeys() {
-		// 1. 语义动作按键（D-Pad、软键、通话、挂机/Home）
-		bindKey(R.id.btn_key_up, KeydroidxKeyBinding.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP);
-		bindKey(R.id.btn_key_down, KeydroidxKeyBinding.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN);
-		bindKey(R.id.btn_key_left, KeydroidxKeyBinding.ACTION_LEFT, KeyEvent.KEYCODE_DPAD_LEFT);
-		bindKey(R.id.btn_key_right, KeydroidxKeyBinding.ACTION_RIGHT, KeyEvent.KEYCODE_DPAD_RIGHT);
-		bindKey(R.id.btn_key_center, KeydroidxKeyBinding.ACTION_SELECT, KeyEvent.KEYCODE_DPAD_CENTER);
+		// 1. 一体化无缝导航环 (方案 A：四瓣对角无缝 Navi-Wheel，100% 空间利用率)
+		naviWheelView = findViewById(R.id.naviWheelView);
+		if (naviWheelView != null) {
+			naviWheelView.setOnVirtualKeyEventListener(new OnVirtualKeyEventListener() {
+				@Override
+				public void onVirtualKeyDown(int action, int defaultKeyCode) {
+					if (listener != null) {
+						listener.onVirtualKeyDown(action, defaultKeyCode);
+					}
+				}
+
+				@Override
+				public void onVirtualKeyUp(int action, int defaultKeyCode) {
+					if (listener != null) {
+						listener.onVirtualKeyUp(action, defaultKeyCode);
+					}
+				}
+			});
+		}
 
 		bindKey(R.id.btn_key_lsk, KeydroidxKeyBinding.ACTION_SOFT_LEFT, KeyEvent.KEYCODE_SOFT_LEFT);
 		bindKey(R.id.btn_key_rsk, KeydroidxKeyBinding.ACTION_SOFT_RIGHT, KeyEvent.KEYCODE_SOFT_RIGHT);

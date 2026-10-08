@@ -175,7 +175,14 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 		display = getWindowManager().getDefaultDisplay();
 		fragmentManager = getSupportFragmentManager();
 
-		fillScreenSizePresets(display.getWidth(), display.getHeight());
+		int initialW = display.getWidth();
+		int initialH = display.getHeight();
+		if (ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage.isTouchMode(this)) {
+			int keypadH = ru.playsoftware.j2meloader.nokia.KeydroidxTouchWindowController.getKeypadHeightPx(this);
+			int totalH = ru.playsoftware.j2meloader.nokia.KeydroidxTouchWindowController.getScreenTotalHeight(this);
+			initialH = Math.max(0, totalH - keypadH);
+		}
+		fillScreenSizePresets(initialW, initialH);
 
 		addFontSizePreset("128 x 128", 9, 13, 15);
 		addFontSizePreset("128 x 160", 13, 15, 20);
@@ -342,14 +349,25 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 			params.screenHeight = 320;
 			params.screenScaleType = 2;
 		} else {
-			int dw = display.getWidth();
-			int dh = display.getHeight();
-			binding.screenWidth.setText(Integer.toString(dw));
-			binding.screenHeight.setText(Integer.toString(dh));
-			binding.scaleTypeSelector.setSelection(1);
-			params.screenWidth = dw;
-			params.screenHeight = dh;
-			params.screenScaleType = 1;
+			if (ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage.isTouchMode(this)) {
+				// 触屏模式下，Java应用始终以标准的诺基亚 240×320 为虚拟画布基准，关闭仅切换为"适应窗口"等比缩放，绝不塞入超千像素物理尺寸
+				binding.screenWidth.setText("240");
+				binding.screenHeight.setText("320");
+				binding.scaleTypeSelector.setSelection(1);
+				params.screenWidth = 240;
+				params.screenHeight = 320;
+				params.screenScaleType = 1;
+			} else {
+				// 实体按键机模式（如 240×320 或 320×480 物理机）：保留原设计，恢复为硬件物理屏幕尺寸
+				int dw = display.getWidth();
+				int dh = display.getHeight();
+				binding.screenWidth.setText(Integer.toString(dw));
+				binding.screenHeight.setText(Integer.toString(dh));
+				binding.scaleTypeSelector.setSelection(1);
+				params.screenWidth = dw;
+				params.screenHeight = dh;
+				params.screenScaleType = 1;
+			}
 		}
 	}
 
