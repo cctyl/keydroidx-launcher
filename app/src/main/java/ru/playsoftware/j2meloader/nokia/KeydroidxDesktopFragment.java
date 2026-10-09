@@ -1958,17 +1958,15 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				KeydroidxLog.i("Desktop", "Shizuku 执行 click-tile 结果: " + executed);
 			}
 
-			// 若 Shizuku 未运行，尝试 root su 执行
-			if (!executed) {
-				try {
-					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
-					int exitCode = p.waitFor();
-					if (exitCode == 0) {
-						executed = true;
-						KeydroidxLog.i("Desktop", "Root 执行 click-tile 成功");
-					}
-				} catch (Exception ignored) {
-					KeydroidxLog.w("Desktop", "root click-tile failed: " + ignored.getMessage());
+			// 若 Shizuku 未运行，尝试 root su 执行；
+			// 门禁：仅 root 模式且服务端不是 root 身份时才起 su（见 KeydroidxQuickToggleManager#isRootFallbackAllowed）
+			if (!executed && KeydroidxQuickToggleManager.isRootFallbackAllowed(ctx)) {
+				KeydroidxRootShell.Result r = KeydroidxRootShell.exec(ctx, cmd, 8000L);
+				if (r.isSuccess()) {
+					executed = true;
+					KeydroidxLog.i("Desktop", "Root 执行 click-tile 成功");
+				} else {
+					KeydroidxLog.w("Desktop", "root click-tile failed: code=" + r.code + " out=" + r.out.trim());
 				}
 			}
 

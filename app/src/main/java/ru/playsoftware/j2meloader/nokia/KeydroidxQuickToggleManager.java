@@ -89,6 +89,33 @@ public class KeydroidxQuickToggleManager {
 		}, "shizuku-probe").start();
 	}
 
+	// ==================== root 直执兜底门禁 ====================
+	//
+	// 与 KeydroidxFreezeManager 同规则（见 docs/权限通道双轨制设计（root模式与mini_shizuku模式）.md §5.6）：
+	// 「已授予 xxx root 权限」是 root 管理器对**每一次新起的 su 进程**各弹一次（一次 su = 一次提示），
+	// 与授权策略是否早已 grant 无关。因此：
+	//   ① 仅 root 模式允许起 su —— mini_shizuku 模式下不暗中提权（双轨制契约）；
+	//   ② 服务端本身已是 root 身份（uid=0）时它就是 root 通道，命令失败即终态，
+	//      不再另起 su 把同一条命令以同一身份重跑一遍（白弹一次授权提示）。
+	// 服务端离线（uid=-1）或为 shell 身份（uid=2000）时仍保留兜底。
+
+	/** 服务端 root 身份 uid（root 激活拉起，服务端自身即 root 通道）。 */
+	private static final int SERVER_UID_ROOT = 0;
+	/** root 兜底命令超时（毫秒）。 */
+	private static final long ROOT_FALLBACK_TIMEOUT_MS = 8000L;
+
+	/**
+	 * 是否允许用 {@code su} 兜底执行开关命令。
+	 * <p><b>仅限后台线程调用</b>：内部含一次服务端身份 TCP 探测（离线时最长约 500ms）。
+	 */
+	public static boolean isRootFallbackAllowed(Context context) {
+		if (context == null) return false;
+		if (KeydroidxSettingsStorage.getAuthMode(context) != KeydroidxSettingsStorage.AUTH_MODE_ROOT) {
+			return false;
+		}
+		return Shizuku.serverUid() != SERVER_UID_ROOT;
+	}
+
 	// ==================== 统一状态与操作分发 ====================
 
 	public static boolean isToggleOn(Context context, int type) {
@@ -380,15 +407,14 @@ public class KeydroidxQuickToggleManager {
 					KeydroidxLog.w(TAG, "write airplane_mode_on failed: " + e.getMessage());
 				}
 
-				// 尝试 root 切换（针对 4.4 等已 root 设备）
-				try {
+				// 尝试 root 切换（针对 4.4 等已 root 设备）；
+				// 服务端已是 root 身份时不再另起 su（见 isRootFallbackAllowed）
+				if (isRootFallbackAllowed(context)) {
 					String suCmd = "settings put global airplane_mode_on " + (targetOn ? "1" : "0")
 							+ " ; am broadcast -a android.intent.action.AIRPLANE_MODE --ez state " + targetOn;
-					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
-					p.waitFor();
-					if (p.exitValue() == 0) return;
-				} catch (Exception ignored) {
-					KeydroidxLog.w(TAG, "su airplane mode toggle failed: " + ignored.getMessage());
+					KeydroidxRootShell.Result r = KeydroidxRootShell.exec(context, suCmd, ROOT_FALLBACK_TIMEOUT_MS);
+					if (r.isSuccess()) return;
+					KeydroidxLog.w(TAG, "root 切换飞行模式失败: code=" + r.code + " out=" + r.out.trim());
 				}
 
 				openSettings(context, Settings.ACTION_AIRPLANE_MODE_SETTINGS);
@@ -780,15 +806,14 @@ public class KeydroidxQuickToggleManager {
 					if (res) return;
 				}
 
-				// 尝试 root 切换（针对 4.4 等已 root 设备）
-				try {
+				// 尝试 root 切换（针对 4.4 等已 root 设备）；
+				// 服务端已是 root 身份时不再另起 su（见 isRootFallbackAllowed）
+				if (isRootFallbackAllowed(context)) {
 					String suCmd = "settings put secure location_mode " + mode
 							+ " ; settings put secure location_providers_allowed '" + providers + "'";
-					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
-					p.waitFor();
-					if (p.exitValue() == 0) return;
-				} catch (Exception ignored) {
-					KeydroidxLog.w(TAG, "su location toggle failed: " + ignored.getMessage());
+					KeydroidxRootShell.Result r = KeydroidxRootShell.exec(context, suCmd, ROOT_FALLBACK_TIMEOUT_MS);
+					if (r.isSuccess()) return;
+					KeydroidxLog.w(TAG, "root 切换定位失败: code=" + r.code + " out=" + r.out.trim());
 				}
 
 				openSettings(context, Settings.ACTION_LOCATION_SOURCE_SETTINGS);
@@ -928,14 +953,12 @@ public class KeydroidxQuickToggleManager {
 					if (res) return;
 				}
 
-				// 尝试 root 切换
-				try {
+				// 尝试 root 切换；服务端已是 root 身份时不再另起 su（见 isRootFallbackAllowed）
+				if (isRootFallbackAllowed(context)) {
 					String suCmd = "settings put global low_power " + (targetOn ? "1" : "0");
-					Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", suCmd});
-					p.waitFor();
-					if (p.exitValue() == 0) return;
-				} catch (Exception ignored) {
-					KeydroidxLog.w(TAG, "su battery saver toggle failed: " + ignored.getMessage());
+					KeydroidxRootShell.Result r = KeydroidxRootShell.exec(context, suCmd, ROOT_FALLBACK_TIMEOUT_MS);
+					if (r.isSuccess()) return;
+					KeydroidxLog.w(TAG, "root 切换省电模式失败: code=" + r.code + " out=" + r.out.trim());
 				}
 
 				openSettings(context, Settings.ACTION_BATTERY_SAVER_SETTINGS);

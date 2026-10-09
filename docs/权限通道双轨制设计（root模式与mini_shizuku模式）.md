@@ -529,6 +529,30 @@ freeze(pkg) / unfreeze(pkg):
 > 与 §5.3 的关系：两级路由本身不变（服务端优先 + 真实状态校验），只是把"root 兜底"的触发条件
 > 从"处于 root 模式"收紧为"root 模式 **且** 服务端不是 root 身份"。
 
+### 5.7 v2.3 修订（2026-10-09）：开关类 su 兜底统一门禁
+
+§5.6 修的是冻结通道，但生态里还有几处同类 su 兜底（同样是"每次调用起一个 `su` → 每次弹一次授权提示"），
+本次一并收口：
+
+| 位置 | 原实现 | 现实现 |
+|---|---|---|
+| `KeydroidxQuickToggleManager`：飞行模式 / 定位 / 省电 | `Runtime.exec({"su","-c",cmd})` + `waitFor()`（**无超时、无模式门禁**） | 入口先过 `isRootFallbackAllowed()`；执行改走 `KeydroidxRootShell.exec(ctx, cmd, 8s)`（带超时、stdout 落日志） |
+| `KeydroidxDesktopFragment#triggerQsTile`（第三方磁贴 click-tile） | 同上 | 同上 |
+
+新增统一门禁 **`KeydroidxQuickToggleManager.isRootFallbackAllowed(Context)`**（与 `KeydroidxFreezeManager` 同一规则，见 §5.6）：
+
+```
+isRootFallbackAllowed(ctx) = 授权模式 == root  &&  Shizuku.serverUid() != 0
+```
+
+- 服务端在线时这些开关本就在最前面先走 TCP（`Shizuku.exec`），**默认路径行为不变**、无 `su`；
+- 只有服务端不可用（离线 / 取不到 K）才落到 `su` 兜底，且此时机器上并没有 root 服务端，兜底是必要且合理的；
+- mini_shizuku 模式下门禁恒为 false → 不再暗中提权（补齐了原先缺失的双轨制契约）。
+
+> 未改动（属用户主动触发的 root 专用流程，各一次 `su` 为预期）：
+> `ShizukuRootFragment` 的 root 检测、`KeydroidxShizukuActivator` 的 root 激活脚本。
+> `KeydroidxQuickToggleManager#execPowerCommand`（关机/重启）只走 mini_shizuku，无 su 兜底。
+
 ---
 
 ## 6. 关键技术点 3：root 模式服务端 EXEC 白名单（v2 新增）
