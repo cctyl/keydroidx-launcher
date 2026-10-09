@@ -69,7 +69,7 @@ android:layout_height="match_parent"
   - 宽度 `match_parent`，高度固定 `KeydroidxDimens.dp(34)`，紧贴底部分隔线。
   - 单元格固定宽度 `36dp`，内置 `HorizontalScrollView` 支持多开关平滑横滚。
 
-#### 2. 12 宫格功能表与百宝箱（`KeydroidxMenuFragment` / `KeydroidxBoxFragment`）
+#### 2. 12 宫格功能表与百宝箱（界面标题「应用程序」；`KeydroidxMenuFragment` / `KeydroidxBoxFragment`）
 - 3 列网格布局采用 `layout_width="match_parent"`。
 - 每列使用 `weight=1` 均分屏幕宽度（240dp 屏为 80dp/列，320dp 屏为 106.6dp/列）。
 - 宫格内图标（48×48dp）和文字保持水平居中，消除边缘空隙与横向溢出。

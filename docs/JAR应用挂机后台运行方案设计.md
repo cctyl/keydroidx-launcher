@@ -368,7 +368,7 @@ if (r != null) {
 ```
 
 - `loadJarIcon`：新增 `AppUtils.findAppByPath(String path)`（遍历 `Config.getAppDir()` 按
-  `getPathExt()` 匹配），图标复用百宝箱的 AppItem 图标加载；失败返回 null
+  `getPathExt()` 匹配），图标复用百宝箱（界面标题「应用程序」）的 AppItem 图标加载；失败返回 null
   （`createTaskRow` 已有 `ic_launcher` 兜底）。
 - 排序沿用现有按 name 排序，挂机条目自然混排。
 
