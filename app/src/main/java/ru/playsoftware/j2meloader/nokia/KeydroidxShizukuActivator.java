@@ -117,6 +117,10 @@ public final class KeydroidxShizukuActivator {
 				}
 			}
 			int uid = online ? Shizuku.serverUid() : ServerIdentity.UID_UNKNOWN;
+			if (online && uid == 0) {
+				// 记录「曾成功激活过」：重启后是否值得提醒用户重新激活（adb 模式）依据该标志
+				KeydroidxSettingsStorage.setShizukuEverActivated(ctx, true);
+			}
 			KeydroidxLog.i(TAG, "激活结果: online=" + online + " serverUid=" + uid);
 			return new Result(true, online, uid, false);
 		} finally {

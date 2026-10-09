@@ -57,6 +57,44 @@ flowchart LR
 - **服务端健壮性**：`ShellUtil` 需在输出回写时同步执行完成（`waitFor`），避免线程池线程被长时间占用的阻塞问题；为防资源泄漏，每条连接关闭时释放 socket。
 - **性能**：TCP 通道为低频控制通道，并发极低，无需额外优化；命令执行走线程池（现有 `SocketService` 已用 1-3 线程 + 队列），避免阻塞连接监听。
 
+## 重启后自动恢复与失效提醒（2026-10）
+
+服务端是独立的 `app_process` 进程（既非本应用进程、也非系统服务），**设备重启后必然消失**（进程被误杀同理）。此前没有任何自愈机制：用户必须每次手动进设置页点一次「root 模式」，adb 模式失效也毫无提示。现由 `KeydroidxShizukuBootRecovery`（`ru.playsoftware.j2meloader.nokia`）在**桌面启动路径**上自动处理。
+
+### 触发与规则
+
+| 当前授权模式 | 探测结果 | 行为 |
+|---|---|---|
+| root 模式 | 服务离线 | 后台自动执行一次 root 激活（复用 `KeydroidxShizukuActivator.activateRootServer`，会自动弹一次 su 授权框）；成功静默，失败弹 Toast |
+| root 模式 | 在线但 `uid != 0` | 同上（kill 残留 shell 服务端后以 root 重新拉起），避免设置页长期显示「✗ 与模式不符」 |
+| root 模式 | 在线且 `uid == 0` | 无操作 |
+| adb（mini_shizuku）模式 | 服务离线且**曾激活过** | 弹 Toast：「mini_shizuku 已失效，请连接电脑 adb 重新激活」 |
+| adb（mini_shizuku）模式 | 服务离线且从未激活过 | 不打扰 |
+| 任意模式 | 服务在线 | 回写「曾激活过」标志 |
+
+### 为什么不用 BOOT_COMPLETED 广播
+
+应用本身就是 HOME 桌面，开机后系统必然拉起 `KeydroidxDesktopActivity`，天然等价于「开机后必执行」；新增清单级 Receiver 需要 `RECEIVE_BOOT_COMPLETED` 权限，并引入「自己拉自己进程」的复杂度与高版本后台限制风险，属于不必要的新模式。
+
+### 三个持久化字段（`nokia_desktop_settings`）
+
+| key | 类型/默认 | 语义 |
+|---|---|---|
+| `shizuku_ever_activated` | boolean / false | 历史曾成功激活过（探测到在线即置位），决定 adb 模式重启后是否值得提醒 |
+| `shizuku_notified_boot_token` | long / -1 | 已弹过失效提醒的开机令牌（同一次开机只提醒一次） |
+| `shizuku_auto_activate_boot_token` | long / -1 | 已自动激活尝试过的开机令牌（同一次开机只尝试一次，避免反复弹 su） |
+
+**开机令牌** = `System.currentTimeMillis() - SystemClock.elapsedRealtime()`，近似「开机时刻的 wall clock」：重启后必变、同一次开机内进程反复重启不变，无需广播即可区分「重启后首次进桌面」（`SystemClock.elapsedRealtime` 为 API 1，无 NewApi 风险）。
+
+### 防打扰与并发
+
+- 进程内 `AtomicBoolean` 单次守卫：一个进程生命周期只做一次恢复检查；`onDestroy` 时若尚未进入后台执行则取消并复位，下次进桌面重新发起。
+- 复用 `KeydroidxShizukuActivator.tryLockActivation()` 互斥闸：与设置页手动激活天然互斥，不会出现两次并发启动互相 kill 服务端。
+- 执行时机：桌面 `onCreate` 后延迟 3 秒（避开首帧与启动权限自检弹窗）；设备处于锁屏时轮询等待解锁（锁屏下 Toast 不可见、su 授权框也可能被系统拦截），最长等 5 分钟。
+- 线程模型：`Shizuku.isRunning()/serverUid()` 内部是 TCP（4.4 主线程调用直接 `NetworkOnMainThreadException` 闪退），su 执行同样阻塞，故探测与激活一律后台线程，Toast 回主线程。
+
+排查日志：`adb logcat -s ShizukuBoot`（激活结果另见 `ShizukuActivator` / `ShizukuRoot`）。
+
 ## 实施注意（防止回归）
 
 - **版本守卫**：项目 `MIN_SDK=14`，新增代码严禁出现无守卫的高版本 API；版本判断一律 `Build.VERSION.SDK_INT >= 24` 形式。

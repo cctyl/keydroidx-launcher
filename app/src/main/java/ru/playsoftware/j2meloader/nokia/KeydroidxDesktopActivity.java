@@ -152,6 +152,11 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 				KeydroidxLog.i("Desktop", "保活服务已按用户设置关闭，本次不启动");
 			}
 		}
+
+		// mini_shizuku 服务端是独立 app_process 进程，重启后消失：进入桌面后自动恢复
+		// —— root 模式自动 su 激活一次；adb 模式若曾激活过则弹 Toast 提醒重新激活。
+		// 延迟 3 秒 + 锁屏轮询等待解锁，详情见 KeydroidxShizukuBootRecovery。
+		KeydroidxShizukuBootRecovery.scheduleAfterDesktopStart(this);
 	}
 
 	/** 本次启动是否已做过核心权限自检，避免重复弹窗。 */
@@ -499,6 +504,8 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 	}
 
 	protected void onDestroy() {
+		// 清掉尚未执行的 mini_shizuku 恢复检查（已进入后台执行的流程不打断）
+		KeydroidxShizukuBootRecovery.release(this);
 		KeydroidxDialogFocus.setDialogWindowAdjuster(null);
 		if (sInstance == this) {
 			sInstance = null;

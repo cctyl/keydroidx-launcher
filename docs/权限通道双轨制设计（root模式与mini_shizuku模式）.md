@@ -258,6 +258,18 @@ flowchart LR
 
 > WHOAMI 属步骤 0 通过后的下一阶段实现（随服务端补组一起做），本轮只定协议与判据。
 
+### 3.5 重启后的自动恢复（v2.4，2026-10 实施）
+
+服务端是独立 `app_process` 进程，**重启后必然消失**；此前没有任何自愈机制，root 用户每次开机都要手动点一次，adb 用户则完全无提示。现由 `KeydroidxShizukuBootRecovery` 在桌面 `onCreate` 后自动处理（延迟 3 秒 + 锁屏解锁门控）：
+
+- **root 模式**：服务离线、或在线但 `uid != 0`（残留 shell 服务端）→ 自动 `KeydroidxShizukuActivator.activateRootServer()` 一次（自动弹 su 授权框），成功静默、失败 Toast。与「root 模式 + 服务离线就自动激活」的产品约定一致，即 §3.4 的「身份不符需重新激活」由系统自动完成，不再依赖用户点击。
+- **mini_shizuku（adb）模式**：服务离线且 `shizuku_ever_activated` 为真 → 弹 Toast「mini_shizuku 已失效，请连接电脑 adb 重新激活」；从未激活过则不打扰。
+- **与手动激活互斥**：复用 `tryLockActivation()` 闸，自动流程与设置页手动激活不会并发（并发会互相 kill 服务端，见 `KeydroidxShizukuActivator` 类注释 2026-09-28 日志）。
+- **防打扰**：进程内单次守卫 + 「本次开机已尝试/已提醒」令牌（`shizuku_auto_activate_boot_token` / `shizuku_notified_boot_token`，令牌 = `currentTimeMillis() - elapsedRealtime()`）。
+- **不加设置开关**：行为始终按模式执行，设置页交互不变。
+
+实现与字段细节见 `mini_shizuku设计文档.md`「重启后自动恢复与失效提醒」节。
+
 ---
 
 ## 4. 关键技术点 1：root 模式下让 root 身份的服务端起来（补 inet 组）

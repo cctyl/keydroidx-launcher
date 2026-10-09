@@ -812,6 +812,81 @@ public class KeydroidxSettingsStorage {
 		return mode == AUTH_MODE_ROOT ? "root 模式" : "mini_shizuku 模式";
 	}
 
+	// ── mini_shizuku 重启恢复（服务端是 app_process 独立进程，重启后消失） ──
+
+	/**
+	 * 是否「历史上曾成功激活过 mini_shizuku」。默认 false。
+	 * <p>用途：adb（mini_shizuku）模式下服务离线时，只有曾经激活过的用户才值得被提醒重新激活，
+	 * 未用过的人不打扰（需求 2026-10）。置位点：探测到服务在线（任意身份）与 root 激活成功。
+	 */
+	private static final String KEY_SHIZUKU_EVER_ACTIVATED = "shizuku_ever_activated";
+
+	/**
+	 * 上一次已弹过「服务已失效」提醒的开机令牌（见 {@link #currentBootToken()}）。默认 -1（从未提醒）。
+	 * <p>用途：同一次开机内只提醒一次；重启后令牌变化，会再提醒一次。
+	 */
+	private static final String KEY_SHIZUKU_NOTIFIED_BOOT_TOKEN = "shizuku_notified_boot_token";
+
+	/**
+	 * 上一次「自动激活尝试」所处的开机令牌（默认 -1 = 从未尝试）。
+	 * <p>用途：同一次开机内只自动尝试一次，避免反复弹 su 授权框；重启后令牌变化，会重新尝试。
+	 */
+	private static final String KEY_SHIZUKU_AUTO_ACTIVATE_BOOT_TOKEN = "shizuku_auto_activate_boot_token";
+
+	/** 读取「曾激活过 mini_shizuku」标志。 */
+	public static boolean hasShizukuEverActivated(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getBoolean(KEY_SHIZUKU_EVER_ACTIVATED, false);
+	}
+
+	/** 置位「曾激活过 mini_shizuku」（幂等，已置位时不重复写盘）。 */
+	public static void setShizukuEverActivated(Context ctx, boolean activated) {
+		if (!activated) {
+			ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+					.edit().putBoolean(KEY_SHIZUKU_EVER_ACTIVATED, false).apply();
+			return;
+		}
+		if (hasShizukuEverActivated(ctx)) {
+			return;
+		}
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putBoolean(KEY_SHIZUKU_EVER_ACTIVATED, true).apply();
+		KeydroidxLog.i("SettingsStorage", "mini_shizuku 曾激活标志已置位");
+	}
+
+	/**
+	 * 本次开机的令牌：{@code System.currentTimeMillis() - SystemClock.elapsedRealtime()}，
+	 * 近似等于「开机时刻的 wall clock」，重启后必变、同一次开机内进程反复重启也不变。
+	 * <p>用它能精确区分「重启后首次进桌面」，无需 BOOT_COMPLETED 广播与额外权限。
+	 */
+	public static long currentBootToken() {
+		return System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime();
+	}
+
+	/** 上一次已提醒过的开机令牌（-1 = 从未提醒）。 */
+	public static long getShizukuNotifiedBootToken(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getLong(KEY_SHIZUKU_NOTIFIED_BOOT_TOKEN, -1L);
+	}
+
+	/** 记录「本次开机已提醒过」的开机令牌。 */
+	public static void setShizukuNotifiedBootToken(Context ctx, long token) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putLong(KEY_SHIZUKU_NOTIFIED_BOOT_TOKEN, token).apply();
+	}
+
+	/** 上一次自动激活尝试所处的开机令牌（-1 = 从未尝试）。 */
+	public static long getShizukuAutoActivateBootToken(Context ctx) {
+		return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.getLong(KEY_SHIZUKU_AUTO_ACTIVATE_BOOT_TOKEN, -1L);
+	}
+
+	/** 记录「本次开机已自动激活尝试过」的开机令牌。 */
+	public static void setShizukuAutoActivateBootToken(Context ctx, long token) {
+		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+				.edit().putLong(KEY_SHIZUKU_AUTO_ACTIVATE_BOOT_TOKEN, token).apply();
+	}
+
 	// ── 电源键拦截方案（高级设置 → 电源键拦截设置） ──
 
 	/** 电源键拦截：关闭。 */

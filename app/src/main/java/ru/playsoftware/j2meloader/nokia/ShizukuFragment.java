@@ -134,11 +134,17 @@ public class ShizukuFragment extends KeydroidxListPageFragment {
 	/** 后台检测服务在线状态与服务端身份（WHOAMI），回主线程刷新状态行。 */
 	private void refreshStatus() {
 		final Handler mainHandler = new Handler(Looper.getMainLooper());
+		final Context appCtx = requireContext().getApplicationContext();
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
 				final boolean running = Shizuku.isRunning();
 				final int uid = running ? Shizuku.serverUid() : ServerIdentity.UID_UNKNOWN;
+				if (running) {
+					// 服务在线即记录「曾成功激活过」——这是 adb 激活路径唯一的置位点，
+					// 决定重启后是否值得弹「已失效，请重新激活」提醒（见 KeydroidxShizukuBootRecovery）
+					KeydroidxSettingsStorage.setShizukuEverActivated(appCtx, true);
+				}
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
