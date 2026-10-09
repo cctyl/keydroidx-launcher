@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 
+import ru.playsoftware.mini_shizuku.ServerIdentity;
 import ru.playsoftware.mini_shizuku.Shizuku;
 
 /**
@@ -38,6 +39,16 @@ public class KeydroidxFreezeManager {
 	private static final String TAG = "KeydroidxFreezeManager";
 	/** 服务端 shell 身份 uid（mini_shizuku 模式只允许此身份的服务端执行特权命令） */
 	private static final int SERVER_UID_SHELL = 2000;
+	/** 服务端 root 身份 uid（root 模式下由桌面内 root 激活拉起，服务端自身即 root 通道） */
+	private static final int SERVER_UID_ROOT = 0;
+	/** 哨兵：调用方未提供本次已探测的服务端 uid，需在方法内自行探测（避免批量场景逐包重复探测） */
+	private static final int UID_NOT_PROBED = Integer.MIN_VALUE;
+	/** 单包 root 直执超时（毫秒） */
+	private static final long ROOT_SINGLE_TIMEOUT_MS = 8000L;
+	/** 批量 root 脚本超时：基准 + 每包增量，上限封顶（毫秒） */
+	private static final long ROOT_BATCH_TIMEOUT_BASE_MS = 8000L;
+	private static final long ROOT_BATCH_TIMEOUT_PER_PKG_MS = 3000L;
+	private static final long ROOT_BATCH_TIMEOUT_MAX_MS = 60000L;
 	/** 包名白名单：只允许字母/数字/下划线/点，杜绝包名拼入 shell 命令时的注入 */
 	private static final Pattern PKG_PATTERN = Pattern.compile("^[a-zA-Z0-9_.]+$");
 	private static final String PREF_NAME = "nokia_freeze_config";
@@ -249,6 +260,14 @@ public class KeydroidxFreezeManager {
 	 */
 	public void freezeApp(String packageName, FreezeCallback callback) {
 		executor.execute(() -> {
+			// 预检：包已卸载/不存在时直接给准确提示，不下发无效命令（否则会多起一次 su）
+			if (!isPackageInstalled(packageName)) {
+				KeydroidxLog.w(TAG, "freezeApp: 包在本机不存在，跳过: " + packageName);
+				mainHandler.post(() -> {
+					if (callback != null) callback.onResult(false, "应用不存在或已卸载");
+				});
+				return;
+			}
 			boolean ok = executeFreeze(packageName);
 			mainHandler.post(() -> {
 				// 成功时携带预期状态预写缓存，避免 PMS 状态更新延迟导致冰块不立即显示
@@ -269,6 +288,14 @@ public class KeydroidxFreezeManager {
 	 */
 	public void unfreezeApp(String packageName, FreezeCallback callback) {
 		executor.execute(() -> {
+			// 预检：包已卸载/不存在时直接给准确提示，不下发无效命令（否则会多起一次 su）
+			if (!isPackageInstalled(packageName)) {
+				KeydroidxLog.w(TAG, "unfreezeApp: 包在本机不存在，跳过: " + packageName);
+				mainHandler.post(() -> {
+					if (callback != null) callback.onResult(false, "应用不存在或已卸载");
+				});
+				return;
+			}
 			boolean ok = executeUnfreeze(packageName);
 			mainHandler.post(() -> {
 				if (ok) {
@@ -468,14 +495,48 @@ public class KeydroidxFreezeManager {
 				return;
 			}
 
-			List<String> succeeded = new ArrayList<>();
+			// 预检：剔除本机不存在的残留条目（名单可能来自其它设备 / 应用已卸载），
+			// 避免对不存在的包下发无效命令（服务端会回 "Unknown package"，进而多起一次 su）
+			List<String> targets = new ArrayList<>();
+			int missing = 0;
 			for (String pkg : list) {
-				if (executeFreeze(pkg)) {
-					succeeded.add(pkg);
+				if (isProtectedPackage(pkg) || !isValidPackageName(pkg)) continue;
+				if (isPackageInstalled(pkg)) {
+					targets.add(pkg);
+				} else {
+					missing++;
+					KeydroidxLog.w(TAG, "freezeAll: 跳过本机不存在的包: " + pkg);
 				}
 			}
+			final int missingCount = missing;
+			if (targets.isEmpty()) {
+				mainHandler.post(() -> {
+					String msg = "冻结名单中的 " + missingCount + " 个应用在本机均不存在";
+					Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show();
+					if (callback != null) callback.onResult(false, msg);
+				});
+				return;
+			}
 
-			final int total = list.size();
+			// 通道选择（整批只探测一次服务端身份）：
+			// ① 服务端可用 → 逐包走 TCP（不弹 su 授权提示）；
+			// ② root 模式且服务端不可用 → 整批合并为一个脚本，一次 su 执行。
+			final int serverUid = Shizuku.serverUid();
+			List<String> succeeded = new ArrayList<>();
+			if (isServerChannelUsable(serverUid)) {
+				for (String pkg : targets) {
+					if (executeFreeze(pkg, serverUid)) {
+						succeeded.add(pkg);
+					}
+				}
+			} else if (isRootFallbackAllowed(serverUid)) {
+				succeeded.addAll(rootExecuteBatch(targets, true));
+			} else {
+				KeydroidxLog.w(TAG, "freezeAll: 无可用通道（rootMode=" + isRootMode()
+						+ ", serverUid=" + serverUid + "），放弃执行");
+			}
+
+			final int total = targets.size();
 			final int success = succeeded.size();
 			final List<String> done = succeeded;
 			mainHandler.post(() -> {
@@ -483,6 +544,8 @@ public class KeydroidxFreezeManager {
 				// 绕过 PMS 状态更新延迟。功能表不在前台时广播丢失，由其
 				// onPageCreated 读 getKnownFrozenSet() 兜底（见 KeydroidxMenuFragment）。
 				notifyStateChanged(done, true);
+				// 跳过数量只记日志（上方 freezeAll: 跳过本机不存在的包），不在完成提示里露出：
+				// 名单里的残余条目属既有数据，不必每次操作都提醒用户（2026-10-09 用户要求）。
 				String msg = "已一键冻结 " + success + "/" + total + " 个应用";
 				Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show();
 				if (callback != null) {
@@ -509,18 +572,50 @@ public class KeydroidxFreezeManager {
 				return;
 			}
 
-			List<String> succeeded = new ArrayList<>();
+			// 预检：剔除本机不存在的残留条目（与 freezeAll 同理）
+			List<String> targets = new ArrayList<>();
+			int missing = 0;
 			for (String pkg : list) {
-				if (executeUnfreeze(pkg)) {
-					succeeded.add(pkg);
+				if (!isValidPackageName(pkg)) continue;
+				if (isPackageInstalled(pkg)) {
+					targets.add(pkg);
+				} else {
+					missing++;
+					KeydroidxLog.w(TAG, "unfreezeAll: 跳过本机不存在的包: " + pkg);
 				}
 			}
+			final int missingCount = missing;
+			if (targets.isEmpty()) {
+				mainHandler.post(() -> {
+					String msg = "冻结名单中的 " + missingCount + " 个应用在本机均不存在";
+					Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show();
+					if (callback != null) callback.onResult(false, msg);
+				});
+				return;
+			}
 
-			final int total = list.size();
+			// 通道选择（整批只探测一次服务端身份），规则与 freezeAll 一致
+			final int serverUid = Shizuku.serverUid();
+			List<String> succeeded = new ArrayList<>();
+			if (isServerChannelUsable(serverUid)) {
+				for (String pkg : targets) {
+					if (executeUnfreeze(pkg, serverUid)) {
+						succeeded.add(pkg);
+					}
+				}
+			} else if (isRootFallbackAllowed(serverUid)) {
+				succeeded.addAll(rootExecuteBatch(targets, false));
+			} else {
+				KeydroidxLog.w(TAG, "unfreezeAll: 无可用通道（rootMode=" + isRootMode()
+						+ ", serverUid=" + serverUid + "），放弃执行");
+			}
+
+			final int total = targets.size();
 			final int success = succeeded.size();
 			final List<String> done = succeeded;
 			mainHandler.post(() -> {
 				notifyStateChanged(done, false);
+				// 同 freezeAll：跳过数量只进日志，不打扰用户
 				String msg = "已一键解冻 " + success + "/" + total + " 个应用";
 				Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show();
 				if (callback != null) {
@@ -531,11 +626,22 @@ public class KeydroidxFreezeManager {
 	}
 
 	/**
-	 * 底层执行冻结：固定两级路由——① 服务端（EXEC_OUT 真实结果）→ ② libsu root 直执兜底
+	 * 底层执行冻结：固定两级路由——① 服务端（EXEC_OUT 真实结果）→ ② root 直执兜底
 	 * → ③ DevicePolicyManager（设备所有者）。最终以 {@link #isAppFrozen} 真实状态为准，
 	 * 不允许"命令发出即成功"。
+	 * <p><b>通道门禁（2026-10）</b>：服务端本身已是 root 身份（uid=0）时它就是 root 通道，
+	 * 失败即终态——不再另起 {@code su -c} 把同一条命令以同一身份重跑一遍，
+	 * 否则 root 管理器会为每次新起的 su 各弹一次「已授予 xxx root 权限」（见 {@link #isRootFallbackAllowed}）。
 	 */
 	private boolean executeFreeze(String packageName) {
+		return executeFreeze(packageName, UID_NOT_PROBED);
+	}
+
+	/**
+	 * @param serverUid 调用方已探测的服务端 uid；{@link #UID_NOT_PROBED} 表示需在方法内自行探测
+	 *                  （批量场景由 {@link #freezeAll} 探测一次后传入，避免逐包重复 TCP 探测）。
+	 */
+	private boolean executeFreeze(String packageName, int serverUid) {
 		if (isProtectedPackage(packageName)) return false;
 		if (!isValidPackageName(packageName)) {
 			KeydroidxLog.w(TAG, "executeFreeze: 包名未通过白名单校验，拒绝执行: " + packageName);
@@ -543,9 +649,20 @@ public class KeydroidxFreezeManager {
 		}
 		KeydroidxLog.i(TAG, "executeFreeze: " + packageName);
 
+		// 0. 预检：名单里可能残留本机已不存在的包（应用已卸载），
+		//    下发命令只会拿到 "Unknown package" 并触发一次无谓的通道兜底（root 模式下即多一次 su 弹窗）。
+		if (!isPackageInstalled(packageName)) {
+			KeydroidxLog.w(TAG, "executeFreeze: 包在本机不存在，跳过: " + packageName);
+			return false;
+		}
+
+		if (serverUid == UID_NOT_PROBED) {
+			serverUid = Shizuku.serverUid();
+		}
+
 		// 1. 服务端优先：EXEC_OUT| 回真实输出，执行后校验 isAppFrozen
-		try {
-			if (Shizuku.isRunning() && isServerIdentityAllowed()) {
+		if (isServerChannelUsable(serverUid)) {
+			try {
 				String out = Shizuku.execWithOutput(buildFreezeCmd(packageName));
 				if (isAppFrozen(packageName)) {
 					KeydroidxLog.i(TAG, "冻结成功(服务端): " + packageName + " out=" + out);
@@ -553,13 +670,14 @@ public class KeydroidxFreezeManager {
 					return true;
 				}
 				KeydroidxLog.w(TAG, "服务端冻结未生效: " + packageName + " out=" + out);
+			} catch (Throwable e) {
+				KeydroidxLog.w(TAG, "mini_shizuku 执行冻结异常: " + e.getMessage());
 			}
-		} catch (Throwable e) {
-			KeydroidxLog.w(TAG, "mini_shizuku 执行冻结异常: " + e.getMessage());
 		}
 
-		// 2. root 直执兜底：仅 root 模式可用（双轨制契约——mini_shizuku 模式不暗中提权）
-		if (isRootMode() && tryRootExecute(buildFreezeCmd(packageName), packageName, true)) {
+		// 2. root 直执兜底：仅 root 模式且服务端不是 root 身份时可用
+		//    （双轨制契约——mini_shizuku 模式不暗中提权；服务端本身是 root 时失败即终态）
+		if (isRootFallbackAllowed(serverUid) && tryRootExecute(buildFreezeCmd(packageName), packageName, true)) {
 			return true;
 		}
 
@@ -585,17 +703,36 @@ public class KeydroidxFreezeManager {
 
 	/**
 	 * 底层执行解冻：与冻结同构的两级路由，最终以 {@link #isAppFrozen} == false 为准。
+	 * <p>通道门禁与 {@link #executeFreeze(String)} 一致：服务端已是 root 身份时不再起 su 兜底。
 	 */
 	private boolean executeUnfreeze(String packageName) {
+		return executeUnfreeze(packageName, UID_NOT_PROBED);
+	}
+
+	/**
+	 * @param serverUid 调用方已探测的服务端 uid；{@link #UID_NOT_PROBED} 表示需在方法内自行探测
+	 *                  （批量场景由 {@link #unfreezeAll} 探测一次后传入，避免逐包重复 TCP 探测）。
+	 */
+	private boolean executeUnfreeze(String packageName, int serverUid) {
 		if (!isValidPackageName(packageName)) {
 			KeydroidxLog.w(TAG, "executeUnfreeze: 包名未通过白名单校验，拒绝执行: " + packageName);
 			return false;
 		}
 		KeydroidxLog.i(TAG, "executeUnfreeze: " + packageName);
 
+		// 0. 预检：包在本机不存在时直接跳过（不下发无效命令、不起 su）
+		if (!isPackageInstalled(packageName)) {
+			KeydroidxLog.w(TAG, "executeUnfreeze: 包在本机不存在，跳过: " + packageName);
+			return false;
+		}
+
+		if (serverUid == UID_NOT_PROBED) {
+			serverUid = Shizuku.serverUid();
+		}
+
 		// 1. 服务端优先：EXEC_OUT| 回真实输出，执行后校验 isAppFrozen
-		try {
-			if (Shizuku.isRunning() && isServerIdentityAllowed()) {
+		if (isServerChannelUsable(serverUid)) {
+			try {
 				String out = Shizuku.execWithOutput(buildUnfreezeCmd(packageName));
 				if (!isAppFrozen(packageName)) {
 					KeydroidxLog.i(TAG, "解冻成功(服务端): " + packageName + " out=" + out);
@@ -603,13 +740,13 @@ public class KeydroidxFreezeManager {
 					return true;
 				}
 				KeydroidxLog.w(TAG, "服务端解冻未生效: " + packageName + " out=" + out);
+			} catch (Throwable e) {
+				KeydroidxLog.w(TAG, "mini_shizuku 执行解冻异常: " + e.getMessage());
 			}
-		} catch (Throwable e) {
-			KeydroidxLog.w(TAG, "mini_shizuku 执行解冻异常: " + e.getMessage());
 		}
 
-		// 2. libsu root 兜底
-		if (isRootMode() && tryRootExecute(buildUnfreezeCmd(packageName), packageName, false)) {
+		// 2. root 直执兜底：门禁与冻结一致（服务端已是 root 时跳过，避免重复执行 + 重复授权提示）
+		if (isRootFallbackAllowed(serverUid) && tryRootExecute(buildUnfreezeCmd(packageName), packageName, false)) {
 			return true;
 		}
 
@@ -666,7 +803,7 @@ public class KeydroidxFreezeManager {
 	private boolean tryRootExecute(String cmd, String packageName, boolean expectFrozen) {
 		if (Build.VERSION.SDK_INT < 19) return false; // su 探测含 I/O，仅后台线程调用
 		try {
-			KeydroidxRootShell.Result result = KeydroidxRootShell.exec(appContext, cmd, 8000);
+			KeydroidxRootShell.Result result = KeydroidxRootShell.exec(appContext, cmd, ROOT_SINGLE_TIMEOUT_MS);
 			boolean ok = result.isSuccess() && isAppFrozen(packageName) == expectFrozen;
 			KeydroidxLog.i(TAG, "root 直执: code=" + result.code + " ok=" + ok
 					+ " out=" + result.out.trim());
@@ -684,37 +821,130 @@ public class KeydroidxFreezeManager {
 		}
 	}
 
-	/** root 通道是否可用（su -c true 探测，5 秒超时） */
-	private boolean hasRootChannel() {
-		if (Build.VERSION.SDK_INT < 19) return false;
-		return KeydroidxRootShell.isRootAvailable(appContext);
-	}
-
 	/** 当前授权模式是否为 root 模式（root 直执兜底的门禁，双轨制契约） */
 	private boolean isRootMode() {
 		return KeydroidxSettingsStorage.getAuthMode(appContext) == KeydroidxSettingsStorage.AUTH_MODE_ROOT;
 	}
 
 	/**
-	 * 服务端通道的身份门禁（双轨制契约）：仅限后台线程调用（内部是 TCP 探测）。
+	 * 服务端通道是否可用（双轨制契约）：仅限后台线程调用（内部可能做 TCP 探活）。
 	 * <ul>
-	 *   <li>root 模式：不限制（shell 服务端冻不住 4.4，会自然落到 root 兜底）；</li>
+	 *   <li>root 模式：不限制身份（shell 服务端冻不住高版本包时，会自然落到 root 兜底）；</li>
 	 *   <li>mini_shizuku 模式：只允许 shell 身份（uid=2000）服务端——
 	 *       root 服务端与模式不符（设置页会提示"请重新激活"），特权操作一律不暗中动用，
 	 *       冻结将直接失败并提示切换 root 模式。</li>
 	 * </ul>
+	 *
+	 * @param serverUid {@link Shizuku#serverUid()} 的探测结果（0=root，2000=shell，-1=离线/无法确认）
 	 */
-	private boolean isServerIdentityAllowed() {
+	private boolean isServerChannelUsable(int serverUid) {
+		if (serverUid == ServerIdentity.UID_UNKNOWN) {
+			// 无法确认身份：可能是服务端离线，也可能是旧版服务端不认识 WHOAMI。
+			// root 模式下用 TCP 探活区分（连得上就仍按可用处理，失败后由 su 兜底）；
+			// mini_shizuku 模式一律不尝试——命中的可能是身份未知的 root 服务端，会破坏双轨制契约。
+			return isRootMode() && Shizuku.isRunning();
+		}
 		if (isRootMode()) {
 			return true;
 		}
-		int uid = Shizuku.serverUid();
-		boolean ok = uid == SERVER_UID_SHELL;
+		boolean ok = serverUid == SERVER_UID_SHELL;
 		if (!ok) {
-			KeydroidxLog.i(TAG, "mini_shizuku 模式下服务端身份不符(uid=" + uid
+			KeydroidxLog.i(TAG, "mini_shizuku 模式下服务端身份不符(uid=" + serverUid
 					+ ")，跳过服务端通道（不暗中动用 root 能力）");
 		}
 		return ok;
+	}
+
+	/**
+	 * root 直执兜底门禁：root 模式，且服务端不是 root 身份时才允许起 {@code su}。
+	 * <p><b>为什么服务端是 root 就跳过</b>：此时服务端本身就是 root 通道，同一条命令、
+	 * 同一身份重跑一遍必然同样失败，却会额外 fork 一个 su 进程——root 管理器
+	 * （KernelSU / Magisk 一类）对每次新起的 su 都会弹一次「已授予 xxx root 权限」，
+	 * 一键冻结 N 个包就白弹 N 次（2026-10 真机复现：14 次）。
+	 * <p>服务端离线（uid=-1）或为 shell 身份（uid=2000）时保留兜底（合理且必要）。
+	 */
+	private boolean isRootFallbackAllowed(int serverUid) {
+		return isRootMode() && serverUid != SERVER_UID_ROOT;
+	}
+
+	/**
+	 * 预检：包在本机是否存在（含已冻结/停用但未卸载的包）。
+	 * <p>与 {@link #isAppFrozen} 使用同样的查询方式：包完全不存在（已卸载）时抛
+	 * {@link PackageManager.NameNotFoundException}。冻结名单可能残留其它设备的导入项或
+	 * 已卸载的应用，直接下发 {@code pm} 命令只会得到 "Unknown package"，
+	 * 并触发一次无谓的通道兜底（root 模式下即多一次 su 授权提示）。
+	 */
+	private boolean isPackageInstalled(String packageName) {
+		if (packageName == null) return false;
+		try {
+			PackageManager pm = appContext.getPackageManager();
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+				pm.getApplicationInfo(packageName,
+						PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS);
+			} else {
+				pm.getApplicationInfo(packageName,
+						PackageManager.GET_UNINSTALLED_PACKAGES | PackageManager.GET_DISABLED_COMPONENTS);
+			}
+			return true;
+		} catch (PackageManager.NameNotFoundException e) {
+			return false;
+		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "isPackageInstalled err pkg=" + packageName + " msg=" + e.getMessage());
+			// 查询异常（非"不存在"）时不阻塞流程，交由后续命令与实测状态判定
+			return true;
+		}
+	}
+
+	/**
+	 * 批量 root 兜底：整批命令合并为一个脚本，一次 {@code su} 执行。
+	 * <p>为什么要合并：root 管理器对<b>每一次新起的 su 进程</b>都会弹一次
+	 * 「已授予 xxx root 权限」。逐包调用 {@link #tryRootExecute} 会让一键冻结 N 个包弹 N 次，
+	 * 合并后整批只起一个 su 进程。
+	 * <p>结果确认：脚本内单条命令失败不中断其余命令，故不能只看退出码——
+	 * 执行后逐包 {@link #isAppFrozen} 实测，只有状态真的变了才算成功。
+	 *
+	 * @param pkgs   目标包名（调用方已预检存在性）
+	 * @param freeze true=冻结，false=解冻
+	 * @return 实测状态已变更的包名列表（可能为空）
+	 */
+	private List<String> rootExecuteBatch(Collection<String> pkgs, boolean freeze) {
+		List<String> valid = new ArrayList<>();
+		StringBuilder script = new StringBuilder();
+		for (String pkg : pkgs) {
+			if (!isValidPackageName(pkg)) continue;
+			valid.add(pkg);
+			script.append(freeze ? buildFreezeCmd(pkg) : buildUnfreezeCmd(pkg)).append('\n');
+		}
+		if (valid.isEmpty()) return new ArrayList<>();
+
+		long timeout = Math.min(
+				ROOT_BATCH_TIMEOUT_BASE_MS + ROOT_BATCH_TIMEOUT_PER_PKG_MS * valid.size(),
+				ROOT_BATCH_TIMEOUT_MAX_MS);
+		try {
+			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(appContext, script.toString(), timeout);
+			KeydroidxLog.i(TAG, "root 批量" + (freeze ? "冻结" : "解冻") + "(单次 su): 包数=" + valid.size()
+					+ " code=" + r.code + " out=" + r.out.trim());
+		} catch (Throwable e) {
+			KeydroidxLog.w(TAG, "root 批量执行异常: " + e.getMessage());
+			return new ArrayList<>();
+		}
+
+		List<String> succeeded = new ArrayList<>();
+		for (String pkg : valid) {
+			try {
+				if (isAppFrozen(pkg) == freeze) {
+					succeeded.add(pkg);
+					if (freeze) {
+						markKnownFrozen(pkg);
+					} else {
+						unmarkKnownFrozen(pkg);
+					}
+				}
+			} catch (Throwable e) {
+				KeydroidxLog.w(TAG, "root 批量执行后校验失败: " + pkg + " : " + e.getMessage());
+			}
+		}
+		return succeeded;
 	}
 
 	/**

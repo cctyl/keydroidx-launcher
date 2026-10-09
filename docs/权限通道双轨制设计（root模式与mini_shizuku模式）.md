@@ -483,6 +483,52 @@ freeze(pkg) / unfreeze(pkg):
 
 现有 `EXEC_OUT|` 已支持回写 stdout + `EXIT:<code>`（`MsgProcess.handleExecWithOutput` / `ShellUtil.execWithOutputAndCode`），`Shizuku.execWithOutput` 门面已存在，**无需改协议**。只需把 `executeFreeze`/`executeUnfreeze` 从 `Shizuku.exec()`（静默）切到 `execWithOutput` + 状态校验 + libsu 兜底。
 
+### 5.6 v2.2 修订（2026-10-09 真机）：通道门禁收紧 + 批量单次 su
+
+**现象**：root 模式（服务端 uid=0）+ 一键冻结之后，root 管理器连续弹出「已授予 xxx root 权限」。
+该提示**不是"重新申请授权"**——root 管理器对**每一次新起的 `su` 进程**都会提示一次，
+与授权策略是否早已 grant 无关（一次 `su` = 一次提示）。
+
+**真机证据**（Q968 / Android 13 / `20261009.log`，10:32 一键冻结，名单 36 个包）：
+
+| 项 | 次数 |
+|---|---|
+| 服务端冻结成功 | 21 |
+| 服务端冻结未生效（`java.lang.IllegalArgumentException: Unknown package`，名单中的包在本机并不存在） | 14 |
+| **root 直执（每个包一次 `su -c`）** | **14** |
+
+即：14 个幽灵包各白起一次 `su` → 14 次授权提示。
+
+**三条修订规则（`KeydroidxFreezeManager`）**：
+
+1. **服务端身份只探测一次，作为兜底门禁**：`Shizuku.serverUid()`（WHOAMI）结果
+   0=root / 2000=shell / -1=离线或无法确认（旧版服务端不认识 WHOAMI 时，
+   root 模式回退 `Shizuku.isRunning()` 探活；mini_shizuku 模式一律不尝试，
+   避免命中身份未知的服务端而破坏双轨制契约）。
+2. **服务端是 root 身份时，不再走 root 直执兜底**：
+   `isRootFallbackAllowed(uid) = isRootMode() && uid != 0`。服务端本身已是 root 通道，
+   同一条命令、同一身份重跑一遍必然同样失败，只会多起一次 `su`、多弹一次提示。
+   服务端离线（-1）或为 shell 身份（2000）时仍保留兜底（合理且必要）。
+3. **包存在性预检 + 批量合并**：
+   - `isPackageInstalled()`（`getApplicationInfo` + `MATCH_UNINSTALLED_PACKAGES|MATCH_DISABLED_COMPONENTS`；
+     `NameNotFoundException` 视为"不存在"；已冻结/停用的包不会被误判）在单包与批量路径
+     下发命令**之前**预检。名单里的残留条目（应用已卸载 / 来自其它设备的导入项）直接跳过：
+     跳过数量**只记日志**（`freezeAll: 跳过本机不存在的包: <pkg>`），完成提示保持
+     「已一键冻结 S/T 个应用」——残余名单属既有数据，不必每次操作都提醒用户（2026-10-09 用户要求；
+     名单项**不做自动清理**，由用户自行决定是否移出）。仅当名单项全部不存在时才提示
+     「冻结名单中的 N 个应用在本机均不存在」。
+   - `freezeAll`/`unfreezeAll` 整批只探测一次服务端身份；服务端不可用且为 root 模式时，
+     整批命令合并为一个脚本、**一次 `su`** 执行（`rootExecuteBatch`，超时 = 8s + 3s/包，上限 60s），
+     随后逐包 `isAppFrozen` 实测校验。服务端在线时仍逐包走 TCP（不弹 `su`）。
+     服务端白名单（§6.2）本就支持 `;` 拼接的批量命令，无需改服务端。
+
+**回归验证（2026-10-09，同一设备）**：修复后连续两次一键冻结，均只产生 14 条
+`freezeAll: 跳过本机不存在的包`、`root 直执` 新增 **0** 次、无任何 `su` 调用，授权提示不再连续弹出。
+同日二次验证（提示文案调整）：完成提示实测为「已一键冻结 22/22 个应用」，不再包含跳过数量。
+
+> 与 §5.3 的关系：两级路由本身不变（服务端优先 + 真实状态校验），只是把"root 兜底"的触发条件
+> 从"处于 root 模式"收紧为"root 模式 **且** 服务端不是 root 身份"。
+
 ---
 
 ## 6. 关键技术点 3：root 模式服务端 EXEC 白名单（v2 新增）
@@ -686,6 +732,7 @@ int main() {
 ## 10. 不做的事（明确边界）
 
 - **不做任意操作的动态降级链**：冻结/解冻的"服务端 → libsu"是**固定两级路由**，不是通用动态降级；其他操作不自动切换通道。这是本方案相对"降级链方案"的核心简化。
+- **不在服务端已是 root 身份时再走 `su` 兜底**（v2.2，见 §5.6）：服务端本身就是 root 通道，重复执行只会多起一次 `su`、多弹一次「已授予 xxx root 权限」。
 - **不做 root 降权拉起 shell 服务端**（v2 砍掉 v1 §5）：`nativeDropToShell` 不再设计、不再实现。
 - **不把 root 当 adb 的换身份版**：root 模式下服务端真正以 root 身份跑（补组后保 root uid），发挥 root 超集能力；不降权。
 - **不重写拦截器常驻承载**：root 模式复用 mini_shizuku 服务端承载拦截器（前提是步骤 0 验证通过）。
@@ -708,6 +755,7 @@ int main() {
 | `nokia/KeydroidxSettingsStorage.java` | 新增"授权模式"偏好（root / shizuku，默认 shizuku） | 下一阶段 |
 | 设置页 Fragment | 新增"授权模式"单选项 + 状态展示拆两行 | 下一阶段 |
 | core `MiniShizukuClient` / `mini_shizuku/Shizuku.java` | 不动（`execWithOutput` 已实现） | — |
+| `nokia/KeydroidxFreezeManager.java` | v2.2 修订：服务端身份一次性探测 + root 兜底门禁（服务端为 root 时跳过 `su`）+ 包存在性预检 + 批量合并单次 `su`（见 §5.6） | 2026-10-09 |
 
 协议层、服务端主链路（除白名单/WHOAMI 外）、拦截器、输入注入快路径：**不动**。
 
