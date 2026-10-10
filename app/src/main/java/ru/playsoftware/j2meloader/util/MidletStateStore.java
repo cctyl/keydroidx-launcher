@@ -2,7 +2,6 @@ package ru.playsoftware.j2meloader.util;
 
 import android.app.ActivityManager;
 import android.content.Context;
-import android.util.Log;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.File;
@@ -64,9 +63,9 @@ public final class MidletStateStore {
 				//noinspection ResultOfMethodCallIgnored
 				tmp.renameTo(file);
 			}
-			Log.i(TAG, "write: " + appName + " pid=" + props.getProperty(KEY_PID));
+			KeydroidxLog.i(TAG, "write: " + appName + " pid=" + props.getProperty(KEY_PID));
 		} catch (IOException e) {
-			Log.e(TAG, "write failed", e);
+			KeydroidxLog.e(TAG, "write failed", e);
 		}
 	}
 
@@ -74,9 +73,9 @@ public final class MidletStateStore {
 	public static void clear(Context context) {
 		File file = stateFile(context);
 		if (file.exists() && !file.delete()) {
-			Log.w(TAG, "clear: delete failed");
+			KeydroidxLog.w(TAG, "clear: delete failed");
 		}
-		Log.i(TAG, "clear");
+		KeydroidxLog.i(TAG, "clear");
 	}
 
 	/**
@@ -91,7 +90,7 @@ public final class MidletStateStore {
 		try (FileInputStream fis = new FileInputStream(file)) {
 			props.load(fis);
 		} catch (IOException e) {
-			Log.e(TAG, "getRunning: read failed", e);
+			KeydroidxLog.e(TAG, "getRunning: read failed", e);
 			return null;
 		}
 		String appPath = props.getProperty(KEY_APP_PATH, "");
@@ -106,7 +105,7 @@ public final class MidletStateStore {
 		if (appPath.isEmpty()) return null;
 		if (!isMidletProcessAlive(context, pid)) {
 			// LMK 杀进程 / 崩溃残留：清掉脏文件
-			Log.w(TAG, "getRunning: :midlet 进程已死，清理残留状态 (app=" + appName + ")");
+			KeydroidxLog.w(TAG, "getRunning: :midlet 进程已死，清理残留状态 (app=" + appName + ")");
 			//noinspection ResultOfMethodCallIgnored
 			file.delete();
 			return null;

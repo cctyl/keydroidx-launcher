@@ -159,17 +159,25 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
 
 ### 8.1 接入与使用规范
 1. **Application 初始化**：
-   ```kotlin
-   KeydroidxLog.setTag("KeydroidX-Music")
-   KeydroidxLog.init(this) // 自动读取详细日志开关决定落盘级别
-   KeydroidxLog.installCrashHandler(this) // 崩溃自动抓取瞬时落盘
+   ```java
+   // 可选：设置全局默认 TAG。不设置时，init() 会自动以「应用名称」作为默认 TAG。
+   // KeydroidxLog.setTag("KeydroidxDesktop");
+   KeydroidxLog.init(this);                // 自动读取详细日志开关决定落盘级别
+   KeydroidxLog.installCrashHandler(this); // 崩溃自动抓取瞬时落盘
    ```
-2. **业务代码打印（零成本桥接）**：
-   - 在 Kotlin 文件头部添加别名导入，现有 `Log.d/i/w/e` 代码无需改动即可自动享受分级过滤与落盘：
-     ```kotlin
-     import io.github.cctyl.keydroidx.music.util.NLog as Log
+2. **业务代码打印（本工程为 Java，直接调用 `KeydroidxLog`，禁止 `android.util.Log`）**：
+   - **TAG 位置说明**：`KeydroidxLog.d(tag, msg)` 的第一个字符串参数是「本条日志的来源标识」，按优先级解析——
+     ① 显式传入的非空 TAG 优先；② 不传 TAG（单参数重载）或传 `null`/空串时，回退到全局默认 TAG
+     （`KeydroidxLog.setTag(...)` 的值；未设置自定义 TAG——未调用或已清除——时，由 `init(this)` 自动以**应用名称**兜底）。
+   - TAG 填「模块 / 类名」这类有意义的名字，**禁止写死为字面量 `"Tag"`**：
+     ```java
+     KeydroidxLog.d("Desktop", "刷新页面栏");   // TAG = Desktop
+     KeydroidxLog.e("Desktop", "加载失败", tr); // TAG = Desktop
+     KeydroidxLog.d("刷新页面栏");              // TAG = 默认（setTag 值 / 应用名称）
      ```
-   - 或直接调用：`KeydroidxLog.d("Tag", "msg")`、`KeydroidxLog.e("Tag", "msg", throwable)`。
+   - **TAG 常量规范（强制）**：每类定义 `private static final String TAG = "<短名>";`（类简名去 `Keydroidx` 前缀，如 `Menu` / `SettingsStorage`），**长度 ≤ 23 字符**；**已定义 `TAG` 常量的文件，调用处只引用 `TAG`**，禁止再写字面量——否则 `grep TAG` 找到的不是真 tag，实机 `adb logcat -s <tag>:*` 会扑空。新增代码一律先定义常量；存量未定义常量的文件在其被改动时顺带补齐。零引用的 TAG 常量直接删除；**不要用 `Class.getSimpleName()` 自动取 tag**（release 开混淆后会输出 `a`/`b`/`c`，tag 反而不稳定）。
+   - **允许直调 `android.util.Log` 的场景（仅此几类）**：门面 `init()` 之前的早期代码 / `:midlet` 子进程 / 崩溃链与上报门面自身（防递归）/ `mini_shizuku` 服务端与其 Provider 组件 / J2ME 移植层（`javax.*`、`org.microemu.*`、`com.*`、`mmpp.*`）。其余一律走 `KeydroidxLog`。
+   - **自检**：`.\tools\log-tags\check-log-tags.ps1`（退出码 0 = 无偏离，可接 CI）。
 3. **日志分级与持久化开关**：
    - **详细日志关闭（默认/Release）**：仅记录 `ERROR` 与 `FATAL` 崩溃堆栈，零文件 I/O 损耗。
    - **详细日志开启（Debug/排查）**：记录所有 `DEBUG`、`INFO`、`WARN` 业务日志。

@@ -37,7 +37,7 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  * 页面结构：状态行（root 权限可用性 + 服务在线状态）+ 操作列表（root 激活 / 刷新状态）。
  */
 public class ShizukuRootFragment extends KeydroidxListPageFragment {
-	private static final String TAG = "ShizukuRootFragment";
+	private static final String TAG = "ShizukuRoot";
 
 
 	private static final String[] ACTION_NAMES = {
@@ -157,11 +157,11 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	 */
 	private void activateRoot() {
 		if (!KeydroidxShizukuActivator.tryLockActivation()) {
-			KeydroidxLog.w("ShizukuRoot", "已有 root 激活正在进行，忽略重复点击");
+			KeydroidxLog.w(TAG, "已有 root 激活正在进行，忽略重复点击");
 			Toast.makeText(requireContext(), "正在激活中，请稍候…", Toast.LENGTH_SHORT).show();
 			return;
 		}
-		KeydroidxLog.i("ShizukuRoot", "开始 root 激活");
+		KeydroidxLog.i(TAG, "开始 root 激活");
 		if (statusText != null) {
 			statusText.setText("正在通过 root 激活...");
 		}
@@ -174,7 +174,7 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 					//    用户允许后脚本才真正执行（超时 15s，见 KeydroidxRootShell）。
 					boolean execOk = startServerAsRoot();
 					if (!execOk) {
-						KeydroidxLog.e("ShizukuRoot", "root 激活失败：无 root 或 su 授权被拒");
+						KeydroidxLog.e(TAG, "root 激活失败：无 root 或 su 授权被拒");
 						mainHandler.post(new Runnable() {
 							@Override
 							public void run() {
@@ -221,7 +221,7 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 					if (!ok) {
 						collectActivationDiagnostics();
 					}
-					KeydroidxLog.i("ShizukuRoot", "root 激活结果: online=" + online + " execOk=true"
+					KeydroidxLog.i(TAG, "root 激活结果: online=" + online + " execOk=true"
 							+ (ok ? " serverUid=" + finalServerUid : ""));
 					mainHandler.post(new Runnable() {
 						@Override
@@ -261,15 +261,15 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	 */
 	private Boolean isRootAvailable() {
 		if (Build.VERSION.SDK_INT < 19) {
-			KeydroidxLog.w("ShizukuRoot", "root 检测跳过: SDK " + Build.VERSION.SDK_INT + " < 19");
+			KeydroidxLog.w(TAG, "root 检测跳过: SDK " + Build.VERSION.SDK_INT + " < 19");
 			return Boolean.FALSE;
 		}
 		try {
 			boolean ok = KeydroidxRootShell.isRootAvailable(requireContext());
-			KeydroidxLog.i("ShizukuRoot", "root 检测(状态): " + ok);
+			KeydroidxLog.i(TAG, "root 检测(状态): " + ok);
 			return ok;
 		} catch (Exception e) {
-			KeydroidxLog.w("ShizukuRoot", "root 检测异常: " + e.getMessage());
+			KeydroidxLog.w(TAG, "root 检测异常: " + e.getMessage());
 			return Boolean.FALSE;
 		}
 	}
@@ -339,12 +339,12 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 					+ "echo \"$L\"; "
 					+ "echo '=== END ==='";
 			KeydroidxRootShell.Result r = KeydroidxRootShell.exec(requireContext(), diag, 10000);
-			KeydroidxLog.e("ShizukuRoot", "root 激活失败诊断(exit " + r.code + "):\n" + r.out);
+			KeydroidxLog.e(TAG, "root 激活失败诊断(exit " + r.code + "):\n" + r.out);
 			// 保险起见多一步：把整个 minishizuku.log 原样复制到 KeydroidxLog 日志目录，
 			// 保留完整原始文件（内联 tail 只截了 80 行），方便事后排查 / 寄回。
 			copyMinishizukuLog();
 		} catch (Exception e) {
-			KeydroidxLog.e("ShizukuRoot", "collect diagnostics failed", e);
+			KeydroidxLog.e(TAG, "collect diagnostics failed", e);
 		}
 	}
 
@@ -361,7 +361,7 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	private void copyMinishizukuLog() {
 		File logDir = KeydroidxLog.getLogDir();
 		if (logDir == null) {
-			KeydroidxLog.w("ShizukuRoot", "copy minishizuku.log skipped: KeydroidxLog dir not initialized");
+			KeydroidxLog.w(TAG, "copy minishizuku.log skipped: KeydroidxLog dir not initialized");
 			return;
 		}
 		String name = "minishizuku_"
@@ -380,14 +380,14 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 			// 旧写法无论成败都只记一句 i，事后无法判断「原始服务端日志到底有没有随包寄回」——
 			// 2026-09-29 那份上报里就没有 minishizuku_*.log，只能反推复制没生效。
 			if (target.isFile() && target.length() > 0) {
-				KeydroidxLog.i("ShizukuRoot", "copied minishizuku.log -> " + target.getAbsolutePath()
+				KeydroidxLog.i(TAG, "copied minishizuku.log -> " + target.getAbsolutePath()
 						+ " (" + target.length() + " bytes, exit " + r.code + ") " + r.out.trim());
 			} else {
 				// 诊断链路自身的失败按规范记 w（e 会再落一次上报标记）
-				KeydroidxLog.w("ShizukuRoot", "复制 minishizuku.log 失败(exit " + r.code + "): " + r.out.trim());
+				KeydroidxLog.w(TAG, "复制 minishizuku.log 失败(exit " + r.code + "): " + r.out.trim());
 			}
 		} catch (Exception e) {
-			KeydroidxLog.w("ShizukuRoot", "copy minishizuku.log failed", e);
+			KeydroidxLog.w(TAG, "copy minishizuku.log failed", e);
 		}
 	}
 
@@ -404,11 +404,11 @@ public class ShizukuRootFragment extends KeydroidxListPageFragment {
 	private void onAction(int index) {
 		switch (index) {
 			case 0:
-				KeydroidxLog.i("ShizukuRoot", "点击 root 激活");
+				KeydroidxLog.i(TAG, "点击 root 激活");
 				activateRoot();
 				break;
 			case 1:
-				KeydroidxLog.i("ShizukuRoot", "点击刷新状态");
+				KeydroidxLog.i(TAG, "点击刷新状态");
 				refreshStatus();
 				break;
 			default:

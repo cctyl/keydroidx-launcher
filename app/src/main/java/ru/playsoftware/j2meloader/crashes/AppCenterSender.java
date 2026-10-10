@@ -18,7 +18,6 @@ package ru.playsoftware.j2meloader.crashes;
 
 import android.content.Context;
 import android.os.Build;
-import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -41,6 +40,7 @@ import java.util.Map;
 
 import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.util.Constants;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
 public class AppCenterSender implements ReportSender {
 	private static final String TAG = AppCenterSender.class.getName();
@@ -60,9 +60,9 @@ public class AppCenterSender implements ReportSender {
 		HurlStack hurlStack = new HurlStack(null, forceTls12 ? new TLSSocketFactory(context) : null);
 		RequestQueue queue = Volley.newRequestQueue(context, hurlStack);
 		StringRequest postRequest = new StringRequest(Request.Method.POST, BASE_URL,
-				response -> Log.d(TAG, "send success: " + response),
+				response -> KeydroidxLog.d(TAG, "send success: " + response),
 				error -> {
-					Log.e(TAG, "Response error", error);
+					KeydroidxLog.w(TAG, "Response error", error);
 					String logFile = Config.getEmulatorDir() + "/crash.txt";
 					try (FileOutputStream fos = new FileOutputStream(logFile)) {
 						String logcat = report.getString(ReportField.LOGCAT);

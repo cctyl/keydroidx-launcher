@@ -25,7 +25,7 @@ import ru.playsoftware.j2meloader.R;
  * 允许高分辨率用户直接输入任意比例值（0.5 ~ 3.0）。
  */
 public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
-	private static final String TAG = "KeydroidxCustomFontScaleFragment";
+	private static final String TAG = "CustomFontScale";
 
 	private EditText etCustomScale;
 	private TextView tvPreviewText;

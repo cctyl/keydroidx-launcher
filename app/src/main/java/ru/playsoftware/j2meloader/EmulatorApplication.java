@@ -59,7 +59,7 @@ import ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage;
 import ru.playsoftware.j2meloader.util.Constants;
 
 public class EmulatorApplication extends Application {
-	private static final String TAG = "EmulatorApplication";
+	private static final String TAG = "EmulatorApp";
 
 	private static final String[] VALID_SIGNATURES = {
 			"78EF7758720A9902F731ED706F72C669C39B765C", // GPlay
@@ -148,7 +148,7 @@ public class EmulatorApplication extends Application {
 			initAcra();
 		}
 		long elapsed = System.currentTimeMillis() - appStart;
-		android.util.Log.i("EmulatorApp", "attachBaseContext 完成，耗时 " + elapsed + "ms");
+		android.util.Log.i(TAG, "attachBaseContext 完成，耗时 " + elapsed + "ms");
 	}
 
 	/** 每日一次自动检查更新（仅主进程，延迟触发以避开冷启动关键路径）。 */
@@ -203,7 +203,7 @@ public class EmulatorApplication extends Application {
 		// ACRA 已注册自己的默认异常处理器，重新包装为「先落盘崩溃堆栈，再交给 ACRA」的链式处理。
 		installCrashHandler();
 		long elapsed = System.currentTimeMillis() - start;
-		android.util.Log.i("EmulatorApp", "ACRA 初始化完成，耗时 " + elapsed + "ms");
+		android.util.Log.i(TAG, "ACRA 初始化完成，耗时 " + elapsed + "ms");
 	}
 
 	/**
@@ -223,9 +223,9 @@ public class EmulatorApplication extends Application {
 					System.exit(1);
 				}
 			});
-			android.util.Log.i("EmulatorApp", "崩溃落盘处理器已安装");
+			android.util.Log.i(TAG, "崩溃落盘处理器已安装");
 		} catch (Exception e) {
-			android.util.Log.w("EmulatorApp", "installCrashHandler 失败", e);
+			android.util.Log.w(TAG, "installCrashHandler 失败", e);
 		}
 	}
 

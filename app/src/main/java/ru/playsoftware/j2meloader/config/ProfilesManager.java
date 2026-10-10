@@ -17,7 +17,6 @@
 package ru.playsoftware.j2meloader.config;
 
 import android.os.Build;
-import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -40,6 +39,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import ru.playsoftware.j2meloader.util.FileUtils;
 import ru.playsoftware.j2meloader.util.XmlUtils;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
 public class ProfilesManager {
 
@@ -116,7 +116,7 @@ public class ProfilesManager {
 				params = gson.fromJson(reader, ProfileModel.class);
 				params.dir = dir;
 			} catch (Exception e) {
-				Log.e(TAG, "loadConfig: ", e);
+				KeydroidxLog.e(TAG, "loadConfig: ", e);
 			}
 		}
 		if (params == null) {
@@ -132,10 +132,10 @@ public class ProfilesManager {
 						params.vkButtonShape = VirtualKeyboard.ROUND_RECT_SHAPE;
 					}
 					if (saveConfig(params) && oldFile.delete()) {
-						Log.d(TAG, "loadConfig: old config file deleted");
+						KeydroidxLog.d(TAG, "loadConfig: old config file deleted");
 					}
 				} catch (Exception e) {
-					Log.e(TAG, "loadConfig: ", e);
+					KeydroidxLog.e(TAG, "loadConfig: ", e);
 				}
 			}
 		}
@@ -176,7 +176,7 @@ public class ProfilesManager {
 			writer.close();
 			return true;
 		} catch (Exception e) {
-			Log.e(TAG, "saveConfig: ", e);
+			KeydroidxLog.e(TAG, "saveConfig: ", e);
 		}
 		return false;
 	}

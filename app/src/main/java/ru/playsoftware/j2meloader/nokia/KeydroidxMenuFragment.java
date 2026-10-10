@@ -61,7 +61,7 @@ import ru.playsoftware.j2meloader.R;
  * 末尾追加「百宝箱」「按键绑定」两个特殊入口，保留原功能可达性。
  */
 public class KeydroidxMenuFragment extends KeydroidxPageFragment {
-	private static final String TAG = "KeydroidxMenuFragment";
+	private static final String TAG = "Menu";
 
 
 	/**
@@ -209,7 +209,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	private void handleAppListBroadcast(Intent intent) {
 		String action = intent.getAction();
 		if (action == null) return;
-		KeydroidxLog.i("Menu", "收到包变化广播: " + action + " data=" + intent.getDataString());
+		KeydroidxLog.i(TAG, "收到包变化广播: " + action + " data=" + intent.getDataString());
 
 		// 冻结状态变化：列表内容不变，只需重绘当前页的冰块/角标（轻量，主线程直接做）
 		if (KeydroidxFreezeManager.ACTION_FREEZE_STATE_CHANGED.equals(action)) {
@@ -222,7 +222,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				boolean expectedFrozen = intent.getBooleanExtra(
 						KeydroidxFreezeManager.EXTRA_FROZEN, false);
 				frozenStateCache.put(changedPkg, expectedFrozen);
-				KeydroidxLog.d("Menu", "预写冻结缓存: " + changedPkg + " -> " + expectedFrozen);
+				KeydroidxLog.d(TAG, "预写冻结缓存: " + changedPkg + " -> " + expectedFrozen);
 			} else {
 				// 一键冻结/解冻走批量路径：携带整包名列表 + 预期状态。
 				ArrayList<String> batch = intent.getStringArrayListExtra(
@@ -233,7 +233,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 					for (String p : batch) {
 						frozenStateCache.put(p, expectedFrozen);
 					}
-					KeydroidxLog.d("Menu", "批量预写冻结缓存: " + batch.size()
+					KeydroidxLog.d(TAG, "批量预写冻结缓存: " + batch.size()
 							+ " 个 -> " + expectedFrozen);
 				}
 			}
@@ -336,9 +336,9 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		try {
 			ContextCompat.registerReceiver(requireContext(), packageReceiver, pkgFilter,
 					ContextCompat.RECEIVER_NOT_EXPORTED);
-			KeydroidxLog.i("Menu", "已注册包变化广播接收器（ADDED/REMOVED/REPLACED）");
+			KeydroidxLog.i(TAG, "已注册包变化广播接收器（ADDED/REMOVED/REPLACED）");
 		} catch (Exception e) {
-			KeydroidxLog.e("Menu", "注册包变化广播失败", e);
+			KeydroidxLog.e(TAG, "注册包变化广播失败", e);
 		}
 
 		IntentFilter freezeFilter = new IntentFilter();
@@ -350,9 +350,9 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			// 冻结广播来自系统与应用自身，声明 NOT_EXPORTED。
 			ContextCompat.registerReceiver(requireContext(), freezeReceiver, freezeFilter,
 					ContextCompat.RECEIVER_NOT_EXPORTED);
-			KeydroidxLog.i("Menu", "已注册冻结状态广播接收器");
+			KeydroidxLog.i(TAG, "已注册冻结状态广播接收器");
 		} catch (Exception e) {
-			KeydroidxLog.e("Menu", "注册冻结状态广播失败", e);
+			KeydroidxLog.e(TAG, "注册冻结状态广播失败", e);
 		}
 
 		// 进入功能表时主动校正冻结缓存——这是本 Bug 的兜底修复：
@@ -369,7 +369,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			prewritten++;
 		}
 		if (prewritten > 0) {
-			KeydroidxLog.i("Menu", "进入功能表预写冻结缓存: " + prewritten + " 个（来自桌面已知冻结集）");
+			KeydroidxLog.i(TAG, "进入功能表预写冻结缓存: " + prewritten + " 个（来自桌面已知冻结集）");
 		}
 
 		appGrid = view.findViewById(R.id.appGrid);
@@ -399,7 +399,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		if (hadCache && panelReady) {
 			buildCurrentPage();
 			applyInitialFocus();
-			KeydroidxLog.i("Menu", "复用进程内应用列表缓存，首帧直接构建：" + items.size() + " 项");
+			KeydroidxLog.i(TAG, "复用进程内应用列表缓存，首帧直接构建：" + items.size() + " 项");
 		}
 		final boolean builtFirstPage = hadCache && panelReady;
 
@@ -420,7 +420,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 					buildCurrentPage();
 					applyInitialFocus();
 				}
-				KeydroidxLog.i("Menu", "功能表初始化完成：共 " + items.size()
+				KeydroidxLog.i(TAG, "功能表初始化完成：共 " + items.size()
 						+ " 项，" + totalPages + " 页，每页 " + perPage
 						+ " 格（" + COLS + "×" + rowsPerPage + "）");
 				// 图标外观变化（换图标 / 恢复默认图标返回）：只就地重算图标，
@@ -459,7 +459,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			// 图标本身由 refreshIconsAsync() 就地重算替换。
 			String currentState = KeydroidxSettingsStorage.getIconStateFingerprint(requireContext());
 			if (!currentState.equals(cachedIconState)) {
-				KeydroidxLog.i("Menu", "图标外观已变化（" + cachedIconState + " → " + currentState
+				KeydroidxLog.i(TAG, "图标外观已变化（" + cachedIconState + " → " + currentState
 						+ "），保留当前页与焦点，改为就地刷新图标");
 				markIconAppearanceChanged();
 			}
@@ -508,7 +508,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 						if (!forceIconRebuild && (isSameMenuList(built, items)
 								|| isSameItemSet(built, items))) {
 							forceIconRebuild = false;
-							KeydroidxLog.d("Menu", "后台校准：应用列表无变化，跳过重建");
+							KeydroidxLog.d(TAG, "后台校准：应用列表无变化，跳过重建");
 							return;
 						}
 						forceIconRebuild = false;
@@ -532,7 +532,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 						} else {
 							setFocusPos(0);
 						}
-						KeydroidxLog.i("Menu", "后台枚举完成并构建：共 " + items.size() + " 项，"
+						KeydroidxLog.i(TAG, "后台枚举完成并构建：共 " + items.size() + " 项，"
 								+ totalPages + " 页");
 						// 图标包映射表在本方法（后台线程）内已按需解析完成，
 						// 因此列表构建完成即图标即最终态，无需再异步补刷（详见 KeydroidxIconResolver）
@@ -633,14 +633,14 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	public void onDestroyView() {
 		try {
 			requireContext().unregisterReceiver(packageReceiver);
-			KeydroidxLog.i("Menu", "已注销包变化广播接收器");
+			KeydroidxLog.i(TAG, "已注销包变化广播接收器");
 		} catch (Exception ignore) {
 			KeydroidxLog.w(TAG, "unregister package receiver failed failed: " + ignore.getMessage());
 			// 未注册或已注销，忽略
 		}
 		try {
 			requireContext().unregisterReceiver(freezeReceiver);
-			KeydroidxLog.i("Menu", "已注销冻结状态广播接收器");
+			KeydroidxLog.i(TAG, "已注销冻结状态广播接收器");
 		} catch (Exception ignore) {
 			KeydroidxLog.w(TAG, "unregister freeze receiver failed failed: " + ignore.getMessage());
 			// 未注册或已注销，忽略
@@ -661,7 +661,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		int panelH = host.getMidPanelHeight();
 		if (panelH <= 0) {
 			// panelH 尚未布局完成，保持默认值，稍后由 post 回调重新计算
-			KeydroidxLog.w("Menu", "computeRowsPerPage: panelH 尚未可用，保持默认 rowsPerPage=" + rowsPerPage);
+			KeydroidxLog.w(TAG, "computeRowsPerPage: panelH 尚未可用，保持默认 rowsPerPage=" + rowsPerPage);
 			return;
 		}
 		float density = getResources().getDisplayMetrics().density;
@@ -685,7 +685,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		rows = Math.max(2, Math.min(8, rows));
 		rowsPerPage = rows;
 		perPage = COLS * rowsPerPage;
-		KeydroidxLog.i("Menu", "computeRowsPerPage: rowsPerPage=" + rowsPerPage
+		KeydroidxLog.i(TAG, "computeRowsPerPage: rowsPerPage=" + rowsPerPage
 				+ " panelH=" + panelH + " scale=" + scale + " density=" + density
 				+ " fontScale=" + fontScale + " iconBoxDp=" + iconBoxDp(fontScale)
 				+ " minSafeRowHDp=" + minSafeRowHDp
@@ -723,7 +723,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		// 那会把停用组件（主题别名、CarPlay 入口）与卸载残留包也枚举进来，
 		// 导致启动报 ActivityNotFoundException 或同包出现多个图标。
 		List<ResolveInfo> list = pm.queryIntentActivities(main, 0);
-		KeydroidxLog.i("Menu", "queryIntentActivities (仅启用应用) 返回 " + list.size() + " 个可启动应用");
+		KeydroidxLog.i(TAG, "queryIntentActivities (仅启用应用) 返回 " + list.size() + " 个可启动应用");
 
 		// 先全部放入临时池 pool，后续再按固定槽位提取
 		List<KeydroidxAppItem> pool = new ArrayList<>();
@@ -732,26 +732,26 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		for (ResolveInfo ri : list) {
 			ActivityInfo ai = ri.activityInfo;
 			if (ai == null) {
-				KeydroidxLog.w("Menu", "跳过空 activityInfo");
+				KeydroidxLog.w(TAG, "跳过空 activityInfo");
 				continue;
 			}
 			boolean appEnabled = ai.applicationInfo == null || ai.applicationInfo.enabled;
 			boolean compEnabled = ai.enabled && appEnabled;
-			KeydroidxLog.d("Menu", "枚举入口: " + ai.packageName + "/" + ai.name
+			KeydroidxLog.d(TAG, "枚举入口: " + ai.packageName + "/" + ai.name
 					+ " enabled=" + compEnabled
 					+ " (componentEnabled=" + ai.enabled
 					+ ", appEnabled=" + appEnabled + ")");
 			if (ai.packageName.equals(selfPkg)) {
-				KeydroidxLog.d("Menu", "排除桌面自身: " + ai.packageName);
+				KeydroidxLog.d(TAG, "排除桌面自身: " + ai.packageName);
 				continue;
 			}
 			// 过滤同应用的多图标入口（如部分应用提供的多种样式启动别名）
 			if (!seenPackages.add(ai.packageName)) {
-				KeydroidxLog.d("Menu", "跳过重复包名入口: " + ai.packageName + "/" + ai.name
+				KeydroidxLog.d(TAG, "跳过重复包名入口: " + ai.packageName + "/" + ai.name
 						+ " (首个入口已选中)");
 				continue;
 			}
-			KeydroidxLog.d("Menu", "选中入口: " + ai.packageName + "/" + ai.name
+			KeydroidxLog.d(TAG, "选中入口: " + ai.packageName + "/" + ai.name
 					+ " enabled=" + compEnabled);
 			// 应用名走进程内缓存，避免每次进入功能表重复 loadLabel IPC
 			String labelKey = ai.packageName + "/" + ai.name;
@@ -793,7 +793,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			for (String pkg : PINNED_SLOTS[s]) {
 				hit = pollByPackage(pool, pkg);
 			if (hit != null) {
-				KeydroidxLog.d("Menu", "固定槽位 " + (s + 1) + " 命中: " + pkg + " -> " + hit.label);
+				KeydroidxLog.d(TAG, "固定槽位 " + (s + 1) + " 命中: " + pkg + " -> " + hit.label);
 				// 固定槽位图标属于内置 S60 图标包：仅当前使用内置 S60 时套用；
 				// 已切到外部图标包 / 不使用图标包时保留图标包解析结果或应用原图标。
 				// 例外：用户在功能表里手动指定过图标（单应用覆盖）时，用户的选择优先级最高，
@@ -801,13 +801,13 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				String pinnedPkg = hit.launchIntent != null && hit.launchIntent.getComponent() != null
 						? hit.launchIntent.getComponent().getPackageName() : null;
 				if (pinnedPkg != null && KeydroidxSettingsStorage.hasIconOverride(appCtx, pinnedPkg)) {
-					KeydroidxLog.d("Menu", "  -> 该应用存在图标覆盖，保留用户指定图标（不动固定槽位图标）");
+					KeydroidxLog.d(TAG, "  -> 该应用存在图标覆盖，保留用户指定图标（不动固定槽位图标）");
 				} else if (isBuiltinPackActive(appCtx)) {
 					Drawable s60icon = safeDrawable(appCtx, PINNED_SLOT_ICONS[s]);
 					if (s60icon != null) {
 						s60icon.setFilterBitmap(false);
 						hit.icon = s60icon;
-						KeydroidxLog.d("Menu", "  -> 已替换为固定槽位 S60 图标");
+						KeydroidxLog.d(TAG, "  -> 已替换为固定槽位 S60 图标");
 					}
 				}
 				break;
@@ -816,7 +816,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		if (hit != null) {
 			pinned.add(hit);
 			} else {
-				KeydroidxLog.d("Menu", "固定槽位 " + (s + 1) + " 未命中，跳过（候选包均不存在）");
+				KeydroidxLog.d(TAG, "固定槽位 " + (s + 1) + " 未命中，跳过（候选包均不存在）");
 			}
 	}
 
@@ -836,7 +836,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	Drawable mainIcon = safeDrawable(appCtx, R.mipmap.ic_launcher);
 	if (mainIcon == null) mainIcon = boxIcon;
 	result.add(new KeydroidxAppItem(KeydroidxAppItem.TYPE_MAIN, "J2ME Loader", mainIcon, null));
-	KeydroidxLog.d("Menu", "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入 J2meLoaderActivity）");
+	KeydroidxLog.d(TAG, "已追加特殊入口：J2ME 加载器（TYPE_MAIN，进入 J2meLoaderActivity）");
 	// 通知中心：读取系统通知并展示，可清除（见 docs/通知中心功能设计.md）
 	Drawable notifIcon = io.github.cctyl.nokia.common.ui.KeydroidxIcons.get(appCtx,
 			io.github.cctyl.nokia.common.ui.KeydroidxIcons.ICON_NOTIFICATIONS, 0xFFFFFFFF, 20);
@@ -861,9 +861,9 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		result.addAll(matchedPool);
 		result.addAll(unmatchedPool);
 
-		KeydroidxLog.i("Menu", "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 匹配 " + matchedPool.size()
+		KeydroidxLog.i(TAG, "最终列表（固定槽位 " + pinned.size() + " + 特殊入口 + 匹配 " + matchedPool.size()
 				+ " + 未匹配 " + unmatchedPool.size() + "）共 " + result.size() + " 项");
-		KeydroidxLog.i("Menu", "buildAppList 耗时 " + (System.currentTimeMillis() - loadStart)
+		KeydroidxLog.i(TAG, "buildAppList 耗时 " + (System.currentTimeMillis() - loadStart)
 				+ "ms（枚举 + label，不含系统图标 IPC）");
 		// 记录本次构建用的图标外观指纹：图标偏好变化后缓存自动失效
 		cachedIconState = KeydroidxSettingsStorage.getIconStateFingerprint(appCtx);
@@ -876,14 +876,14 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		*/
 		private void refreshAppList() {
 		if (!isAdded() || getView() == null) return;
-		KeydroidxLog.i("Menu", "刷新应用列表（包变化触发）");
+		KeydroidxLog.i(TAG, "刷新应用列表（包变化触发）");
 		int oldPage = pageIndex;
 		int oldFocus = focusPos;
 		// 缓存已失效，走后台重新枚举（不再在主线程做重 IPC），完成后恢复原页码与焦点
 		refreshKeepPosition = true;
 		invalidateCachedItems();
 		loadAppsAsync();
-		KeydroidxLog.d("Menu", "已提交后台刷新：page=" + (oldPage + 1) + " focus=" + oldFocus);
+		KeydroidxLog.d(TAG, "已提交后台刷新：page=" + (oldPage + 1) + " focus=" + oldFocus);
 		}
 
 		/**
@@ -926,7 +926,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			if (iconRefreshRunning) return;
 			final String newState = KeydroidxSettingsStorage.getIconStateFingerprint(requireContext());
 			if (!TextUtils.equals(packIdOf(staleIconState), packIdOf(newState))) {
-				KeydroidxLog.i("Menu", "检测到全局图标包切换（" + staleIconState + " → " + newState
+				KeydroidxLog.i(TAG, "检测到全局图标包切换（" + staleIconState + " → " + newState
 						+ "），改走后台重建（页码与焦点保持不变）");
 				// 本次交给后台重建负责：forceIconRebuild 保持置位（重建落地后才清），
 				// 这里先复位「待就地刷新」标记，避免每次进入功能表都重复走这个分支
@@ -977,7 +977,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 					} catch (Exception e) {
 						// 取图异常：保持 forceIconRebuild 置位，交给后台校准重建兜底
 						ok = false;
-						KeydroidxLog.w("Menu", "图标就地刷新异常，转由后台校准重建兜底", e);
+						KeydroidxLog.w(TAG, "图标就地刷新异常，转由后台校准重建兜底", e);
 					}
 					final int fChanged = changed;
 					final boolean fOk = ok;
@@ -996,7 +996,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 							}
 							if (!isAdded() || getView() == null) return;
 							updateCurrentPageIcons();
-							KeydroidxLog.i("Menu", "图标就地刷新完成：扫描 " + snapshot.size()
+							KeydroidxLog.i(TAG, "图标就地刷新完成：扫描 " + snapshot.size()
 									+ " 项，外观变化 " + fChanged + " 项（未重新枚举应用列表）");
 						}
 					});
@@ -1054,7 +1054,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				}
 			}
 			if (updated > 0) {
-				KeydroidxLog.i("Menu", "图标外观变化：原地替换当前页 " + updated
+				KeydroidxLog.i(TAG, "图标外观变化：原地替换当前页 " + updated
 						+ " 个图标（未重建网格、页码与焦点不变）");
 			}
 		}
@@ -1104,7 +1104,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		try {
 			list = pm.queryIntentActivities(main, flags);
 		} catch (Exception e) {
-			KeydroidxLog.e("Menu", "冻结应用枚举失败", e);
+			KeydroidxLog.e(TAG, "冻结应用枚举失败", e);
 			return;
 		}
 
@@ -1134,10 +1134,10 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 					appCtx, ai.packageName, launch.getComponent(), label), appCtx);
 			pool.add(item);
 			added++;
-			KeydroidxLog.d("Menu", "追加冻结应用: " + ai.packageName + "/" + ai.name);
+			KeydroidxLog.d(TAG, "追加冻结应用: " + ai.packageName + "/" + ai.name);
 		}
 		if (added > 0) {
-			KeydroidxLog.i("Menu", "追加冻结应用 " + added + " 个");
+			KeydroidxLog.i(TAG, "追加冻结应用 " + added + " 个");
 		}
 	}
 
@@ -1233,7 +1233,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			}
 			return d;
 		} catch (Exception e) {
-			KeydroidxLog.w("Menu", "加载图标失败 res=" + resId);
+			KeydroidxLog.w(TAG, "加载图标失败 res=" + resId);
 			return null;
 		}
 	}
@@ -1252,7 +1252,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				}
 				placeholderIcon = d;
 			} catch (Exception e) {
-				KeydroidxLog.w("Menu", "加载占位图标失败");
+				KeydroidxLog.w(TAG, "加载占位图标失败");
 			}
 		}
 		return placeholderIcon;
@@ -1283,7 +1283,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 
 		int start = pageIndex * perPage;
 		int count = Math.min(perPage, items.size() - start);
-		KeydroidxLog.d("Menu", "buildCurrentPage 页=" + (pageIndex + 1) + "/" + totalPages
+		KeydroidxLog.d(TAG, "buildCurrentPage 页=" + (pageIndex + 1) + "/" + totalPages
 				+ " start=" + start + " count=" + count + " rows=" + rowsPerPage
 				+ " rowH=" + rowH + "px rowActualDp=" + rowActualDp + " availDesign=" + availDesign);
 
@@ -1482,7 +1482,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		if (pageIndex < totalPages - 1) {
 			pageIndex++;
 			rebuildAndFocusCol(col, col);
-			KeydroidxLog.d("Menu", "翻页(下/左滑) -> " + (pageIndex + 1) + "/" + totalPages
+			KeydroidxLog.d(TAG, "翻页(下/左滑) -> " + (pageIndex + 1) + "/" + totalPages
 					+ " col=" + col);
 		}
 	}
@@ -1494,7 +1494,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		if (pageIndex > 0) {
 			pageIndex--;
 			rebuildAndFocusCol(col, (rowsPerPage - 1) * COLS + col);
-			KeydroidxLog.d("Menu", "翻页(上/右滑) -> " + (pageIndex + 1) + "/" + totalPages
+			KeydroidxLog.d(TAG, "翻页(上/右滑) -> " + (pageIndex + 1) + "/" + totalPages
 					+ " col=" + col);
 		}
 	}
@@ -1552,21 +1552,21 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		View mid = requireActivity().findViewById(R.id.midPanel);
 		if (mid != null) {
 			mid.setOnTouchListener(swipeTouchListener);
-			KeydroidxLog.d("Menu", "initSwipeListener 已挂载到 midPanel（覆盖空白区）");
+			KeydroidxLog.d(TAG, "initSwipeListener 已挂载到 midPanel（覆盖空白区）");
 		}
-		KeydroidxLog.d("Menu", "initSwipeListener 已挂载滑动翻页监听（根视图 + midPanel + 每个 cell 复用）");
+		KeydroidxLog.d(TAG, "initSwipeListener 已挂载滑动翻页监听（根视图 + midPanel + 每个 cell 复用）");
 	}
 
 	@Override
 	public boolean onSelect() {
 		int global = pageIndex * perPage + focusPos;
 		if (global < 0 || global >= items.size()) {
-			KeydroidxLog.w("Menu", "onSelect 越界 global=" + global);
+			KeydroidxLog.w(TAG, "onSelect 越界 global=" + global);
 			return false;
 		}
 		KeydroidxAppItem item = items.get(global);
 		if (item == null) return false;
-		KeydroidxLog.i("Menu", "onSelect type=" + item.type + " label=" + item.label);
+		KeydroidxLog.i(TAG, "onSelect type=" + item.type + " label=" + item.label);
 
 		if (item.type == KeydroidxAppItem.TYPE_BOX) {
 			((KeydroidxDesktopActivity) requireActivity()).openBox();
@@ -1578,9 +1578,9 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
 						| Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 				startActivity(main);
-				KeydroidxLog.i("Menu", "进入原始 J2ME-Loader 主界面 J2meLoaderActivity");
+				KeydroidxLog.i(TAG, "进入原始 J2ME-Loader 主界面 J2meLoaderActivity");
 			} catch (Exception e) {
-				KeydroidxLog.e("Menu", "启动 J2meLoaderActivity 失败", e);
+				KeydroidxLog.e(TAG, "启动 J2meLoaderActivity 失败", e);
 			}
 			return true;
 		}
@@ -1608,13 +1608,13 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 
 			try {
 				startActivity(item.launchIntent);
-				KeydroidxLog.i("Menu", "启动应用 " + item.label);
+				KeydroidxLog.i(TAG, "启动应用 " + item.label);
 			} catch (Exception e) {
 				// 兜底：组件可能因应用更新/状态变化而失效，重新解析当前启用入口再试一次
 				if (pkg != null && retryWithLaunchIntent(pkg, item.label)) {
 					return true;
 				}
-				KeydroidxLog.e("Menu", "启动失败 " + item.label, e);
+				KeydroidxLog.e(TAG, "启动失败 " + item.label, e);
 			}
 			return true;
 		}
@@ -1628,10 +1628,10 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			if (retry == null) return false;
 			retry.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 			startActivity(retry);
-			KeydroidxLog.i("Menu", "兜底启动成功 " + label + " -> " + retry.getComponent());
+			KeydroidxLog.i(TAG, "兜底启动成功 " + label + " -> " + retry.getComponent());
 			return true;
 		} catch (Exception e2) {
-			KeydroidxLog.e("Menu", "兜底启动也失败 " + label, e2);
+			KeydroidxLog.e(TAG, "兜底启动也失败 " + label, e2);
 			return false;
 		}
 	}
@@ -1655,7 +1655,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 	 */
 	private void showAppOptionsMenu(KeydroidxAppItem item) {
 		if (item == null || item.launchIntent == null) {
-			KeydroidxLog.w("Menu", "showAppOptionsMenu: item 或 launchIntent 为 null，忽略");
+			KeydroidxLog.w(TAG, "showAppOptionsMenu: item 或 launchIntent 为 null，忽略");
 			return;
 		}
 		String resolvedPkg = item.launchIntent.getPackage();
@@ -1663,11 +1663,11 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			resolvedPkg = item.launchIntent.getComponent().getPackageName();
 		}
 		if (TextUtils.isEmpty(resolvedPkg)) {
-			KeydroidxLog.w("Menu", "showAppOptionsMenu: 无法解析包名，忽略 " + item.label);
+			KeydroidxLog.w(TAG, "showAppOptionsMenu: 无法解析包名，忽略 " + item.label);
 			return;
 		}
 		final String pkg = resolvedPkg;
-		KeydroidxLog.i("Menu", "弹出选项菜单: " + item.label + " pkg=" + pkg);
+		KeydroidxLog.i(TAG, "弹出选项菜单: " + item.label + " pkg=" + pkg);
 		List<KeydroidxOptionsDialog.OptionItem> options = new ArrayList<>();
 
 		// 冻结 / 移出冻结列表选项
@@ -1718,7 +1718,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		options.add(new KeydroidxOptionsDialog.OptionItem(
 				io.github.cctyl.nokia.common.ui.KeydroidxIcons.ICON_PALETTE,
 				"更换图标", true, false, () -> {
-			KeydroidxLog.i("Menu", "选项菜单-更换图标: " + item.label + " pkg=" + pkg);
+			KeydroidxLog.i(TAG, "选项菜单-更换图标: " + item.label + " pkg=" + pkg);
 			((KeydroidxDesktopActivity) requireActivity()).openFragment(
 					KeydroidxIconPackSettingsFragment.newInstanceForApp(pkg, item.label));
 		}));
@@ -1729,7 +1729,7 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 				KeydroidxSettingsStorage.clearIconOverride(requireContext(), pkg);
 				KeydroidxIconResolver.invalidatePackage(requireContext(), pkg);
 				Toast.makeText(requireContext(), "已恢复默认图标", Toast.LENGTH_SHORT).show();
-				KeydroidxLog.i("Menu", "选项菜单-恢复默认图标: " + item.label + " pkg=" + pkg);
+				KeydroidxLog.i(TAG, "选项菜单-恢复默认图标: " + item.label + " pkg=" + pkg);
 				// 只重算图标外观，不再整表重新枚举：当前页、页码、焦点都不动
 				markIconAppearanceChanged();
 				refreshIconsAsync();
@@ -1737,26 +1737,26 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		}
 		options.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_delete,
 				"卸载", true, false, () -> {
-			KeydroidxLog.i("Menu", "选项菜单-卸载: " + item.label + " pkg=" + pkg);
+			KeydroidxLog.i(TAG, "选项菜单-卸载: " + item.label + " pkg=" + pkg);
 			try {
 				Intent uninstall = new Intent(Intent.ACTION_DELETE,
 						Uri.fromParts("package", pkg, null));
 				uninstall.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				startActivity(uninstall);
 			} catch (Exception e) {
-				KeydroidxLog.e("Menu", "卸载跳转失败 " + item.label, e);
+				KeydroidxLog.e(TAG, "卸载跳转失败 " + item.label, e);
 			}
 		}));
 		options.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_manage,
 				"应用设置", true, false, () -> {
-			KeydroidxLog.i("Menu", "选项菜单-应用设置: " + item.label + " pkg=" + pkg);
+			KeydroidxLog.i(TAG, "选项菜单-应用设置: " + item.label + " pkg=" + pkg);
 			try {
 				Intent settings = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
 						Uri.fromParts("package", pkg, null));
 				settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				startActivity(settings);
 			} catch (Exception e) {
-				KeydroidxLog.e("Menu", "应用设置跳转失败 " + item.label, e);
+				KeydroidxLog.e(TAG, "应用设置跳转失败 " + item.label, e);
 			}
 		}));
 		KeydroidxOptionsDialog.show(getParentFragmentManager(), item.label, options);

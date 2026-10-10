@@ -18,7 +18,6 @@ package ru.woesss.j2me.jar;
 
 import android.content.Context;
 import android.text.SpannableStringBuilder;
-import android.util.Log;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.io.EOFException;
@@ -180,7 +179,7 @@ public class Descriptor {
 		try {
 			parse(source);
 		} catch (Exception e) {
-			Log.e(TAG, source);
+			KeydroidxLog.w(TAG, "parse descriptor failed", e);
 			throw new DescriptorException("Bad descriptor", e);
 		}
 	}

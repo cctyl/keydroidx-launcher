@@ -17,7 +17,7 @@ import java.util.List;
  * 使用 SharedPreferences + JSON 数组持久化。
  */
 public class KeydroidxQuickToggleStorage {
-	private static final String TAG = "KeydroidxQuickToggleStorage";
+	private static final String TAG = "QuickToggleStorage";
 
 
 	private static final String PREFS_NAME = "nokia_quick_toggles";
@@ -33,7 +33,7 @@ public class KeydroidxQuickToggleStorage {
 
 	private void initDefaultsIfNeeded() {
 		if (prefs.getBoolean(KEY_INITIALIZED, false)) return;
-		KeydroidxLog.i("QuickToggleStorage", "首次启动，初始化默认快捷开关列表");
+		KeydroidxLog.i(TAG, "首次启动，初始化默认快捷开关列表");
 		List<KeydroidxQuickToggleItem> defaults = new ArrayList<>();
 		for (int i = 0; i < KeydroidxQuickToggleItem.TYPE_COUNT; i++) {
 			defaults.add(KeydroidxQuickToggleItem.createDefault(i));
@@ -67,7 +67,7 @@ public class KeydroidxQuickToggleStorage {
 				}
 			}
 		} catch (JSONException e) {
-			KeydroidxLog.e("QuickToggleStorage", "解析快捷开关列表 JSON 失败: " + e.getMessage());
+			KeydroidxLog.e(TAG, "解析快捷开关列表 JSON 失败: " + e.getMessage());
 		}
 
 		// 补充可能新增的开关类型
@@ -114,7 +114,7 @@ public class KeydroidxQuickToggleStorage {
 			}
 		}
 		prefs.edit().putString(KEY_TOGGLE_LIST, array.toString()).apply();
-		KeydroidxLog.i("QuickToggleStorage", "快捷开关列表已保存，共 " + list.size() + " 项");
+		KeydroidxLog.i(TAG, "快捷开关列表已保存，共 " + list.size() + " 项");
 	}
 
 	public void resetToDefaults() {

@@ -33,8 +33,6 @@ import ru.playsoftware.j2meloader.R;
  */
 public class KeydroidxQuickToggleSettingsFragment extends KeydroidxPageFragment {
 
-	private static final String TAG = "QuickToggleSettings";
-
 	public static final int MODE_NORMAL = 0;
 	public static final int MODE_SORT = 1;
 

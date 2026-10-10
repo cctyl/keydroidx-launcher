@@ -20,7 +20,6 @@ import android.telephony.SignalStrength;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -182,7 +181,7 @@ public class StatusBarController {
 			subListener = new SubscriptionManager.OnSubscriptionsChangedListener() {
 				@Override
 				public void onSubscriptionsChanged() {
-					Log.d(TAG, "onSubscriptionsChanged -> reregister");
+					KeydroidxLog.d(TAG, "onSubscriptionsChanged -> reregister");
 					registerSignalListeners();
 					updateCarriers();
 				}
@@ -194,7 +193,7 @@ public class StatusBarController {
 	/** 运行时权限授予后调用，重新注册信号监听。 */
 	@SuppressLint("MissingPermission")
 	public void onPermissionGranted() {
-		Log.d(TAG, "onPermissionGranted -> reregister");
+		KeydroidxLog.d(TAG, "onPermissionGranted -> reregister");
 		registerSignalListeners();
 		updateCarriers();
 	}
@@ -249,12 +248,12 @@ public class StatusBarController {
 		boolean canCreateForSubId = Build.VERSION.SDK_INT >= 24;
 		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
 			List<SubscriptionInfo> subs = getActiveSubs();
-			Log.d(TAG, "registerSignalListeners subs.size=" + subs.size());
+			KeydroidxLog.d(TAG, "registerSignalListeners subs.size=" + subs.size());
 			if (!subs.isEmpty()) {
 				usedSubscriptionPath = true;
 				for (int i = 0; i < subs.size() && i < 2; i++) {
 					int subId = subs.get(i).getSubscriptionId();
-					Log.d(TAG, "  sub i=" + i + " subId=" + subId
+					KeydroidxLog.d(TAG, "  sub i=" + i + " subId=" + subId
 							+ " slot=" + subs.get(i).getSimSlotIndex());
 					if (i > 0 && !canCreateForSubId) {
 						// API 22/23 无法按订阅分卡监听，只能监听默认卡（卡 1），
@@ -283,7 +282,7 @@ public class StatusBarController {
 		// SubscriptionManager 路径拿不到活动 SIM 时（MIUI 等屏蔽第三方读取）：
 		// 改用 createForSubscriptionId 探测常见 subId，为每张就绪的卡监听信号。
 		if (!usedSubscriptionPath) {
-			Log.d(TAG, "registerSignalListeners fallback: probe subIds (both SIMs)");
+			KeydroidxLog.d(TAG, "registerSignalListeners fallback: probe subIds (both SIMs)");
 			probeSubIdsAndListen();
 			startSignalPolling();
 		}
@@ -328,7 +327,7 @@ public class StatusBarController {
 			List<SubscriptionInfo> subs = subscriptionManager.getActiveSubscriptionInfoList();
 			if (subs != null && !subs.isEmpty()) {
 				result.addAll(subs);
-				Log.d(TAG, "getActiveSubs via list: size=" + result.size());
+				KeydroidxLog.d(TAG, "getActiveSubs via list: size=" + result.size());
 				return result;
 			}
 			// MIUI 等机型 getActiveSubscriptionInfoList() 可能返回空，
@@ -336,14 +335,14 @@ public class StatusBarController {
 			for (int slot = 0; slot < 2; slot++) {
 				SubscriptionInfo info =
 						subscriptionManager.getActiveSubscriptionInfoForSimSlotIndex(slot);
-				Log.d(TAG, "getActiveSubs slot=" + slot + " info=" + (info != null
+				KeydroidxLog.d(TAG, "getActiveSubs slot=" + slot + " info=" + (info != null
 						? ("subId=" + info.getSubscriptionId()) : "null"));
 				if (info != null) {
 					result.add(info);
 				}
 			}
 		} catch (Exception e) {
-			Log.e(TAG, "getActiveSubs failed", e);
+			KeydroidxLog.w(TAG, "getActiveSubs failed", e);
 		}
 		return result;
 	}
@@ -379,13 +378,13 @@ public class StatusBarController {
 					ready.add(sub);
 				}
 			} catch (Exception e) {
-				Log.e(TAG, "probeSubIds createForSubscriptionId(" + sub + ") failed", e);
+				KeydroidxLog.w(TAG, "probeSubIds createForSubscriptionId(" + sub + ") failed", e);
 			}
 			if (ready.size() >= 2) {
 				break;
 			}
 		}
-		Log.d(TAG, "probeSubIds ready=" + ready.size());
+		KeydroidxLog.d(TAG, "probeSubIds ready=" + ready.size());
 		if (ready.isEmpty()) {
 			telephonyManager.listen(listener1, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
 			// 仍将默认 TM 赋给 probeTm1，使运营商名至少能读到第一张卡。
@@ -420,11 +419,11 @@ public class StatusBarController {
 				SignalStrength ss = tm.getSignalStrength();
 				if (ss != null) {
 					l.setLevel(ss.getLevel());
-					Log.d(TAG, "pollTmSignal slot=" + l.slot + " level=" + l.getLevel());
+					KeydroidxLog.d(TAG, "pollTmSignal slot=" + l.slot + " level=" + l.getLevel());
 				}
 			}
 		} catch (Exception e) {
-			Log.e(TAG, "pollTmSignal failed", e);
+			KeydroidxLog.w(TAG, "pollTmSignal failed", e);
 		}
 	}
 
@@ -479,7 +478,7 @@ public class StatusBarController {
 		// 每个卡槽独立判断：该卡槽无 SIM（或未就绪）显示「无SIM」，有卡则显示运营商名。
 		// 仅当设备确为双卡时，第二卡槽才参与显示，避免单卡设备出现幽灵「无SIM」。
 		boolean dual = getPhoneCount() >= 2;
-		Log.d(TAG, "updateCarriers dual=" + dual
+		KeydroidxLog.d(TAG, "updateCarriers dual=" + dual
 				+ " probeTm1=" + (probeTm1 != null) + " probeTm2=" + (probeTm2 != null));
 		updateCarrierSlot(tvCarrier1, probeTm1);
 		if (dual) {
@@ -512,11 +511,11 @@ public class StatusBarController {
 			try {
 				simState = tm.getSimState();
 			} catch (Exception e) {
-				Log.w(TAG, "updateCarrierSlot getSimState failed", e);
+				KeydroidxLog.w(TAG, "updateCarrierSlot getSimState failed", e);
 			}
 		}
 		if (tm == null || simState != TelephonyManager.SIM_STATE_READY) {
-			Log.d(TAG, "updateCarrierSlot: 无 SIM（tm=" + (tm != null) + " state=" + simState + "）");
+			KeydroidxLog.d(TAG, "updateCarrierSlot: 无 SIM（tm=" + (tm != null) + " state=" + simState + "）");
 			tv.setText("无SIM");
 			return;
 		}
@@ -524,7 +523,7 @@ public class StatusBarController {
 		if (name == null || name.isEmpty()) {
 			name = tm.getSimOperatorName();
 		}
-		Log.d(TAG, "updateCarrierSlot: 运营商=" + (name == null ? "" : name));
+		KeydroidxLog.d(TAG, "updateCarrierSlot: 运营商=" + (name == null ? "" : name));
 		tv.setText((name == null || name.isEmpty()) ? "" : name);
 	}
 
@@ -536,7 +535,7 @@ public class StatusBarController {
 				return telephonyManager.getPhoneCount();
 			}
 		} catch (Exception e) {
-			Log.w(TAG, "getPhoneCount failed", e);
+			KeydroidxLog.w(TAG, "getPhoneCount failed", e);
 		}
 		return 1;
 	}
@@ -592,7 +591,7 @@ public class StatusBarController {
 					return true;
 				}
 			} catch (Exception e) {
-				Log.w(TAG, "isPowerSaveMode failed", e);
+				KeydroidxLog.w(TAG, "isPowerSaveMode failed", e);
 			}
 		}
 		try {
@@ -790,7 +789,7 @@ public class StatusBarController {
 					level = asuToLevel(signalStrength.getGsmSignalStrength());
 				}
 			}
-			Log.d(TAG, "onSignalStrengthsChanged slot=" + slot + " level=" + level);
+			KeydroidxLog.d(TAG, "onSignalStrengthsChanged slot=" + slot + " level=" + level);
 			apply();
 		}
 

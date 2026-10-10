@@ -19,7 +19,6 @@ package ru.playsoftware.j2meloader.util;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -46,7 +45,7 @@ public class AppUtils {
 			File appFolder = new File(appsDir, appFolderName);
 			if (!appFolder.isDirectory()) {
 				if (!appFolder.delete()) {
-					Log.e(TAG, "getAppsList() failed delete file: " + appFolder);
+					KeydroidxLog.w(TAG, "getAppsList() failed delete file: " + appFolder);
 				}
 				continue;
 			}
@@ -59,7 +58,7 @@ public class AppUtils {
 				AppItem item = getApp(appFolder);
 				apps.add(item);
 			} catch (Exception e) {
-				Log.w(TAG, "getAppsList: ", e);
+				KeydroidxLog.w(TAG, "getAppsList: ", e);
 				FileUtils.deleteDirectory(appFolder);
 			}
 		}
@@ -129,7 +128,7 @@ public class AppUtils {
 		try {
 			return getApp(appDir);
 		} catch (Exception e) {
-			Log.w(TAG, "findAppByPath: ", e);
+			KeydroidxLog.w(TAG, "findAppByPath: ", e);
 			return null;
 		}
 	}

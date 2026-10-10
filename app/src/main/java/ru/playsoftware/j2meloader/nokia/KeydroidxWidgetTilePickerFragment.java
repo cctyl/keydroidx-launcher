@@ -35,7 +35,7 @@ import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
  * 供用户选择并添加为桌面组件。
  */
 public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment {
-	private static final String TAG = "KeydroidxWidgetTilePickerFragment";
+	private static final String TAG = "WidgetTilePicker";
 
 
 	private static class TileInfo {
@@ -281,7 +281,7 @@ public class KeydroidxWidgetTilePickerFragment extends KeydroidxListPageFragment
 		);
 		storage.addWidget(item);
 		Toast.makeText(requireContext(), "已添加组件: " + info.tileLabel, Toast.LENGTH_SHORT).show();
-		KeydroidxLog.i("WidgetTilePicker", "添加快捷开关组件: " + info.getDisplayTitle() + " target=" + info.getComponentValue());
+		KeydroidxLog.i(TAG, "添加快捷开关组件: " + info.getDisplayTitle() + " target=" + info.getComponentValue());
 
 		if (getActivity() instanceof KeydroidxDesktopActivity) {
 			((KeydroidxDesktopActivity) getActivity()).exitCurrent();

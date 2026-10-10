@@ -48,7 +48,7 @@ import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
  * 支持方向键导航，SELECT 切换选中状态，左软键保存，右软键返回。
  */
 public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment {
-	private static final String TAG = "KeydroidxShortcutSettingsFragment";
+	private static final String TAG = "ShortcutSettings";
 
 
 	private LinearLayout appListLayout;
@@ -85,12 +85,12 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 					: makeKey(app.type, app.appKey);
 			selectedMap.put(key, app);
 		}
-		KeydroidxLog.i("ShortcutSettings", "已加载 " + selectedMap.size() + " 个已选应用");
+		KeydroidxLog.i(TAG, "已加载 " + selectedMap.size() + " 个已选应用");
 
 		// 异步加载应用列表
 		loadAppsAsync();
 
-		KeydroidxLog.i("ShortcutSettings", "快捷栏设置初始化完成");
+		KeydroidxLog.i(TAG, "快捷栏设置初始化完成");
 	}
 
 	// ---- 异步加载应用 ----
@@ -110,10 +110,10 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 							allApps.clear();
 							allApps.addAll(apps);
 							buildAppList();
-							KeydroidxLog.i("ShortcutSettings", "应用列表加载完成：共 " + apps.size() + " 个（安卓 + J2ME）");
+							KeydroidxLog.i(TAG, "应用列表加载完成：共 " + apps.size() + " 个（安卓 + J2ME）");
 						},
 						error -> {
-							KeydroidxLog.w("ShortcutSettings", "加载应用列表失败", error);
+							KeydroidxLog.w(TAG, "加载应用列表失败", error);
 							if (!isAdded()) return; // 同上：detach 后 buildAppList/requireActivity 会再次抛异常
 							// 降级：至少加载安卓应用
 							allApps.clear();
@@ -140,17 +140,17 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 			if (ai == null) continue;
 			boolean appEnabled = ai.applicationInfo == null || ai.applicationInfo.enabled;
 			boolean compEnabled = ai.enabled && appEnabled;
-			KeydroidxLog.d("ShortcutSettings", "枚举入口: " + ai.packageName + "/" + ai.name
+			KeydroidxLog.d(TAG, "枚举入口: " + ai.packageName + "/" + ai.name
 					+ " enabled=" + compEnabled
 					+ " (componentEnabled=" + ai.enabled
 					+ ", appEnabled=" + appEnabled + ")");
 			if (ai.packageName.equals(selfPkg)) continue;
 			if (!seenPkgs.add(ai.packageName)) {
-				KeydroidxLog.d("ShortcutSettings", "同包多入口去重: " + ai.packageName + "/" + ai.name
+				KeydroidxLog.d(TAG, "同包多入口去重: " + ai.packageName + "/" + ai.name
 						+ " (首个入口已选中)");
 				continue;
 			}
-			KeydroidxLog.d("ShortcutSettings", "选中入口: " + ai.packageName + "/" + ai.name
+			KeydroidxLog.d(TAG, "选中入口: " + ai.packageName + "/" + ai.name
 					+ " enabled=" + compEnabled);
 
 			CharSequence labelCs = ri.loadLabel(pm);
@@ -167,7 +167,7 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 			out.add(item);
 		}
 
-		KeydroidxLog.i("ShortcutSettings", "加载安卓应用: " + out.size() + " 个");
+		KeydroidxLog.i(TAG, "加载安卓应用: " + out.size() + " 个");
 	}
 
 	/** 加载 J2ME 已安装的应用 */
@@ -176,7 +176,7 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 			String emulatorDir = Config.getEmulatorDir();
 			File dbFile = new File(emulatorDir, "J2ME-apps.db");
 			if (!dbFile.exists()) {
-				KeydroidxLog.i("ShortcutSettings", "J2ME 数据库不存在，跳过 JAR 应用加载");
+				KeydroidxLog.i(TAG, "J2ME 数据库不存在，跳过 JAR 应用加载");
 				return;
 			}
 
@@ -193,7 +193,7 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 					try {
 						icon = Drawable.createFromPath(iconPath);
 					} catch (Exception e) {
-						KeydroidxLog.w("ShortcutSettings", "加载 J2ME 图标失败: " + iconPath);
+						KeydroidxLog.w(TAG, "加载 J2ME 图标失败: " + iconPath);
 					}
 				}
 				// 使用 pathExt 作为唯一标识
@@ -208,9 +208,9 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 				out.add(item);
 			}
 
-			KeydroidxLog.i("ShortcutSettings", "加载 J2ME 应用: " + j2meApps.size() + " 个");
+			KeydroidxLog.i(TAG, "加载 J2ME 应用: " + j2meApps.size() + " 个");
 		} catch (Exception e) {
-			KeydroidxLog.e("ShortcutSettings", "加载 J2ME 应用失败", e);
+			KeydroidxLog.e(TAG, "加载 J2ME 应用失败", e);
 		}
 	}
 
@@ -382,15 +382,15 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 
 		if (selectedMap.containsKey(key)) {
 			selectedMap.remove(key);
-			KeydroidxLog.d("ShortcutSettings", "取消选中: " + app.label);
+			KeydroidxLog.d(TAG, "取消选中: " + app.label);
 		} else {
 			ShortcutApp sa = buildShortcutApp(app);
 			if (sa == null) {
-				KeydroidxLog.w("ShortcutSettings", "无法构造快捷项，忽略: " + app.label);
+				KeydroidxLog.w(TAG, "无法构造快捷项，忽略: " + app.label);
 				return;
 			}
 			selectedMap.put(key, sa);
-			KeydroidxLog.d("ShortcutSettings", "选中: " + app.label);
+			KeydroidxLog.d(TAG, "选中: " + app.label);
 		}
 
 		// 刷新当前行的勾选标记
@@ -420,7 +420,7 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 		// 不再遍历 allApps 重建，避免 key 不匹配 / 列表未加载完整的项被静默丢弃
 		List<ShortcutApp> result = new ArrayList<>(selectedMap.values());
 		settingsStorage.setShortcutApps(result);
-		KeydroidxLog.i("ShortcutSettings", "即时保存 " + result.size() + " 个快捷栏应用");
+		KeydroidxLog.i(TAG, "即时保存 " + result.size() + " 个快捷栏应用");
 	}
 
 	/** 根据列表项构造可持久化的 ShortcutApp；无法构造时返回 null */
@@ -475,7 +475,7 @@ public class KeydroidxShortcutSettingsFragment extends KeydroidxListPageFragment
 
 	@Override
 	public boolean onSoftRight() {
-		KeydroidxLog.i("ShortcutSettings", "右软键：不保存返回");
+		KeydroidxLog.i(TAG, "右软键：不保存返回");
 		((KeydroidxDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}

@@ -18,7 +18,6 @@ package ru.woesss.j2me.installer;
 
 import android.app.Application;
 import android.net.Uri;
-import android.util.Log;
 
 import com.android.dx.command.dexer.Main;
 
@@ -228,7 +227,7 @@ public class AppInstaller {
 		}
 		srcFile = new File(cacheDir, "tmp.jad");
 		String url = uri.toString();
-		Log.d(TAG, "Downloading " + url);
+		KeydroidxLog.d(TAG, "Downloading " + url);
 		Exception exception;
 		HttpURLConnection connection = null;
 		try {
@@ -255,7 +254,7 @@ public class AppInstaller {
 				}
 			}
 			connection.disconnect();
-			Log.d(TAG, "Download complete");
+			KeydroidxLog.d(TAG, "Download complete");
 			return;
 		} catch (MalformedURLException e) {
 			KeydroidxLog.w(TAG, "download jad failed: bad url failed: " + e.getMessage());
@@ -311,7 +310,7 @@ public class AppInstaller {
 			try {
 				ZipUtils.unzipEntry(resJar, icon, iconFile);
 			} catch (IOException e) {
-				Log.w(TAG, "Can't unzip icon: " + icon, e);
+				KeydroidxLog.w(TAG, "Can't unzip icon: " + icon, e);
 				icon = null;
 				//noinspection ResultOfMethodCallIgnored
 				iconFile.delete();
@@ -429,7 +428,7 @@ public class AppInstaller {
 			}
 		}
 		String url = jarUri.toString();
-		Log.d(TAG, "Downloading " + url);
+		KeydroidxLog.d(TAG, "Downloading " + url);
 		Exception exception;
 		HttpURLConnection connection = null;
 		try {
@@ -456,7 +455,7 @@ public class AppInstaller {
 				}
 			}
 			connection.disconnect();
-			Log.d(TAG, "Download complete");
+			KeydroidxLog.d(TAG, "Download complete");
 			return;
 		} catch (MalformedURLException e) {
 			KeydroidxLog.w(TAG, "download jar failed: bad url failed: " + e.getMessage());

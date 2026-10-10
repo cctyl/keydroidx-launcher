@@ -32,7 +32,6 @@ import android.text.InputFilter;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.Menu;
@@ -426,7 +425,7 @@ public class ConfigActivity extends BaseActivity implements View.OnClickListener
 						try {
 							info.set(line);
 						} catch (Exception e) {
-							Log.e(TAG, "initShaderSpinner: ", e);
+							KeydroidxLog.e(TAG, "initShaderSpinner: ", e);
 						}
 					}
 				}

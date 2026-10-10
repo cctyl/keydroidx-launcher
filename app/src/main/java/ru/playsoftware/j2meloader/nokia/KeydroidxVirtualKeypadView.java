@@ -21,7 +21,6 @@ import ru.playsoftware.j2meloader.R;
  */
 public class KeydroidxVirtualKeypadView extends LinearLayout {
 
-	private static final String TAG = "VirtualKeypad";
 	public static final int ACTION_HOME = 100;
 
 	public interface OnVirtualKeyEventListener {

@@ -45,7 +45,7 @@ import ru.playsoftware.j2meloader.R;
  * 继承 {@link KeydroidxScrollPageFragment}，支持方向键平滑滚动；左软键「复制」把命令写入系统剪贴板；右软键「返回」。
  */
 public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
-	private static final String TAG = "ShizukuAdbFragment";
+	private static final String TAG = "ShizukuAdb";
 
 
 	/** assets 中的脚本文件名。 */
@@ -72,7 +72,7 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 			public void run() {
 				final String cmd = buildCommand(ctx);
 				if (cmd == null) {
-					KeydroidxLog.e("ShizukuAdb", "释放脚本失败，命令不可用");
+					KeydroidxLog.e(TAG, "释放脚本失败，命令不可用");
 					// 失败必须显式落到界面，否则用户看到的仍是 XML 占位符，复制出来的是残缺命令。
 					if (tvCommand != null) {
 						tvCommand.post(new Runnable() {
@@ -99,7 +99,7 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 				}
 			}
 		}, "shizuku-adb-extract").start();
-		KeydroidxLog.i("ShizukuAdb", "adb 激活说明页初始化完成");
+		KeydroidxLog.i(TAG, "adb 激活说明页初始化完成");
 	}
 
 	/**
@@ -124,7 +124,7 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 	private File extractScript(Context ctx) {
 		File dir = ctx.getExternalFilesDir(null);
 		if (dir == null) {
-			KeydroidxLog.e("ShizukuAdb", "外存不可用，无法释放脚本");
+			KeydroidxLog.e(TAG, "外存不可用，无法释放脚本");
 			return null;
 		}
 		File target = new File(dir, TARGET_SCRIPT_NAME);
@@ -145,11 +145,11 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 			// "syntax error: unexpected 'do"，导致 mini_shizuku 激活失败。
 			out.write(normalizeLf(bos.toByteArray()));
 			out.flush();
-			KeydroidxLog.i("ShizukuAdb", "脚本已释放: " + target.getAbsolutePath()
+			KeydroidxLog.i(TAG, "脚本已释放: " + target.getAbsolutePath()
 					+ " (" + target.length() + "B)");
 			return target;
 		} catch (IOException e) {
-			KeydroidxLog.e("ShizukuAdb", "释放脚本失败", e);
+			KeydroidxLog.e(TAG, "释放脚本失败", e);
 			return null;
 		} finally {
 			if (in != null) {
@@ -211,12 +211,12 @@ public class ShizukuAdbFragment extends KeydroidxScrollPageFragment {
 			if (cm != null) {
 				cm.setPrimaryClip(ClipData.newPlainText("mini_shizuku", text));
 				Toast.makeText(requireContext(), "命令已复制", Toast.LENGTH_SHORT).show();
-				KeydroidxLog.i("ShizukuAdb", "命令已复制到剪贴板");
+				KeydroidxLog.i(TAG, "命令已复制到剪贴板");
 			} else {
 				Toast.makeText(requireContext(), "剪贴板不可用", Toast.LENGTH_SHORT).show();
 			}
 		} catch (Exception e) {
-			KeydroidxLog.e("ShizukuAdb", "复制命令失败", e);
+			KeydroidxLog.e(TAG, "复制命令失败", e);
 			Toast.makeText(requireContext(), "复制失败", Toast.LENGTH_SHORT).show();
 		}
 	}

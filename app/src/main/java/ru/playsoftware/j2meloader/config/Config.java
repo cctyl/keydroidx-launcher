@@ -22,7 +22,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Environment;
-import android.util.Log;
 
 import java.io.File;
 
@@ -39,6 +38,7 @@ import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
 import static ru.playsoftware.j2meloader.util.Constants.*;
 
 import ru.playsoftware.j2meloader.util.FileUtils;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
 public class Config {
 	public static final String DEX_OPT_CACHE_DIR = "dex_opt";
@@ -133,7 +133,7 @@ public class Config {
 		File configDir = new File(workDir + Config.MIDLET_CONFIGS_DIR + appDir.getName());
 		if (showSettings) {
 			// 用户显式点「设置」：打开设置界面（沿用原行为）
-			Log.i("Config", "startApp: 显式打开设置界面 -> " + name);
+			KeydroidxLog.i("Config", "startApp: 显式打开设置界面 -> " + name);
 			Intent intent = new Intent(ACTION_EDIT, Uri.parse(path),
 					context, ConfigActivity.class);
 			intent.putExtra(KEY_MIDLET_NAME, name);
@@ -150,18 +150,18 @@ public class Config {
 				File defDir = new File(Config.getProfilesDir(), defProfile);
 				if (defDir.exists()) {
 					FileUtils.copyFiles(defDir, configDir, null);
-					Log.i("Config", "startApp: 新 JAR 套用默认 profile '" + defProfile
+					KeydroidxLog.i("Config", "startApp: 新 JAR 套用默认 profile '" + defProfile
 							+ "' -> " + configDir.getAbsolutePath());
 				} else {
-					Log.w("Config", "startApp: 默认 profile 目录不存在: " + defDir);
+					KeydroidxLog.w("Config", "startApp: 默认 profile 目录不存在: " + defDir);
 				}
 			} else {
-				Log.w("Config", "startApp: 未设置默认 profile，无法套用全局设置");
+				KeydroidxLog.w("Config", "startApp: 未设置默认 profile，无法套用全局设置");
 			}
 		}
 		if (configDir.exists()) {
 			// 已有配置（或已套用全局设置）：直接启动
-			Log.i("Config", "startApp: 直接启动 -> " + name);
+			KeydroidxLog.i("Config", "startApp: 直接启动 -> " + name);
 			Intent intent = new Intent(Intent.ACTION_DEFAULT, Uri.parse(path),
 					context, MicroActivity.class);
 			intent.putExtra(KEY_MIDLET_NAME, name);
@@ -175,7 +175,7 @@ public class Config {
 			}
 		} else {
 			// 没有任何兜底配置：仍走设置界面（保持原行为）
-			Log.i("Config", "startApp: 无默认配置，退回设置界面 -> " + name);
+			KeydroidxLog.i("Config", "startApp: 无默认配置，退回设置界面 -> " + name);
 			Intent intent = new Intent(ACTION_EDIT, Uri.parse(path),
 					context, ConfigActivity.class);
 			intent.putExtra(KEY_MIDLET_NAME, name);

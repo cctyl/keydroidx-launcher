@@ -38,7 +38,6 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.util.Log;
 import android.view.ContextMenu;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -93,6 +92,7 @@ import ru.playsoftware.j2meloader.util.Constants;
 import ru.playsoftware.j2meloader.util.FileUtils;
 import ru.playsoftware.j2meloader.util.LogUtils;
 import ru.woesss.j2me.installer.KeydroidxInstallerDialog;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
 public class AppsListFragment extends ListFragment {
 	private static final String TAG = AppsListFragment.class.getSimpleName();
@@ -161,7 +161,7 @@ public class AppsListFragment extends ListFragment {
 	private void alertDbError(Throwable throwable) {
 		Activity activity = getActivity();
 		if (activity == null) {
-			Log.e(TAG, "Db error detected", throwable);
+			KeydroidxLog.w(TAG, "Db error detected", throwable);
 			return;
 		}
 		if (throwable instanceof SQLiteDiskIOException) {

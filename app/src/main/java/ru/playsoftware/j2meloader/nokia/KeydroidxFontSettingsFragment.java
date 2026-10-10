@@ -39,7 +39,7 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 
 	private static final int REQUEST_CODE_PICK_FONT = 1001;
 
-	private static final String TAG = "KeydroidxFontSettingsFragment";
+	private static final String TAG = "FontSettings";
 
 	/** 字体文件 MIME 白名单（部分文件管理器按 MIME 过滤，缺一档就选不中 .ttf）。 */
 	private static final String[] FONT_MIME_TYPES = {

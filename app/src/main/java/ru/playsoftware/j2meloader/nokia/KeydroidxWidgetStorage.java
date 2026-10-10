@@ -19,7 +19,7 @@ import java.util.List;
  * 首次启动时自动写入默认组件（日历、后台管理、音乐播放器）。
  */
 public class KeydroidxWidgetStorage {
-	private static final String TAG = "KeydroidxWidgetStorage";
+	private static final String TAG = "WidgetStorage";
 
 
 	private static final String PREFS_NAME = "nokia_desktop_widgets";
@@ -69,7 +69,7 @@ public class KeydroidxWidgetStorage {
 				list.set(i, new KeydroidxWidgetItem(
 						KeydroidxWidgetItem.TYPE_BG_MANAGER, "最近任务", ""));
 				setWidgets(list);
-				KeydroidxLog.i("WidgetStorage", "已迁移旧版默认内存组件 -> 后台管理（最近任务）");
+				KeydroidxLog.i(TAG, "已迁移旧版默认内存组件 -> 后台管理（最近任务）");
 				break;
 			}
 		}
@@ -99,7 +99,7 @@ public class KeydroidxWidgetStorage {
 		if (legacy != null) {
 			list.remove(legacy);
 			setWidgets(list);
-			KeydroidxLog.i("WidgetStorage", "已清理旧版默认网址组件: 3g.qq.com");
+			KeydroidxLog.i(TAG, "已清理旧版默认网址组件: 3g.qq.com");
 		}
 		prefs.edit().putBoolean(KEY_LEGACY_URL_CLEANED, true).apply();
 	}
@@ -110,31 +110,31 @@ public class KeydroidxWidgetStorage {
 	 */
 	private void initDefaultsIfNeeded(Context ctx) {
 		if (prefs.getBoolean(KEY_INITIALIZED, false)) return;
-		KeydroidxLog.i("WidgetStorage", "首次启动，写入默认组件");
+		KeydroidxLog.i(TAG, "首次启动，写入默认组件");
 
 		List<KeydroidxWidgetItem> defaults = new ArrayList<>();
 
 		// 1. 日历组件
 		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_CALENDAR, "日历", ""));
-		KeydroidxLog.i("WidgetStorage", "默认组件: 日历");
+		KeydroidxLog.i(TAG, "默认组件: 日历");
 
 		// 2. 后台管理组件（点击打开最近任务页，桌面显示类型名「最近任务」）
 		defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_BG_MANAGER, "最近任务", ""));
-		KeydroidxLog.i("WidgetStorage", "默认组件: 后台管理（最近任务）");
+		KeydroidxLog.i(TAG, "默认组件: 后台管理（最近任务）");
 
 		// 3. 应用组件：默认音乐播放器（取第一个已安装的）
 		String musicAppKey = findMusicApp(ctx);
 		if (musicAppKey != null) {
 			String musicLabel = findMusicLabel(ctx, musicAppKey);
 			defaults.add(new KeydroidxWidgetItem(KeydroidxWidgetItem.TYPE_APP, musicLabel, musicAppKey));
-			KeydroidxLog.i("WidgetStorage", "默认组件: 音乐 " + musicLabel + " -> " + musicAppKey);
+			KeydroidxLog.i(TAG, "默认组件: 音乐 " + musicLabel + " -> " + musicAppKey);
 		} else {
-			KeydroidxLog.i("WidgetStorage", "默认组件: 未找到已安装的音乐应用，跳过");
+			KeydroidxLog.i(TAG, "默认组件: 未找到已安装的音乐应用，跳过");
 		}
 
 		setWidgets(defaults);
 		prefs.edit().putBoolean(KEY_INITIALIZED, true).apply();
-		KeydroidxLog.i("WidgetStorage", "默认组件写入完成，共 " + defaults.size() + " 个");
+		KeydroidxLog.i(TAG, "默认组件写入完成，共 " + defaults.size() + " 个");
 	}
 
 	/** 按优先级查找第一个已安装的音乐应用，返回 "pkg/cls" 格式。未找到返回 null。 */
@@ -171,7 +171,7 @@ public class KeydroidxWidgetStorage {
 		List<KeydroidxWidgetItem> result = new ArrayList<>();
 		String json = prefs.getString(KEY_WIDGETS, null);
 		if (json == null || json.isEmpty()) {
-			KeydroidxLog.i("WidgetStorage", "getWidgets: 无已配置组件");
+			KeydroidxLog.i(TAG, "getWidgets: 无已配置组件");
 			return result;
 		}
 		try {
@@ -179,9 +179,9 @@ public class KeydroidxWidgetStorage {
 			for (int i = 0; i < arr.length(); i++) {
 				result.add(KeydroidxWidgetItem.fromJson(arr.getJSONObject(i)));
 			}
-			KeydroidxLog.i("WidgetStorage", "getWidgets: 读取 " + result.size() + " 个组件");
+			KeydroidxLog.i(TAG, "getWidgets: 读取 " + result.size() + " 个组件");
 		} catch (JSONException e) {
-			KeydroidxLog.e("WidgetStorage", "getWidgets 解析失败", e);
+			KeydroidxLog.e(TAG, "getWidgets 解析失败", e);
 		}
 		return result;
 	}
@@ -193,30 +193,30 @@ public class KeydroidxWidgetStorage {
 			try {
 				arr.put(item.toJson());
 			} catch (JSONException e) {
-				KeydroidxLog.e("WidgetStorage", "setWidgets 序列化失败: " + item.label, e);
+				KeydroidxLog.e(TAG, "setWidgets 序列化失败: " + item.label, e);
 			}
 		}
 		prefs.edit().putString(KEY_WIDGETS, arr.toString()).apply();
-		KeydroidxLog.i("WidgetStorage", "setWidgets: 保存 " + widgets.size() + " 个组件");
+		KeydroidxLog.i(TAG, "setWidgets: 保存 " + widgets.size() + " 个组件");
 	}
 
 	/** 替换指定下标位置的组件（应用/网址/Activity 编辑「换绑」使用）。下标越界时忽略。 */
 	public void updateWidget(int index, KeydroidxWidgetItem item) {
 		List<KeydroidxWidgetItem> list = getWidgets();
 		if (index < 0 || index >= list.size()) {
-			KeydroidxLog.w("WidgetStorage", "updateWidget: 下标越界 index=" + index + " size=" + list.size());
+			KeydroidxLog.w(TAG, "updateWidget: 下标越界 index=" + index + " size=" + list.size());
 			return;
 		}
 		list.set(index, item);
 		setWidgets(list);
-		KeydroidxLog.i("WidgetStorage", "updateWidget: 更新下标 " + index + " -> " + item.label);
+		KeydroidxLog.i(TAG, "updateWidget: 更新下标 " + index + " -> " + item.label);
 	}
 
 	/** 追加一个组件；已达上限时拒绝并返回 false。 */
 	public boolean addWidget(KeydroidxWidgetItem item) {
 		List<KeydroidxWidgetItem> list = getWidgets();
 		if (list.size() >= MAX_COUNT) {
-			KeydroidxLog.w("WidgetStorage", "addWidget: 已达上限 " + MAX_COUNT + "，拒绝添加 " + item.label);
+			KeydroidxLog.w(TAG, "addWidget: 已达上限 " + MAX_COUNT + "，拒绝添加 " + item.label);
 			return false;
 		}
 		list.add(item);
@@ -230,7 +230,7 @@ public class KeydroidxWidgetStorage {
 		List<KeydroidxWidgetItem> list = getWidgets();
 		list.removeAll(toRemove);
 		setWidgets(list);
-		KeydroidxLog.i("WidgetStorage", "removeWidgets: 删除 " + toRemove.size() + " 个组件");
+		KeydroidxLog.i(TAG, "removeWidgets: 删除 " + toRemove.size() + " 个组件");
 	}
 
 	/** 是否已达组件数量上限。 */

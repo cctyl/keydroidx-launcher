@@ -37,7 +37,7 @@ import ru.playsoftware.j2meloader.BuildConfig;
  * 管理快捷栏应用列表、壁纸、软键映射等设置项的读写。
  */
 public class KeydroidxSettingsStorage {
-	private static final String TAG = "KeydroidxSettingsStorage";
+	private static final String TAG = "SettingsStorage";
 
 
 	private static final String PREFS_NAME = "nokia_desktop_settings";
@@ -101,7 +101,7 @@ public class KeydroidxSettingsStorage {
 			String json = prefs.getString(KEY_SHORTCUT_APPS, null);
 			if (json == null) {
 				// 首次启动：生成默认快捷应用（仅已安装的应用会被加入），并持久化
-				KeydroidxLog.i("SettingsStorage", "shortcut_apps 未配置，生成默认快捷应用");
+				KeydroidxLog.i(TAG, "shortcut_apps 未配置，生成默认快捷应用");
 				result = buildDefaultShortcutApps();
 				setShortcutApps(result);
 				return result;
@@ -130,7 +130,7 @@ public class KeydroidxSettingsStorage {
 			return;
 		}
 		// 首次启动：后台线程构建默认快捷应用（含 PackageManager 批量查询）
-		KeydroidxLog.i("SettingsStorage", "shortcut_apps 未配置，后台生成默认快捷应用");
+		KeydroidxLog.i(TAG, "shortcut_apps 未配置，后台生成默认快捷应用");
 		final Handler mainHandler = new Handler(Looper.getMainLooper());
         new Thread(new Runnable() {
                 @Override
@@ -142,7 +142,7 @@ public class KeydroidxSettingsStorage {
                         } catch (Throwable t) {
                                 // 最后防线：默认构建里任何未预料的异常（如 ROM 层 IPC bug）都不允许带崩进程。
                                 // 不落盘（保留 null），下次冷启动会重新尝试构建。
-                                KeydroidxLog.e("SettingsStorage", "构建默认快捷应用失败，本次返回空列表且不落盘", t);
+                                KeydroidxLog.e(TAG, "构建默认快捷应用失败，本次返回空列表且不落盘", t);
                                 mainHandler.post(new Runnable() {
                                         @Override
                                         public void run() {
@@ -157,11 +157,11 @@ public class KeydroidxSettingsStorage {
 				final List<ShortcutApp> actual;
 				synchronized (KeydroidxSettingsStorage.class) {
 					if (prefs.getString(KEY_SHORTCUT_APPS, null) == null) {
-						KeydroidxLog.i("SettingsStorage", "后台生成默认快捷应用完成: " + defaults.size()
+						KeydroidxLog.i(TAG, "后台生成默认快捷应用完成: " + defaults.size()
 								+ " 个，耗时 " + elapsed + "ms，落盘");
 						setShortcutApps(defaults);
 					} else {
-						KeydroidxLog.w("SettingsStorage", "后台默认构建完成，但期间已有用户配置，放弃覆盖");
+						KeydroidxLog.w(TAG, "后台默认构建完成，但期间已有用户配置，放弃覆盖");
 					}
 					// 以实际存储内容为准回调，避免桌面渲染出与设置页不一致的数据
 					actual = parseShortcutApps(prefs.getString(KEY_SHORTCUT_APPS, null));
@@ -193,12 +193,12 @@ public class KeydroidxSettingsStorage {
 			}
 			result.addAll(unique.values());
 			if (unique.size() < arr.length()) {
-				KeydroidxLog.w("SettingsStorage", "快捷栏配置存在同包重复入口，已去重: "
+				KeydroidxLog.w(TAG, "快捷栏配置存在同包重复入口，已去重: "
 						+ arr.length() + " -> " + unique.size());
 			}
-			KeydroidxLog.i("SettingsStorage", "getShortcutApps: 从存储读取 " + result.size() + " 个应用");
+			KeydroidxLog.i(TAG, "getShortcutApps: 从存储读取 " + result.size() + " 个应用");
 		} catch (JSONException e) {
-			KeydroidxLog.e("SettingsStorage", "getShortcutApps 解析失败", e);
+			KeydroidxLog.e(TAG, "getShortcutApps 解析失败", e);
 		}
 		return result;
 	}
@@ -241,7 +241,7 @@ public class KeydroidxSettingsStorage {
 					}
 					setShortcutApps(cleaned);
 				}
-				KeydroidxLog.i("SettingsStorage", "快捷栏已清理失效项，剩余 " + cleaned.size() + " 个");
+				KeydroidxLog.i(TAG, "快捷栏已清理失效项，剩余 " + cleaned.size() + " 个");
 				mainHandler.post(new Runnable() {
 					@Override
 					public void run() {
@@ -273,7 +273,7 @@ public class KeydroidxSettingsStorage {
 			}
 		}
 		if (!removed.isEmpty()) {
-			KeydroidxLog.i("SettingsStorage", "快捷栏发现已失效应用 " + removed.size()
+			KeydroidxLog.i(TAG, "快捷栏发现已失效应用 " + removed.size()
 					+ " 个，剔除: " + removed);
 		}
 		return kept;
@@ -295,7 +295,7 @@ public class KeydroidxSettingsStorage {
 				return false;
 			} catch (Throwable t) {
 				// 与 addPackageApp 同理：部分 ROM 的 CTA 钩子会对后台线程 PackageManager IPC 抛异常
-				KeydroidxLog.w("SettingsStorage", "校验快捷栏应用是否安装失败，保留: " + pkg);
+				KeydroidxLog.w(TAG, "校验快捷栏应用是否安装失败，保留: " + pkg);
 				return true;
 			}
 		}
@@ -311,7 +311,7 @@ public class KeydroidxSettingsStorage {
 		// 或根目录被整体搬走，不是"这个应用被卸载"——保留配置，避免误删用户勾选的快捷项
 		File parent = appDir.getParentFile();
 		if (parent == null || !parent.isDirectory()) {
-			KeydroidxLog.w("SettingsStorage", "快捷项目录不可访问（存储未挂载？），保留: "
+			KeydroidxLog.w(TAG, "快捷项目录不可访问（存储未挂载？），保留: "
 					+ app.label + " -> " + app.appKey);
 			return true;
 		}
@@ -348,7 +348,7 @@ public class KeydroidxSettingsStorage {
 		// 音乐：多个音乐 app 仅取第一个已安装的
 		addMusicApp(pm, defaults);
 
-		KeydroidxLog.i("SettingsStorage", "默认快捷应用生成完成: " + defaults.size() + " 个");
+		KeydroidxLog.i(TAG, "默认快捷应用生成完成: " + defaults.size() + " 个");
 		return defaults;
 	}
 
@@ -369,7 +369,7 @@ public class KeydroidxSettingsStorage {
                 } catch (Throwable t) {
                         // 展讯等 ROM 的 CTA 权限钩子可能对后台线程的 PackageManager IPC 抛 NPE（系统层 bug），
                         // 这里兜底跳过该项，避免「构建默认快捷栏」的后台线程把整个进程带崩
-                        KeydroidxLog.w("SettingsStorage", "查询音乐应用启动 Intent 失败，跳过: " + label + " (" + pkg + ")");
+                        KeydroidxLog.w(TAG, "查询音乐应用启动 Intent 失败，跳过: " + label + " (" + pkg + ")");
                         continue;
                 }
                 if (launch == null || launch.getComponent() == null) {
@@ -379,10 +379,10 @@ public class KeydroidxSettingsStorage {
 			String appKey = launch.getComponent().getPackageName() + "/"
 					+ launch.getComponent().getClassName();
 			out.add(new ShortcutApp(ShortcutApp.TYPE_ANDROID, label, appKey, launch));
-			KeydroidxLog.i("SettingsStorage", "默认音乐应用已加入: " + label + " -> " + appKey);
+			KeydroidxLog.i(TAG, "默认音乐应用已加入: " + label + " -> " + appKey);
 			return; // 仅取第一个
 		}
-		KeydroidxLog.i("SettingsStorage", "未找到已安装的音乐 app，跳过音乐快捷项");
+		KeydroidxLog.i(TAG, "未找到已安装的音乐 app，跳过音乐快捷项");
 	}
 
 	/** 通过包名检查是否已安装，并取主启动 Activity 加入默认列表 */
@@ -390,7 +390,7 @@ public class KeydroidxSettingsStorage {
         try {
                 pm.getPackageInfo(pkg, 0);
         } catch (PackageManager.NameNotFoundException e) {
-                KeydroidxLog.i("SettingsStorage", "默认应用未安装，跳过: " + label + " (" + pkg + ")");
+                KeydroidxLog.i(TAG, "默认应用未安装，跳过: " + label + " (" + pkg + ")");
                 return;
         }
         Intent launch;
@@ -398,18 +398,18 @@ public class KeydroidxSettingsStorage {
                 launch = pm.getLaunchIntentForPackage(pkg);
         } catch (Throwable t) {
                 // 同 addMusicApp：ROM 层 CTA 钩子可能对后台线程 IPC 抛 NPE，兜底跳过
-                KeydroidxLog.w("SettingsStorage", "查询默认应用启动 Intent 失败，跳过: " + label + " (" + pkg + ")");
+                KeydroidxLog.w(TAG, "查询默认应用启动 Intent 失败，跳过: " + label + " (" + pkg + ")");
                 return;
         }
         if (launch == null || launch.getComponent() == null) {
-			KeydroidxLog.w("SettingsStorage", "默认应用无启动 Intent，跳过: " + label + " (" + pkg + ")");
+			KeydroidxLog.w(TAG, "默认应用无启动 Intent，跳过: " + label + " (" + pkg + ")");
 			return;
 		}
 		launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 		String appKey = launch.getComponent().getPackageName() + "/"
 				+ launch.getComponent().getClassName();
 		out.add(new ShortcutApp(ShortcutApp.TYPE_ANDROID, label, appKey, launch));
-		KeydroidxLog.i("SettingsStorage", "默认应用已加入: " + label + " -> " + appKey);
+		KeydroidxLog.i(TAG, "默认应用已加入: " + label + " -> " + appKey);
 	}
 
 	/** 通过系统隐式 Intent 解析出可用 Activity 并加入默认列表 */
@@ -421,11 +421,11 @@ public class KeydroidxSettingsStorage {
                         ri = pm.resolveActivity(intent, 0);
                 } catch (Throwable t) {
                         // 同 addMusicApp：ROM 层 CTA 钩子可能对后台线程 IPC 抛 NPE，兜底跳过
-                        KeydroidxLog.w("SettingsStorage", "解析系统应用失败，跳过: " + label + " (" + key + ")");
+                        KeydroidxLog.w(TAG, "解析系统应用失败，跳过: " + label + " (" + key + ")");
                         return;
                 }
                 if (ri == null || ri.activityInfo == null) {
-			KeydroidxLog.i("SettingsStorage", "默认应用无可用 Activity，跳过: " + label + " (" + key + ")");
+			KeydroidxLog.i(TAG, "默认应用无可用 Activity，跳过: " + label + " (" + key + ")");
 			return;
 		}
 		ActivityInfo ai = ri.activityInfo;
@@ -435,7 +435,7 @@ public class KeydroidxSettingsStorage {
 		launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 		String appKey = ai.packageName + "/" + ai.name;
 		out.add(new ShortcutApp(ShortcutApp.TYPE_ANDROID, label, appKey, launch));
-		KeydroidxLog.i("SettingsStorage", "默认应用已加入: " + label + " -> " + appKey);
+		KeydroidxLog.i(TAG, "默认应用已加入: " + label + " -> " + appKey);
 	}
 
 	/** 根据 action key 构造对应的隐式 Intent */
@@ -461,11 +461,11 @@ public class KeydroidxSettingsStorage {
 			try {
 				arr.put(app.toJson());
 			} catch (JSONException e) {
-				KeydroidxLog.e("SettingsStorage", "setShortcutApps 序列化失败: " + app.label, e);
+				KeydroidxLog.e(TAG, "setShortcutApps 序列化失败: " + app.label, e);
 			}
 		}
 		prefs.edit().putString(KEY_SHORTCUT_APPS, arr.toString()).apply();
-		KeydroidxLog.i("SettingsStorage", "setShortcutApps: 保存 " + apps.size() + " 个应用");
+		KeydroidxLog.i(TAG, "setShortcutApps: 保存 " + apps.size() + " 个应用");
 	}
 
 	// ── 壁纸 ──
@@ -484,7 +484,7 @@ public class KeydroidxSettingsStorage {
 
 	public void setWallpaper(String wallpaperId) {
 		prefs.edit().putString(KEY_WALLPAPER, wallpaperId).apply();
-		KeydroidxLog.i("SettingsStorage", "setWallpaper: " + wallpaperId);
+		KeydroidxLog.i(TAG, "setWallpaper: " + wallpaperId);
 	}
 
 	// ── 自定义壁纸缩放模式（桌面设置 → 外观与显示 → 壁纸设置） ──
@@ -515,7 +515,7 @@ public class KeydroidxSettingsStorage {
 	public static void setWallpaperScale(Context ctx, int mode) {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putInt(KEY_WALLPAPER_SCALE, mode).apply();
-		KeydroidxLog.i("SettingsStorage", "setWallpaperScale: " + mode);
+		KeydroidxLog.i(TAG, "setWallpaperScale: " + mode);
 	}
 
 	/** 获取当前壁纸对应的内置 Drawable Resource ID（如果为 custom 则返回 0） */
@@ -543,7 +543,7 @@ public class KeydroidxSettingsStorage {
 
 	public void setSoftLeftAction(String action) {
 		prefs.edit().putString(KEY_SOFT_LEFT_ACTION, action).apply();
-		KeydroidxLog.i("SettingsStorage", "setSoftLeftAction: " + action);
+		KeydroidxLog.i(TAG, "setSoftLeftAction: " + action);
 	}
 
 	public String getSoftRightAction() {
@@ -552,7 +552,7 @@ public class KeydroidxSettingsStorage {
 
 	public void setSoftRightAction(String action) {
 		prefs.edit().putString(KEY_SOFT_RIGHT_ACTION, action).apply();
-		KeydroidxLog.i("SettingsStorage", "setSoftRightAction: " + action);
+		KeydroidxLog.i(TAG, "setSoftRightAction: " + action);
 	}
 
 	// ── 后台管理保护名单 ──
@@ -573,9 +573,9 @@ public class KeydroidxSettingsStorage {
 			for (int i = 0; i < arr.length(); i++) {
 				result.add(arr.getString(i));
 			}
-			KeydroidxLog.i("SettingsStorage", "getProtectedPackages: 读取 " + result.size() + " 个包");
+			KeydroidxLog.i(TAG, "getProtectedPackages: 读取 " + result.size() + " 个包");
 		} catch (JSONException e) {
-			KeydroidxLog.e("SettingsStorage", "getProtectedPackages 解析失败", e);
+			KeydroidxLog.e(TAG, "getProtectedPackages 解析失败", e);
 		}
 		return result;
 	}
@@ -589,7 +589,7 @@ public class KeydroidxSettingsStorage {
 			}
 		}
 		prefs.edit().putString(KEY_PROTECTED_PACKAGES, arr.toString()).apply();
-		KeydroidxLog.i("SettingsStorage", "setProtectedPackages: 保存 " + arr.length() + " 个包");
+		KeydroidxLog.i(TAG, "setProtectedPackages: 保存 " + arr.length() + " 个包");
 	}
 
 	// ── 字体大小与字体样式 ──
@@ -622,7 +622,7 @@ public class KeydroidxSettingsStorage {
 		KeydroidxFontManager.setCurrentFontId(fontId);
 		KeydroidxFontManager.invalidate();
 		notifySettingsChanged(ctx);
-		KeydroidxLog.i("SettingsStorage", "setFontId: " + fontId);
+		KeydroidxLog.i(TAG, "setFontId: " + fontId);
 	}
 
 	/**
@@ -639,7 +639,7 @@ public class KeydroidxSettingsStorage {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putFloat(KEY_FONT_SCALE, scale).apply();
 		notifySettingsChanged(ctx);
-		KeydroidxLog.i("SettingsStorage", "setFontScale: " + scale);
+		KeydroidxLog.i(TAG, "setFontScale: " + scale);
 	}
 
 	// ── 日志记录开关 ──
@@ -667,7 +667,7 @@ public class KeydroidxSettingsStorage {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putBoolean(KEY_LOG_FILE, enabled).apply();
 		KeydroidxLog.setDetailedLogEnabled(ctx, enabled);
-		KeydroidxLog.i("SettingsStorage", "setFileLogEnabled: " + enabled);
+		KeydroidxLog.i(TAG, "setFileLogEnabled: " + enabled);
 	}
 
 	// ── 通知使用权提示开关 ──
@@ -687,7 +687,7 @@ public class KeydroidxSettingsStorage {
         public static void setNotifyAccessPromptDisabled(Context ctx, boolean disabled) {
                 ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                                 .edit().putBoolean(KEY_NOTIFY_ACCESS_PROMPT_DISABLED, disabled).apply();
-                KeydroidxLog.i("SettingsStorage", "setNotifyAccessPromptDisabled: " + disabled);
+                KeydroidxLog.i(TAG, "setNotifyAccessPromptDisabled: " + disabled);
         }
 
         // ── 通知中心（桌面设置 → 系统与权限 → 通知中心） ──
@@ -708,7 +708,7 @@ public class KeydroidxSettingsStorage {
         public static void setNotificationBarEnabled(Context ctx, boolean enabled) {
                 ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                                 .edit().putBoolean(KEY_NOTIFICATION_BAR_ENABLED, enabled).apply();
-                KeydroidxLog.i("SettingsStorage", "setNotificationBarEnabled: " + enabled);
+                KeydroidxLog.i(TAG, "setNotificationBarEnabled: " + enabled);
         }
 
         /**
@@ -724,7 +724,7 @@ public class KeydroidxSettingsStorage {
         public static void setNotificationShowOngoing(Context ctx, boolean show) {
                 ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                                 .edit().putBoolean(KEY_NOTIFICATION_SHOW_ONGOING, show).apply();
-                KeydroidxLog.i("SettingsStorage", "setNotificationShowOngoing: " + show);
+                KeydroidxLog.i(TAG, "setNotificationShowOngoing: " + show);
         }
 
 	// ── 桌面保活开关（桌面设置 → 系统与权限 → 保活服务） ──
@@ -748,7 +748,7 @@ public class KeydroidxSettingsStorage {
 	public static void setDesktopKeepAliveEnabled(Context ctx, boolean enabled) {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putBoolean(KEY_DESKTOP_KEEPALIVE, enabled).apply();
-		KeydroidxLog.i("SettingsStorage", "setDesktopKeepAliveEnabled: " + enabled);
+		KeydroidxLog.i(TAG, "setDesktopKeepAliveEnabled: " + enabled);
 	}
 
 	// ── 触屏模式（屏幕分为两部分：上半部桌面内容，下半部虚拟触摸按键） ──
@@ -804,7 +804,7 @@ public class KeydroidxSettingsStorage {
 	public static void setAuthMode(Context ctx, int mode) {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putInt(KEY_AUTH_MODE, mode).apply();
-		KeydroidxLog.i("SettingsStorage", "setAuthMode: " + getAuthModeName(mode));
+		KeydroidxLog.i(TAG, "setAuthMode: " + getAuthModeName(mode));
 	}
 
 	/** 授权模式中文名（菜单展示 / 日志复用）。 */
@@ -851,7 +851,7 @@ public class KeydroidxSettingsStorage {
 		}
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putBoolean(KEY_SHIZUKU_EVER_ACTIVATED, true).apply();
-		KeydroidxLog.i("SettingsStorage", "mini_shizuku 曾激活标志已置位");
+		KeydroidxLog.i(TAG, "mini_shizuku 曾激活标志已置位");
 	}
 
 	/**
@@ -918,7 +918,7 @@ public class KeydroidxSettingsStorage {
 	public static void setPowerInterceptorMode(Context ctx, int mode) {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putInt(KEY_POWER_INTERCEPTOR_MODE, mode).apply();
-		KeydroidxLog.i("SettingsStorage", "setPowerInterceptorMode: " + mode
+		KeydroidxLog.i(TAG, "setPowerInterceptorMode: " + mode
 				+ " (" + getPowerInterceptorModeName(mode) + ")");
 	}
 
@@ -956,7 +956,7 @@ public class KeydroidxSettingsStorage {
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putString(KEY_ICON_PACK_ID, packId).apply();
 		notifySettingsChanged(ctx);
-		KeydroidxLog.i("SettingsStorage", "setIconPackId: " + packId);
+		KeydroidxLog.i(TAG, "setIconPackId: " + packId);
 	}
 
 	/** 该应用是否存在单应用图标覆盖 */
@@ -982,7 +982,7 @@ public class KeydroidxSettingsStorage {
 		Map<String, String[]> map = new HashMap<>(overrides(ctx));
 		map.put(pkg, new String[]{packId, iconName});
 		writeOverrides(ctx, map);
-		KeydroidxLog.i("SettingsStorage", "setIconOverride: " + pkg + " → " + packId + "/" + iconName);
+		KeydroidxLog.i(TAG, "setIconOverride: " + pkg + " → " + packId + "/" + iconName);
 	}
 
 	/**
@@ -997,7 +997,7 @@ public class KeydroidxSettingsStorage {
 		if (map.isEmpty()) return 0;
 		int count = map.size();
 		writeOverrides(ctx, new HashMap<>());
-		KeydroidxLog.i("SettingsStorage", "clearAllIconOverrides: 清除 " + count + " 条覆盖");
+		KeydroidxLog.i(TAG, "clearAllIconOverrides: 清除 " + count + " 条覆盖");
 		return count;
 	}
 
@@ -1006,7 +1006,7 @@ public class KeydroidxSettingsStorage {
 		Map<String, String[]> map = new HashMap<>(overrides(ctx));
 		if (map.remove(pkg) == null) return;
 		writeOverrides(ctx, map);
-		KeydroidxLog.i("SettingsStorage", "clearIconOverride: " + pkg);
+		KeydroidxLog.i(TAG, "clearIconOverride: " + pkg);
 	}
 
 	/** 被单应用覆盖过的包名集合 */
@@ -1059,7 +1059,7 @@ public class KeydroidxSettingsStorage {
 				}
 			} catch (Exception e) {
 				// 历史脏数据：忽略整表，退化为「无覆盖」而不是崩溃
-				KeydroidxLog.w("SettingsStorage", "icon_overrides 解析失败: " + e.getMessage());
+				KeydroidxLog.w(TAG, "icon_overrides 解析失败: " + e.getMessage());
 			}
 			map = java.util.Collections.unmodifiableMap(map);
 			iconOverrideCache = map;
@@ -1076,7 +1076,7 @@ public class KeydroidxSettingsStorage {
 				item.put("icon", e.getValue()[1]);
 				obj.put(e.getKey(), item);
 			} catch (JSONException ex) {
-				KeydroidxLog.e("SettingsStorage", "序列化图标覆盖失败: " + e.getKey(), ex);
+				KeydroidxLog.e(TAG, "序列化图标覆盖失败: " + e.getKey(), ex);
 			}
 		}
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -1098,7 +1098,7 @@ public class KeydroidxSettingsStorage {
 	public void setThemeId(String themeId) {
 		prefs.edit().putString(KEY_WALLPAPER, themeId).apply();
 		notifySettingsChanged(context);
-		KeydroidxLog.i("SettingsStorage", "setThemeId: " + themeId);
+		KeydroidxLog.i(TAG, "setThemeId: " + themeId);
 	}
 
 	private static void notifySettingsChanged(Context ctx) {
@@ -1109,7 +1109,7 @@ public class KeydroidxSettingsStorage {
 			Uri keysUri = Uri.parse("content://" + ctx.getPackageName() + ".keyprovider/keys");
 			ctx.getContentResolver().notifyChange(keysUri, null);
 		} catch (Exception e) {
-			KeydroidxLog.w("SettingsStorage", "notifySettingsChanged failed: " + e.getMessage());
+			KeydroidxLog.w(TAG, "notifySettingsChanged failed: " + e.getMessage());
 		}
 	}
 }

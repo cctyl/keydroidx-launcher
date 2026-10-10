@@ -21,7 +21,6 @@ import android.content.Context;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
-import android.util.Log;
 
 import androidx.activity.result.contract.ActivityResultContract;
 
@@ -38,6 +37,7 @@ import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 
 import ru.playsoftware.j2meloader.config.Config;
+import io.github.cctyl.nokia.common.log.KeydroidxLog;
 
 public class FileUtils {
 
@@ -50,7 +50,7 @@ public class FileUtils {
 
 	public static void copyFiles(File src, File dst, FilenameFilter filter) {
 		if (!dst.exists() && !dst.mkdirs()) {
-			Log.e(TAG, "copyFiles() failed create dir: " + dst);
+			KeydroidxLog.w(TAG, "copyFiles() failed create dir: " + dst);
 			return;
 		}
 		File[] list = src.listFiles(filter);
@@ -88,7 +88,7 @@ public class FileUtils {
 			}
 		}
 		if (!dir.delete() && dir.exists()) {
-			Log.w(TAG, "Can't delete file: " + dir);
+			KeydroidxLog.w(TAG, "Can't delete file: " + dir);
 			return false;
 		}
 		return true;
@@ -171,7 +171,7 @@ public class FileUtils {
 			return;
 		}
 		if (!dst.mkdirs()) {
-			Log.e(TAG, "moveFiles() can't create directory: " + dst);
+			KeydroidxLog.w(TAG, "moveFiles() can't create directory: " + dst);
 		}
 		for (File file : files) {
 			File to = new File(dst, file.getName());
@@ -181,15 +181,15 @@ public class FileUtils {
 				try {
 					copyFileUsingChannel(file, to);
 					if (!file.delete()) {
-						Log.e(TAG, "moveFiles() can't delete: " + file);
+						KeydroidxLog.w(TAG, "moveFiles() can't delete: " + file);
 					}
 				} catch (IOException e) {
-					Log.e(TAG, "moveFiles() can't move [" + file + "] to [" + to + "]", e);
+					KeydroidxLog.w(TAG, "moveFiles() can't move [" + file + "] to [" + to + "]", e);
 				}
 			}
 		}
 		if (!src.delete()) {
-			Log.e(TAG, "moveFiles() can't delete: " + src);
+			KeydroidxLog.w(TAG, "moveFiles() can't delete: " + src);
 		}
 	}
 
@@ -199,7 +199,7 @@ public class FileUtils {
 			dis.readFully(buf);
 			return new String(buf);
 		} catch (IOException e) {
-			Log.e(TAG, "getText: " + path, e);
+			KeydroidxLog.w(TAG, "getText: " + path, e);
 		}
 		return "";
 	}

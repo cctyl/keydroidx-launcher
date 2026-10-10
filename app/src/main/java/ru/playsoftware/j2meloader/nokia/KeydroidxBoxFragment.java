@@ -64,7 +64,7 @@ import ru.woesss.j2me.installer.KeydroidxInstallerDialog;
  * 方向键导航，复用 J2ME-Loader 原有的安装与启动逻辑。
  */
 public class KeydroidxBoxFragment extends KeydroidxPageFragment {
-	private static final String TAG = "KeydroidxBoxFragment";
+	private static final String TAG = "Box";
 
 	/**
 	 * 本进程是否已在本页「进入时」自动申请过存储权限。
@@ -131,7 +131,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	@Override
 	public void onCreate(@Nullable Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		KeydroidxLog.i("Box", "onCreate");
+		KeydroidxLog.i(TAG, "onCreate");
 
 		// 注册文件选择器（必须在 onCreate 前/内注册）
 		openFileLauncher = registerForActivityResult(
@@ -175,7 +175,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			appItems = new ArrayList<>(cachedAppItems);
 		}
 		buildGrid();
-		KeydroidxLog.i("Box", "首帧同步构建网格完成，应用数：" + appItems.size());
+		KeydroidxLog.i(TAG, "首帧同步构建网格完成，应用数：" + appItems.size());
 
 		// 延迟到 midPanel 布局完成后再计算行数并订阅数据（panelH 需要实测反推）
 		view.post(() -> {
@@ -191,7 +191,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			// 本页一切功能都依赖外部工作目录：首次进入就补齐存储权限，
 			// 而不是等用户点了「安装」才把人拦在操作中途。
 			requestStoragePermissionOnEnter();
-			KeydroidxLog.i("Box", "应用程序初始化完成（延迟到 panelH 可用），等待数据加载…");
+			KeydroidxLog.i(TAG, "应用程序初始化完成（延迟到 panelH 可用），等待数据加载…");
 		});
 	}
 
@@ -207,7 +207,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		KeydroidxDesktopActivity host = (KeydroidxDesktopActivity) requireActivity();
 		int panelH = host.getMidPanelHeight();
 		if (panelH <= 0) {
-			KeydroidxLog.w("Box", "computeRowsPerPage: panelH 尚未可用，保持默认 rowsPerPage=" + rowsPerPage);
+			KeydroidxLog.w(TAG, "computeRowsPerPage: panelH 尚未可用，保持默认 rowsPerPage=" + rowsPerPage);
 			return;
 		}
 		float density = getResources().getDisplayMetrics().density;
@@ -223,7 +223,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		rows = Math.max(2, Math.min(8, rows));
 		rowsPerPage = rows;
 		perPage = COLS * rowsPerPage;
-		KeydroidxLog.i("Box", "computeRowsPerPage: rowsPerPage=" + rowsPerPage
+		KeydroidxLog.i(TAG, "computeRowsPerPage: rowsPerPage=" + rowsPerPage
 				+ " panelH=" + panelH + " scale=" + scale + " density=" + density
 				+ " fontScale=" + fontScale + " dynamicRowHDp=" + dynamicRowHDp
 				+ " availDesign=" + availDesign);
@@ -235,16 +235,16 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 
 	private void onDbUpdated(List<AppItem> items) {
 		List<AppItem> fresh = items != null ? items : new ArrayList<>();
-		KeydroidxLog.i("Box", "onDbUpdated 收到 " + fresh.size() + " 个应用");
+		KeydroidxLog.i(TAG, "onDbUpdated 收到 " + fresh.size() + " 个应用");
 		// 内容与缓存一致且网格已正常渲染时跳过重建：避免「先显示缓存版、Room 回调后又闪一次」
 		// 的多余重排（安装/卸载/重命名才会走到重建分支）。
 		if (gridCellViews != null && isSameAppList(fresh, appItems)) {
 			// 覆盖安装同一 JAR：列表三项字段同，但图标文件被重写（mtime 变化），
 			// 缓存 key 随之改变 → 检测到任一图标缓存失效即重建，让新图标上屏。
 			if (hasStaleIconCache()) {
-				KeydroidxLog.i("Box", "列表未变但图标文件已更新（覆盖安装），重建网格");
+				KeydroidxLog.i(TAG, "列表未变但图标文件已更新（覆盖安装），重建网格");
 			} else {
-				KeydroidxLog.d("Box", "数据与缓存一致，跳过重建");
+				KeydroidxLog.d(TAG, "数据与缓存一致，跳过重建");
 				return;
 			}
 		}
@@ -303,7 +303,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		float rowActualDp = rowsPerPage > 0 ? (availDesign - TITLE_H_DP) / rowsPerPage : ROW_H_DP;
 		int rowH = KeydroidxDimens.dp(getResources(), Math.round(rowActualDp));
 
-		KeydroidxLog.i("Box", "buildGrid: totalCells=" + totalGridCells
+		KeydroidxLog.i(TAG, "buildGrid: totalCells=" + totalGridCells
 				+ " rows=" + totalRows + " apps=" + appItems.size()
 				+ " rowH=" + rowH + "px rowActualDp=" + rowActualDp + " availDesign=" + availDesign);
 
@@ -427,7 +427,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 						cachedIcons.put(cacheKey, icon);
 					}
 				} catch (Exception e) {
-					KeydroidxLog.w("Box", "加载图标失败: " + imgPath + " " + e.getMessage());
+					KeydroidxLog.w(TAG, "加载图标失败: " + imgPath + " " + e.getMessage());
 				}
 			}
 			if (icon != null) {
@@ -542,7 +542,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			return;
 		}
 		storagePermissionRequestedOnEnter = true;
-		KeydroidxLog.i("Box", "进入应用程序页，主动申请存储权限");
+		KeydroidxLog.i(TAG, "进入应用程序页，主动申请存储权限");
 		requestStoragePermission(false);
 	}
 
@@ -553,7 +553,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	 *                        false 表示申请来自页面进入时的主动申请，授予后只需把列表数据刷出来
 	 */
 	private void requestStoragePermission(boolean continueInstall) {
-		KeydroidxLog.i("Box", "存储权限缺失，发起申请（授予后继续安装=" + continueInstall + "）");
+		KeydroidxLog.i(TAG, "存储权限缺失，发起申请（授予后继续安装=" + continueInstall + "）");
 		KeydroidxPermissionManager.requestWithNokiaDialog(requireActivity(),
 				"存储权限申请",
 				"运行 J2ME 应用需要读写手机存储权限：用于读取安装包，并把应用数据写入模拟器工作目录。",
@@ -561,7 +561,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 				new OnPermissionCallback() {
 					@Override
 					public void onGranted(@NonNull List<String> permissions, boolean allGranted) {
-						KeydroidxLog.i("Box", "存储权限已授予，重建工作目录并重新初始化数据库");
+						KeydroidxLog.i(TAG, "存储权限已授予，重建工作目录并重新初始化数据库");
 						FileUtils.initWorkDir(new File(Config.getEmulatorDir()));
 						appRepository.ensureReady();
 						if (!appRepository.isReady()) {
@@ -574,7 +574,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 
 					@Override
 					public void onDenied(@NonNull List<String> permissions, boolean quick) {
-						KeydroidxLog.w("Box", "存储权限被拒绝，无法安装 JAR（quick=" + quick + "）");
+						KeydroidxLog.w(TAG, "存储权限被拒绝，无法安装 JAR（quick=" + quick + "）");
 						if (isAdded()) {
 							Toast.makeText(requireContext(),
 									"没有存储权限，无法运行 JAR 应用", Toast.LENGTH_SHORT).show();
@@ -609,7 +609,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			return;
 		}
 		String path = Config.getEmulatorDir();
-		KeydroidxLog.w("Box", "工作目录不可写，JAR 列表/安装均不可用: " + path);
+		KeydroidxLog.w(TAG, "工作目录不可写，JAR 列表/安装均不可用: " + path);
 		new KeydroidxConfirmDialog(requireContext(), "无法访问存储",
 				"无法写入模拟器工作目录：\n" + path
 						+ "\n\n若刚刚授予了存储权限，需要重新启动应用才会生效。\n确定立即重启应用吗？")
@@ -624,7 +624,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		if (context == null) {
 			return;
 		}
-		KeydroidxLog.i("Box", "重启应用以使存储权限生效");
+		KeydroidxLog.i(TAG, "重启应用以使存储权限生效");
 		try {
 			Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
 			if (intent != null) {
@@ -632,13 +632,13 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 				context.startActivity(intent);
 			}
 		} catch (Exception e) {
-			KeydroidxLog.w("Box", "重新拉起应用失败: " + e.getMessage());
+			KeydroidxLog.w(TAG, "重新拉起应用失败: " + e.getMessage());
 		}
 		android.os.Process.killProcess(android.os.Process.myPid());
 	}
 
 	private void launchFilePicker() {
-		KeydroidxLog.i("Box", "启动文件选择器");
+		KeydroidxLog.i(TAG, "启动文件选择器");
 		String path = preferences.getString(Constants.PREF_LAST_PATH, null);
 		if (path == null) {
 			File dir = Environment.getExternalStorageDirectory();
@@ -649,16 +649,16 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		try {
 			openFileLauncher.launch(path);
 		} catch (Exception e) {
-			KeydroidxLog.e("Box", "启动文件选择器失败", e);
+			KeydroidxLog.e(TAG, "启动文件选择器失败", e);
 		}
 	}
 
 	private void onPickFileResult(android.net.Uri uri) {
 		if (uri == null) {
-			KeydroidxLog.i("Box", "文件选择器返回 null（用户取消）");
+			KeydroidxLog.i(TAG, "文件选择器返回 null（用户取消）");
 			return;
 		}
-		KeydroidxLog.i("Box", "文件选择器返回: " + uri);
+		KeydroidxLog.i(TAG, "文件选择器返回: " + uri);
 		preferences.edit()
 				.putString(Constants.PREF_LAST_PATH, FilteredFilePickerFragment.getLastPath())
 				.apply();
@@ -735,7 +735,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 
 		if (focusIndex == 0) {
 			// 安装入口
-			KeydroidxLog.i("Box", "onSelect: 安装");
+			KeydroidxLog.i(TAG, "onSelect: 安装");
 			if (!ensureStorageReady()) {
 				return true;
 			}
@@ -744,7 +744,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		}
 		if (focusIndex == 1) {
 			// JAR 全局设置
-			KeydroidxLog.i("Box", "onSelect: JAR 全局设置");
+			KeydroidxLog.i(TAG, "onSelect: JAR 全局设置");
 			KeydroidxGlobalProfile.openGlobalSettings(requireContext());
 			return true;
 		}
@@ -753,7 +753,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 		int appIdx = focusIndex - 2;
 		if (appIdx >= 0 && appIdx < appItems.size()) {
 			AppItem app = appItems.get(appIdx);
-			KeydroidxLog.i("Box", "onSelect: 直接启动 " + app.getTitle());
+			KeydroidxLog.i(TAG, "onSelect: 直接启动 " + app.getTitle());
 			KeydroidxJarLauncher.launch(requireActivity(), app.getTitle(), app.getPathExt());
 			return true;
 		}
@@ -768,16 +768,16 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	 * 弹出诺基亚风格确认弹窗：把全局 JAR 设置覆盖到所有已装 JAR。
 	 */
 	private void showSyncAllDialog() {
-		KeydroidxLog.i("Box", "弹出同步全局设置确认弹窗");
+		KeydroidxLog.i(TAG, "弹出同步全局设置确认弹窗");
 		List<KeydroidxOptionsDialog.OptionItem> items = new ArrayList<>();
 		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_SETTINGS,
 				"确定，覆盖全部", true, false, () -> {
-			KeydroidxLog.i("Box", "确认同步全局设置到所有 JAR");
+			KeydroidxLog.i(TAG, "确认同步全局设置到所有 JAR");
 			doSyncAll();
 		}));
 		items.add(new KeydroidxOptionsDialog.OptionItem(0,
 				"取消", true, false, () -> {
-			KeydroidxLog.i("Box", "取消同步全局设置");
+			KeydroidxLog.i(TAG, "取消同步全局设置");
 		}));
 		KeydroidxOptionsDialog.show(getParentFragmentManager(),
 				"同步全局设置\n将覆盖所有已装 JAR 的设置，确定？", items);
@@ -808,21 +808,21 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	 * 弹出诺基亚风格选项菜单弹窗（启动/设置/卸载）。
 	 */
 	private void showAppOptionsMenu(AppItem app) {
-		KeydroidxLog.i("Box", "弹出选项菜单: " + app.getTitle());
+		KeydroidxLog.i(TAG, "弹出选项菜单: " + app.getTitle());
 		List<KeydroidxOptionsDialog.OptionItem> items = new ArrayList<>();
 		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_PLAY,
 				"启动", true, false, () -> {
-			KeydroidxLog.i("Box", "选项菜单-启动: " + app.getTitle());
+			KeydroidxLog.i(TAG, "选项菜单-启动: " + app.getTitle());
 			KeydroidxJarLauncher.launch(requireActivity(), app.getTitle(), app.getPathExt());
 		}));
 		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_SETTINGS,
 				"设置", true, false, () -> {
-			KeydroidxLog.i("Box", "选项菜单-设置: " + app.getTitle());
+			KeydroidxLog.i(TAG, "选项菜单-设置: " + app.getTitle());
 			Config.startApp(requireContext(), app.getTitle(), app.getPathExt(), true);
 		}));
 		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_DELETE,
 				"卸载", true, false, () -> {
-			KeydroidxLog.i("Box", "选项菜单-卸载: " + app.getTitle());
+			KeydroidxLog.i(TAG, "选项菜单-卸载: " + app.getTitle());
 			showUninstallDialog(app);
 		}));
 		KeydroidxOptionsDialog.show(getParentFragmentManager(), app.getTitle(), items);
@@ -838,10 +838,10 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	 */
 	private void showUninstallDialog(AppItem app) {
 		if (app == null) {
-			KeydroidxLog.w("Box", "showUninstallDialog: app 为 null，忽略");
+			KeydroidxLog.w(TAG, "showUninstallDialog: app 为 null，忽略");
 			return;
 		}
-		KeydroidxLog.i("Box", "弹出卸载确认弹窗: " + app.getTitle());
+		KeydroidxLog.i(TAG, "弹出卸载确认弹窗: " + app.getTitle());
 		KeydroidxUninstallDialog dialog = KeydroidxUninstallDialog.newInstance(app.getTitle());
 		dialog.setConfirmListener(() -> doUninstall(app));
 		dialog.show(getParentFragmentManager(), "uninstall");
@@ -850,7 +850,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	/** 执行卸载：删除应用目录/存档/图标 + 数据库记录，数据库变更会触发 onDbUpdated 自动重建网格 */
 	private void doUninstall(AppItem app) {
 		if (app == null) return;
-		KeydroidxLog.i("Box", "执行卸载: " + app.getTitle());
+		KeydroidxLog.i(TAG, "执行卸载: " + app.getTitle());
 		// 图标文件即将被删除，同步清掉进程内缓存（重装同路径应用时不至于显示旧图）
 		String imgPath = app.getImagePathExt();
 		if (imgPath != null) {
