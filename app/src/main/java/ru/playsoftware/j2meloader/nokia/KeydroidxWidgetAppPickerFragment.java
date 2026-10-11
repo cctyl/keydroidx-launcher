@@ -1,11 +1,14 @@
 package ru.playsoftware.j2meloader.nokia;
 import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.database.sqlite.SQLiteCantOpenDatabaseException;
+import android.database.sqlite.SQLiteException;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -51,6 +54,7 @@ import ru.playsoftware.j2meloader.appsdb.AppDatabase;
 import ru.playsoftware.j2meloader.appsdb.AppItemDao;
 import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
+import ru.playsoftware.j2meloader.util.FileUtils;
 
 /**
  * 桌面组件设置 → 添加组件 → 应用选择页（应用类组件添加/编辑 + Activity快捷选应用）。
@@ -100,6 +104,8 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 	private String currentEditValue; // EDIT 模式当前编辑项的 widget.value
 
 	private KeydroidxWidgetStorage storage;
+	/** J2ME 应用列表是否读取失败（工作目录不可写等原因）。true 时用顶部匹配计数位给一行灰色提示。 */
+	private volatile boolean j2meLoadFailed;
 
 	// 宫格参数
 	private int columns = COLS_MIN;
@@ -415,23 +421,48 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 					buildPage();
 					setInitialFocus();
 				}
+				// 读取失败（工作目录不可写/权限不足等）：复用顶部匹配计数位给一行灰色提示，不新增布局节点
+				if (j2meLoadFailed) {
+					tvMatchCount.setText("J2ME 应用读取失败");
+					tvMatchCount.setVisibility(View.VISIBLE);
+				}
 			},
-			error -> KeydroidxLog.e(TAG, "加载 J2ME 应用失败", error)
+			// 环境类失败已在 loadJ2meApps 内降级处理，这里兜底也走 w（避免误触发自动上报）
+			error -> KeydroidxLog.w(TAG, "加载 J2ME 应用失败", error)
 		);
 	}
 
+	/**
+	 * 加载 J2ME 已安装的应用（J2ME-apps.db）。
+	 * <p>
+	 * 失败一律在本方法内降级处理（宫格少 J2ME 项 + 顶部一行灰色提示），绝不向上抛异常，
+	 * 以保证安卓应用列表始终可用。
+	 */
 	private void loadJ2meApps(List<AppEntry> out) {
+		String emulatorDir = Config.getEmulatorDir();
+		File dir = new File(emulatorDir);
+		File dbFile = new File(dir, "J2ME-apps.db");
+
+		// 与 AppRepository.ensureReady() 同一套判定：存储权限按设计是首次使用相关功能时才申请，
+		// 此时工作目录不可写，SQLite 连 WAL/journal 都建不出来（SQLITE_CANTOPEN），先跳过、别去开库。
+		// 这里刻意不复用 FileUtils.initWorkDir()：它会顺带补建 shaders/ 与 .nomedia，
+		// 对「只是读一下应用列表」的调用方副作用过大。
+		if ((!dir.isDirectory() && !dir.mkdirs()) || !dir.canWrite()) {
+			j2meLoadFailed = true;
+			KeydroidxLog.w(TAG, "工作目录暂不可写，跳过 J2ME 应用加载: " + buildDiagInfo(dir, dbFile));
+			return;
+		}
+
+		if (!dbFile.exists()) {
+			KeydroidxLog.i(TAG, "J2ME 数据库不存在，跳过 JAR 应用加载");
+			return;
+		}
+
+		AppDatabase db = null;
 		try {
-			String emulatorDir = Config.getEmulatorDir();
-			File dbFile = new File(emulatorDir, "J2ME-apps.db");
-			if (!dbFile.exists()) {
-				KeydroidxLog.i(TAG, "J2ME 数据库不存在，跳过 JAR 应用加载");
-				return;
-			}
-			AppDatabase db = AppDatabase.open(requireActivity().getApplicationContext(), emulatorDir);
+			db = AppDatabase.open(requireActivity().getApplicationContext(), emulatorDir);
 			AppItemDao dao = db.appItemDao();
 			List<AppItem> j2meApps = dao.getAllSingle(new SimpleSortQuery()).blockingGet();
-			db.close();
 			for (AppItem app : j2meApps) {
 				String label = app.getTitle();
 				Drawable icon = null;
@@ -448,8 +479,59 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 			}
 			KeydroidxLog.i(TAG, "加载 J2ME 应用: " + j2meApps.size() + " 个");
 		} catch (Exception e) {
-			KeydroidxLog.e(TAG, "加载 J2ME 应用失败", e);
+			j2meLoadFailed = true;
+			if (isEnvironmentFailure(e, dir)) {
+				// 外部存储不可写/权限不足导致打不开库：预期内的环境问题 → w（不落盘、不触发自动上报）
+				KeydroidxLog.w(TAG, "加载 J2ME 应用失败（工作目录不可用）: " + buildDiagInfo(dir, dbFile), e);
+			} else {
+				KeydroidxLog.e(TAG, "加载 J2ME 应用失败", e);
+			}
+		} finally {
+			// 任何路径（含上面各分支抛异常）都必须释放 Room 实例，否则连接池泄漏
+			if (db != null) {
+				try {
+					db.close();
+				} catch (Exception e) {
+					KeydroidxLog.w(TAG, "关闭 J2ME 数据库失败", e);
+				}
+			}
 		}
+	}
+
+	/**
+	 * 是否属于「环境类」失败——外部存储不可写 / 无存储权限导致 SQLite 打不开库。
+	 * 这类问题与代码无关且预期内，按日志规范记 w；其余（schema 不符、数据损坏等）属程序缺陷，记 e。
+	 */
+	private static boolean isEnvironmentFailure(Exception e, File dir) {
+		if (e instanceof SQLiteCantOpenDatabaseException) {
+			return true;
+		}
+		// 目录不可写时，任何 SQLite 异常都可归因为环境问题（只读外部存储、权限不足等）
+		return e instanceof SQLiteException && !dir.canWrite();
+	}
+
+	/**
+	 * 失败路径专用：拼一行环境诊断信息，便于下次同类自动上报直接判定根因。
+	 * 全部为 stat 级调用（无额外 I/O），只在失败时执行一次。
+	 */
+	private String buildDiagInfo(File dir, File dbFile) {
+		String writePerm;
+		Context ctx = getContext();
+		if (ctx == null) {
+			writePerm = "未知(页面已销毁)";
+		} else {
+			writePerm = ContextCompat.checkSelfPermission(ctx, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+					== PackageManager.PERMISSION_GRANTED ? "已授予" : "未授予";
+		}
+		return "sdk=" + Build.VERSION.SDK_INT
+				+ " legacyStorage=" + FileUtils.isExternalStorageLegacy()
+				+ " writePerm=" + writePerm
+				+ " dir=" + dir.getAbsolutePath()
+				+ "[isDir=" + dir.isDirectory() + ",canWrite=" + dir.canWrite() + "]"
+				+ " dbFile=J2ME-apps.db[exists=" + dbFile.exists()
+				+ ",canRead=" + dbFile.canRead()
+				+ ",canWrite=" + dbFile.canWrite()
+				+ ",len=" + dbFile.length() + "]";
 	}
 
 	private void sortApps() {
