@@ -4,13 +4,9 @@ import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxIcons;
 
-import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -32,19 +28,14 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.PreferenceManager;
 
-import io.github.cctyl.nokia.common.permission.KeydroidxPermissionManager;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
-import io.github.cctyl.nokia.common.ui.dialog.KeydroidxConfirmDialog;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
 import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.hjq.permissions.OnPermissionCallback;
 
 import ru.playsoftware.j2meloader.R;
 import ru.playsoftware.j2meloader.applist.AppItem;
@@ -513,16 +504,16 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			return false;
 		}
 		// 先自愈一次：权限可能已在别处授予，此时目录已可写，直接补齐数据库初始化
-		appRepository.ensureReady();
-		if (appRepository.isReady()) {
+		if (KeydroidxStorageGate.isWorkDirReady(appRepository)) {
 			return true;
 		}
-		if (needsStoragePermission(context)) {
+		if (KeydroidxStorageGate.needsStoragePermission(context)) {
 			requestStoragePermission(true);
 			return false;
 		}
 		// 无权限诉求却仍未就绪：目录确实不可写（权限已授予但本进程未生效 / 路径不可用）
-		showStorageUnavailableDialog();
+		KeydroidxStorageGate.showUnavailableDialog(requireActivity(),
+				() -> KeydroidxStorageGate.restartApp(requireContext()));
 		return false;
 	}
 
@@ -538,7 +529,7 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 			return;
 		}
 		Context context = getContext();
-		if (context == null || !needsStoragePermission(context)) {
+		if (context == null || !KeydroidxStorageGate.needsStoragePermission(context)) {
 			return;
 		}
 		storagePermissionRequestedOnEnter = true;
@@ -554,87 +545,19 @@ public class KeydroidxBoxFragment extends KeydroidxPageFragment {
 	 */
 	private void requestStoragePermission(boolean continueInstall) {
 		KeydroidxLog.i(TAG, "存储权限缺失，发起申请（授予后继续安装=" + continueInstall + "）");
-		KeydroidxPermissionManager.requestWithNokiaDialog(requireActivity(),
-				"存储权限申请",
-				"运行 J2ME 应用需要读写手机存储权限：用于读取安装包，并把应用数据写入模拟器工作目录。",
-				Collections.singletonList(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-				new OnPermissionCallback() {
-					@Override
-					public void onGranted(@NonNull List<String> permissions, boolean allGranted) {
-						KeydroidxLog.i(TAG, "存储权限已授予，重建工作目录并重新初始化数据库");
-						FileUtils.initWorkDir(new File(Config.getEmulatorDir()));
-						appRepository.ensureReady();
-						if (!appRepository.isReady()) {
-							// 授权已生效但当前进程仍未拿到可写视图：只能靠重启进程
-							showStorageUnavailableDialog();
-						} else if (continueInstall) {
-							launchFilePicker();
-						}
+		KeydroidxStorageGate.requestStoragePermission(requireActivity(), appRepository,
+				() -> {
+					// 授权且工作目录可用：来自安装入口时自动继续打开文件选择器
+					if (continueInstall) {
+						launchFilePicker();
 					}
-
-					@Override
-					public void onDenied(@NonNull List<String> permissions, boolean quick) {
-						KeydroidxLog.w(TAG, "存储权限被拒绝，无法安装 JAR（quick=" + quick + "）");
-						if (isAdded()) {
-							Toast.makeText(requireContext(),
-									"没有存储权限，无法运行 JAR 应用", Toast.LENGTH_SHORT).show();
-						}
+				},
+				() -> {
+					if (isAdded()) {
+						Toast.makeText(requireContext(),
+								"没有存储权限，无法运行 JAR 应用", Toast.LENGTH_SHORT).show();
 					}
 				});
-	}
-
-	/**
-	 * 当前系统是否需要「存储读写」运行时权限才能访问外部工作目录。
-	 *
-	 * <p>API 23 以下无运行时权限机制（安装即授予）；API 30（Android 11）起分区存储强制执行，
-	 * 该权限已失效、安装改走 SAF（见 {@code FileUtils.isExternalStorageLegacy()}），
-	 * 因此这两段区间都无需申请。
-	 */
-	private static boolean needsStoragePermission(Context context) {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
-				|| Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-			return false;
-		}
-		return ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-				!= PackageManager.PERMISSION_GRANTED;
-	}
-
-	/**
-	 * 工作目录最终仍不可写时的显式提示。
-	 * <p>兜底路径：部分 ROM 在授予存储权限后不刷新已启动进程的存储视图，
-	 * 此时只能靠重启进程生效——提供一键重启，避免让用户自己去猜「为什么要重启」。
-	 */
-	private void showStorageUnavailableDialog() {
-		if (!isAdded()) {
-			return;
-		}
-		String path = Config.getEmulatorDir();
-		KeydroidxLog.w(TAG, "工作目录不可写，JAR 列表/安装均不可用: " + path);
-		new KeydroidxConfirmDialog(requireContext(), "无法访问存储",
-				"无法写入模拟器工作目录：\n" + path
-						+ "\n\n若刚刚授予了存储权限，需要重新启动应用才会生效。\n确定立即重启应用吗？")
-				.setPositiveButton("立即重启", this::restartApp)
-				.setNegativeButton("稍后", null)
-				.show();
-	}
-
-	/** 重新拉起自身并结束当前进程，使新的存储视图/权限在进程启动时生效。 */
-	private void restartApp() {
-		Context context = getContext();
-		if (context == null) {
-			return;
-		}
-		KeydroidxLog.i(TAG, "重启应用以使存储权限生效");
-		try {
-			Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
-			if (intent != null) {
-				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-				context.startActivity(intent);
-			}
-		} catch (Exception e) {
-			KeydroidxLog.w(TAG, "重新拉起应用失败: " + e.getMessage());
-		}
-		android.os.Process.killProcess(android.os.Process.myPid());
 	}
 
 	private void launchFilePicker() {

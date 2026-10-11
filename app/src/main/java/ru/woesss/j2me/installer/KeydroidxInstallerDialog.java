@@ -36,6 +36,7 @@ import ru.playsoftware.j2meloader.appsdb.AppRepository;
 import ru.playsoftware.j2meloader.config.Config;
 import ru.playsoftware.j2meloader.nokia.KeydroidxDesktopActivity;
 import ru.playsoftware.j2meloader.nokia.KeydroidxKeyBinding;
+import ru.playsoftware.j2meloader.nokia.KeydroidxStorageGate;
 import ru.playsoftware.j2meloader.nokia.KeydroidxTouchWindowController;
 import ru.playsoftware.j2meloader.util.FileUtils;
 import ru.woesss.j2me.jar.Descriptor;
@@ -88,6 +89,14 @@ public class KeydroidxInstallerDialog extends DialogFragment {
 	private int uiState = UI_STATE_LOADING;
 	private int confirmType = CONFIRM_NONE;
 
+	// 安装前门禁状态（防止权限框引发的二次 onStart 重复触发安装）
+	/** 门禁是否已放行并进入安装流程。 */
+	private boolean gatePassed;
+	/** 门禁是否正在等待权限结果（权限框会让本弹窗走 pause/resume）。 */
+	private boolean gateWaiting;
+	/** 是否已放弃本次安装（Fragment 重建守卫触发）。 */
+	private boolean aborted;
+
 	private KeydroidxKeyBinding keyBinding;
 
 	// 视图引用
@@ -131,6 +140,7 @@ public class KeydroidxInstallerDialog extends DialogFragment {
 		// 重建守卫：旋转等导致 Fragment 重建时直接放弃，避免二次触发 loadInfo/install
 		if (savedInstanceState != null) {
 			KeydroidxLog.i(TAG, "重建（savedInstanceState!=null），放弃安装避免重复");
+			aborted = true;
 			dismissAllowingStateLoss();
 			return;
 		}
@@ -184,9 +194,61 @@ public class KeydroidxInstallerDialog extends DialogFragment {
 		if (getDialog() != null) {
 			KeydroidxTouchWindowController.applyDialogWindowBounds(getDialog());
 		}
-		if (installer == null) {
-			startLoadInfo();
+		if (aborted || gatePassed || gateWaiting) {
+			// 已放弃本次安装，或已进入安装流程 / 正在等存储权限结果：
+			// 权限框返回会再次触发 onStart，必须拦掉以免重复申请或重复 loadInfo
+			return;
 		}
+		ensureRepositoryReady();
+	}
+
+	/**
+	 * 安装前门禁：工作目录与清单数据库未就绪时不硬装。
+	 *
+	 * <p><b>背景</b>：工作目录位于外部存储，存储权限按设计在首次使用相关功能时才申请，
+	 * 授权晚于进程启动，仓库可能长期停在未初始化状态。此时若直接安装：
+	 * 文件会落盘到工作目录，但清单记录被安全跳过 → 界面显示「安装成功」却看不到应用（假成功）。
+	 * 因此所有安装入口（百宝箱选文件、外部打开 JAR、旧应用列表重装）在真正动手前统一走这里。
+	 *
+	 * <p>三条分支：
+	 * <ol>
+	 *   <li>就绪 → 正常加载安装信息；</li>
+	 *   <li>缺存储权限 → 弹诺基亚权限引导框，授予后重建工作目录并自动继续（无需重启应用）；
+	 *       授予后目录仍不可写则由门禁弹「无法访问存储」并支持一键重启；拒绝则错误态收尾；</li>
+	 *   <li>无权限可申请却仍不可写 → 明确报错，提示重启应用后重试。</li>
+	 * </ol>
+	 */
+	private void ensureRepositoryReady() {
+		if (KeydroidxStorageGate.isWorkDirReady(appRepository)) {
+			gatePassed = true;
+			startLoadInfo();
+			return;
+		}
+		if (isAdded() && KeydroidxStorageGate.needsStoragePermission(requireContext())) {
+			gateWaiting = true;
+			KeydroidxStorageGate.requestStoragePermission(requireActivity(), appRepository,
+					() -> {
+						// 授权且目录已可用：直接续装，不必让用户重新走一遍
+						KeydroidxLog.i(TAG, "存储已就绪，继续安装流程");
+						gateWaiting = false;
+						gatePassed = true;
+						if (isAdded()) {
+							startLoadInfo();
+						}
+					},
+					() -> {
+						gateWaiting = false;
+						KeydroidxLog.w(TAG, "用户拒绝存储权限，安装中止");
+						if (isAdded()) {
+							showError("没有存储权限，无法安装");
+						}
+					});
+			return;
+		}
+		// 无权限诉求却仍未就绪：目录确实不可写（权限已授予但本进程未生效 / 路径不可用）
+		KeydroidxLog.w(TAG, "工作目录不可用且无存储权限可申请，安装中止");
+		gatePassed = true;
+		showError("存储不可用，请重启应用后重试");
 	}
 
 	@Override

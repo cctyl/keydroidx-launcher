@@ -53,7 +53,8 @@ import ru.playsoftware.j2meloader.util.ZipUtils;
 import ru.woesss.j2me.jar.Descriptor;
 
 public class AppInstaller {
-	private static final String TAG = AppInstaller.class.getSimpleName();
+	/** 日志来源标识：类简名，长度须 ≤23 字符（AGENTS.md 统一日志规范，禁止 getSimpleName 取 tag）。 */
+	private static final String TAG = "AppInstaller";
 	static final int STATUS_OLDEST = -1;
 	static final int STATUS_EQUAL = 0;
 	static final int STATUS_NEWEST = 1;
@@ -109,6 +110,11 @@ public class AppInstaller {
 	void loadInfo(SingleEmitter<Integer> emitter) throws IOException, ConverterException {
 		if (id != -1) {
 			currentApp = appRepository.get(id);
+			if (currentApp == null) {
+				// 工作目录/清单数据库未就绪，或该记录已被删除：继续下去会空指针，提前失败让 UI 提示
+				KeydroidxLog.w(TAG, "重装失败：查不到已安装记录（存储未就绪或记录已删除）id=" + id);
+				throw new ConverterException("应用记录不存在或存储未就绪");
+			}
 			srcJar = new File(currentApp.getPathExt(), Config.MIDLET_RES_FILE);
 			newDesc = new Descriptor(new File(currentApp.getPathExt(), Config.MIDLET_MANIFEST_FILE), false);
 			appDirName = currentApp.getPath();
@@ -276,6 +282,13 @@ public class AppInstaller {
 
 	/** Install app */
 	void install(SingleEmitter<Integer> emitter) throws ConverterException, IOException {
+		// 前置校验：清单数据库不可用时绝不能开装——DEX 转换与文件拷贝是不可回滚的重活，
+		// 装完却登记不上，会导致「界面显示安装成功、百宝箱里却看不到应用」的假成功 + 磁盘残留。
+		if (appRepository == null || !appRepository.isReady()) {
+			KeydroidxLog.w(TAG, "存储/清单数据库未就绪，拒绝安装以免产生假成功: "
+					+ (appRepository == null ? "repository=null" : "not ready"));
+			throw new ConverterException("存储不可用，无法安装");
+		}
 		if (!cacheDir.exists() && !cacheDir.mkdirs()) {
 			throw new ConverterException("Can't create cache dir");
 		}
