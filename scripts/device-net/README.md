@@ -51,7 +51,7 @@ PC 出口网卡（以太网 2，192.168.1.6）→ 路由器 → 互联网
 
 ## 4. 使用步骤
 
-> **日常只有一条命令**：插上手机 → `cd tools\device-net` → **`.\net-up.ps1`**，完事。
+> **日常只有一条命令**：插上手机 → `cd scripts\device-net` → **`.\net-up.ps1`**，完事。
 >
 > `pc-ics.ps1` **不是每次都要跑**：它是 PC 侧的持久配置，只在「第一次」或「PC 侧共享被关掉 / 换了 USB 口导致 RNDIS 网卡重新枚举」时才需要。
 > 顺序不能颠倒——`pc-ics.ps1` 要求 PC 上已经存在「Remote NDIS」网卡，而那张网卡只有设备切成 `rndis,adb` 后才会出现（也就是 `net-up.ps1` 做的事）。
@@ -65,7 +65,7 @@ PC 出口网卡（以太网 2，192.168.1.6）→ 路由器 → 互联网
 ### 4.1 首次（PC 侧，只需做一次）
 
 ```powershell
-cd tools\device-net
+cd scripts\device-net
 .\pc-ics.ps1                 # 弹 UAC → 点"是"；自动探测出口网卡并开启共享
 ```
 成功后会看到 `sharing is on: 以太网 2 -> 以太网 4 (device gateway = 192.168.137.1)`。
@@ -75,7 +75,7 @@ PC 侧共享是**持久配置**，重启电脑后一般仍在（除非 RNDIS 网
 ### 4.2 每次重启设备 / 拔插 USB 之后（设备侧）
 
 ```powershell
-cd tools\device-net
+cd scripts\device-net
 .\net-up.ps1
 ```
 它会依次做 5 步：检查 `extra` → 切 USB 组合 → 配 `rndis0` → 校时 → 自检。

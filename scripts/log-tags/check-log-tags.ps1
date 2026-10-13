@@ -31,10 +31,10 @@
 
 .EXAMPLE
   # keydroidx-launcher（默认参数即为该项目的白名单）
-  .\tools\log-tags\check-log-tags.ps1
+  .\scripts\log-tags\check-log-tags.ps1
 
   # 其他项目（按项目补充白名单）
-  .\tools\log-tags\check-log-tags.ps1 -ProjectRoot D:\project\keydroidx_ecosystem\keydroidx-music
+  .\scripts\log-tags\check-log-tags.ps1 -ProjectRoot D:\project\keydroidx_ecosystem\keydroidx-music
 #>
 [CmdletBinding()]
 param(

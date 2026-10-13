@@ -178,7 +178,7 @@ J2ME-Loader 是一个运行在 Android 上的 J2ME（MIDP/CLDC）模拟器。它
    - **TAG 常量规范（强制）**：每类定义 `private static final String TAG = "<短名>";`（类简名去 `Keydroidx` 前缀，如 `Menu` / `SettingsStorage`），**长度 ≤ 23 字符**；**已定义 `TAG` 常量的文件，调用处只引用 `TAG`**，禁止再写字面量——否则 `grep TAG` 找到的不是真 tag，实机 `adb logcat -s <tag>:*` 会扑空。新增代码一律先定义常量；存量未定义常量的文件在其被改动时顺带补齐。零引用的 TAG 常量直接删除；**不要用 `Class.getSimpleName()` 自动取 tag**（release 开混淆后会输出 `a`/`b`/`c`，tag 反而不稳定）。
    - **允许直调 `android.util.Log` 的场景（仅此三类）**：① 拿不到门面的模块（`:dexlib`、`mini_shizuku` 服务端）；② 连 logcat 都不需要的日志/上报门面自身与崩溃链（防递归）；③ J2ME 移植层（`javax.*`、`org.microemu.*`、`com.*`、`mmpp.*`）。其余一律走 `KeydroidxLog`。
      注意：**「门面还没 `init`」不是直调的理由**——门面在 `init` 前调用是安全的（`logToFile` 早退，logcat 照常输出，只是不落盘），`attachBaseContext`、`Provider.onCreate`、`:midlet` 子进程也推荐直接用门面。
-   - **自检**：`.\tools\log-tags\check-log-tags.ps1`（退出码 0 = 无偏离，可接 CI）。
+   - **自检**：`.\scripts\log-tags\check-log-tags.ps1`（退出码 0 = 无偏离，可接 CI）。
 3. **日志分级与持久化开关**：
    - **详细日志关闭（默认/Release）**：仅记录 `ERROR` 与 `FATAL` 崩溃堆栈，零文件 I/O 损耗。
    - **详细日志开启（Debug/排查）**：记录所有 `DEBUG`、`INFO`、`WARN` 业务日志。
