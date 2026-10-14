@@ -643,7 +643,15 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 				if (backHost instanceof KeydroidxFocusHost
 						&& !(backHost instanceof KeydroidxDesktopFragment)) {
 					KeydroidxLog.d("Desktop", "未绑定返回键 -> host.onBack()");
-					((KeydroidxFocusHost) backHost).onBack();
+					boolean backHandled = ((KeydroidxFocusHost) backHost).onBack();
+					if (!backHandled) {
+						// 页面没实现 onBack（漏写 → 落到 common 基类的 return false）时，宿主这里会把返回键一起吞掉：
+						// 实体按键机上还有系统兜底（未消费的真机事件回流系统 → 系统弹返回栈），
+						// 而触屏模式的虚拟软键是注入事件、没有回流路径，页面就会彻底卡死。
+						// 此处只点名页面便于定位，行为保持与历史一致（不替页面决定退出）。
+						KeydroidxLog.w("Desktop", "页面未处理返回键（onBack 返回 false），宿主已吞键 page="
+								+ backHost.getClass().getSimpleName() + "，请检查该页面是否漏实现 onBack()");
+					}
 					lastHandledDownKeyCode = event.getKeyCode();
 					return true;
 				}
@@ -712,6 +720,14 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			return true;
 		}
 
+		if (action == KeydroidxKeyBinding.ACTION_SOFT_RIGHT) {
+			// 与返回键同理：页面不处理右软键「返回」时，触屏模式的注入事件没有系统兜底，页面会卡住。
+			// 仍然不改分发行为，只点名页面便于定位（左软键/确认键等动作未消费属正常，不在此列）。
+			Fragment softHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+			KeydroidxLog.w("Desktop", "页面未处理右软键（onSoftRight/onBack 返回 false）page="
+					+ (softHost != null ? softHost.getClass().getSimpleName() : "null")
+					+ "，触屏模式下会卡在本页");
+		}
 		KeydroidxLog.d("Desktop", "dispatchKeyEvent 未消费 " + KeydroidxKeyBinding.keyName(event.getKeyCode())
 				+ "，交给系统");
 		resetLastHandledKeyCode();
