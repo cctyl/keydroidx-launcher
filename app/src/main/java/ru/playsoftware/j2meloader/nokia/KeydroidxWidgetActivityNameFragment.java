@@ -90,7 +90,9 @@ public class KeydroidxWidgetActivityNameFragment extends KeydroidxPageFragment {
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	public void onCreate(@Nullable Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		// 与同组页面统一：参数驱动状态在 onCreate 读取，保证页头/底栏首帧即用真值。
 		Bundle args = getArguments();
 		if (args != null) {
 			mode = args.getString(EXTRA_MODE, MODE_ADD);
@@ -99,6 +101,10 @@ public class KeydroidxWidgetActivityNameFragment extends KeydroidxPageFragment {
 			activityLabel = args.getString(EXTRA_ACTIVITY_LABEL);
 			editIndex = args.getInt(EXTRA_EDIT_INDEX, -1);
 		}
+	}
+
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		KeydroidxLog.i(TAG, "初始化 mode=" + mode + " pkg=" + packageName
 				+ " cls=" + className + " label=" + activityLabel + " editIndex=" + editIndex);
 

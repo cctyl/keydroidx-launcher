@@ -1,6 +1,7 @@
 package ru.playsoftware.j2meloader.nokia;
 import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 
+import android.app.Activity;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,9 +27,11 @@ import ru.playsoftware.j2meloader.R;
  *   <li>{@link #onViewCreated}（final）：自动执行
  *       {@link KeydroidxBaseActivity#scaleMidContent(View, boolean)} 缩放 +
  *       {@link KeydroidxBaseActivity#fixMidContentHeight(View, boolean)} 高度调整（topAlign 时）+
- *       壁纸设置 + {@link KeydroidxDesktopActivity#refreshPageBar()} 底部菜单栏装配；</li>
+ *       壁纸设置 → 回调 {@link #onPageCreated(View, Bundle)} → 最后
+ *       {@link KeydroidxDesktopActivity#refreshPageBar()} 底部菜单栏装配；</li>
  *   <li>{@link #onPageCreated(View, Bundle)}：子类唯一初始化钩子，替代原先
- *       onViewCreated 中除样板外的部分。</li>
+ *       onViewCreated 中除样板外的部分。参数驱动的状态（分组号 / 模式 / 应用名等）
+ *       请在 {@code onCreate} 里读 {@code getArguments()}，底栏装配必然晚于本钩子。</li>
  * </ol>
  * 子类只需实现三个方法：
  * <ul>
@@ -77,16 +80,32 @@ public abstract class KeydroidxPageFragment extends Fragment implements Keydroid
 		host.scaleMidContent(view, topAlign);
 		// 应用当前全局主题（背景壁纸与软键栏渐变）
 		host.applyCurrentTheme();
-		// 底部菜单栏由 KeydroidxPage 声明 + host.refreshPageBar() 自动装配
-		host.refreshPageBar();
 		// 子类初始化钩子（在此构建动态列表与子 View）
 		onPageCreated(view, savedInstanceState);
+		// 底部菜单栏由 KeydroidxPage 声明 + host.refreshPageBar() 自动装配。
+		// 必须放在 onPageCreated 之后：页面标题常依赖子类的参数态字段（分组号 / 模式 / 应用名），
+		// 早于本钩子装配会读到 Java 默认值（2026-10-13 回归报告「设置分组页中栏标题错误」即此因）。
+		host.refreshPageBar();
 		// 统一应用全局字体（确保子类动态添加的 TextView 全部生效）
 		KeydroidxFontManager.applyFontToViewHierarchy(view);
 	}
 
 	/**
-	 * 页面初始化钩子：在缩放、壁纸、底栏装配全部完成之后调用。
+	 * 页面重新可见时重同步底栏，避免残留上一层的标题与软键（与 common 基类行为对齐）。
+	 * <p>
+	 * 覆盖「从子页面返回 / 切到其它 Activity 再回来」等不走 onViewCreated 的路径。
+	 */
+	@Override
+	public void onResume() {
+		super.onResume();
+		Activity activity = getActivity();
+		if (activity instanceof KeydroidxDesktopActivity) {
+			((KeydroidxDesktopActivity) activity).refreshPageBar();
+		}
+	}
+
+	/**
+	 * 页面初始化钩子：在缩放与壁纸应用之后、底栏装配之前调用。
 	 * 子类在此 findViewById / 构建列表 / 设置焦点等（替代原先 onViewCreated 的剩余部分）。
 	 */
 	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {

@@ -187,12 +187,19 @@ public class KeydroidxWidgetAppPickerFragment extends KeydroidxPageFragment {
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	public void onCreate(@Nullable Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		// 模式必须在 onCreate 读取：getPageTitle() 依赖 mode（选择应用 / 更换应用），
+		// 而底栏紧随 onPageCreated 装配，滞后赋值首帧会显示另一分支的标题。
 		Bundle args = getArguments();
 		if (args != null) {
 			mode = args.getInt(EXTRA_MODE, MODE_ADD);
 			editIndex = args.getInt(EXTRA_EDIT_INDEX, -1);
 		}
+	}
+
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		KeydroidxLog.i(TAG, "初始化 mode=" + modeName() + " editIndex=" + editIndex);
 
 		storage = new KeydroidxWidgetStorage(requireContext());

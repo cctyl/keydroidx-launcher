@@ -349,11 +349,12 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			io.github.cctyl.nokia.common.ui.page.KeydroidxPage page =
 					(io.github.cctyl.nokia.common.ui.page.KeydroidxPage) f;
 			CharSequence left = page.getSoftLeftText();
-			// 中键：common 页面（如意见反馈页）会用中键承载「选择 / 提交」动作，优先显示它自己声明的文案；
-			// 桌面页面不声明中键（默认 null），沿用一贯的「中键显示页面名」。
-			CharSequence center = page.getSoftCenterText();
+			// 中栏 = 页面身份位：物理按键里没有中软键动作（KeydroidxKeyBinding 只有左右软键），
+			// 触屏点中栏等同「确认键」（见 bindBottomBarTouch），故中栏不适合承载动作文案，
+			// 一律显示页面标题；仅当页面未声明标题（common 部分页面）才回退其中键文案，避免中栏空白。
+			CharSequence center = page.getPageTitle();
 			if (center == null || center.length() == 0) {
-				center = page.getPageTitle();
+				center = page.getSoftCenterText();
 			}
 			CharSequence right = page.getSoftRightText();
 			KeydroidxLog.d("Desktop", "refreshPageBar 装配 " + f.getClass().getSimpleName()

@@ -122,7 +122,10 @@ public class KeydroidxWidgetActivityPickerFragment extends KeydroidxPageFragment
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	public void onCreate(@Nullable Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		// 应用名/模式必须在 onCreate 读取：getPageTitle() 用 appLabel 拼「应用名 - 选择Activity」，
+		// 而底栏紧随 onPageCreated 装配，滞后赋值会让首帧丢掉应用名。
 		Bundle args = getArguments();
 		if (args != null) {
 			mode = args.getString(EXTRA_MODE, MODE_ADD);
@@ -130,6 +133,10 @@ public class KeydroidxWidgetActivityPickerFragment extends KeydroidxPageFragment
 			appLabel = args.getString(EXTRA_APP_LABEL);
 			editIndex = args.getInt(EXTRA_EDIT_INDEX, -1);
 		}
+	}
+
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		KeydroidxLog.i(TAG, "初始化 mode=" + mode + " pkg=" + packageName
 				+ " appLabel=" + appLabel + " editIndex=" + editIndex);
 

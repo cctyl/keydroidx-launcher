@@ -72,12 +72,19 @@ public class KeydroidxWidgetUrlEditFragment extends KeydroidxPageFragment {
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	public void onCreate(@Nullable Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		// 模式必须在 onCreate 读取：getPageTitle() 依赖 mode，而底栏紧随 onPageCreated 装配，
+		// 滞后赋值会让「编辑网址」首帧显示成「添加网址」。
 		Bundle args = getArguments();
 		if (args != null) {
 			mode = args.getInt(EXTRA_MODE, MODE_ADD);
 			editIndex = args.getInt(EXTRA_EDIT_INDEX, -1);
 		}
+	}
+
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		KeydroidxLog.i(TAG, "初始化 mode=" + (mode == MODE_EDIT ? "EDIT" : "ADD")
 				+ " editIndex=" + editIndex);
 

@@ -136,9 +136,17 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	public void onCreate(@Nullable Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		// 分组号必须在这里（onCreate）读取：getPageTitle() 直接返回 getGroupTitle(group)，
+		// 而底栏紧随 onPageCreated 装配 —— 若在 onPageCreated 里才赋值，装配时仍为 Java 默认值
+		// 0（= GROUP_APPEARANCE），非首个分组的中栏会错误显示「外观与显示」。
 		Bundle args = getArguments();
 		group = args != null ? args.getInt(ARG_GROUP, GROUP_APPEARANCE) : GROUP_APPEARANCE;
+	}
+
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		itemIcons = iconsOf(group);
 		itemNames = namesOf(group);
 

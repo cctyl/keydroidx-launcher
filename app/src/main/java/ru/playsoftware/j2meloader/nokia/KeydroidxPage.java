@@ -14,7 +14,13 @@ import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
  * 契约主体来自 common {@link io.github.cctyl.nokia.common.ui.page.KeydroidxPage}：
  * 标题 / 左软键 / 中软键 / 右软键 + 焦点事件
  * （{@link io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost}）。
- * 中软键文案桌面暂不使用，这里给默认实现（null=隐藏），页面需要时再覆写。
+ * <p>
+ * 中软键文案桌面端不作为可按键位使用：底栏中栏显示的是 {@link #getPageTitle()}，
+ * 只有标题为空时才回退到中软键文案兜底（见 {@link KeydroidxDesktopActivity#refreshPageBar()}），
+ * 因此本接口给 {@code getSoftCenterText()} 默认实现（null）。
+ * <p>
+ * 标题（及左/右软键）允许依赖进入参数，但相关字段必须在 {@code onCreate} 里读
+ * {@code getArguments()} —— 底栏装配发生在 {@code onPageCreated} 之后，滞后初始化会读到默认值。
  */
 public interface KeydroidxPage extends io.github.cctyl.nokia.common.ui.page.KeydroidxPage {
 

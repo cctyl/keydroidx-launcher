@@ -115,13 +115,19 @@ public class KeydroidxIconPickerFragment extends KeydroidxPageFragment {
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	public void onCreate(@Nullable Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		// 与 widget/图标包系列页面统一：参数驱动状态在 onCreate 读取（页头与底栏都用它）。
 		Bundle args = getArguments();
 		if (args != null) {
 			packId = args.getString(ARG_PACK_ID);
 			targetPkg = args.getString(ARG_PKG);
 			targetLabel = args.getString(ARG_LABEL);
 		}
+	}
+
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		grid = view.findViewById(R.id.appGrid);
 		tvPage = view.findViewById(R.id.menuPage);
 		TextView title = view.findViewById(R.id.menuTitle);

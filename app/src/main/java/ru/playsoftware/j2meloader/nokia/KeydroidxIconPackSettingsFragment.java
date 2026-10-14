@@ -130,13 +130,19 @@ public class KeydroidxIconPackSettingsFragment extends KeydroidxListPageFragment
 	}
 
 	@Override
-	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+	public void onCreate(@Nullable Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		// 目标应用必须在 onCreate 读取：getPageTitle()/isPerAppMode() 依赖它，
+		// 底栏紧随 onPageCreated 装配 —— 滞后赋值会让单应用模式首帧显示成全局的「图标包」。
 		Bundle args = getArguments();
 		if (args != null) {
 			targetPkg = args.getString(ARG_TARGET_PKG);
 			targetLabel = args.getString(ARG_TARGET_LABEL);
 		}
+	}
 
+	@Override
+	protected void onPageCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		TextView title = view.findViewById(R.id.settingsTitle);
 		if (title != null) {
 			title.setText(isPerAppMode()
