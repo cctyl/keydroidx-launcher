@@ -25,6 +25,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
+import io.github.cctyl.nokia.common.ui.dialog.KeydroidxConfirmDialog;
 import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import java.io.File;
 import java.util.ArrayList;
@@ -33,7 +34,19 @@ import java.util.List;
 import ru.playsoftware.j2meloader.R;
 
 /**
- * 字体设置页面：支持内置方舟像素体（12px/16px）、系统默认字体以及从本地导入自定义 TTF/OTF 字体文件。
+ * 字体设置页面：内置方舟像素体（12px）、缝合怪像素体（12px）、系统默认字体，
+ * 并支持从本地导入 / 删除自定义 TTF、OTF 字体文件。
+ * <p>
+ * 屏幕契约（FEATURE_PHONE_UI_SPEC §54）：
+ * <ul>
+ *   <li>中栏标题「字体设置」；</li>
+ *   <li><b>确认键</b>：选用当前高亮字体并即时全应用生效（本页主操作，勿改）；</li>
+ *   <li><b>左软键「选项」</b>：选项弹窗 —— 恒有「导入字体」与「删除该字体」；高亮内置字体时
+ *       「删除该字体」灰显不可选（方向键自动跳过），高亮自定义导入字体时才可执行。
+ *       破坏性项排最后，弹窗默认焦点在「导入字体」，误按不会删；</li>
+ *   <li><b>右软键 / 返回键</b>：返回上一层。</li>
+ * </ul>
+ * 删除走二次确认（§16/§41/§42）：安全项「取消」在左软键，破坏性动作「删除」必须显式按右软键。
  */
 public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 
@@ -69,7 +82,7 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 
 	@Override
 	public String getSoftLeftText() {
-		return "导入字体";
+		return "选项";
 	}
 
 	@Override
@@ -90,8 +103,131 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 
 	@Override
 	public boolean onSoftLeft() {
-		pickFontFile();
+		showOptionsMenu();
 		return true;
+	}
+
+	/**
+	 * 左软键「选项」弹窗：恒有「导入字体」+「删除该字体」两项。
+	 * <p>
+	 * 「删除该字体」的可用性随当前高亮行变化：内置三项（方舟像素体 / 缝合怪像素体 /
+	 * 系统默认字体）是 assets 与系统资源，没有可删文件，项灰显禁用；只有自定义导入字体
+	 * 才可执行。之所以不用"按行隐藏"而是"灰显"：隐藏会让用户以为本页没有删除能力
+	 * （2026-10-15 实机反馈即此），灰显则一眼可见、且方向键自动跳过不会误按。
+	 * <p>
+	 * 破坏性项固定排在最后：{@link KeydroidxOptionsDialog} 默认焦点是第一个可用项（即
+	 * 「导入字体」），因此误按确认键 / 左软键不会触发删除（§15.6、§42）。
+	 */
+	private void showOptionsMenu() {
+		List<KeydroidxOptionsDialog.OptionItem> items = new ArrayList<>();
+		final KeydroidxFontManager.FontItem focused =
+				(focusIndex >= 0 && focusIndex < fontList.size()) ? fontList.get(focusIndex) : null;
+
+		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_ADD, "导入字体",
+				true, false, new Runnable() {
+			@Override
+			public void run() {
+				pickFontFile();
+			}
+		}));
+
+		// 「删除该字体」恒显示：内置字体（assets / 系统字体）没有可删文件，此时灰显禁用
+		// （enabled=false 由弹窗灰显并让方向键自动跳过），用户一眼就能看到本页有删除能力，
+		// 不会因为"当前高亮的是内置字体"而误以为功能不存在（2026-10-15 实机反馈）。
+		final boolean deletable = (focused != null && focused.isCustom);
+		items.add(new KeydroidxOptionsDialog.OptionItem(KeydroidxIcons.ICON_DELETE, "删除该字体",
+				deletable, false, new Runnable() {
+			@Override
+			public void run() {
+				if (focused != null) {
+					confirmDeleteFont(focused);
+				}
+			}
+		}));
+
+		String title = (focused != null) ? "选项 · " + focused.name : "选项";
+		KeydroidxOptionsDialog.show(getParentFragmentManager(), title, items);
+		KeydroidxLog.i(TAG, "弹出选项菜单: " + title + " 项数=" + items.size()
+				+ " 可删除=" + (focused != null && focused.isCustom));
+	}
+
+	/**
+	 * 删除二次确认（§16/§41/§42）。
+	 * <p>
+	 * 安全项「取消」放左软键（确认键与左软键等效，误按只会取消），破坏性动作「删除」
+	 * 必须显式按<b>右软键</b>——与「最近任务 → 清理此任务」等页面保持同一约定。
+	 */
+	private void confirmDeleteFont(final KeydroidxFontManager.FontItem item) {
+		Activity activity = getActivity();
+		if (activity == null || !item.isCustom) {
+			return;
+		}
+		boolean inUse = item.id.equals(currentFontId);
+		String message = "将删除字体文件「" + item.name + "」。"
+				+ (inUse ? "\n该字体正在使用，删除后将切换为系统默认字体。" : "")
+				+ "\n此操作不可撤销。";
+		new KeydroidxConfirmDialog(activity, "删除字体？", message)
+				.setPositiveButton("取消", null)
+				.setNegativeButton("删除", new Runnable() {
+					@Override
+					public void run() {
+						doDeleteFont(item);
+					}
+				})
+				.show();
+		KeydroidxLog.i(TAG, "弹出删除确认: " + item.id + " 使用中=" + inUse);
+	}
+
+	/**
+	 * 执行删除：删文件 → 按「是否正在使用」分叉处理 → 刷新列表。
+	 * <ul>
+	 *   <li>删的是当前字体：fontId 落回「系统默认字体」（用户确认的方案，避免残留非法 fontId
+	 *       被渲染兜底成异常显示），并 {@code recreate()} 让全应用一起换字体；</li>
+	 *   <li>删的是其它字体：当前字体不动，只重建列表并把焦点收敛到原位置（不跳回顶部）。</li>
+	 * </ul>
+	 */
+	private void doDeleteFont(final KeydroidxFontManager.FontItem item) {
+		if (!isAdded() || getView() == null) {
+			return;
+		}
+		Context appCtx = requireContext().getApplicationContext();
+		if (!KeydroidxFontManager.deleteCustomFont(appCtx, item.id)) {
+			// 文件已被外部清理或被占用：外部环境问题，按规范用 w，不触发自动上报
+			KeydroidxLog.w(TAG, "删除字体文件失败（文件不存在或被占用）: " + item.id);
+			Toast.makeText(requireContext(),
+					"删除失败：字体文件可能已被删除或被占用", Toast.LENGTH_LONG).show();
+			rebuildListKeepingFocus();
+			return;
+		}
+		KeydroidxLog.i(TAG, "已删除自定义字体: " + item.id);
+
+		boolean inUse = item.id.equals(currentFontId);
+		if (inUse) {
+			currentFontId = KeydroidxFontManager.FONT_ID_SYSTEM_DEFAULT;
+			storage.setFontId(currentFontId);
+			KeydroidxFontManager.invalidate();
+			Toast.makeText(requireContext(),
+					"已删除 " + item.name + "，字体已切换为系统默认", Toast.LENGTH_LONG).show();
+			if (getActivity() instanceof KeydroidxBaseActivity) {
+				((KeydroidxBaseActivity) getActivity()).recreate();
+			} else {
+				rebuildListKeepingFocus();
+			}
+			return;
+		}
+
+		rebuildListKeepingFocus();
+		Toast.makeText(requireContext(), "已删除字体：" + item.name, Toast.LENGTH_SHORT).show();
+	}
+
+	/** 重建列表并把焦点收敛到合法范围（删除一行后停在原位置，不跳回顶部）。 */
+	private void rebuildListKeepingFocus() {
+		rebuildList();
+		if (fontList.isEmpty()) {
+			focusIndex = -1;
+			return;
+		}
+		setFocusIndex(Math.max(0, Math.min(focusIndex, fontList.size() - 1)));
 	}
 
 	/**
