@@ -11,6 +11,7 @@ import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.TextView;
 
@@ -169,6 +170,41 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 		// 字号仍保留 keydroidx_font_title 的缩放结果（applyScaledTextSize 已记录设计基准）。
 		if (tvTime != null) {
 			tvTime.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+		}
+		// 时间居中避让（2026-10）：顶栏时间锚定屏幕中轴，左右图标簇（左=双卡信号，
+		// 右=WiFi/蓝牙/飞行模式+电池）由 StatusBarController 动态显隐。图标全开时
+		// 若挤压到时间，按全局布局回调把时间整体平移到两侧图标之间的空位上，
+		// 保证任何图标组合下时间都不与图标重叠；图标稀少时 translationX 恒为 0（正居中）。
+		if (tvTime != null && topPanel != null) {
+			final View clusterLeft = topPanel.findViewById(R.id.statusClusterLeft);
+			final View clusterRight = topPanel.findViewById(R.id.statusClusterRight);
+			if (clusterLeft != null && clusterRight != null) {
+				final float gap = tvTime.getResources().getDisplayMetrics().density * 4f;
+				topPanel.getViewTreeObserver().addOnGlobalLayoutListener(
+						new ViewTreeObserver.OnGlobalLayoutListener() {
+							@Override
+							public void onGlobalLayout() {
+								int parentW = topPanel.getWidth();
+								int timeW = tvTime.getWidth();
+								if (parentW == 0 || timeW == 0) return;
+								// tvTime 以 layout_gravity=center 布局，getLeft() 即水平居中位；
+								// 两个簇是底层 LinearLayout（铺满 FrameLayout）的直接子项，坐标系一致。
+								int minLeft = clusterLeft.getRight() + Math.round(gap);
+								int maxLeft = clusterRight.getLeft() - Math.round(gap) - timeW;
+								int tx;
+								if (tvTime.getLeft() < minLeft) {
+									tx = minLeft - tvTime.getLeft();
+								} else if (tvTime.getLeft() > maxLeft) {
+									tx = maxLeft - tvTime.getLeft();
+								} else {
+									tx = 0;
+								}
+								if (Math.round(tvTime.getTranslationX()) != tx) {
+									tvTime.setTranslationX(tx);
+								}
+							}
+						});
+			}
 		}
 		View bottomPanel = findViewById(R.id.bottomPanel);
 		if (bottomPanel != null) {

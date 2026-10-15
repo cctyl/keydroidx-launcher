@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>顶栏「时钟 + 电池」设计原型 · 4 方案</title>
+<style>
+  /* ===== 基准：240x320 设计稿，按 2x 渲染（所有 px = 2dp） ===== */
+  :root {
+    --bg0: #0d1b3e; --bg1: #1a3a6b;
+    --white: #ffffff; --line: #26ffffff; --tray: #3d000000;
+    --blue: #64b5f6; --focus: #3d64b5f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #20242c; color: #d8dde6; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; padding: 24px; }
+  h1 { font-size: 20px; color: #fff; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #9aa3b2; margin-bottom: 20px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 28px; }
+
+  /* ===== 方案卡片 ===== */
+  .card { width: 512px; }
+  .card .name { font-size: 15px; font-weight: 600; color: #ffd54f; margin-bottom: 2px; }
+  .card .desc { font-size: 12.5px; line-height: 1.7; color: #b7c0ce; margin-bottom: 10px; min-height: 60px; }
+  .card .desc b { color: #e8eef5; }
+  .pros { font-size: 12px; color: #8fd694; margin-top: 6px; }
+  .cons { font-size: 12px; color: #e08e8e; margin-top: 2px; }
+
+  /* ===== 手机屏：240x320 @2x = 480x640 ===== */
+  .phone {
+    width: 480px; height: 640px; border-radius: 10px;
+    background: linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 40%, var(--bg0) 100%);
+    border: 2px solid #39414f; overflow: hidden;
+    display: flex; flex-direction: column;
+    font-family: "Consolas", "Courier New", monospace;
+    box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  }
+  /* 顶栏：高 22dp=44px，单行 */
+  .topbar {
+    height: 44px; flex: none; display: flex; align-items: center;
+    padding: 0 12px; color: var(--white); font-size: 22px; /* 11sp */
+    letter-spacing: 1px;
+  }
+  .sig { display: flex; align-items: center; gap: 4px; margin-right: 12px; }
+  .sig .num { font-size: 18px; }
+  .sig .bar { width: 40px; height: 28px; background: #2b3d5f; position: relative; }
+  .sig .bar i { position: absolute; left: 0; bottom: 0; top: 0; background: #fff; width: 70%; }
+  .wifi { width: 40px; height: 28px; margin-right: 10px; border-radius: 40% 40% 4px 4px;
+          background: conic-gradient(from 230deg, #fff 0 150deg, transparent 150deg 360deg); opacity: .95; }
+  .spring { flex: 1; }
+  .time { font-weight: 700; }
+  .time.thin { font-weight: 400; letter-spacing: 2px; }
+
+  /* 电池：现状 24x13dp = 48x26px */
+  .battery { width: 48px; height: 26px; border: 3px solid #fff; border-radius: 4px;
+             display: flex; gap: 2px; padding: 2px; position: relative; }
+  .battery::after { content: ""; position: absolute; right: -8px; top: 6px;
+                    width: 6px; height: 10px; background: #fff; border-radius: 0 2px 2px 0; }
+  .battery i { flex: 1; background: #4caf50; border-radius: 1px; }
+  .battery i.off { background: transparent; }
+  .battery i.low { background: #e53935; }
+  .battery i.charge { background: #aef; }
+  /* 精修电池：圆角更大、壳双色调 */
+  .battery.refined { border-radius: 7px; border-color: #eef4fb; box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+  .battery.refined i { border-radius: 2px; }
+  /* 胶囊组合 */
+  .capsule { display: flex; align-items: center; gap: 10px; padding: 4px 14px 4px 12px;
+             background: var(--tray); border: 1px solid var(--line); border-radius: 16px; }
+  .divider-v { width: 1px; height: 24px; background: #33ffffff; margin: 0 6px; }
+
+  /* ===== 大时钟区 ===== */
+  .clockzone { display: flex; align-items: center; padding: 8px 12px 4px; color: #fff; }
+  .clockzone .left { display: flex; flex-direction: column; }
+  .clockzone .carrier { font-size: 14px; color: #fff; opacity: .95; letter-spacing: 0; }
+  .clockzone .big { font-size: 34px; line-height: 1.05; letter-spacing: 2px; }
+  .clockzone .right { margin-left: auto; text-align: right; }
+  .clockzone .date { font-size: 22px; }
+  .clockzone .lunar { font-size: 18px; color: #b8c8ea; margin-top: 4px; }
+
+  /* 快捷栏托盘 */
+  .tray { margin: 4px 0 4px; padding: 6px 10px; background: var(--tray);
+          border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+          display: flex; gap: 10px; }
+  .appicon { width: 44px; height: 42px; border-radius: 6px; flex: none; position: relative;
+             border: 1px solid rgba(255,255,255,.18); }
+  .appicon.sel { outline: 2px solid var(--blue); background: rgba(100,181,246,.28); }
+  .appicon:nth-child(1) { background: #2f7d4f; }
+  .appicon:nth-child(2) { background: #d8544f; }
+  .appicon:nth-child(3) { background: #3b6fd8; }
+  .appicon:nth-child(4) { background: #8a56c9; }
+  .appicon:nth-child(5) { background: #2b8f8f; }
+  .appicon:nth-child(6) { background: #c47f2e; }
+
+  .notif { margin: 4px 8px; font-size: 18px; color: #b8c8ea; display: flex; align-items: center; gap: 6px; }
+  .notif .n { background: #d8544f; color: #fff; font-size: 14px; border-radius: 8px; padding: 0 6px; }
+  .widget { margin: 2px 8px; font-size: 19px; color: #e8eef5; display: flex; gap: 8px; padding: 6px 6px; }
+  .widget.sel { background: var(--focus); border-radius: 6px; }
+  .widget .info { margin-left: auto; color: #b8c8ea; font-size: 17px; }
+  .spring-mid { flex: 1; }
+
+  /* 底部软键栏 */
+  .softbar { height: 44px; flex: none; display: flex; align-items: center;
+             background: linear-gradient(180deg, var(--bg1), var(--bg0));
+             border-top: 1px solid rgba(255,255,255,.12);
+             color: #fff; font-size: 22px; padding: 0 12px; letter-spacing: 1px; }
+  .softbar .mid { flex: 1; text-align: center; opacity: .4; }
+
+  /* ===== 状态小图区 ===== */
+  .states { display: flex; gap: 18px; margin-top: 10px; align-items: center; }
+  .states .lbl { font-size: 11px; color: #9aa3b2; margin-right: 2px; }
+</style>
+</head>
+<body>
+
+<h1>顶栏「时钟 + 电池」重设计 · 4 方案</h1>
+<div class="sub">240×320 设计基准（图中按 2x 放大渲染）。桌面大时钟区已承担"时间主视觉"，顶栏时钟的定位需要重新想：方案 B/D 试图解决"桌面双时钟重复"的问题，方案 A/C 在保留顶栏时间的前提下做视觉精修。电池演示块含 4 格 / 充电 / 低电红格三种状态。</div>
+
+<div class="grid">
+
+  <!-- ================= 方案 A：现状基线 ================= -->
+  <div class="card">
+    <div class="name">A · 现状基线（当前线上效果）</div>
+    <div class="desc">
+      右侧「<b>时钟 + 电池</b>」并排：11sp 粗体时间 + 24×13dp 电池图标。<br>
+      问题：两个白色小元素体积接近、无层次间隔，电池外壳生硬；且待机屏大时钟区与顶栏时间<b>重复显示两份时间</b>。
+    </div>
+    <div class="phone">
+      <div class="topbar">
+        <div class="sig"><span class="num">1</span><span class="bar"><i></i></span></div>
+        <div class="sig"><span class="num">2</span><span class="bar"><i></i></span></div>
+        <div class="wifi"></div>
+        <div class="spring"></div>
+        <span class="time">10:02</span>
+        <div class="battery" style="margin-left:10px"><i></i><i></i><i></i><i class="off"></i></div>
+      </div>
+      <div class="clockzone">
+        <div class="left"><span class="carrier">中国移动</span><span class="big">10:02</span></div>
+        <div class="right"><div class="date">2026年10月15日</div><div class="lunar">星期四 · 农历九月初六</div></div>
+      </div>
+      <div class="tray">
+        <div class="appicon sel"></div><div class="appicon"></div><div class="appicon"></div>
+        <div class="appicon"></div><div class="appicon"></div><div class="appicon"></div>
+      </div>
+      <div class="notif">♪ 3 条未读通知 · 原键鼠标：光标已隐藏 <span class="n">3</span></div>
+      <div class="widget sel">▦ 日历<span class="info">星期四 2026-10-15</span></div>
+      <div class="widget">◈ 最近任务<span class="info">未激活</span></div>
+      <div class="spring-mid"></div>
+      <div class="softbar"><span>功能表</span><span class="mid">　</span><span>桌面设置</span></div>
+    </div>
+    <div class="pros">＋ 无改动成本</div>
+    <div class="cons">－ 双时钟重复 / 元素无层次 / 电池外壳生硬</div>
+  </div>
+
+  <!-- ================= 方案 B：时间居中 ================= -->
+  <div class="card">
+    <div class="name">B · 对称式：时间居中，电池独占右侧</div>
+    <div class="desc">
+      顶栏变三段：<b>左信号簇 · 中时间 · 右电池</b>。时间是"状态"而非"仪表"，居中后与底栏中栏页面名上下呼应，
+      右侧只留电池一个元素，不再互相挤压。电池加大到 30×15dp 并精修外壳（圆角、格条加宽）。
+    </div>
+    <div class="phone">
+      <div class="topbar" style="position:relative">
+        <div class="sig"><span class="num">1</span><span class="bar"><i></i></span></div>
+        <div class="sig"><span class="num">2</span><span class="bar"><i></i></span></div>
+        <div class="wifi"></div>
+        <span class="time" style="position:absolute;left:50%;transform:translateX(-50%)">10:02</span>
+        <div class="spring"></div>
+        <div class="battery refined"><i></i><i></i><i></i><i class="off"></i></div>
+      </div>
+      <div class="clockzone">
+        <div class="left"><span class="carrier">中国移动</span><span class="big">10:02</span></div>
+        <div class="right"><div class="date">2026年10月15日</div><div class="lunar">星期四 · 农历九月初六</div></div>
+      </div>
+      <div class="tray">
+        <div class="appicon sel"></div><div class="appicon"></div><div class="appicon"></div>
+        <div class="appicon"></div><div class="appicon"></div><div class="appicon"></div>
+      </div>
+      <div class="notif">♪ 3 条未读通知 · 原键鼠标：光标已隐藏 <span class="n">3</span></div>
+      <div class="widget sel">▦ 日历<span class="info">星期四 2026-10-15</span></div>
+      <div class="widget">◈ 最近任务<span class="info">未激活</span></div>
+      <div class="spring-mid"></div>
+      <div class="softbar"><span>功能表</span><span class="mid">　</span><span>桌面设置</span></div>
+    </div>
+    <div class="states">
+      <span class="lbl">充电：</span>
+      <div class="battery refined" style="position:relative"><i class="charge"></i><i class="charge"></i><i class="charge"></i><i class="charge"></i>
+        <span style="position:absolute;left:14px;top:2px;width:14px;height:18px;background:#ffd54f;clip-path:polygon(60% 0,15% 55%,45% 55%,35% 100%,85% 40%,55% 40%)"></span></div>
+      <span class="lbl">低电：</span>
+      <div class="battery refined"><i class="low"></i><i class="off"></i><i class="off"></i><i class="off"></i></div>
+    </div>
+    <div class="pros">＋ 三段对称最像真功能机；右侧干净；顶栏-底栏中轴呼应</div>
+    <div class="cons">－ 时间仍是第二份（与大时钟区重复）；居中时间可能被飞行模式图标挤（概率低）</div>
+  </div>
+
+  <!-- ================= 方案 C：原位精修 ================= -->
+  <div class="card">
+    <div class="name">C · 精修式：字号提档 + 竖分隔线 + 电池重绘</div>
+    <div class="desc">
+      保持「时间 电池」右置顺序不动，只做质感：<b>时钟 11sp→13sp（title 档）</b>、字距收紧；
+      时钟与电池之间加 1dp 竖向分隔线；<b>电池重绘</b>为圆角外壳（2dp）+ 内描边阴影 + 4 格条加宽，
+      充电闪电 / 低电红格规则不变。
+    </div>
+    <div class="phone">
+      <div class="topbar">
+        <div class="sig"><span class="num">1</span><span class="bar"><i></i></span></div>
+        <div class="sig"><span class="num">2</span><span class="bar"><i></i></span></div>
+        <div class="wifi"></div>
+        <div class="spring"></div>
+        <span class="time" style="font-size:26px">10:02</span>
+        <div class="divider-v"></div>
+        <div class="battery refined"><i></i><i></i><i></i><i class="off"></i></div>
+      </div>
+      <div class="clockzone">
+        <div class="left"><span class="carrier">中国移动</span><span class="big">10:02</span></div>
+        <div class="right"><div class="date">2026年10月15日</div><div class="lunar">星期四 · 农历九月初六</div></div>
+      </div>
+      <div class="tray">
+        <div class="appicon sel"></div><div class="appicon"></div><div class="appicon"></div>
+        <div class="appicon"></div><div class="appicon"></div><div class="appicon"></div>
+      </div>
+      <div class="notif">♪ 3 条未读通知 · 原键鼠标：光标已隐藏 <span class="n">3</span></div>
+      <div class="widget sel">▦ 日历<span class="info">星期四 2026-10-15</span></div>
+      <div class="widget">◈ 最近任务<span class="info">未激活</span></div>
+      <div class="spring-mid"></div>
+      <div class="softbar"><span>功能表</span><span class="mid">　</span><span>桌面设置</span></div>
+    </div>
+    <div class="states">
+      <span class="lbl">充电：</span>
+      <div class="battery refined" style="position:relative"><i class="charge"></i><i class="charge"></i><i class="charge"></i><i class="charge"></i>
+        <span style="position:absolute;left:14px;top:2px;width:14px;height:18px;background:#ffd54f;clip-path:polygon(60% 0,15% 55%,45% 55%,35% 100%,85% 40%,55% 40%)"></span></div>
+      <span class="lbl">低电：</span>
+      <div class="battery refined"><i class="low"></i><i class="off"></i><i class="off"></i><i class="off"></i></div>
+    </div>
+    <div class="pros">＋ 改动最小、层次立刻出来；电池质感提升；规范内字号（title 13sp）</div>
+    <div class="cons">－ 双时钟重复依旧存在</div>
+  </div>
+
+  <!-- ================= 方案 D：桌面顶栏去时间 ================= -->
+  <div class="card">
+    <div class="name">D · 去重式：桌面顶栏只留电池，时间交给大时钟区</div>
+    <div class="desc">
+      待机屏已有 34sp 大时钟，顶栏再放 11sp 时间纯属冗余——<b>待机屏顶栏只留电池</b>（贴最右）；
+      <b>功能表 / 应用程序页没有大时钟区，顶栏时间保留</b>（见下方第二块屏）。重复感消失，顶栏最干净。
+    </div>
+    <div class="phone" style="margin-bottom:14px">
+      <div class="topbar">
+        <div class="sig"><span class="num">1</span><span class="bar"><i></i></span></div>
+        <div class="sig"><span class="num">2</span><span class="bar"><i></i></span></div>
+        <div class="wifi"></div>
+        <div class="spring"></div>
+        <div class="battery refined"><i></i><i></i><i></i><i class="off"></i></div>
+      </div>
+      <div class="clockzone">
+        <div class="left"><span class="carrier">中国移动</span><span class="big">10:02</span></div>
+        <div class="right"><div class="date">2026年10月15日</div><div class="lunar">星期四 · 农历九月初六</div></div>
+      </div>
+      <div class="tray">
+        <div class="appicon sel"></div><div class="appicon"></div><div class="appicon"></div>
+        <div class="appicon"></div><div class="appicon"></div><div class="appicon"></div>
+      </div>
+      <div class="notif">♪ 3 条未读通知 · 原键鼠标：光标已隐藏 <span class="n">3</span></div>
+      <div class="widget sel">▦ 日历<span class="info">星期四 2026-10-15</span></div>
+      <div class="widget">◈ 最近任务<span class="info">未激活</span></div>
+      <div class="spring-mid"></div>
+      <div class="softbar"><span>功能表</span><span class="mid">　</span><span>桌面设置</span></div>
+    </div>
+    <div class="desc" style="color:#8fd694">↑ 待机屏（顶栏无时间）　↓ 功能表页（无大时钟区，顶栏保留时间）</div>
+    <div class="phone">
+      <div class="topbar">
+        <div class="sig"><span class="num">1</span><span class="bar"><i></i></span></div>
+        <div class="sig"><span class="num">2</span><span class="bar"><i></i></span></div>
+        <div class="wifi"></div>
+        <div class="spring"></div>
+        <span class="time" style="font-size:26px">10:02</span>
+        <div class="divider-v"></div>
+        <div class="battery refined"><i></i><i></i><i></i><i class="off"></i></div>
+      </div>
+      <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px;align-content:start">
+        <div class="appicon" style="width:56px;height:56px;margin:0 auto"></div>
+        <div class="appicon" style="width:56px;height:56px;margin:0 auto"></div>
+        <div class="appicon" style="width:56px;height:56px;margin:0 auto"></div>
+        <div class="appicon" style="width:56px;height:56px;margin:0 auto"></div>
+        <div class="appicon" style="width:56px;height:56px;margin:0 auto"></div>
+        <div class="appicon" style="width:56px;height:56px;margin:0 auto"></div>
+      </div>
+      <div class="softbar"><span>选项</span><span class="mid" style="opacity:1">功能表</span><span>退出</span></div>
+    </div>
+    <div class="states">
+      <span class="lbl">充电：</span>
+      <div class="battery refined" style="position:relative"><i class="charge"></i><i class="charge"></i><i class="charge"></i><i class="charge"></i>
+        <span style="position:absolute;left:14px;top:2px;width:14px;height:18px;background:#ffd54f;clip-path:polygon(60% 0,15% 55%,45% 55%,35% 100%,85% 40%,55% 40%)"></span></div>
+      <span class="lbl">低电：</span>
+      <div class="battery refined"><i class="low"></i><i class="off"></i><i class="off"></i><i class="off"></i></div>
+    </div>
+    <div class="pros">＋ 消除双时钟重复；待机屏顶栏元素最少最干净；电池贴右不挤</div>
+    <div class="cons">－ 两页顶栏不一致（待机屏无时间）；顶栏时钟每秒刷新逻辑需按页区分</div>
+  </div>
+
+</div>
+</body>
+</html>

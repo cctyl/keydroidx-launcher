@@ -2,7 +2,10 @@
 <!-- 共用的诺基亚顶部状态栏：三页复用。
      注意：顶栏由基类以"原生分辨率"渲染（不做 setScaleX 缩放），以保证矢量图标清晰不模糊；
      仅高度按设计比例(TOP_H*scale)放大，由代码设置。内层宽度铺满屏幕。
-     顶部单行：左侧图标簇(SIM1/SIM2 信号 + WiFi + 蓝牙 + 飞行模式)；右侧电池和时钟。
+     顶部单行（2026-10）：时间经 FrameLayout 上层锚定绝对居中；状态图标左右分摊——
+     左簇（statusClusterLeft）= 双卡信号，右簇（statusClusterRight）= WiFi/蓝牙/飞行模式 + 电池（最右）。
+     图标与时间冲突时由 KeydroidxBaseActivity 注册的全局布局监听平移时间避让，
+     任何图标组合下时间都不与图标重叠。
      原第二行双卡运营商名已移除：只在桌面大时钟区显示（见 fragment_keydroidx_desktop.xml
      的 simCarrierContainer），StatusBarController 按 id 查找，其它页找不到时自动跳过。
      界面名统一显示在底部菜单栏中间，顶部不再显示标题。 -->
@@ -14,124 +17,151 @@
     android:orientation="vertical"
     android:visibility="invisible">
 
-    <LinearLayout
+    <!-- 第一行：FrameLayout 双层——底层左右图标簇 + 弹性空档，上层时间绝对居中。 -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp">
+        android:layout_height="wrap_content">
 
-        <!-- 左侧图标簇：双卡信号 + 电池 + WiFi + 蓝牙 + 飞行模式 -->
+        <!-- 底层：左信号簇 + 弹性空档 + 右图标簇。
+             paddingTop 3dp：图标/时间整体下移，不贴屏幕顶缘；
+             layout_gravity 必须垂直居中：顶栏行高由上层时间 TextView 撑起，
+             FrameLayout 子视图默认贴顶，不居中会导致电池/信号整体偏上。 -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:paddingStart="6dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="6dp">
 
-            <!-- SIM1 信号 -->
+            <!-- 左簇：双卡信号 -->
             <LinearLayout
-                android:id="@+id/sim1Container"
+                android:id="@+id/statusClusterLeft"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <TextView
+                <!-- SIM1 信号 -->
+                <LinearLayout
+                    android:id="@+id/sim1Container"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:includeFontPadding="false"
-                    android:text="1"
-                    android:textColor="#FFFFFF"
-                    android:textSize="@dimen/keydroidx_font_caption" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <ImageView
-                    android:id="@+id/ivSignal1"
-                    android:layout_width="20dp"
-                    android:layout_height="15dp"
-                    android:layout_marginStart="2dp"
-                    android:scaleType="fitCenter"
-                    app:srcCompat="@drawable/ic_signal_0" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="1"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/keydroidx_font_caption" />
+
+                    <ImageView
+                        android:id="@+id/ivSignal1"
+                        android:layout_width="20dp"
+                        android:layout_height="15dp"
+                        android:layout_marginStart="2dp"
+                        android:scaleType="fitCenter"
+                        app:srcCompat="@drawable/ic_signal_0" />
+                </LinearLayout>
+
+                <!-- SIM2 信号 -->
+                <LinearLayout
+                    android:id="@+id/sim2Container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="2"
+                        android:textColor="#FFFFFF"
+                        android:textSize="@dimen/keydroidx_font_caption" />
+
+                    <ImageView
+                        android:id="@+id/ivSignal2"
+                        android:layout_width="20dp"
+                        android:layout_height="15dp"
+                        android:layout_marginStart="2dp"
+                        android:scaleType="fitCenter"
+                        app:srcCompat="@drawable/ic_signal_0" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- SIM2 信号 -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- 右簇：连接类图标 + 电池（电池保持最右）。显隐由 StatusBarController 按 id 管理。 -->
             <LinearLayout
-                android:id="@+id/sim2Container"
+                android:id="@+id/statusClusterRight"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:includeFontPadding="false"
-                    android:text="2"
-                    android:textColor="#FFFFFF"
-                    android:textSize="@dimen/keydroidx_font_caption" />
-
+                <!-- WiFi（开启时显示） -->
                 <ImageView
-                    android:id="@+id/ivSignal2"
+                    android:id="@+id/ivWifi"
                     android:layout_width="20dp"
                     android:layout_height="15dp"
-                    android:layout_marginStart="2dp"
+                    android:layout_marginStart="8dp"
                     android:scaleType="fitCenter"
-                    app:srcCompat="@drawable/ic_signal_0" />
+                    app:srcCompat="@drawable/ic_keydroidx_wifi"
+                    android:visibility="gone" />
+
+                <!-- 蓝牙（开启时显示） -->
+                <ImageView
+                    android:id="@+id/ivBluetooth"
+                    android:layout_width="18dp"
+                    android:layout_height="15dp"
+                    android:layout_marginStart="6dp"
+                    android:scaleType="fitCenter"
+                    app:srcCompat="@drawable/ic_keydroidx_bluetooth"
+                    android:visibility="gone" />
+
+                <!-- 飞行模式（开启时显示） -->
+                <ImageView
+                    android:id="@+id/ivAirplane"
+                    android:layout_width="20dp"
+                    android:layout_height="15dp"
+                    android:layout_marginStart="6dp"
+                    android:scaleType="fitCenter"
+                    app:srcCompat="@drawable/ic_keydroidx_airplane"
+                    android:visibility="gone" />
+
+                <!-- 电池（最右侧） -->
+                <ImageView
+                    android:id="@+id/ivBattery"
+                    android:layout_width="24dp"
+                    android:layout_height="13dp"
+                    android:layout_marginStart="8dp"
+                    android:scaleType="fitCenter"
+                    app:srcCompat="@drawable/ic_keydroidx_battery" />
             </LinearLayout>
-
-            <!-- WiFi（开启时显示） -->
-            <ImageView
-                android:id="@+id/ivWifi"
-                android:layout_width="20dp"
-                android:layout_height="15dp"
-                android:layout_marginStart="8dp"
-                android:scaleType="fitCenter"
-                app:srcCompat="@drawable/ic_keydroidx_wifi"
-                android:visibility="gone" />
-
-            <!-- 蓝牙（开启时显示） -->
-            <ImageView
-                android:id="@+id/ivBluetooth"
-                android:layout_width="18dp"
-                android:layout_height="15dp"
-                android:layout_marginStart="6dp"
-                android:scaleType="fitCenter"
-                app:srcCompat="@drawable/ic_keydroidx_bluetooth"
-                android:visibility="gone" />
-
-            <!-- 飞行模式（开启时显示） -->
-            <ImageView
-                android:id="@+id/ivAirplane"
-                android:layout_width="20dp"
-                android:layout_height="15dp"
-                android:layout_marginStart="6dp"
-                android:scaleType="fitCenter"
-                app:srcCompat="@drawable/ic_keydroidx_airplane"
-                android:visibility="gone" />
         </LinearLayout>
 
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <!-- 电池（右侧） -->
-        <ImageView
-            android:id="@+id/ivBattery"
-            android:layout_width="24dp"
-            android:layout_height="13dp"
-            android:layout_marginEnd="6dp"
-        android:scaleType="fitCenter"
-        app:srcCompat="@drawable/ic_keydroidx_battery" />
-
+        <!-- 时钟：FrameLayout 上层绝对居中（与左右图标簇解耦）。
+             高度固定 15dp（与信号格/电池等高）+ gravity center：把字体行盒压平到内容高。
+             左右图标挤压时由 KeydroidxBaseActivity 的全局布局监听用 translationX 平移避让。 -->
         <TextView
             android:id="@+id/tvTime"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="15dp"
+            android:layout_gravity="center"
+            android:gravity="center"
             android:includeFontPadding="false"
             android:text="09:55"
             android:textColor="#FFFFFF"
             android:textSize="@dimen/keydroidx_font_small_title"
             android:textStyle="bold" />
-    </LinearLayout>
+    </FrameLayout>
 </LinearLayout>

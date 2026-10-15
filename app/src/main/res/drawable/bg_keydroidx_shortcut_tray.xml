@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 桌面顶部快捷应用栏的「托盘」底：
-     中性半透明黑 + 细白描边，通栏铺满（无左右边界，本身可横向滚动），
-     兼容全部主题壁纸（蓝/黑/金/绿/紫/自定义）。
-     与名称气泡 bg_keydroidx_bubble 同设计语言（深底 + 白描边），
+     中性半透明黑 + 仅上下两条细白线（通栏铺满、左右无边界——shape 的 stroke 是四边一圈，
+     左右也会出线，故用 layer-list 分层：底层整层线色，上层上下各留 1dp 铺底色）。
+     兼容全部主题壁纸（蓝/黑/金/绿/紫/自定义）；item 的 top/bottom 偏移为 API 1 属性。
+     与名称气泡 bg_keydroidx_bubble 同设计语言（深底 + 白线），
      透明度比气泡低（24% vs 66%），只做衬托不抢焦点高亮。 -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#3D000000" />
-    <stroke
-        android:width="1dp"
-        android:color="#26FFFFFF" />
-</shape>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 底层：整层细线色（最终只露出上下各 1dp） -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#26FFFFFF" />
+        </shape>
+    </item>
+    <!-- 上层：上下各让出 1dp 铺半透明黑底，左右铺满无边线 -->
+    <item
+        android:top="1dp"
+        android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#3D000000" />
+        </shape>
+    </item>
+</layer-list>
