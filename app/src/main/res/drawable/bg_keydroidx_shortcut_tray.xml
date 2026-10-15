@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 桌面顶部快捷应用栏的「托盘」底：
+     中性半透明黑 + 细白描边，通栏铺满（无左右边界，本身可横向滚动），
+     兼容全部主题壁纸（蓝/黑/金/绿/紫/自定义）。
+     与名称气泡 bg_keydroidx_bubble 同设计语言（深底 + 白描边），
+     透明度比气泡低（24% vs 66%），只做衬托不抢焦点高亮。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#3D000000" />
+    <stroke
+        android:width="1dp"
+        android:color="#26FFFFFF" />
+</shape>

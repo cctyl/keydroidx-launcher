@@ -198,6 +198,22 @@ public class StatusBarController {
 		updateCarriers();
 	}
 
+	/**
+	 * 运营商视图随桌面碎片重建后重新绑定并立即刷新。
+	 * <p>
+	 * 运营商视图（simCarrierContainer/tvCarrier1/tvCarrier2）自 2026-10 起从共用顶栏
+	 * 迁入桌面大时钟区（fragment_keydroidx_desktop.xml），而桌面页切换用 replace——
+	 * 返回桌面时碎片视图整体重建，但 Activity 的 onResume/start() 不会重跑，
+	 * 成员里持有的旧视图引用已 detach，直接刷会写进旧视图。由桌面碎片的
+	 * {@code onPageCreated} 调用本方法完成重绑 + 立即刷新。
+	 */
+	public void refreshCarrierViews() {
+		tvCarrier1 = activity.findViewById(R.id.tvCarrier1);
+		tvCarrier2 = activity.findViewById(R.id.tvCarrier2);
+		simCarrierContainer = activity.findViewById(R.id.simCarrierContainer);
+		updateCarriers();
+	}
+
 	/** 取消监听与广播。需在 Activity 的 onPause 中调用。 */
 	public void stop() {
 		stopCellInfoPolling();

@@ -1,21 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 桌面待机屏中间内容（碎片）：240dp 宽，高度 match_parent 自适应中间容器。
-     顶栏与快捷栏（含上下点线）位置固定优先保障；通知/组件区填充剩余空间，
+     顶部大时钟区与快捷栏位置固定优先保障；通知/组件区填充剩余空间，
      允许被挤压（后续会做可滚动）。基类缩放不再触发二次缩小分支。
-     运营商名(中国移动/联通等)已迁到 keydroidx_top_bar.xml，由 StatusBarController 统一管理。 -->
+     运营商名(中国移动/联通等)在时钟区左列（simCarrierContainer），由 StatusBarController 统一管理。 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- 快捷栏上方的点线分割线（代码覆盖背景为 KeydroidxDashedLineDrawable 点阵） -->
-    <View
-        android:id="@+id/shortcutDividerTop"
+    <!-- 桌面大时钟区：左侧竖排（大号时间 + 双卡运营商名），右侧两行（公历日期 / 星期 · 农历），
+         位于快捷栏正上方（与诺基亚 S40 待机屏一致，此处不放点线）。
+         时间/日期/农历由 KeydroidxDesktopFragment 的分钟级 tick 驱动刷新；
+         运营商名（simCarrierContainer/tvCarrier1/tvCarrier2）由 StatusBarController 按 id 统一管理，
+         原先在共用顶栏第二行，2026-10 起仅桌面显示（顶栏三页统一删行换取内容区高度）。 -->
+    <LinearLayout
+        android:id="@+id/clockPanel"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
+        android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp" />
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="2dp">
+
+        <LinearLayout
+            android:id="@+id/clockLeftColumn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- 双卡运营商名（横排）：StatusBarController 按 id 更新（运营商名/飞行模式/无SIM）。
+                 关闭 includeFontPadding（点阵字体自带上部额外行距），行距收紧。 -->
+            <LinearLayout
+                android:id="@+id/simCarrierContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="start|center_vertical"
+                android:orientation="horizontal"
+                android:paddingBottom="1dp">
+
+                <TextView
+                    android:id="@+id/tvCarrier1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:text=""
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/keydroidx_font_micro" />
+
+                <TextView
+                    android:id="@+id/tvCarrier2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:includeFontPadding="false"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:text=""
+                    android:textColor="#FFFFFF"
+                    android:textSize="@dimen/keydroidx_font_micro" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvDesktopClock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="16:30"
+                android:textColor="#FFFFFF"
+                android:textSize="@dimen/keydroidx_font_display" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/clockTextColumn"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvDesktopDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="2026年10月6日"
+                android:textColor="#FFFFFF"
+                android:textSize="@dimen/keydroidx_font_small_title" />
+
+            <TextView
+                android:id="@+id/tvDesktopLunar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="星期二 · 农历八月初六"
+                android:textColor="#B8C8EA"
+                android:textSize="@dimen/keydroidx_font_caption" />
+        </LinearLayout>
+    </LinearLayout>
 
     <!-- 注意：这里不要加 android:layerType="software"。
          软件层会把滚动内容缓存进一张位图，滚动/内容重建（图标异步替换、rebuildShortcutBar）
@@ -27,7 +118,9 @@
         android:id="@+id/shortcutBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/shortcutDividerTop"
+        android:layout_below="@id/clockPanel"
+        android:layout_marginBottom="2dp"
+        android:background="@drawable/bg_keydroidx_shortcut_tray"
         android:scrollbars="none">
 
         <LinearLayout
@@ -37,18 +130,18 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingStart="4dp"
-            android:paddingTop="4dp"
+            android:paddingTop="3dp"
             android:paddingEnd="4dp"
-            android:paddingBottom="4dp" />
+            android:paddingBottom="3dp" />
     </HorizontalScrollView>
 
-    <!-- 选中快捷应用时，在图标正上方浮出的名称气泡 -->
+    <!-- 选中快捷应用时，在图标正上方浮出的名称气泡（底边贴快捷栏顶边，运行时由
+         showShortcutBubble 用 setX/setY 精确定位，此处锚定仅为初始布局语义） -->
     <TextView
         android:id="@+id/shortcutNameBubble"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_marginTop="0dp"
+        android:layout_above="@id/shortcutBar"
         android:background="@drawable/bg_keydroidx_bubble"
         android:gravity="center"
         android:maxWidth="200dp"
@@ -62,15 +155,6 @@
         android:textSize="@dimen/keydroidx_font_caption"
         android:visibility="gone" />
 
-    <!-- 快捷栏与通知区之间的点线分割线（代码覆盖背景为 KeydroidxDashedLineDrawable 点阵） -->
-    <View
-        android:id="@+id/shortcutDivider"
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_below="@id/shortcutBar"
-        android:layout_marginStart="6dp"
-        android:layout_marginEnd="6dp" />
-
     <!-- 通知条：有通知时显示未读数与最新摘要，确认键进入通知中心。
          无通知 / 用户关闭 / 未授权时 GONE，桌面布局与无通知条时完全一致
          （RelativeLayout 中 GONE 视图按零尺寸点参与锚定，notificationArea 自动上移）。 -->
@@ -78,7 +162,7 @@
         android:id="@+id/notifBarContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/shortcutDivider"
+        android:layout_below="@id/shortcutBar"
         android:layout_marginStart="6dp"
         android:layout_marginEnd="6dp"
         android:layout_marginTop="2dp"

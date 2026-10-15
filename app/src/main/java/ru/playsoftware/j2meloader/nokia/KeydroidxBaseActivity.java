@@ -125,9 +125,9 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 
 	/** 设计基准尺寸（单位 dp）。 */
 	private static final float BASE_W = 240f;
-	private static final float TOP_H = 36f;  // 加了运营商行（原 22dp + 14dp 运营商行）
+	private static final float TOP_H = 22f;  // 2026-10 运营商行迁入桌面时钟区，顶栏回归单行（原 36dp）
 	private static final float BOT_H = 22f;
-	private static final float MID_H = 262f; // 320(设计总高) - 36(顶栏) - 22(底栏)
+	private static final float MID_H = 276f; // 320(设计总高) - 22(顶栏) - 22(底栏)
 
 	/** 响应式原生 DP 模式：所有组件按真实物理像素点对点渲染，scale 恒为 1.0f。 */
 	public float getScale() {

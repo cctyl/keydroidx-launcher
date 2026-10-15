@@ -4,6 +4,7 @@ import io.github.cctyl.nokia.common.ui.KeydroidxFontManager;
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxIcons;
 import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
+import ru.playsoftware.j2meloader.nokia.utils.KeydroidxLunarCalendar;
 
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -24,6 +25,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
 import io.github.cctyl.nokia.common.ui.drawable.KeydroidxDashedLineDrawable;
 import android.location.LocationManager;
@@ -81,6 +83,8 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  */
 public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 
+	private static final String TAG = "Desktop";
+
 	private final List<View> focusTargets = new ArrayList<>();
 	private final List<ShortcutApp> shortcutApps = new ArrayList<>();
 	private final List<KeydroidxWidgetItem> widgetItems = new ArrayList<>();
@@ -93,6 +97,28 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 	private HorizontalScrollView shortcutBar;
 	private Handler bubbleHandler;
 	private static final long BUBBLE_DURATION = 2000;
+
+	// ---- 桌面大时钟区（快捷栏上方：左时间，右日期 / 星期 · 农历） ----
+
+	/** 大时钟时间/日期/星期农历三行文本，布局见 fragment_keydroidx_desktop.xml 的 clockPanel。 */
+	private TextView tvDesktopClock;
+	private TextView tvDesktopDate;
+	private TextView tvDesktopLunar;
+	/** 日期行当前文本缓存：分钟 tick 只在跨天时重设一次日期与农历，避免重复 setText。 */
+	private String lastDateText = "";
+	/** 分钟级 tick：对齐下一分钟边界，onResume 启动、onPause 停止。 */
+	private final Handler clockHandler = new Handler(Looper.getMainLooper());
+	private final SimpleDateFormat clockMinuteFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
+	private final SimpleDateFormat clockDateFmt = new SimpleDateFormat("yyyy年M月d日", Locale.getDefault());
+	private final Runnable clockTick = new Runnable() {
+		@Override
+		public void run() {
+			if (!isAdded() || getView() == null) return;
+			refreshClockTexts();
+			// 对齐下一分钟边界（+200ms 容差），避免按固定 60s 轮询时的秒级漂移
+			clockHandler.postDelayed(this, 60000 - System.currentTimeMillis() % 60000 + 200);
+		}
+	};
 
 	/** 桌面「最近任务」组件行的条目数缓存（后台线程刷新，主线程只读，避免 TCP 卡顿）。 */
 	private volatile int cachedTaskCount = -1;
@@ -233,16 +259,16 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		shortcutNameBubble = view.findViewById(R.id.shortcutNameBubble);
 		bubbleHandler = new Handler(Looper.getMainLooper());
 
-		// 点线分割线
-		View dividerTop = view.findViewById(R.id.shortcutDividerTop);
-		View dividerBottom = view.findViewById(R.id.shortcutDivider);
+		// 大时钟区（快捷栏上方）：绑定三行文本并立即渲染一次
+		tvDesktopClock = view.findViewById(R.id.tvDesktopClock);
+		tvDesktopDate = view.findViewById(R.id.tvDesktopDate);
+		tvDesktopLunar = view.findViewById(R.id.tvDesktopLunar);
+		refreshClockTexts();
+		// 运营商视图在大时钟区内：碎片 replace 重建后旧引用失效，重绑并立即刷新一次
+		((KeydroidxDesktopActivity) requireActivity()).refreshCarrierViews();
+
+		// 点线分割线（快捷栏下方分割线已随托盘化移除，仅剩开关栏上方一条）
 		View toggleDivider = view.findViewById(R.id.quickToggleDivider);
-		if (dividerTop != null) {
-			dividerTop.setBackground(new KeydroidxDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
-		}
-		if (dividerBottom != null) {
-			dividerBottom.setBackground(new KeydroidxDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
-		}
 		if (toggleDivider != null) {
 			toggleDivider.setBackground(new KeydroidxDashedLineDrawable(getResources(), 0x60FFFFFF, 3, 3));
 		}
@@ -317,8 +343,22 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		// 注册应用卸载广播：当场卸载的应用当场从快捷栏移除
 		registerPackageRemovedReceiver();
 
-		KeydroidxLog.i("Desktop", "桌面待机屏初始化完成：快捷栏 " + shortcutCount
+		KeydroidxLog.i(TAG, "桌面待机屏初始化完成：快捷栏 " + shortcutCount
 				+ " 项，组件区 " + widgetCount + " 项");
+	}
+
+	/** 刷新大时钟区：时间每分钟更新；日期与「星期 · 农历」只在跨天时重设一次。 */
+	private void refreshClockTexts() {
+		if (tvDesktopClock == null) return;
+		Date now = new Date();
+		tvDesktopClock.setText(clockMinuteFmt.format(now));
+		String dateText = clockDateFmt.format(now);
+		if (!dateText.equals(lastDateText)) {
+			lastDateText = dateText;
+			tvDesktopDate.setText(dateText);
+			// 农历转换失败时降级为只显示「星期X」（工具类内部保证非 null）
+			tvDesktopLunar.setText(KeydroidxLunarCalendar.toWeekLunarText(now));
+		}
 	}
 
 	@Override
@@ -326,6 +366,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		super.onResume();
 		KeydroidxDesktopActivity host = (KeydroidxDesktopActivity) requireActivity();
 		host.refreshPageBar();
+		// 大时钟：先移除残留回调再立即刷一次，防止 onResume 重复进入时 tick 叠加
+		clockHandler.removeCallbacks(clockTick);
+		clockHandler.post(clockTick);
 		// 注册音乐播放状态 ContentObserver（监听播放态变化刷新组件行）
 		registerMusicPlaybackObserver();
 		// 通知条：订阅通知变化并按最新快照刷新（从通知中心清除后回桌面立即同步）
@@ -363,7 +406,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				}
 			}
 		});
-		KeydroidxLog.d("Desktop", "桌面 onResume，已刷新组件区");
+		KeydroidxLog.d(TAG, "桌面 onResume，已刷新组件区");
 	}
 
 	@Override
@@ -371,6 +414,8 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		super.onPause();
 		// 离开桌面后再次回来需要重建内容区（桌面设置可能增删改了组件/快捷栏/开关）
 		contentDirty = true;
+		// 停止大时钟分钟 tick，避免在不可见期间空转
+		clockHandler.removeCallbacks(clockTick);
 		unregisterToggleReceiver();
 		unregisterPackageRemovedReceiver();
 		unregisterMusicPlaybackObserver();
@@ -431,13 +476,13 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		long loadStart = System.currentTimeMillis();
 		// 图标包映射表后台预热（主线程不解析 XML；完成后回调里再刷新图标）
 		KeydroidxIconResolver.warmUpAsync(c, null);
-		KeydroidxLog.i("Desktop", "图标包预热已触发，耗时 " + (System.currentTimeMillis() - loadStart) + "ms");
+		KeydroidxLog.i(TAG, "图标包预热已触发，耗时 " + (System.currentTimeMillis() - loadStart) + "ms");
 
 		settingsStorage.getShortcutAppsAsync(new KeydroidxSettingsStorage.OnShortcutAppsLoaded() {
 			@Override
 			public void onLoaded(List<ShortcutApp> apps) {
 				if (!isAdded() || getView() == null) return;
-				KeydroidxLog.i("Desktop", "快捷栏配置就绪：" + apps.size() + " 项");
+				KeydroidxLog.i(TAG, "快捷栏配置就绪：" + apps.size() + " 项");
 				rebuildShortcutBar(apps);
 			}
 		});
@@ -581,7 +626,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		}
 
 		long buildElapsed = System.currentTimeMillis() - buildStart;
-		KeydroidxLog.i("Desktop", "快捷栏已构建：" + apps.size() + " 项，共 " + focusTargets.size()
+		KeydroidxLog.i(TAG, "快捷栏已构建：" + apps.size() + " 项，共 " + focusTargets.size()
 				+ " 个焦点，耗时 " + buildElapsed + "ms");
 
 		view.post(() -> {
@@ -619,7 +664,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		Context ctx = getContext();
 		if (ctx == null || musicObserverRegistered) return;
 		if (KeydroidxBgManagerHelper.wasCleared(MUSIC_PKG)) {
-			KeydroidxLog.i("Desktop", "音乐已被后台管理清理，暂不注册播放状态监听（避免冷启动）");
+			KeydroidxLog.i(TAG, "音乐已被后台管理清理，暂不注册播放状态监听（避免冷启动）");
 			return;
 		}
 		final Context appCtx = ctx.getApplicationContext();
@@ -630,9 +675,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					appCtx.getContentResolver().registerContentObserver(
 							MUSIC_PLAYBACK_URI, false, musicPlaybackObserver);
 					musicObserverRegistered = true;
-					KeydroidxLog.i("Desktop", "已注册音乐播放状态 ContentObserver");
+					KeydroidxLog.i(TAG, "已注册音乐播放状态 ContentObserver");
 				} catch (Exception e) {
-					KeydroidxLog.w("Desktop", "注册音乐播放 ContentObserver 失败: " + e.getMessage());
+					KeydroidxLog.w(TAG, "注册音乐播放 ContentObserver 失败: " + e.getMessage());
 				}
 			}
 		});
@@ -671,7 +716,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				if (focusIdx >= 0 && focusIdx < focusTargets.size()) {
 					focusTargets.set(focusIdx, newRow);
 				}
-				KeydroidxLog.i("Desktop", "音乐播放组件行已刷新");
+				KeydroidxLog.i(TAG, "音乐播放组件行已刷新");
 				break;
 			}
 		}
@@ -705,7 +750,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			hint.setTextColor(0xFF888888);
 			KeydroidxFontManager.textSize(hint, 9);
 			notifArea.addView(hint);
-			KeydroidxLog.i("Desktop", "组件区为空");
+			KeydroidxLog.i(TAG, "组件区为空");
 		} else {
 			for (int i = 0; i < widgetItems.size(); i++) {
 				View row = createWidgetRow(widgetItems.get(i));
@@ -713,7 +758,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					notifArea.addView(row);
 				}
 			}
-			KeydroidxLog.i("Desktop", "组件区已渲染 " + widgetItems.size() + " 个组件");
+			KeydroidxLog.i(TAG, "组件区已渲染 " + widgetItems.size() + " 个组件");
 		}
 
 		// 重建焦点列表（保留「快捷栏 + 通知条」头部，重建组件区部分）
@@ -943,7 +988,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 	 * Activity 的按键分发对其无效）与当前主题配色，无需另造一个确认框。
 	 */
 	private void confirmPowerAction(final KeydroidxQuickToggleItem item) {
-		KeydroidxLog.i("Desktop", "电源操作二次确认: " + item.name + " type=" + item.type);
+		KeydroidxLog.i(TAG, "电源操作二次确认: " + item.name + " type=" + item.type);
 		List<KeydroidxOptionsDialog.OptionItem> options = new ArrayList<>();
 		options.add(new KeydroidxOptionsDialog.OptionItem(
 				item.getIconUnicode(), "确认" + item.name, true, false,
@@ -995,7 +1040,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		ContextCompat.registerReceiver(ctx, toggleStateReceiver, filter,
 				ContextCompat.RECEIVER_NOT_EXPORTED);
 		receiverRegistered = true;
-		KeydroidxLog.i("Desktop", "已注册开关栏广播接收器");
+		KeydroidxLog.i(TAG, "已注册开关栏广播接收器");
 	}
 
 	private void unregisterToggleReceiver() {
@@ -1007,7 +1052,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				}
 			} catch (Exception ignored) {}
 			receiverRegistered = false;
-			KeydroidxLog.i("Desktop", "已注销开关栏广播接收器");
+			KeydroidxLog.i(TAG, "已注销开关栏广播接收器");
 		}
 	}
 
@@ -1022,16 +1067,16 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				if (!isAdded()) return;
 				// EXTRA_REPLACING=true 表示这是应用更新过程中的临时移除，包马上会装回来，不能删
 				if (intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
-					KeydroidxLog.i("Desktop", "收到包替换广播，跳过快捷栏清理: " + intent.getDataString());
+					KeydroidxLog.i(TAG, "收到包替换广播，跳过快捷栏清理: " + intent.getDataString());
 					return;
 				}
 				String pkg = intent.getData() != null
 						? intent.getData().getSchemeSpecificPart() : null;
 				if (TextUtils.isEmpty(pkg)) {
-					KeydroidxLog.w("Desktop", "卸载广播缺少包名，忽略");
+					KeydroidxLog.w(TAG, "卸载广播缺少包名，忽略");
 					return;
 				}
-				KeydroidxLog.i("Desktop", "收到应用卸载广播: " + pkg);
+				KeydroidxLog.i(TAG, "收到应用卸载广播: " + pkg);
 				removeShortcutByPackage(pkg);
 			}
 		};
@@ -1040,9 +1085,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		try {
 			ctx.registerReceiver(packageRemovedReceiver, filter);
 			packageReceiverRegistered = true;
-			KeydroidxLog.i("Desktop", "已注册应用卸载广播接收器");
+			KeydroidxLog.i(TAG, "已注册应用卸载广播接收器");
 		} catch (Exception e) {
-			KeydroidxLog.e("Desktop", "注册应用卸载广播失败", e);
+			KeydroidxLog.e(TAG, "注册应用卸载广播失败", e);
 		}
 	}
 
@@ -1055,7 +1100,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				}
 			} catch (Exception ignored) {}
 			packageReceiverRegistered = false;
-			KeydroidxLog.i("Desktop", "已注销应用卸载广播接收器");
+			KeydroidxLog.i(TAG, "已注销应用卸载广播接收器");
 		}
 	}
 
@@ -1075,10 +1120,10 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			}
 		}
 		if (removed.isEmpty()) {
-			KeydroidxLog.d("Desktop", "卸载的应用不在快捷栏，无需处理: " + pkg);
+			KeydroidxLog.d(TAG, "卸载的应用不在快捷栏，无需处理: " + pkg);
 			return;
 		}
-		KeydroidxLog.i("Desktop", "应用已卸载，从快捷栏移除 " + removed.size() + " 项: " + removed);
+		KeydroidxLog.i(TAG, "应用已卸载，从快捷栏移除 " + removed.size() + " 项: " + removed);
 		shortcutApps.clear();
 		shortcutApps.addAll(kept);
 		if (settingsStorage != null) {
@@ -1390,7 +1435,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		if (KeydroidxSettingsStorage.isNotifyAccessPromptDisabled(ctx)) return;
 		if (KeydroidxMusicSessionReader.isNotificationListenerEnabled(ctx)) return;
 		notifyAccessPromptShown = true;
-		KeydroidxLog.i("Desktop", "弹出通知使用权授予提示");
+		KeydroidxLog.i(TAG, "弹出通知使用权授予提示");
 		KeydroidxMusicSessionReader.showGrantPrompt(getParentFragmentManager(), ctx, true);
 	}
 
@@ -1411,7 +1456,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		// 回退 Provider：query 在对方进程不在时会把它冷启动起来。
 		// 能判断存活（ps -A / getRunningAppProcesses）就先判一次，已死直接按未播放返回。
 		if (!KeydroidxBgManagerHelper.isPackageAlive(appCtx, MUSIC_PKG)) {
-			KeydroidxLog.i("Desktop", "音乐进程未运行，跳过播放状态查询（避免冷启动）");
+			KeydroidxLog.i(TAG, "音乐进程未运行，跳过播放状态查询（避免冷启动）");
 			return new MusicSnapshot();
 		}
 		return queryMusicProviderSnapshot(appCtx);
@@ -1452,7 +1497,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				if (dur > 0) s.progress = (float) c.getLong(iPos) / dur;
 			}
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "读取音乐播放状态失败: " + e.getMessage());
+			KeydroidxLog.w(TAG, "读取音乐播放状态失败: " + e.getMessage());
 		} finally {
 			if (c != null) c.close();
 		}
@@ -1494,7 +1539,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					if (d != null) iv.setImageDrawable(d);
 				}
 			} catch (Exception ignored) {
-				KeydroidxLog.w("Desktop", "load app icon failed: " + ignored.getMessage());
+				KeydroidxLog.w(TAG, "load app icon failed: " + ignored.getMessage());
 			}
 		}
 		iv.setPadding(0, 0, KeydroidxDimens.dp(getResources(), 5), 0);
@@ -1540,7 +1585,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		int kc = kb != null ? kb.getKeyCode(KeydroidxKeyBinding.ACTION_LOCK_SCREEN)
 				: KeyEvent.KEYCODE_UNKNOWN;
 		String keyName = KeydroidxKeyBinding.keyName(kc);
-		KeydroidxLog.i("Desktop", "锁屏组件提示文字: 按下" + keyName + "键锁屏");
+		KeydroidxLog.i(TAG, "锁屏组件提示文字: 按下" + keyName + "键锁屏");
 		return "按下" + keyName + "键锁屏";
 	}
 
@@ -1597,7 +1642,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					ip & 0xff, (ip >> 8) & 0xff,
 					(ip >> 16) & 0xff, (ip >> 24) & 0xff);
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "format ip address failed: " + e.getMessage());
+			KeydroidxLog.w(TAG, "format ip address failed: " + e.getMessage());
 			return "未连接";
 		}
 	}
@@ -1624,7 +1669,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			memTotal = mi.totalMem;
 			memAvail = mi.availMem;
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "read memory info failed: " + e.getMessage());
+			KeydroidxLog.w(TAG, "read memory info failed: " + e.getMessage());
 			memTotal = 0;
 		}
 	}
@@ -1662,7 +1707,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				storageAvail = (long) stat.getAvailableBlocks() * stat.getBlockSize();
 			}
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "read storage info failed: " + e.getMessage());
+			KeydroidxLog.w(TAG, "read storage info failed: " + e.getMessage());
 			storageTotal = 0;
 		}
 	}
@@ -1690,7 +1735,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 			return weekDay + " " + sdf.format(cal.getTime());
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "format date failed: " + e.getMessage());
+			KeydroidxLog.w(TAG, "format date failed: " + e.getMessage());
 			return "日历";
 		}
 	}
@@ -1705,7 +1750,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			}
 			return minutes + "分钟";
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "format usage duration failed: " + e.getMessage());
+			KeydroidxLog.w(TAG, "format usage duration failed: " + e.getMessage());
 			return "使用时长";
 		}
 	}
@@ -1717,7 +1762,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				row.setOnClickListener(v -> {
 					String url = item.value;
 					if (url != null && !url.isEmpty()) {
-						KeydroidxLog.i("Desktop", "打开网址组件: " + url);
+						KeydroidxLog.i(TAG, "打开网址组件: " + url);
 						try {
 							Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
 							intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -1725,7 +1770,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 						} catch (Exception e) {
 							// 无浏览器（如手表/极简功能机未内置）属环境问题：按规范用 w，
 							// 不烧自动上报配额，并 Toast 明确告知用户
-							KeydroidxLog.w("Desktop", "打开网址失败: " + url + " : " + e.getMessage());
+							KeydroidxLog.w(TAG, "打开网址失败: " + url + " : " + e.getMessage());
 							Context c = getContext();
 							if (c != null) {
 								Toast.makeText(c, "未找到可打开网址的浏览器", Toast.LENGTH_SHORT).show();
@@ -1744,7 +1789,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 						String cls = parts[1];
 						Context ctx = getContext();
 						if (ctx == null) return;
-						KeydroidxLog.i("Desktop", "打开应用组件: " + pkgAndCls);
+						KeydroidxLog.i(TAG, "打开应用组件: " + pkgAndCls);
 
 						Intent intent = new Intent(Intent.ACTION_MAIN);
 						intent.setClassName(pkg, cls);
@@ -1757,17 +1802,17 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 
 						try {
 							startActivity(intent);
-							KeydroidxLog.i("Desktop", "启动应用组件成功: " + item.label);
+							KeydroidxLog.i(TAG, "启动应用组件成功: " + item.label);
 						} catch (Exception e) {
 							// 兜底：组件可能因应用更新/状态变化而失效，重新解析当前启用入口再试一次
 							if (retryWithLaunchIntent(ctx, pkg, item.label)) {
 								return;
 							}
 							if (e instanceof android.content.ActivityNotFoundException) {
-								KeydroidxLog.w("Desktop", "打开应用未找到或已被卸载: " + pkgAndCls, e);
+								KeydroidxLog.w(TAG, "打开应用未找到或已被卸载: " + pkgAndCls, e);
 								Toast.makeText(ctx, "未找到应用「" + item.label + "」，可能已被卸载", Toast.LENGTH_SHORT).show();
 							} else {
-								KeydroidxLog.e("Desktop", "打开应用失败: " + pkgAndCls, e);
+								KeydroidxLog.e(TAG, "打开应用失败: " + pkgAndCls, e);
 								Toast.makeText(ctx, "打开应用失败: " + item.label, Toast.LENGTH_SHORT).show();
 							}
 						}
@@ -1776,7 +1821,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				break;
 			case KeydroidxWidgetItem.TYPE_CALENDAR:
 				row.setOnClickListener(v -> {
-					KeydroidxLog.i("Desktop", "打开日历");
+					KeydroidxLog.i(TAG, "打开日历");
 					Context ctx = getContext();
 					if (ctx == null) return;
 					// 部分功能机 ROM（如展讯）日历包被出厂停用，且不响应 CATEGORY_APP_CALENDAR /
@@ -1796,20 +1841,20 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 						launch = ctx.getPackageManager().getLaunchIntentForPackage("com.android.calendar");
 					} catch (Exception e) {
 						// 展讯 ROM 的 CTA 钩子可能对 PackageManager IPC 抛异常，环境问题用 w
-						KeydroidxLog.w("Desktop", "查询日历启动入口失败: " + e.getMessage());
+						KeydroidxLog.w(TAG, "查询日历启动入口失败: " + e.getMessage());
 					}
 					if (launch != null && tryStartCalendar(ctx, launch, "getLaunchIntentForPackage")) return;
 					Intent fallback = new Intent(Intent.ACTION_VIEW);
 					fallback.setData(android.provider.CalendarContract.CONTENT_URI);
 					if (tryStartCalendar(ctx, fallback, "ACTION_VIEW")) return;
-					KeydroidxLog.w("Desktop", "打开日历失败：系统无可用日历应用");
+					KeydroidxLog.w(TAG, "打开日历失败：系统无可用日历应用");
 					Toast.makeText(ctx, "未找到可用的日历应用", Toast.LENGTH_SHORT).show();
 				});
 				break;
 			case KeydroidxWidgetItem.TYPE_LOCK_SCREEN:
 				// 锁屏组件：点击执行一键锁屏（需设备管理员权限，未授权跳转系统激活页）
 				row.setOnClickListener(v -> {
-					KeydroidxLog.i("Desktop", "锁屏组件点击：执行锁屏");
+					KeydroidxLog.i(TAG, "锁屏组件点击：执行锁屏");
 					Context c = getContext();
 					if (c != null) {
 						KeydroidxLockScreen.lock(c);
@@ -1820,7 +1865,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				// 后台管理组件：点击进入「最近任务」页（组件与新按键动作两个入口共用同一套 UI）；
 				// 运行/受保护页签的「后台管理」页改从该页选项菜单进入。
 				row.setOnClickListener(v -> {
-					KeydroidxLog.i("Desktop", "后台管理组件点击：打开最近任务页");
+					KeydroidxLog.i(TAG, "后台管理组件点击：打开最近任务页");
 					if (getActivity() instanceof KeydroidxDesktopActivity) {
 						((KeydroidxDesktopActivity) getActivity())
 								.openFragment(new KeydroidxRecentTasksFragment());
@@ -1843,7 +1888,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 					Toast.makeText(c,
 							"未连接".equals(ip) ? "WiFi未连接" : "已复制: " + ip,
 							Toast.LENGTH_SHORT).show();
-					KeydroidxLog.i("Desktop", "IP组件点击: ip=" + ip);
+					KeydroidxLog.i(TAG, "IP组件点击: ip=" + ip);
 					rebuildWidgetArea(getView());
 				});
 				break;
@@ -1870,11 +1915,11 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		try {
 			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 			ctx.startActivity(intent);
-			KeydroidxLog.i("Desktop", "打开日历成功: " + tag);
+			KeydroidxLog.i(TAG, "打开日历成功: " + tag);
 			return true;
 		} catch (Exception e) {
 			// 无匹配 Activity / 包停用属环境问题，按规范用 w（不落盘、不触发自动上报）
-			KeydroidxLog.w("Desktop", "打开日历尝试失败(" + tag + "): " + e.getMessage());
+			KeydroidxLog.w(TAG, "打开日历尝试失败(" + tag + "): " + e.getMessage());
 			return false;
 		}
 	}
@@ -1883,7 +1928,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 	private void launchMusicPlayer() {
 		Context ctx = getContext();
 		if (ctx == null) return;
-		KeydroidxLog.i("Desktop", "正在播放组件点击：打开音乐播放器");
+		KeydroidxLog.i(TAG, "正在播放组件点击：打开音乐播放器");
 		Intent intent = new Intent(Intent.ACTION_MAIN);
 		intent.setClassName(MUSIC_PKG, MUSIC_PLAYER_ACTIVITY);
 		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -1895,13 +1940,13 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 
 		try {
 			startActivity(intent);
-			KeydroidxLog.i("Desktop", "启动音乐播放器成功");
+			KeydroidxLog.i(TAG, "启动音乐播放器成功");
 		} catch (Exception e) {
 			if (retryWithLaunchIntent(ctx, MUSIC_PKG, "音乐")) {
 				return;
 			}
 			// 未安装 / 被停用属外部环境问题（Toast 文案本身就是「未安装」）：用 w，不烧上报配额
-			KeydroidxLog.w("Desktop", "打开音乐播放器失败: " + e.getMessage(), e);
+			KeydroidxLog.w(TAG, "打开音乐播放器失败: " + e.getMessage(), e);
 			Toast.makeText(ctx, "未安装音乐播放器", Toast.LENGTH_SHORT).show();
 		}
 	}
@@ -1913,11 +1958,11 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			if (retry == null) return false;
 			retry.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 			startActivity(retry);
-			KeydroidxLog.i("Desktop", "兜底启动成功 " + label + " -> " + retry.getComponent());
+			KeydroidxLog.i(TAG, "兜底启动成功 " + label + " -> " + retry.getComponent());
 			return true;
 		} catch (Exception e2) {
 			// 兜底路径失败同样是外部应用被卸载/停用的环境问题：用 w，不触发自动上报
-			KeydroidxLog.w("Desktop", "兜底启动也失败 " + label + ": " + e2.getMessage(), e2);
+			KeydroidxLog.w(TAG, "兜底启动也失败 " + label + ": " + e2.getMessage(), e2);
 			return false;
 		}
 	}
@@ -1929,7 +1974,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		if (ctx == null) return;
 		final String target = item.value.trim();
 		final String label = item.label;
-		KeydroidxLog.i("Desktop", "触发快捷开关: " + label + " target=" + target);
+		KeydroidxLog.i(TAG, "触发快捷开关: " + label + " target=" + target);
 
 		// 1. 小黑屋特化官方一键冻结通道（免 root、免 Shizuku、直接调用官方公开的 StopappActivity）
 		if (target.contains("web1n.stopapp")) {
@@ -1939,10 +1984,10 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				freezeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				ctx.startActivity(freezeIntent);
 				Toast.makeText(ctx, "已触发: " + label, Toast.LENGTH_SHORT).show();
-				KeydroidxLog.i("Desktop", "已直接拉起小黑屋一键冻结 StopappActivity");
+				KeydroidxLog.i(TAG, "已直接拉起小黑屋一键冻结 StopappActivity");
 				return;
 			} catch (Exception e) {
-				KeydroidxLog.e("Desktop", "拉起小黑屋 StopappActivity 失败，尝试通用 Shell 通道", e);
+				KeydroidxLog.e(TAG, "拉起小黑屋 StopappActivity 失败，尝试通用 Shell 通道", e);
 			}
 		}
 
@@ -1955,7 +2000,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			// 优先使用 mini_shizuku 服务以 Shell 身份执行
 			if (Shizuku.isRunning()) {
 				executed = Shizuku.exec(cmd);
-				KeydroidxLog.i("Desktop", "Shizuku 执行 click-tile 结果: " + executed);
+				KeydroidxLog.i(TAG, "Shizuku 执行 click-tile 结果: " + executed);
 			}
 
 			// 若 Shizuku 未运行，尝试 root su 执行；
@@ -1964,9 +2009,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				KeydroidxRootShell.Result r = KeydroidxRootShell.exec(ctx, cmd, 8000L);
 				if (r.isSuccess()) {
 					executed = true;
-					KeydroidxLog.i("Desktop", "Root 执行 click-tile 成功");
+					KeydroidxLog.i(TAG, "Root 执行 click-tile 成功");
 				} else {
-					KeydroidxLog.w("Desktop", "root click-tile failed: code=" + r.code + " out=" + r.out.trim());
+					KeydroidxLog.w(TAG, "root click-tile failed: code=" + r.code + " out=" + r.out.trim());
 				}
 			}
 
@@ -2025,7 +2070,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			try {
 				iv.setImageDrawable(ContextCompat.getDrawable(ctx, R.mipmap.ic_launcher));
 			} catch (Exception ignored) {
-				KeydroidxLog.w("Desktop", "load fallback launcher icon failed: " + ignored.getMessage());
+				KeydroidxLog.w(TAG, "load fallback launcher icon failed: " + ignored.getMessage());
 			}
 		}
 		iconContainer.addView(iv);
@@ -2055,7 +2100,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				}
 			}
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "加载快捷栏图标(内存)失败: " + app.label);
+			KeydroidxLog.w(TAG, "加载快捷栏图标(内存)失败: " + app.label);
 		}
 		return null;
 	}
@@ -2079,7 +2124,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 							if (packIcon != null) return packIcon;
 						}
 					} catch (Exception ignored) {
-						KeydroidxLog.w("Desktop", "load pack icon failed: " + ignored.getMessage());
+						KeydroidxLog.w(TAG, "load pack icon failed: " + ignored.getMessage());
 					}
 					try {
 						if (getActivity() != null) {
@@ -2090,12 +2135,12 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 									intent.getComponent(), null);
 						}
 					} catch (Exception ignored) {
-						KeydroidxLog.w("Desktop", "load activity icon failed: " + ignored.getMessage());
+						KeydroidxLog.w(TAG, "load activity icon failed: " + ignored.getMessage());
 					}
 				}
 			}
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "加载快捷栏图标失败: " + app.label);
+			KeydroidxLog.w(TAG, "加载快捷栏图标失败: " + app.label);
 		}
 		return null;
 	}
@@ -2225,7 +2270,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 			canvas.setBitmap(null);
 			return new BitmapDrawable(res, bmp);
 		} catch (Exception e) {
-			KeydroidxLog.w("Desktop", "快捷图标预缩放失败: " + e.getMessage());
+			KeydroidxLog.w(TAG, "快捷图标预缩放失败: " + e.getMessage());
 			return d;
 		}
 	}
@@ -2233,7 +2278,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 	private void launchShortcutApp(ShortcutApp app) {
 		Context ctx = getContext();
 		if (ctx == null) return;
-		KeydroidxLog.i("Desktop", "启动快捷栏应用: " + app.label);
+		KeydroidxLog.i(TAG, "启动快捷栏应用: " + app.label);
 		try {
 			if (app.type == ShortcutApp.TYPE_ANDROID) {
 				String pkg = null;
@@ -2260,7 +2305,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 							try {
 								retry = ctx.getPackageManager().getLaunchIntentForPackage(pkg);
 							} catch (Exception pmEx) {
-								KeydroidxLog.w("Desktop", "快捷栏应用查询启动入口失败(" + app.label + "): " + pmEx.getMessage());
+								KeydroidxLog.w(TAG, "快捷栏应用查询启动入口失败(" + app.label + "): " + pmEx.getMessage());
 							}
 							if (retry != null) {
 								retry.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -2268,17 +2313,17 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 									startActivity(retry);
 									app.intentUri = retry.toUri(Intent.URI_INTENT_SCHEME);
 									settingsStorage.setShortcutApps(new ArrayList<>(shortcutApps));
-									KeydroidxLog.i("Desktop", "快捷栏应用兜底启动成功并修正缓存: "
+									KeydroidxLog.i(TAG, "快捷栏应用兜底启动成功并修正缓存: "
 											+ app.label + " -> " + retry.getComponent());
 									return;
 								} catch (Exception retryEx) {
-									KeydroidxLog.w("Desktop", "快捷栏应用兜底启动异常(" + app.label + "): " + retryEx.getMessage());
+									KeydroidxLog.w(TAG, "快捷栏应用兜底启动异常(" + app.label + "): " + retryEx.getMessage());
 								}
 							}
 						}
 						// 兜底失败或未找到可用入口：属于外部应用被卸载/停用等环境问题，非启动器自身缺陷
 						if (e instanceof android.content.ActivityNotFoundException) {
-							KeydroidxLog.w("Desktop", "启动快捷栏应用未找到或已被卸载: " + app.label
+							KeydroidxLog.w(TAG, "启动快捷栏应用未找到或已被卸载: " + app.label
 									+ (pkg != null ? " (" + pkg + ")" : ""), e);
 							Toast.makeText(ctx, "未找到应用「" + app.label + "」，可能已被卸载", Toast.LENGTH_SHORT).show();
 							return;
@@ -2292,10 +2337,10 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 				KeydroidxJarLauncher.launch(requireActivity(), app.label, app.appKey);
 			}
 		} catch (android.content.ActivityNotFoundException e) {
-			KeydroidxLog.w("Desktop", "启动快捷栏应用未找到或已被卸载: " + app.label, e);
+			KeydroidxLog.w(TAG, "启动快捷栏应用未找到或已被卸载: " + app.label, e);
 			Toast.makeText(ctx, "未找到应用「" + app.label + "」，可能已被卸载", Toast.LENGTH_SHORT).show();
 		} catch (Exception e) {
-			KeydroidxLog.e("Desktop", "启动快捷栏应用失败: " + app.label, e);
+			KeydroidxLog.e(TAG, "启动快捷栏应用失败: " + app.label, e);
 			Toast.makeText(ctx, "启动失败: " + app.label, Toast.LENGTH_SHORT).show();
 		}
 	}
@@ -2556,7 +2601,7 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		if (v != null) {
 			Context ctx = getContext();
 			if (ctx != null) {
-				v.setBackground(KeydroidxTheme.createSelectionDrawable(ctx, 4));
+				v.setBackground(createDesktopSelectionDrawable(4));
 			}
 			selectedView = v;
 		}
@@ -2565,6 +2610,31 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		} else {
 			hideShortcutBubble();
 		}
+	}
+
+	/**
+	 * 桌面焦点高亮（参照诺基亚 S40 选中样式）：选中项底色变实（主题 focusColor 提高到
+	 * 80% 不透明度），并叠加一圈主题强调色描边（经典蓝主题下即浅亮蓝框）。
+	 * 颜色全部取自当前主题，切换翡翠绿/琥珀金等主题时自动联动。
+	 * 仅桌面使用；common 的 {@code KeydroidxTheme.createSelectionDrawable} 保持原样，
+	 * 不影响设置页 / Music 等生态内其它列表的高亮。
+	 */
+	private Drawable createDesktopSelectionDrawable(float radiusDp) {
+		Context ctx = getContext();
+		if (ctx == null) return null;
+		float density = ctx.getResources().getDisplayMetrics().density;
+		KeydroidxTheme.ThemeDef theme = KeydroidxTheme.getCurrentTheme(ctx);
+		GradientDrawable gd = new GradientDrawable();
+		gd.setShape(GradientDrawable.RECTANGLE);
+		gd.setColor(raiseAlphaTo(theme.focusColor, 0xCC));
+		gd.setCornerRadius(radiusDp * density);
+		gd.setStroke(Math.max(1, Math.round(density)), theme.accentColor);
+		return gd;
+	}
+
+	/** 把颜色 alpha 通道替换为指定值（保留 RGB），用于把半透明焦点色提实。 */
+	private static int raiseAlphaTo(int color, int alpha) {
+		return (color & 0x00FFFFFF) | (alpha << 24);
 	}
 
 	private void showShortcutBubble(int index, View cell) {
@@ -2587,7 +2657,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		if (left < 2) left = 2;
 		if (left > maxLeft) left = Math.max(2, maxLeft);
 		shortcutNameBubble.setX(left);
-		shortcutNameBubble.setY(shortcutBar.getTop() + shortcutBar.getHeight() + KeydroidxDimens.dp(getResources(), 1));
+		// 名称气泡改为在图标上方弹出：底边贴快捷栏顶边（上方是大时钟区，短暂覆盖其底部，2s 后自动隐藏）
+		shortcutNameBubble.setY(shortcutBar.getTop() - shortcutNameBubble.getMeasuredHeight()
+				- KeydroidxDimens.dp(getResources(), 1));
 		shortcutNameBubble.setVisibility(View.VISIBLE);
 
 		bubbleHandler.removeCallbacks(bubbleHideRunnable);

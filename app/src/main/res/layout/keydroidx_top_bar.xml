@@ -2,8 +2,9 @@
 <!-- 共用的诺基亚顶部状态栏：三页复用。
      注意：顶栏由基类以"原生分辨率"渲染（不做 setScaleX 缩放），以保证矢量图标清晰不模糊；
      仅高度按设计比例(TOP_H*scale)放大，由代码设置。内层宽度铺满屏幕。
-     顶部第一行：左侧图标簇(SIM1/SIM2 信号 + WiFi + 蓝牙 + 飞行模式)；右侧电池和时钟。
-     顶部第二行：双卡运营商名(无 SIM 时隐藏)。
+     顶部单行：左侧图标簇(SIM1/SIM2 信号 + WiFi + 蓝牙 + 飞行模式)；右侧电池和时钟。
+     原第二行双卡运营商名已移除：只在桌面大时钟区显示（见 fragment_keydroidx_desktop.xml
+     的 simCarrierContainer），StatusBarController 按 id 查找，其它页找不到时自动跳过。
      界面名统一显示在底部菜单栏中间，顶部不再显示标题。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -132,39 +133,5 @@
             android:textColor="#FFFFFF"
             android:textSize="@dimen/keydroidx_font_small_title"
             android:textStyle="bold" />
-    </LinearLayout>
-
-    <!-- 双卡运营商名（横排）：始终显示，根据状态显示运营商名/飞行模式/无SIM。
-         上下 padding 收紧为 1dp，且关闭 includeFontPadding（点阵字体自带上部额外行距），
-         减少顶栏第二行占用的纵向空间，把空间还给中间内容区。 -->
-    <LinearLayout
-        android:id="@+id/simCarrierContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="6dp"
-        android:paddingTop="1dp"
-        android:paddingEnd="6dp"
-        android:paddingBottom="1dp">
-
-        <TextView
-            android:id="@+id/tvCarrier1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:includeFontPadding="false"
-            android:text=""
-            android:textColor="#FFFFFF"
-            android:textSize="@dimen/keydroidx_font_micro" />
-
-        <TextView
-            android:id="@+id/tvCarrier2"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:includeFontPadding="false"
-            android:text=""
-            android:textColor="#FFFFFF"
-            android:textSize="@dimen/keydroidx_font_micro" />
     </LinearLayout>
 </LinearLayout>

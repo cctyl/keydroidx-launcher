@@ -1028,6 +1028,16 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		postReportPageState();
 	}
 
+	/**
+	 * 供桌面碎片重建后重新绑定顶栏运营商视图（运营商视图已迁入桌面时钟区，
+	 * 碎片 replace 重建时 Activity 生命周期不重跑，须由碎片主动触发重绑刷新）。
+	 */
+	public void refreshCarrierViews() {
+		if (statusBarController != null) {
+			statusBarController.refreshCarrierViews();
+		}
+	}
+
 	private void switchFragment(Fragment fragment) {
 		KeydroidxLog.i("Desktop", "切换中间面板 -> "
 				+ (fragment != null ? fragment.getClass().getSimpleName() : "null"));
