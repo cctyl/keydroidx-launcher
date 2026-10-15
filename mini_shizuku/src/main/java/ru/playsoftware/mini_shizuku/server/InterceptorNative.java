@@ -217,9 +217,20 @@ public class InterceptorNative {
      */
     public static native void nativeSetSuppGroups(int[] gids);
 
-    /** root 身份服务端需补齐的补充组：root(0) + shell 全组，关键为 inet(3003)。 */
+    /**
+     * root 身份服务端需补齐的补充组：root(0) + shell 全组。
+     * <ul>
+     *   <li><b>inet(3003)</b>：Android 内核对 socket() 的权限检查针对补充组而非 uid
+     *       （paranoid networking），缺失则服务端 TCP 起不来；</li>
+     *   <li><b>readproc(3009)</b>：这台及多数 ROM 的 /proc 以 {@code hidepid=2,gid=3009}
+     *       挂载，不属于该组就看不到<b>其它 uid</b> 的进程（含全部应用进程）——
+     *       root 服务端被 su 拉起时补充组被清空，曾导致 {@code ps -A} 只能看到
+     *       内核线程与原生守护进程、任何应用进程都不可见（2026-10-15 q968 实测：
+     *       381 行里 0 个 u0_a 进程）。adb 激活因继承 shell 的 3009 组而一直正常。</li>
+     * </ul>
+     */
     public static final int[] SERVER_SUPP_GROUPS = {
-            0, 1004, 1007, 1011, 1015, 1028, 3001, 3002, 3003, 3006, 9997
+            0, 1004, 1007, 1011, 1015, 1028, 3001, 3002, 3003, 3006, 3009, 9997
     };
 
     /** native 库是否已加载成功（供 root 启动早期判断补组前提是否满足）。 */

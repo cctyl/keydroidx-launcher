@@ -380,6 +380,12 @@ E/MiniShizuku: java.io.FileNotFoundException: /data/local/tmp/libnokiaintercepto
 
 **最终实测（4.4.4 真机，root 激活）**：`Uid: 0`、`Groups: 0 1004 1007 1011 1015 1028 3001 3002 3003 3006 9997`（与 `SERVER_SUPP_GROUPS` 完全一致）、`Listening on 127.0.0.1:10500`、WHOAMI 返回 `OK:uid=0`。
 
+> **2026-10-15 增补 `readproc(3009)`（并改换存活枚举通道）**：q968（Android 13）实测 `/proc` 以 `hidepid=2,gid=3009` 挂载，不在该组的进程看不到**其它 uid** 的进程。root 服务端被 su 拉起后补充组被清空，导致 `ps -A` 只能看到内核线程与原生守护进程（381 行里 0 个应用进程），旧后台管理页/存活枚举在 root 模式下"失明"；adb 激活因继承 shell 的 3009 组一直正常。
+>
+> **补 3009 在该 ROM 上仍失败**：`nativeSetSuppGroups` 实测返回 `EPERM`——`CapEff` 虽为全量，但 SELinux `u:r:shell:s0` 域未授予 `setgid` capability 许可，内核 `ns_capable()` 走 SELinux capable 钩子后拒绝（4.4 机型策略较松，同样代码可成功）。因此：
+> 1. `SERVER_SUPP_GROUPS` 保留 3009（对宽松策略的机型有效，失败仅打日志不影响启动）；
+> 2. **存活进程枚举整体改用 `dumpsys activity processes`**（binder 经 system_server，与 /proc 挂载参数、SELinux capable 无关，root/adb 两模式一致），`ps -A` 仅留作诊断。
+
 ### 4.4 激活流程（root 模式，✅ 已按此实施）
 
 ```

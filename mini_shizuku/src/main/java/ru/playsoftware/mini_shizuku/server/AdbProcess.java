@@ -77,6 +77,6 @@ public final class AdbProcess {
         }
         InterceptorNative.nativeSetSuppGroups(InterceptorNative.SERVER_SUPP_GROUPS);
         Log.i(TAG, "root server: supplemental groups set (n=" + InterceptorNative.SERVER_SUPP_GROUPS.length
-                + ", incl. inet 3003)");
+                + ", incl. inet 3003 / readproc 3009)");
     }
 }

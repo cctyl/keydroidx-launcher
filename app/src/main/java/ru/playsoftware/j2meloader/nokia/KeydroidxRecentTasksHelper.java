@@ -77,6 +77,12 @@ public final class KeydroidxRecentTasksHelper {
 			Pattern.compile("([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+)/[A-Za-z0-9_.$]+");
 	private static final Pattern P_TIME =
 			Pattern.compile("(?:lastActiveTime|lastTimeMoved|lastUsedTime)=(\\d+)");
+	/**
+	 * 任务块首行内的子任务数：{@code Task{... sz=1}}。
+	 * <p>{@code force-stop} 后任务记录若以空壳留在 recents，则 {@code sz=0}；
+	 * 有 Activity 在栈里则 {@code sz>0}。用于「已清理」自愈判定的辅助信号。
+	 */
+	private static final Pattern P_SZ = Pattern.compile("\\bsz=(\\d+)");
 
 	private KeydroidxRecentTasksHelper() {}
 
@@ -140,11 +146,21 @@ public final class KeydroidxRecentTasksHelper {
 		final String pkg;
 		final int taskId;
 		final long agoMs;
+		/**
+		 * 任务块内<b>原始</b> {@code lastActiveTime}（未经归一化）。
+		 * &lt;=0 表示未知（如 4.4 getRecentTasks 通道）。供「已清理」自愈判定与
+		 * 清理时刻（双时间基）比较使用。
+		 */
+		final long rawActiveTime;
+		/** 任务子任务数（块首行 {@code sz=N}）；未知为 -1。 */
+		final int sz;
 
-		Cand(String pkg, int taskId, long agoMs) {
+		Cand(String pkg, int taskId, long agoMs, int sz, long rawActiveTime) {
 			this.pkg = pkg;
 			this.taskId = taskId;
 			this.agoMs = agoMs;
+			this.sz = sz;
+			this.rawActiveTime = rawActiveTime;
 		}
 	}
 
@@ -238,7 +254,7 @@ public final class KeydroidxRecentTasksHelper {
 			if ((info.baseIntent.getFlags() & Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0) continue;
 			ComponentName cn = info.baseIntent.getComponent();
 			if (cn == null || cn.getPackageName() == null) continue;
-			out.add(new Cand(cn.getPackageName(), info.id, 0));
+			out.add(new Cand(cn.getPackageName(), info.id, 0, -1, 0));
 		}
 		KeydroidxLog.i(TAG, "getRecentTasks 候选: " + out.size());
 		return out;
@@ -283,6 +299,7 @@ public final class KeydroidxRecentTasksHelper {
 		List<Cand> out = new ArrayList<>();
 		String curPkg = null;
 		int curId = -1;
+		int curSz = -1;
 		long curRaw = 0;
 		boolean inBlock = false;
 
@@ -294,11 +311,12 @@ public final class KeydroidxRecentTasksHelper {
 			Matcher taskM = P_TASK_BLOCK.matcher(line);
 			if (taskM.find()) {
 				// 上一个块入库
-				if (inBlock) addCand(out, curPkg, curId, curRaw);
+				if (inBlock) addCand(out, curPkg, curId, curSz, curRaw);
 				inBlock = true;
 				curPkg = null;
 				curRaw = 0;
 				curId = -1;
+				curSz = -1;
 
 				String inner = taskM.group(1);
 				Matcher idM = P_HASH_ID.matcher(inner);
@@ -311,6 +329,14 @@ public final class KeydroidxRecentTasksHelper {
 				}
 				Matcher pkgM = P_PKG_A.matcher(inner);
 				if (pkgM.find()) curPkg = pkgM.group(1);
+				Matcher szM = P_SZ.matcher(inner);
+				if (szM.find()) {
+					try {
+						curSz = Integer.parseInt(szM.group(1));
+					} catch (NumberFormatException e) {
+						KeydroidxLog.w(TAG, "解析 sz 失败: " + e.getMessage());
+					}
+				}
 				continue;
 			}
 			if (!inBlock) continue;
@@ -330,26 +356,31 @@ public final class KeydroidxRecentTasksHelper {
 				}
 			}
 		}
-		if (inBlock) addCand(out, curPkg, curId, curRaw);
+		if (inBlock) addCand(out, curPkg, curId, curSz, curRaw);
 		return out;
 	}
 
-	private static void addCand(List<Cand> out, String pkg, int taskId, long rawTime) {
+	private static void addCand(List<Cand> out, String pkg, int taskId, int sz, long rawTime) {
 		if (pkg == null || pkg.isEmpty()) return;
-		out.add(new Cand(pkg, taskId, normalizeDumpsysTime(rawTime)));
+		out.add(new Cand(pkg, taskId, normalizeDumpsysTime(rawTime), sz, rawTime));
 	}
 
 	/**
-	 * 归一化 dumpsys 时间戳：{@code lastActiveTime} 多数版本取 {@link SystemClock#uptimeMillis()} 时间基，
-	 * 少数版本给墙上时钟。按「落在哪个时间基区间内」自动判定；两者都不成立时按未知（0）处理。
+	 * dumpsys 时间戳可能的时间基（随 ROM/版本而异）：
+	 * boottime（{@link SystemClock#elapsedRealtime()}，含休眠，q968 实测落在该基）、
+	 * uptime（不含深睡）、墙上时钟。不做猜测，逐一计算后取最小非负差值即可——
+	 * 真实时间基给出的差值一定最小，错误基只会更大或为负。
 	 */
 	private static long normalizeDumpsysTime(long raw) {
 		if (raw <= 0) return 0;
-		long uptime = SystemClock.uptimeMillis();
-		if (raw <= uptime) return uptime - raw;             // uptime 时间基
-		long now = System.currentTimeMillis();
-		if (raw <= now) return now - raw;                    // 墙上时钟时间基
-		return 0;
+		long best = -1;
+		long ago = SystemClock.elapsedRealtime() - raw;
+		if (ago >= 0 && (best < 0 || ago < best)) best = ago;
+		ago = SystemClock.uptimeMillis() - raw;
+		if (ago >= 0 && (best < 0 || ago < best)) best = ago;
+		ago = System.currentTimeMillis() - raw;
+		if (ago >= 0 && (best < 0 || ago < best)) best = ago;
+		return best < 0 ? 0 : best;
 	}
 
 	// ============================================================
@@ -391,33 +422,36 @@ public final class KeydroidxRecentTasksHelper {
 			if (!unique.containsKey(c.pkg)) unique.put(c.pkg, c);
 		}
 
-		// 存活判据只有一个用途：识别「本应用刚清理掉的」条目。
-		// 清理只杀进程、任务记录不会消失（实测 4.4 与 Android 13 均如此；13 需要
-		// am stack remove 才能真删），所以清完必须靠 wasCleared 把卡片隐去，否则
-		// 用户会觉得"清了等于没清"。该标记只在内存里（进程重启即失效）：
-		// 重启后这些条目会以"点进去需冷启动"的形态回来，属于无删栈能力时的已知取舍。
-		Set<String> alive = mode == MODE_REAL_TASK
+		// 「已清理」标记只用于识别「本应用刚清理掉、任务记录还以空壳留在 recents」的条目
+		// （force-stop 只杀进程不删任务记录，am stack remove 不总生效）。
+		// 隐藏与否不再依赖进程存活探测（root 通道 ps -A 曾因 /proc hidepid + SELinux
+		// 完全看不到应用进程，造成被清过的应用被永久隐藏），而是用任务记录自身的
+		// lastActiveTime/sz 自愈判定，并有 TTL 保险丝兜底。
+		// alive 集合（dumpsys activity processes）仅作辅助复活信号与诊断日志。
+		// 只有候选里真的存在「已清理」标记时才去查进程表：该命令输出很大
+		// （q968 实测 ~260KB），常规路径（没有清理记录）不该为它付出代价。
+		boolean anyCleared = false;
+		for (String p : unique.keySet()) {
+			if (KeydroidxBgManagerHelper.wasCleared(p)) {
+				anyCleared = true;
+				break;
+			}
+		}
+		Set<String> alive = (mode == MODE_REAL_TASK && anyCleared)
 				? KeydroidxBgManagerHelper.getAlivePackages(ctx) : null;
 
 		for (Map.Entry<String, Cand> entry : unique.entrySet()) {
 			String pkg = entry.getKey();
 			Cand c = entry.getValue();
-			if (alive != null) {
-				if (!alive.contains(pkg)) {
-					// 进程已死：只有「本应用清的」才隐去；系统回收的照样显示
-					if (KeydroidxBgManagerHelper.wasCleared(pkg)) {
-						KeydroidxLog.d(TAG, "跳过已清理任务: " + pkg);
-						continue;
-					}
-				} else if (KeydroidxBgManagerHelper.wasCleared(pkg)) {
-					// 进程还在 = 用户又从图标把它打开了，撤销「已清理」标记
+			if (KeydroidxBgManagerHelper.wasCleared(pkg)) {
+				if (isRevivedSinceClear(pkg, c, alive)) {
+					// 用户在清理之后又重新用过它：撤销标记并照常显示
 					KeydroidxBgManagerHelper.unmarkCleared(pkg);
-					KeydroidxLog.i(TAG, "已清理包检测到重新启动，撤销标记: " + pkg);
+					KeydroidxLog.i(TAG, "已清理任务检测到重新使用，撤销标记: " + pkg);
+				} else {
+					KeydroidxLog.d(TAG, "跳过已清理任务(空壳): " + pkg);
+					continue;
 				}
-			} else if (KeydroidxBgManagerHelper.wasCleared(pkg)) {
-				// 无法确认存活时沿用旧标记过滤，避免刚清掉的应用立刻"复活"成空壳卡
-				KeydroidxLog.d(TAG, "跳过已清理包(存活未知): " + pkg);
-				continue;
 			}
 			try {
 				// 无可启动入口的应用（系统服务、Provider 进程等）不是"任务"
@@ -448,6 +482,63 @@ public final class KeydroidxRecentTasksHelper {
 				}
 			if (out.size() >= MAX_TASKS) break;
 		}
+	}
+
+	/**
+	 * 被「本应用清理」过的包，自清理之后是否又被用户重新使用过。
+	 *
+	 * <p><b>背景：</b>「已清理」标记曾只加不撤（撤销依赖存活探测命中），而 root 通道的
+	 * {@code ps -A} 受 /proc hidepid + SELinux 限制完全看不到应用进程，导致 bilibili 等
+	 * 应用被<b>永久隐藏</b>
+	 * （真机日志：07:00:50 启动哔哩哔哩 → 07:00:56 仍「跳过已清理任务」，持续 2 小时）。
+	 * 本方法改用三层信号，任一命中即判定「已复活」并撤销标记，保证不可能永久隐藏：</p>
+	 * <ol>
+	 *   <li><b>存活探测命中</b>（辅助）：{@code ps -A} 看到了该包；</li>
+	 *   <li><b>任务 lastActiveTime 晚于清理时刻</b>（主路径，不依赖 ps -A，与最近任务
+	 *       数据同一次 dumpsys 调用）：说明用户在清理后重新打开过它；</li>
+	 *   <li><b>TTL 过期</b>（保险丝，由 {@code getClearedRecord} 返回 null 体现）。</li>
+	 * </ol>
+	 *
+	 * <p>时间基按 dumpsys 原始值与清理记录的双时间基（uptime / 墙上时钟）对齐比较；
+	 * 时间不可判时退化为 {@code sz}（任务栈里有 Activity ≈ 被重新用过），仍不可判则维持隐藏
+	 * 至 TTL 到期（4.4 通道无时间与 sz，最多隐藏 {@code CLEARED_TTL_MS}）。</p>
+	 *
+	 * @param rec   未过期的已清理记录（调用方已确认 {@code wasCleared(pkg)} 为真）
+	 * @return true = 撤销标记并显示；false = 维持隐藏
+	 */
+	private static boolean isRevivedSinceClear(String pkg, Cand c, Set<String> alive) {
+		// 信号一：存活探测命中
+		if (alive != null && alive.contains(pkg)) return true;
+		KeydroidxBgManagerHelper.ClearedRecord rec = KeydroidxBgManagerHelper.getClearedRecord(pkg);
+		if (rec == null) {
+			// 标记已在两次调用间过期：按「已复活」处理（fail-open，宁可多显示）
+			return true;
+		}
+		// 信号二：任务最后活跃时刻晚于清理时刻。
+		// dumpsys lastActiveTime 的时间基随 ROM/版本而异（boottime 含休眠 / uptime / 墙上时钟），
+		// 与本地三种时钟基逐一比较，任一基上「任务比清理时刻更近」即判定复活。
+		// 不做单基猜测：q968 实测 lastActiveTime 落在 boottime（含休眠）基，按 uptime 或
+		// 墙上时钟猜测会把刚复活的任务误判成「很久以前」而继续隐藏。
+		if (c.rawActiveTime > 0) {
+			boolean revived =
+					activeAfterClearIn(c.rawActiveTime, SystemClock.elapsedRealtime(), rec.clearedRealtimeMs)
+							|| activeAfterClearIn(c.rawActiveTime, SystemClock.uptimeMillis(), rec.clearedElapsedMs)
+							|| activeAfterClearIn(c.rawActiveTime, System.currentTimeMillis(), rec.clearedWallMs);
+			return revived;
+		}
+		// 信号三：时间不可判时退化为 sz（任务栈里有 Activity ≈ 被重新用过）
+		return c.sz > 0;
+	}
+
+	/**
+	 * 单一时间基上的「任务最后活跃晚于清理时刻」判定。
+	 * {@code rawActiveTime} 不落在该基的过去区间（差值为负 = 时间基不符）时不计。
+	 */
+	private static boolean activeAfterClearIn(long rawActiveTime, long nowInBase, long clearedAtInBase) {
+		long ago = nowInBase - rawActiveTime;
+		if (ago < 0) return false;
+		long clearedAgo = nowInBase - clearedAtInBase;
+		return clearedAgo > 0 && ago < clearedAgo;
 	}
 
 	/**

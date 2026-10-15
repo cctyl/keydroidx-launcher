@@ -13,6 +13,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.provider.Settings;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
@@ -21,7 +22,11 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import ru.playsoftware.j2meloader.applist.AppItem;
 import ru.playsoftware.j2meloader.nokia.iconpack.KeydroidxIconResolver;
@@ -199,7 +204,8 @@ public final class KeydroidxBgManagerHelper {
 	/**
 	 * 枚举后台包名集合（去重，排除桌面自身与系统应用）。
 	 * <ul>
-	 *   <li>API ≥ 21 且 mini_shizuku 已激活：执行 {@code ps -A} 解析真实存活进程；</li>
+	 *   <li>API ≥ 21 且 mini_shizuku 已激活：执行 {@code dumpsys activity processes}
+	 *       解析真实存活进程；</li>
 	 *   <li>API ≥ 21 未激活：返回空（功能不可用，UI 显示「未激活」）；</li>
 	 *   <li>API &lt; 21：{@link ActivityManager#getRunningAppProcesses()}。</li>
 	 * </ul>
@@ -210,7 +216,8 @@ public final class KeydroidxBgManagerHelper {
 			String imePkg = getDefaultImePackage(ctx);
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 				if (!shizukuActivated) return out;
-				out.addAll(enumerateViaPs(ctx));
+				Set<String> ps = enumerateAlivePackages(ctx);
+				if (ps != null) out.addAll(ps);
 				// 输入法进程常驻但不算"后台应用"
 				if (imePkg != null) out.remove(imePkg);
 				return out;
@@ -233,36 +240,72 @@ public final class KeydroidxBgManagerHelper {
 		return out;
 	}
 
+	/** 存活进程枚举命令：走 binder 经 system_server，不受 /proc 挂载参数与 SELinux capable 限制。 */
+	private static final String CMD_ALIVE_PROCESSES = "dumpsys activity processes";
+	/** {@code ProcessRecord{268f37d 23109:com.bilibili.app.in/u0a172}} → 进程名（包名或 pkg:子进程）。 */
+	private static final Pattern P_PROCESS_RECORD =
+			Pattern.compile("ProcessRecord\\{[0-9a-fA-F]+ \\d+:([a-zA-Z0-9_.]+)");
+
 	/**
-	 * 通过 mini_shizuku 执行 {@code ps -A} 解析存活进程包名集合（去重）。
-	 * 解析 NAME 列（最后一列）：内核线程 {@code [xxx]} 跳过；子进程 {@code pkg:proc}
-	 * 取主包名；非应用进程（init / 守护进程）由后续 PackageManager 查询天然过滤。
+	 * 通过 mini_shizuku 执行 {@code dumpsys activity processes} 解析存活应用包名集合（去重）。
+	 * <p>
+	 * <b>为什么不用 {@code ps -A}</b>（2026-10-15 q968 / Android 13 实测教训）：
+	 * 该 ROM 的 /proc 以 {@code hidepid=2,gid=3009} 挂载，不属于 readproc(3009) 组就看不到
+	 * 其它 uid 的进程；root 服务端被 su 拉起时补充组被清空，补组又因 SELinux shell 域无
+	 * {@code setgid} capability 许可而 EPERM——结果 {@code ps -A} 只能看到内核线程与原生
+	 * 守护进程，<b>任何应用进程都不可见</b>（adb 激活因继承 shell 的 3009 组而一直正常）。
+	 * {@code dumpsys} 走 binder 经 system_server 输出进程表，与 /proc 可见性无关，
+	 * root/adb 两种激活模式行为一致。
+	 * <p>
+	 * 解析 {@code ProcessRecord{hash pid:pkg[:子进程]/uid}} 行取主包名；子进程
+	 * {@code pkg:proc} 归并到主包名；非应用进程天然不出现 ProcessRecord，无需过滤。
+	 *
+	 * @return 包名集合；<b>探测异常或解析结果为空时返回 null（=「无法判断」）</b>，
+	 *         调用方必须按 fail-open 处理（宁可多显示，不可误判为已死）
 	 */
-	private static Set<String> enumerateViaPs(Context ctx) {
-		Set<String> out = new HashSet<>();
+	private static Set<String> enumerateAlivePackages(Context ctx) {
+		// 结果缓存：dumpsys activity processes 输出很大（q968 实测 ~260KB，约 6 倍于 ps -A），
+		// 而桌面计数 / 最近任务页 / 音乐组件经常在同一秒内并发触发；低端机（msm8909）上
+		// 连发会把 loadavg 打到 10+、整机卡顿。同 TTL 内共用一次结果，失败（null）不缓存。
+		synchronized (ALIVE_CACHE_LOCK) {
+			long now = SystemClock.elapsedRealtime();
+			if (sAliveCache != null && now - sAliveCacheAtMs < ALIVE_CACHE_TTL_MS) {
+				return sAliveCache;
+			}
+			Set<String> out = fetchAlivePackages(ctx);
+			if (out != null) {
+				sAliveCache = out;
+				sAliveCacheAtMs = now;
+			}
+			return out;
+		}
+	}
+
+	/** 存活集合缓存有效期（毫秒）。 */
+	private static final long ALIVE_CACHE_TTL_MS = 5000L;
+	private static final Object ALIVE_CACHE_LOCK = new Object();
+	private static Set<String> sAliveCache;
+	private static long sAliveCacheAtMs;
+
+	/** 真正执行进程表查询并解析（无缓存）。 */
+	private static Set<String> fetchAlivePackages(Context ctx) {
 		String output;
 		try {
-			output = Shizuku.execWithOutput("ps -A");
+			output = Shizuku.execWithOutput(CMD_ALIVE_PROCESSES);
 		} catch (Exception e) {
-			KeydroidxLog.e(TAG, "ps -A 执行失败", e);
-			return out;
+			KeydroidxLog.e(TAG, "存活进程枚举执行失败", e);
+			return null;
 		}
 		if (output == null || output.isEmpty()) {
-			KeydroidxLog.w(TAG, "ps -A 无输出（mini_shizuku 服务异常？）");
-			return out;
+			KeydroidxLog.w(TAG, "存活进程枚举无输出（mini_shizuku 服务异常？），按未知处理");
+			return null;
 		}
+		Set<String> out = new HashSet<>();
 		String self = ctx.getPackageName();
-		for (String line : output.split("\n")) {
-			if (line == null || line.isEmpty()) continue;
-			line = line.trim();
-			// 跳过表头
-			if (line.startsWith("USER")) continue;
-			String[] cols = line.split("\\s+");
-			if (cols.length < 2) continue;
-			String name = cols[cols.length - 1];
+		Matcher m = P_PROCESS_RECORD.matcher(output);
+		while (m.find()) {
+			String name = m.group(1);
 			if (name == null || name.isEmpty()) continue;
-			// 内核线程 [xxx] 跳过
-			if (name.startsWith("[")) continue;
 			// 子进程 pkg:proc → 取主包名
 			String pkg = name.contains(":") ? name.substring(0, name.indexOf(':')) : name;
 			if (pkg.isEmpty()) continue;
@@ -270,25 +313,78 @@ public final class KeydroidxBgManagerHelper {
 			if (pkg.equals(self)) continue;
 			out.add(pkg);
 		}
+		if (out.isEmpty()) {
+			// 正常设备不可能一个应用进程都没有：走到这里说明输出格式异常/被截断，
+			// 空集会被误当成「全部已死」（曾造成被清过的应用被永久隐藏），按未知处理
+			KeydroidxLog.w(TAG, "进程表解析到 0 个包（疑似输出异常），按未知处理");
+			return null;
+		}
+		// 诊断日志：核对「已清理」标记的包是否真被进程表看见。
+		// 仅在存在「已清理」标记时输出，属低频枚举路径，不刷屏。
+		if (!CLEARED_PKGS.isEmpty()) {
+			StringBuilder sb = new StringBuilder();
+			for (String cleared : CLEARED_PKGS.keySet()) {
+				sb.append(cleared).append(out.contains(cleared) ? "(存活)" : "(未见)").append(' ');
+			}
+			KeydroidxLog.i(TAG, "进程表诊断: 包数=" + out.size()
+					+ " 已清理标记命中: " + sb.toString().trim());
+		}
 		return out;
 	}
 
-	// ---- 清理结果记忆 ----
+	// ---- 清理结果记忆（带自愈信息） ----
 
 	/**
-	 * 被本应用清理掉、且尚未确认其重新启动的包名集合（仅进程内存，桌面进程重启后清空）。
-	 * <p>
-	 * 用途：清理是我们自己做的，那「它已停止」就是已知事实，不需要再查询。
-	 * 桌面「正在播放」组件原先每次渲染都去查音乐 App 的 ContentProvider，而
-	 * {@code query()} 在对方进程不在时会让 AMS 把它<b>冷启动</b>——用户刚在后台管理里
-	 * 清掉音乐，桌面转头又把它拉起来，既自相矛盾又卡顿（实测主线程阻塞 1.2s）。
+	 * 「已清理」标记的最长存活时间（TTL 保险丝）。
+	 * <p>此前标记只加不撤，撤销依赖存活探测命中；而 root 通道的 {@code ps -A} 受
+	 * /proc hidepid + SELinux 限制完全看不到应用进程（见 {@link #enumerateAlivePackages}），
+	 * 撤销永不触发，导致被清过的应用被<b>永久隐藏</b>（2026-10-15 真机日志：
+	 * 07:00:50 启动哔哩哔哩 → 07:00:56 仍「跳过已清理任务」，持续到 08:58）。
+	 * TTL 保证任何探测异常下最多隐藏这么久。
 	 */
-	private static final Set<String> CLEARED_PKGS =
-			Collections.synchronizedSet(new HashSet<String>());
+	private static final long CLEARED_TTL_MS = 10 * 60 * 1000L;
 
-	/** 记录某个包已被本应用清理（{@link #clearBackgroundTasks} 内部调用）。 */
+	/**
+	 * 已清理记录（仅进程内存，桌面进程重启即清空）。
+	 * <p>除包名外还记录清理时刻（uptime 与墙上时钟<b>双时间基</b>）与清理时的系统任务栈 id，
+	 * 供「最近任务」页用 dumpsys 任务记录自身的 {@code lastActiveTime} 判定「用户是否重新用过它」
+	 * ——该判定<b>不依赖 {@code ps -A}</b>，与最近任务数据同一次 dumpsys 调用、零额外开销。
+	 */
+	static final class ClearedRecord {
+		/** 清理时的系统任务栈 id；未知为 &lt;=0。 */
+		final int taskId;
+		/** {@link SystemClock#uptimeMillis()} 时间基的清理时刻（不含深睡）。 */
+		final long clearedElapsedMs;
+		/** {@link SystemClock#elapsedRealtime()} 时间基的清理时刻（含休眠，与 dumpsys lastActiveTime 同基）。 */
+		final long clearedRealtimeMs;
+		/** {@link System#currentTimeMillis()} 时间基的清理时刻。 */
+		final long clearedWallMs;
+		/** TTL 到期时刻（uptime 基）。 */
+		final long expireElapsedMs;
+
+		ClearedRecord(int taskId, long clearedElapsedMs, long clearedRealtimeMs, long clearedWallMs) {
+			this.taskId = taskId;
+			this.clearedElapsedMs = clearedElapsedMs;
+			this.clearedRealtimeMs = clearedRealtimeMs;
+			this.clearedWallMs = clearedWallMs;
+			this.expireElapsedMs = clearedElapsedMs + CLEARED_TTL_MS;
+		}
+	}
+
+	/** pkg → 已清理记录。并发访问（枚举线程 / 清理线程 / 主线程音乐组件），用并发表。 */
+	private static final Map<String, ClearedRecord> CLEARED_PKGS =
+			new ConcurrentHashMap<String, ClearedRecord>();
+
+	/** 记录某个包已被本应用清理（未知 taskId 传 &lt;=0）。 */
+	private static void markCleared(String pkg, int taskId) {
+		if (pkg == null || pkg.isEmpty()) return;
+		CLEARED_PKGS.put(pkg, new ClearedRecord(taskId,
+				SystemClock.uptimeMillis(), SystemClock.elapsedRealtime(), System.currentTimeMillis()));
+	}
+
+	/** 便捷重载：未知 taskId。 */
 	private static void markCleared(String pkg) {
-		if (pkg != null && !pkg.isEmpty()) CLEARED_PKGS.add(pkg);
+		markCleared(pkg, -1);
 	}
 
 	/** 清除「已清理」标记：确认目标包又活过来时调用。 */
@@ -296,9 +392,26 @@ public final class KeydroidxBgManagerHelper {
 		if (pkg != null) CLEARED_PKGS.remove(pkg);
 	}
 
-	/** 目标包是否刚被本应用清理、且尚未确认重新启动。 */
+	/** 目标包是否刚被本应用清理、且尚未确认重新启动（过期记录视同未清理并自动清除）。 */
 	public static boolean wasCleared(String pkg) {
-		return pkg != null && CLEARED_PKGS.contains(pkg);
+		return getClearedRecord(pkg) != null;
+	}
+
+	/**
+	 * 取未过期的已清理记录；过期即清除并返回 null。
+	 * 包级可见：供「最近任务」页做「清理时刻 vs 任务 lastActiveTime」的自愈判定。
+	 */
+	static ClearedRecord getClearedRecord(String pkg) {
+		if (pkg == null || pkg.isEmpty()) return null;
+		ClearedRecord rec = CLEARED_PKGS.get(pkg);
+		if (rec == null) return null;
+		if (SystemClock.uptimeMillis() > rec.expireElapsedMs) {
+			// TTL 保险丝：无论存活探测是否可靠，到期一律不再隐藏
+			CLEARED_PKGS.remove(pkg);
+			KeydroidxLog.i(TAG, "已清理标记过期自动失效: " + pkg);
+			return null;
+		}
+		return rec;
 	}
 
 	/**
@@ -309,7 +422,7 @@ public final class KeydroidxBgManagerHelper {
 	 * 后台计数用的是同一套存活判据，两处口径一致。
 	 * <b>必须在后台线程调用</b>（含 shell 命令 / IPC）。
 	 *
-	 * @return 存活包名集合；<b>无法判断时返回 null</b>（5.0+ 未激活 mini_shizuku），
+	 * @return 存活包名集合；<b>无法判断时返回 null</b>（5.0+ 未激活 mini_shizuku 或探测异常），
 	 *         调用方应据此跳过过滤，不要当成"全部已死"
 	 */
 	public static Set<String> getAlivePackages(Context ctx) {
@@ -317,7 +430,7 @@ public final class KeydroidxBgManagerHelper {
 		try {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 				if (!shizukuActivated) return null;
-				return enumerateViaPs(ctx);
+				return enumerateAlivePackages(ctx);
 			}
 			// 4.4：getRunningAppProcesses 可枚举全部进程
 			ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
@@ -348,7 +461,10 @@ public final class KeydroidxBgManagerHelper {
 		try {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 				if (!shizukuActivated) return true;
-				return enumerateViaPs(ctx).contains(pkg);
+				Set<String> alive = enumerateAlivePackages(ctx);
+				// 探测失败/未知（null）时按「存活」处理——宁可多查一次，也不能把正在
+				// 播放的应用误判成已停止（与 getAlivePackages 的 fail-open 契约一致）
+				return alive == null || alive.contains(pkg);
 			}
 			ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
 			if (am == null) return true;
@@ -558,7 +674,8 @@ public final class KeydroidxBgManagerHelper {
 				Shizuku.exec("am stack remove " + taskId);
 			}
 			// 保留「已清理」标记：拿不到 taskId（或删栈失败）时，靠它把该条目从列表隐去
-			if (ok) markCleared(pkg);
+			// （记录 taskId 与清理时刻，供最近任务页做「是否被重新使用」的自愈判定）
+			if (ok) markCleared(pkg, taskId);
 			KeydroidxLog.i(TAG, "手动清理单任务(force-stop"
 					+ (taskId > 0 ? "+removeTask" : "") + "): " + pkg + " ok=" + ok);
 			return ok;
