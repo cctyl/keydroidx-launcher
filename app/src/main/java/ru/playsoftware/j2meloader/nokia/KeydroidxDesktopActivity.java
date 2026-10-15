@@ -985,8 +985,24 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		if (fm.getBackStackEntryCount() > 0) {
 			fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
 		}
+		// 返回栈整栈回放会把每条旧记录里「被 replace 掉的碎片」原样 add 回来。
+		// 若历史上有旁路 replace（如向导完成时未清返回栈），回放会复活一整条
+		// 设置页/向导链，连同一个被替换掉的旧桌面碎片——多个碎片同时挂在
+		// midPanel 上互相叠加，表现为快捷栏图标双层残影（2026-10-15 复现）。
+		// 这里统计容器内现存碎片：多于一个、或当前不是桌面时，整组 replace 清理，
+		// 保证「midPanel 至多一个桌面碎片」的不变量。
 		Fragment cur = fm.findFragmentById(R.id.midPanel);
-		if (!(cur instanceof KeydroidxDesktopFragment)) {
+		int containerCount = 0;
+		for (Fragment f : fm.getFragments()) {
+			if (f != null && !f.isDetached() && f.getId() == R.id.midPanel) {
+				containerCount++;
+			}
+		}
+		if (containerCount > 1 || !(cur instanceof KeydroidxDesktopFragment)) {
+			if (containerCount > 1) {
+				KeydroidxLog.w("Desktop", "goHome 检测到 " + containerCount
+						+ " 个碎片共存于 midPanel（返回栈回放复活旧碎片），整组清理重建桌面");
+			}
 			fm.beginTransaction()
 					.replace(R.id.midPanel, new KeydroidxDesktopFragment())
 					.commitAllowingStateLoss();

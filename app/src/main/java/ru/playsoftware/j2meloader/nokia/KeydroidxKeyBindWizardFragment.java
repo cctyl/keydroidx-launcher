@@ -244,6 +244,12 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	private void exitToDesktop() {
 		if (!isAdded() || getActivity() == null) return;
 		FragmentManager fm = requireActivity().getSupportFragmentManager();
+		// 先清空返回栈再 replace：进入向导的记录链（设置分组页/按键绑定页）还压在栈里，
+		// 直接 replace 会让这些旧记录残留——之后任意一次 goHome 的整栈回放会把旧页面
+		// 连同被替换掉的旧桌面碎片一起复活，造成多个碎片叠加在 midPanel 上（快捷栏残影）。
+		if (fm.getBackStackEntryCount() > 0) {
+			fm.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+		}
 		fm.beginTransaction()
 				.replace(R.id.midPanel, new KeydroidxDesktopFragment())
 				.commitAllowingStateLoss();
