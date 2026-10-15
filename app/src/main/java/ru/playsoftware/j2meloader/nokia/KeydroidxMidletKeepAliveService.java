@@ -33,6 +33,14 @@ import ru.playsoftware.j2meloader.util.MidletStateStore;
  * <p>
  * 僵尸防御：系统 START_STICKY 重启拉起时进程内已无 MIDlet 实例，
  * 直接 stopSelf，避免无意义常驻通知。
+ * <p>
+ * <b>FGS 义务前置（线上实测崩溃）</b>：startForegroundService 被调用后，系统看门狗
+ * 要求在超时窗口内（实测约 10s）调到 startForeground，否则抛
+ * {@code ForegroundServiceDidNotStartInTimeException} 杀死本进程、连带杀死挂机中的
+ * MIDlet（Android 16 / OPPO 线上复现）。因此 onStartCommand 的<b>第一行</b>就先
+ * startForeground 一个构建成本近零的极简通知履行义务，磁盘 I/O（状态文件、
+ * SharedPreferences）与正式通知（含 PendingIntent）构建全部后移，完成后用
+ * {@link NotificationManager#notify} 原地替换，用户无感知。
  */
 public class KeydroidxMidletKeepAliveService extends Service {
 
@@ -60,15 +68,18 @@ public class KeydroidxMidletKeepAliveService extends Service {
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
+		// FGS 义务前置：必须先于一切业务工作（hasInstance 判断、磁盘 I/O、
+		// SharedPreferences 读取、PendingIntent/正式通知构建）挂出极简通知，
+		// 否则主线程繁忙/进程被冻结时超出看门狗窗口，进程被杀（线上实测崩溃）。
+		if (!startForegroundSafe(buildBareNotification())) {
+			// 极端 ROM 限制下极简通知也起不来：无法履行 FGS 义务，只能停服降级。
+			// 此时看门狗仍可能抛超时异常，但该场景概率极低，与修复前持平。
+			stopSelf();
+			return START_NOT_STICKY;
+		}
 		if (!MidletThread.hasInstance()) {
 			// 僵尸防御（系统重启拉起/竞态残留）：进程内已无 MIDlet。
-			// 注意：API 26+ 规定 startForegroundService 调用后必须调用 startForeground，
-			// 即使立即 stopSelf 也要先补一次，否则 ForegroundServiceDidNotStartInTimeException
-			// 会杀死进程并触发崩溃循环（实测 bug）。
-			if (!startForegroundSafe(buildNotification(null, null, null))) {
-				stopSelf();
-				return START_NOT_STICKY;
-			}
+			// FGS 义务已在方法开头履行，这里直接撤除并停服即可。
 			stopForeground(true);
 			stopSelf();
 			return START_NOT_STICKY;
@@ -77,7 +88,8 @@ public class KeydroidxMidletKeepAliveService extends Service {
 		String appPath = intent != null && intent.getData() != null ? intent.getData().toString() : null;
 		int[] keyCodes = intent != null ? intent.getIntArrayExtra(Constants.KEY_KEYCODES) : null;
 		if (appName == null || appPath == null) {
-			// START_STICKY 重启 intent 为 null：从状态文件兜底
+			// START_STICKY 重启 intent 为 null：从状态文件兜底（磁盘 I/O，
+			// 已在 startForeground 之后，不再占用 FGS 超时窗口）
 			MidletStateStore.RunningInfo r = MidletStateStore.getRunning(this);
 			if (r != null) {
 				if (appName == null) appName = r.appName;
@@ -87,12 +99,9 @@ public class KeydroidxMidletKeepAliveService extends Service {
 		if (keyCodes == null) {
 			keyCodes = KeydroidxKeyBinding.loadKeyCodes(this);
 		}
-		if (!startForegroundSafe(buildNotification(appName, appPath, keyCodes))) {
-			// 保活降级：通知起不来（权限被剥离/ROM 限制等极端场景）也不能崩溃——
-			// 挂机本身仍成立（进程存活），只是无常驻通知、更易被系统回收
-			stopSelf();
-			return START_NOT_STICKY;
-		}
+		// 正式通知原地替换（带点击回跳 PendingIntent）。FGS 义务已履行，
+		// 即使替换失败也仅通知停留在极简版，绝不影响挂机。
+		updateNotification(buildNotification(appName, appPath, keyCodes));
 		// NOT_STICKY：进程死=挂机已失效，禁止系统重启空进程制造崩溃循环
 		return START_NOT_STICKY;
 	}
@@ -100,14 +109,55 @@ public class KeydroidxMidletKeepAliveService extends Service {
 	/**
 	 * 安全版 startForeground：失败返回 false（调用方降级 stopSelf），绝不抛异常——
 	 * 本服务运行在 :midlet 进程，任何崩溃都会连带杀死挂机中的 MIDlet（实测 bug）。
+	 * <p>
+	 * 失败属预期内降级（权限被剥离/ROM 限制等环境因素），按规范记 {@code w} 而非
+	 * {@code e}：不落盘、不占用崩溃上报每日配额。
 	 */
 	private boolean startForegroundSafe(Notification notification) {
 		try {
 			startForeground(NOTIFICATION_ID, notification);
 			return true;
 		} catch (Throwable t) {
-			KeydroidxLog.e(TAG, "startForeground 失败，保活降级（挂机不受影响）: " + t);
+			KeydroidxLog.w(TAG, "startForeground 失败，保活降级（挂机不受影响）: " + t);
 			return false;
+		}
+	}
+
+	/**
+	 * 极简通知：仅小图标 + 通用文案，不含 PendingIntent 与任何 extras，构建成本近零。
+	 * 专用于 onStartCommand 第一时间履行 startForeground 义务；
+	 * 业务信息随后由 {@link #updateNotification} 用正式通知原地替换。
+	 */
+	private Notification buildBareNotification() {
+		Notification.Builder builder;
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			builder = new Notification.Builder(this, CHANNEL_ID);
+		} else {
+			builder = new Notification.Builder(this);
+		}
+		return builder
+				.setSmallIcon(R.mipmap.ic_launcher)
+				.setContentTitle("J2ME")
+				.setContentText("正在后台运行")
+				.setOngoing(true)
+				.build();
+	}
+
+	/**
+	 * 原地更新为正式通知（带点击回跳）。仅 {@code notify}，不再 startForeground：
+	 * FGS 义务已在 onStartCommand 开头履行，这里失败仅意味着通知停留在极简版，
+	 * 绝不抛异常、绝不影响挂机。
+	 */
+	private void updateNotification(Notification notification) {
+		try {
+			NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+			if (nm != null) {
+				nm.notify(NOTIFICATION_ID, notification);
+			} else {
+				KeydroidxLog.w(TAG, "NotificationManager 不可用，通知停留在极简版（挂机不受影响）");
+			}
+		} catch (Throwable t) {
+			KeydroidxLog.w(TAG, "更新正式通知失败（挂机不受影响）: " + t);
 		}
 	}
 
