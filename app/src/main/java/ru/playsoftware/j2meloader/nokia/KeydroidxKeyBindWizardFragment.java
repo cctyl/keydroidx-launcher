@@ -2,6 +2,7 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.TextView;
@@ -37,9 +38,22 @@ import ru.playsoftware.j2meloader.R;
  */
 public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implements KeydroidxKeyRecorder {
 
+	private static final String TAG = "KeyWizard";
+
 	private static final int STATE_INTRO = 0;
 	private static final int STATE_RECORDING = 1;
 	private static final int STATE_DONE = 2;
+
+	/**
+	 * 录入冷却时长：每录完一项（或刚进入录制）后必须停顿该时长，期间物理键一律吞掉不录入。
+	 * 防两类事故：① 用户手快，上一键的第二次敲击被当成下一动作的键录入；
+	 * ② 设备连键（一次按压抖出两个不同键码），第二个键码被录进下一动作，
+	 * 造成「一个物理键同时承担两个功能」——绝对不允许出现。
+	 */
+	private static final long RECORD_COOLDOWN_MS = 1000L;
+
+	/** INTRO 进入防抖：刚进入向导的确认/软键连键抖出的第二发，不得立刻触发「绑定/触屏模式」。 */
+	private static final long ENTRY_DEBOUNCE_MS = 800L;
 
 	/** 向导引导绑定的动作全集：桌面动作去掉「最近任务」（其复用拨号键，不单独引导）。 */
 	private static final int[] WIZARD_ACTIONS = {
@@ -58,6 +72,14 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	private int state = STATE_INTRO;
 	private int introChoice = 0;      // 0=绑定, 1=跳过
 	private int recordingStep = -1;   // -1=非录制态；0..ACTION_COUNT-1=正在录制第 N 个动作
+
+	/** 录入冷却中：true 期间 onKeyRecorded 吞掉一切按键（防连键/连击误录下一动作）。 */
+	private boolean coolingDown;
+	/** 刚进入 INTRO 的时刻（uptimeMillis），用于进入防抖。 */
+	private long enteredAt;
+
+	private final Handler cooldownHandler = new Handler(Looper.getMainLooper());
+	private final Runnable cooldownEndRunnable = this::endRecordCooldown;
 
 	private View introCard;
 	private View recordingLayout;
@@ -92,7 +114,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		View recordSkip = view.findViewById(R.id.recordSkip);
 		if (recordSkip != null) {
 			recordSkip.setOnClickListener(v -> {
-				KeydroidxLog.i("KeyWizard", "触摸点击 跳过当前项");
+				KeydroidxLog.i(TAG, "触摸点击 跳过当前项");
 				onSkipCurrent();
 			});
 		}
@@ -117,11 +139,22 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		showIntro();
 	}
 
+	@Override
+	public void onDestroyView() {
+		// 清掉冷却回调，防止视图销毁后回调触碰已释放的 UI 或跨页面误刷新
+		cooldownHandler.removeCallbacksAndMessages(null);
+		coolingDown = false;
+		super.onDestroyView();
+	}
+
 	// ---- 状态切换 ----
 
 	private void showIntro() {
 		state = STATE_INTRO;
 		recordingStep = -1;
+		coolingDown = false;
+		// 进入防抖：从上一页面按键进入向导时，该键的连键/长按残留事件不得立刻误触 INTRO 选择
+		enteredAt = android.os.SystemClock.uptimeMillis();
 		introCard.setVisibility(View.VISIBLE);
 		recordingLayout.setVisibility(View.GONE);
 		doneLayout.setVisibility(View.GONE);
@@ -130,7 +163,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		if (stepBadge != null) stepBadge.setText("");
 		KeydroidxDesktopActivity host = (KeydroidxDesktopActivity) requireActivity();
 		host.refreshPageBar();
-		KeydroidxLog.i("KeyWizard", "进入 INTRO 弹窗（绑定/跳过）");
+		KeydroidxLog.i(TAG, "进入 INTRO 弹窗（绑定/跳过）");
 	}
 
 	private void updateIntroHighlight() {
@@ -147,9 +180,38 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		// 录制态下任意键都会被捕获为当前动作的绑定键，底部栏隐藏
 		KeydroidxDesktopActivity host = (KeydroidxDesktopActivity) requireActivity();
 		host.refreshPageBar();
-		updateRecordingPrompt();
-		KeydroidxLog.i("KeyWizard", "开始录制，第 1 项="
-				+ KeydroidxKeyBinding.getWizardPromptName(0));
+		// 刚进入录制的确认/软键可能连键抖出第二发，先进入 1 秒冷却再接受录入
+		beginRecordCooldown("请稍候，正在准备录制…");
+		KeydroidxLog.i(TAG, "开始录制，第 1 项="
+				+ KeydroidxKeyBinding.getWizardPromptName(0)
+				+ "（冷却 1 秒后接受录入）");
+	}
+
+	/**
+	 * 进入录入冷却：冷却期内 onKeyRecorded 吞掉一切物理键，结束后刷新录制提示。
+	 * 必须在「录完一项」「跳过一项」「刚进入录制」三个时机调用，
+	 * 保证相邻两项录入之间有 1 秒硬间隔，连键/连击绝不落到下一动作上。
+	 */
+	private void beginRecordCooldown(String transitionHint) {
+		coolingDown = true;
+		cooldownHandler.removeCallbacks(cooldownEndRunnable);
+		if (recordPrompt != null && transitionHint != null) {
+			recordPrompt.setText(transitionHint);
+		}
+		cooldownHandler.postDelayed(cooldownEndRunnable, RECORD_COOLDOWN_MS);
+	}
+
+	private void endRecordCooldown() {
+		coolingDown = false;
+		if (state == STATE_RECORDING) {
+			updateRecordingPrompt();
+			KeydroidxLog.i(TAG, "录入冷却结束，开始接受第 " + (recordingStep + 1) + " 项录入");
+		}
+	}
+
+	/** 是否仍在刚进入 INTRO 的防抖窗口内（窗口内触发状态转换的按键一律忽略）。 */
+	private boolean inEntryDebounce() {
+		return android.os.SystemClock.uptimeMillis() - enteredAt < ENTRY_DEBOUNCE_MS;
 	}
 
 	private void updateRecordingPrompt() {
@@ -185,12 +247,17 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	@Override
 	public void onKeyRecorded(int keycode) {
 		if (state != STATE_RECORDING) return;
+		if (coolingDown) {
+			// 冷却期：吞掉连键抖出的第二发 / 用户手快的连击，绝不录入（防同一物理键占两个动作）
+			KeydroidxLog.w(TAG, "录入冷却中，吞掉按键 " + KeydroidxKeyBinding.keyName(keycode));
+			return;
+		}
 		int action = WIZARD_ACTIONS[recordingStep];
 
 		keyBinding.setKeyCode(action, keycode);
 		// 同步到全局 JAR 设置
 		KeydroidxGlobalProfile.syncKeyBindings(requireContext());
-		KeydroidxLog.i("KeyWizard", "第 " + (recordingStep + 1) + " 项 绑定成功 "
+		KeydroidxLog.i(TAG, "第 " + (recordingStep + 1) + " 项 绑定成功 "
 				+ KeydroidxKeyBinding.keyName(keycode));
 
 		int next = recordingStep + 1;
@@ -198,9 +265,11 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 			finishWizard(true);
 		} else {
 			recordingStep = next;
-			updateRecordingPrompt();
-			KeydroidxLog.i("KeyWizard", "进入第 " + (next + 1) + " 项="
-					+ KeydroidxKeyBinding.getWizardPromptName(WIZARD_ACTIONS[next]));
+			// 强制 1 秒硬间隔：等用户松手、连键窗口过去后再接受下一项录入
+			beginRecordCooldown("已记录，请松开按键并稍候…");
+			KeydroidxLog.i(TAG, "进入第 " + (next + 1) + " 项="
+					+ KeydroidxKeyBinding.getWizardPromptName(WIZARD_ACTIONS[next])
+					+ "（冷却 1 秒后接受录入）");
 		}
 	}
 
@@ -209,7 +278,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	public void onSkipCurrent() {
 		if (state != STATE_RECORDING) return;
 		int action = WIZARD_ACTIONS[recordingStep];
-		KeydroidxLog.i("KeyWizard", "第 " + (recordingStep + 1) + " 项 跳过（保留默认 "
+		KeydroidxLog.i(TAG, "第 " + (recordingStep + 1) + " 项 跳过（保留默认 "
 				+ KeydroidxKeyBinding.keyName(keyBinding.getKeyCode(action)) + "）");
 
 		int next = recordingStep + 1;
@@ -217,15 +286,20 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 			finishWizard(true);
 		} else {
 			recordingStep = next;
-			updateRecordingPrompt();
-			KeydroidxLog.i("KeyWizard", "跳过进入第 " + (next + 1) + " 项="
-					+ KeydroidxKeyBinding.getWizardPromptName(WIZARD_ACTIONS[next]));
+			// 跳过同样进入 1 秒冷却，防止触摸跳过后残留按键误录下一项
+			beginRecordCooldown("已跳过，请稍候…");
+			KeydroidxLog.i(TAG, "跳过进入第 " + (next + 1) + " 项="
+					+ KeydroidxKeyBinding.getWizardPromptName(WIZARD_ACTIONS[next])
+					+ "（冷却 1 秒后接受录入）");
 		}
 	}
 
 	private void finishWizard(boolean bound) {
 		state = STATE_DONE;
 		recordingStep = -1;
+		// 最后一项录入后仍保持 1 秒冷却：连键第二发不得立刻触发「完成→返回桌面」
+		cooldownHandler.removeCallbacks(cooldownEndRunnable);
+		cooldownHandler.postDelayed(cooldownEndRunnable, RECORD_COOLDOWN_MS);
 		introCard.setVisibility(View.GONE);
 		recordingLayout.setVisibility(View.GONE);
 		doneLayout.setVisibility(View.VISIBLE);
@@ -237,7 +311,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 			((KeydroidxDesktopActivity) getActivity()).reloadKeyBindings();
 			((KeydroidxDesktopActivity) getActivity()).refreshPageBar();
 		}
-		KeydroidxLog.i("KeyWizard", "向导结束 bound=" + bound + "，进入完成提示页");
+		KeydroidxLog.i(TAG, "向导结束 bound=" + bound + "，进入完成提示页（冷却 1 秒防连键误触）");
 	}
 
 	/** 退出向导并返回桌面待机屏 */
@@ -253,7 +327,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		fm.beginTransaction()
 				.replace(R.id.midPanel, new KeydroidxDesktopFragment())
 				.commitAllowingStateLoss();
-		KeydroidxLog.i("KeyWizard", "返回桌面待机屏");
+		KeydroidxLog.i(TAG, "返回桌面待机屏");
 		// 向导结束后：若尚未是默认桌面，则询问是否设为默认桌面；之后检查并批量请求核心权限
 		askSetDefaultLauncher();
 	}
@@ -265,38 +339,38 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		List<KeydroidxOptionsDialog.OptionItem> items = new ArrayList<>();
 		items.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_home, "设置默认桌面", true, false,
 				() -> {
-					KeydroidxLog.i("KeyWizard", "用户选择设置默认桌面");
+					KeydroidxLog.i(TAG, "用户选择设置默认桌面");
 					host.requestSetDefaultLauncher();
 					navigateToPermissionCheckIfNeeded(host);
 				}));
 		items.add(new KeydroidxOptionsDialog.OptionItem(0, "稍后再说", true, false,
 				() -> {
-					KeydroidxLog.i("KeyWizard", "用户选择稍后再说");
+					KeydroidxLog.i(TAG, "用户选择稍后再说");
 					navigateToPermissionCheckIfNeeded(host);
 				}));
 		KeydroidxOptionsDialog.show(host.getSupportFragmentManager(), "设为默认桌面？", items)
 				// 用户按返回键/右软键直接关掉弹窗时也要接续后续流程，
 				// 否则向导后的权限自检被整条跳过（实测 release 上按返回键即丢失该步骤）。
 				.setOnDismissAction(() -> {
-					KeydroidxLog.i("KeyWizard", "默认桌面询问窗未选择即关闭");
+					KeydroidxLog.i(TAG, "默认桌面询问窗未选择即关闭");
 					navigateToPermissionCheckIfNeeded(host);
 				});
-		KeydroidxLog.i("KeyWizard", "弹出默认桌面询问窗");
+		KeydroidxLog.i(TAG, "弹出默认桌面询问窗");
 	}
 
 	/** 向导完成后检查核心运行时权限，若有缺失则跳转至「系统权限自检」页面引导授权 */
 	private void navigateToPermissionCheckIfNeeded(KeydroidxDesktopActivity host) {
 		if (host == null || host.isFinishing()) return;
 		if (KeydroidxPermissionManager.isCorePermissionsGranted(host)) {
-			KeydroidxLog.i("KeyWizard", "核心权限已全部授予，跳过自检");
+			KeydroidxLog.i(TAG, "核心权限已全部授予，跳过自检");
 			return;
 		}
-		KeydroidxLog.i("KeyWizard", "核心权限存在缺失，打开系统权限自检页");
+		KeydroidxLog.i(TAG, "核心权限存在缺失，打开系统权限自检页");
 		host.openFragment(new KeydroidxPermissionCheckFragment());
 	}
 
 	private void chooseTouchMode() {
-		KeydroidxLog.i("KeyWizard", "选择开启触屏模式");
+		KeydroidxLog.i(TAG, "选择开启触屏模式");
 		if (getActivity() instanceof KeydroidxDesktopActivity) {
 			((KeydroidxDesktopActivity) getActivity()).setTouchModeEnabled(true);
 		} else {
@@ -312,7 +386,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 		if (state == STATE_INTRO) {
 			introChoice = (introChoice == 0) ? 1 : 0;
 			updateIntroHighlight();
-			KeydroidxLog.d("KeyWizard", "INTRO 切换选择 -> " + (introChoice == 0 ? "绑定" : "触屏模式"));
+			KeydroidxLog.d(TAG, "INTRO 切换选择 -> " + (introChoice == 0 ? "绑定" : "触屏模式"));
 			return true;
 		}
 		return true;
@@ -321,17 +395,25 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	@Override
 	public boolean onSelect() {
 		if (state == STATE_INTRO) {
+			if (inEntryDebounce()) {
+				KeydroidxLog.w(TAG, "INTRO 进入防抖中，忽略确认键（防连键误触）");
+				return true;
+			}
 			if (introChoice == 0) {
-				KeydroidxLog.i("KeyWizard", "INTRO 选择 绑定");
+				KeydroidxLog.i(TAG, "INTRO 选择 绑定");
 				startRecording();
 			} else {
-				KeydroidxLog.i("KeyWizard", "INTRO 选择 触屏模式");
+				KeydroidxLog.i(TAG, "INTRO 选择 触屏模式");
 				chooseTouchMode();
 			}
 			return true;
 		}
 		if (state == STATE_DONE) {
-			KeydroidxLog.i("KeyWizard", "DONE 确认 -> 进入桌面");
+			if (coolingDown) {
+				KeydroidxLog.w(TAG, "DONE 冷却中，忽略确认键（防末项连键立刻返回桌面）");
+				return true;
+			}
+			KeydroidxLog.i(TAG, "DONE 确认 -> 进入桌面");
 			exitToDesktop();
 			return true;
 		}
@@ -341,12 +423,20 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	@Override
 	public boolean onSoftLeft() {
 		if (state == STATE_INTRO) {
-			KeydroidxLog.i("KeyWizard", "左软键 -> 绑定");
+			if (inEntryDebounce()) {
+				KeydroidxLog.w(TAG, "INTRO 进入防抖中，忽略左软键（防连键误触）");
+				return true;
+			}
+			KeydroidxLog.i(TAG, "左软键 -> 绑定");
 			startRecording();
 			return true;
 		}
 		if (state == STATE_DONE) {
-			KeydroidxLog.i("KeyWizard", "DONE 左软键 -> 完成/进入桌面");
+			if (coolingDown) {
+				KeydroidxLog.w(TAG, "DONE 冷却中，忽略左软键（防末项连键立刻返回桌面）");
+				return true;
+			}
+			KeydroidxLog.i(TAG, "DONE 左软键 -> 完成/进入桌面");
 			exitToDesktop();
 			return true;
 		}
@@ -356,12 +446,20 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	@Override
 	public boolean onSoftRight() {
 		if (state == STATE_INTRO) {
-			KeydroidxLog.i("KeyWizard", "右软键 -> 触屏模式");
+			if (inEntryDebounce()) {
+				KeydroidxLog.w(TAG, "INTRO 进入防抖中，忽略右软键（防连键误触）");
+				return true;
+			}
+			KeydroidxLog.i(TAG, "右软键 -> 触屏模式");
 			chooseTouchMode();
 			return true;
 		}
 		if (state == STATE_DONE) {
-			KeydroidxLog.i("KeyWizard", "DONE 右软键 -> 完成/进入桌面");
+			if (coolingDown) {
+				KeydroidxLog.w(TAG, "DONE 冷却中，忽略右软键（防末项连键立刻返回桌面）");
+				return true;
+			}
+			KeydroidxLog.i(TAG, "DONE 右软键 -> 完成/进入桌面");
 			exitToDesktop();
 			return true;
 		}
@@ -372,12 +470,20 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	public boolean onBack() {
 		// 录制态的 BACK 由 onKeyRecorded 处理（将其绑定为当前动作）；此处仅 INTRO / DONE 生效
 		if (state == STATE_INTRO) {
-			KeydroidxLog.i("KeyWizard", "返回键 -> 触屏模式");
+			if (inEntryDebounce()) {
+				KeydroidxLog.w(TAG, "INTRO 进入防抖中，忽略返回键（防连键误触）");
+				return true;
+			}
+			KeydroidxLog.i(TAG, "返回键 -> 触屏模式");
 			chooseTouchMode();
 			return true;
 		}
 		if (state == STATE_DONE) {
-			KeydroidxLog.i("KeyWizard", "DONE 返回键 -> 进入桌面");
+			if (coolingDown) {
+				KeydroidxLog.w(TAG, "DONE 冷却中，忽略返回键（防末项连键立刻返回桌面）");
+				return true;
+			}
+			KeydroidxLog.i(TAG, "DONE 返回键 -> 进入桌面");
 			exitToDesktop();
 			return true;
 		}

@@ -30,6 +30,8 @@ import ru.playsoftware.j2meloader.nokia.KeydroidxGlobalProfile;
  */
 public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements KeydroidxKeyRecorder {
 
+	private static final String TAG = "KeyBind";
+
 	private KeydroidxKeyBinding keyBinding;
 	private View[] itemViews = new View[KeydroidxKeyBinding.ACTION_COUNT];
 	private int focusIndex = 0;
@@ -49,6 +51,14 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 	// 忽略 SELECT（消费但不录制），防止"进入即录制"。
 	private static final long ENTRY_DEBOUNCE_MS = 800L;
 	private long enteredAt;
+
+	// 录制结束冷却：刚录完/取消一个键后，设备连键抖出的第二个键码、或用户手快的连击，
+	// 若不拦截会被解析成 SELECT/BACK/方向键，误触发新一轮录制、误移动焦点或误退出本页。
+	// 冷却窗口内本页消费掉一切物理键动作，保证一次按压只完成一次绑定。
+	private static final long RECORD_COOLDOWN_MS = 1000L;
+	/** 表示"从未录制过"的哨兵时间（uptimeMillis 恒为正，取足够小的负值防误判）。 */
+	private static final long NO_TIMESTAMP = -10_000L;
+	private long recordEndedAt = NO_TIMESTAMP;
 
 	private LinearLayout bindListContainer;
 	private LinearLayout recordStatusBar;
@@ -75,7 +85,7 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 		// 录制状态栏触摸点击 = 取消当前录制（仅触摸触发跳过，返回键在录制态被忽略）
 		recordStatusBar.setClickable(true);
 		recordStatusBar.setOnClickListener(v -> {
-			KeydroidxLog.i("KeyBind", "触摸点击录制状态栏 -> 取消录制");
+			KeydroidxLog.i(TAG, "触摸点击录制状态栏 -> 取消录制");
 			onSkipCurrent();
 		});
 
@@ -191,7 +201,7 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 		recordingAction = action;
 		recordStatusBar.setVisibility(View.VISIBLE);
 		recordStatusText.setText("正在录制: " + KeydroidxKeyBinding.getActionName(action) + " — 请按目标键（点此处取消）");
-		KeydroidxLog.i("KeyBind", "开始录制 action=" + KeydroidxKeyBinding.getActionName(action)
+		KeydroidxLog.i(TAG, "开始录制 action=" + KeydroidxKeyBinding.getActionName(action)
 				+ "，等待物理按键...");
 	}
 
@@ -202,14 +212,16 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 		recording = false;
 		recordStatusBar.setVisibility(View.GONE);
 		recordingAction = -1;
+		// 标记录制结束时刻：随后 1 秒冷却窗口内吞掉连键/连击，防误触新一轮录制或误退出
+		recordEndedAt = SystemClock.uptimeMillis();
 
-		KeydroidxLog.i("KeyBind", "录制完成 action=" + KeydroidxKeyBinding.getActionName(action)
+		KeydroidxLog.i(TAG, "录制完成 action=" + KeydroidxKeyBinding.getActionName(action)
 				+ " 捕获 " + KeydroidxKeyBinding.keyName(keycode));
 
 		int occupied = keyBinding.getActionForKeyCode(keycode);
 		if (occupied >= 0 && occupied != action) {
 			// 该键已被其它动作占用，进入确认模式（复用方向键/确认/返回导航）
-			KeydroidxLog.w("KeyBind", "录制冲突：" + KeydroidxKeyBinding.keyName(keycode)
+			KeydroidxLog.w(TAG, "录制冲突：" + KeydroidxKeyBinding.keyName(keycode)
 					+ " 已被 " + KeydroidxKeyBinding.getActionName(occupied) + " 占用");
 			enterConfirm(action, occupied, keycode);
 			return;
@@ -225,8 +237,15 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 		recording = false;
 		recordingAction = -1;
 		recordStatusBar.setVisibility(View.GONE);
-		KeydroidxLog.i("KeyBind", "跳过录制 action=" + KeydroidxKeyBinding.getActionName(action)
+		recordEndedAt = SystemClock.uptimeMillis();
+		KeydroidxLog.i(TAG, "跳过录制 action=" + KeydroidxKeyBinding.getActionName(action)
 				+ "（保留默认 " + KeydroidxKeyBinding.keyName(keyBinding.getKeyCode(action)) + "）");
+	}
+
+	/** 录制刚结束/取消后的连键冷却窗口：期间本页不响应任何物理键动作（消费但不执行）。 */
+	private boolean inRecordCooldown() {
+		if (recordEndedAt == NO_TIMESTAMP) return false;
+		return SystemClock.uptimeMillis() - recordEndedAt < RECORD_COOLDOWN_MS;
 	}
 
 	/** 应用绑定并刷新列表。 */
@@ -260,7 +279,7 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 		recordStatusBar.setOnClickListener(null);
 		recordStatusBar.setOnLongClickListener(null);
 		updateConfirmText();
-		KeydroidxLog.i("KeyBind", "进入冲突确认模式，触摸点击取消/覆盖按钮选择");
+		KeydroidxLog.i(TAG, "进入冲突确认模式，触摸点击取消/覆盖按钮选择");
 	}
 
 	private void updateConfirmText() {
@@ -325,12 +344,12 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 	/** 执行用户的选择并退出确认模式。 */
 	private void doConfirm() {
 		if (confirmChoice == 1) {
-			KeydroidxLog.i("KeyBind", "用户选择覆盖：解除 "
+			KeydroidxLog.i(TAG, "用户选择覆盖：解除 "
 					+ KeydroidxKeyBinding.getActionName(confirmOccupied)
 					+ "，绑定到 " + KeydroidxKeyBinding.getActionName(confirmAction));
 			applyBinding(confirmAction, confirmKeycode);
 		} else {
-			KeydroidxLog.i("KeyBind", "用户取消覆盖，保持 "
+			KeydroidxLog.i(TAG, "用户取消覆盖，保持 "
 					+ KeydroidxKeyBinding.getActionName(confirmOccupied) + " 不变");
 			Toast.makeText(requireContext(), "已取消，绑定未更改", Toast.LENGTH_SHORT).show();
 		}
@@ -380,7 +399,7 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 
 		// 录制态：点击取消录制
 		recordStatusBar.setOnClickListener(v -> {
-			KeydroidxLog.i("KeyBind", "触摸点击录制状态栏 -> 取消录制");
+			KeydroidxLog.i(TAG, "触摸点击录制状态栏 -> 取消录制");
 			onSkipCurrent();
 		});
 		recordStatusBar.setOnLongClickListener(null);
@@ -399,7 +418,11 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 			// 冲突确认模式：纯触摸操作，方向键无作用（消费掉防止穿透）
 			return true;
 		}
-		KeydroidxLog.d("KeyBind", "onDirection " + KeydroidxKeyBinding.getActionName(direction)
+		if (inRecordCooldown()) {
+			KeydroidxLog.w(TAG, "录制刚结束冷却中，忽略方向键（防连键误移动焦点）");
+			return true;
+		}
+		KeydroidxLog.d(TAG, "onDirection " + KeydroidxKeyBinding.getActionName(direction)
 				+ " focus=" + focusIndex);
 		if (focusIndex < 0) {
 			setFocusIndex(0);
@@ -427,11 +450,15 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 		// 会被误解析为"选择当前焦点项"，导致立即开始录制第一个动作（上）。
 		// 窗口期内消费掉 SELECT 但不进入录制；触摸点击列表行不受影响（不走本方法）。
 		if (SystemClock.uptimeMillis() - enteredAt < ENTRY_DEBOUNCE_MS) {
-			KeydroidxLog.i("KeyBind", "进入防抖窗口（"
+			KeydroidxLog.i(TAG, "进入防抖窗口（"
 					+ (SystemClock.uptimeMillis() - enteredAt) + "ms），忽略 SELECT，不触发录制");
 			return true;
 		}
-		KeydroidxLog.d("KeyBind", "onSelect focus=" + focusIndex);
+		if (inRecordCooldown()) {
+			KeydroidxLog.w(TAG, "录制刚结束冷却中，忽略 SELECT（防连键误触发新录制）");
+			return true;
+		}
+		KeydroidxLog.d(TAG, "onSelect focus=" + focusIndex);
 		if (focusIndex >= 0 && focusIndex < KeydroidxKeyBinding.ACTION_COUNT) {
 			startRecording(focusIndex);
 		}
@@ -444,7 +471,7 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 			// 冲突确认模式：纯触摸操作，左软键无作用
 			return true;
 		}
-		KeydroidxLog.d("KeyBind", "onSoftLeft -> 等同选择");
+		KeydroidxLog.d(TAG, "onSoftLeft -> 等同选择");
 		return onSelect(); // 左软键 = 选择 = 进入录制
 	}
 
@@ -454,7 +481,11 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 			// 冲突确认模式：纯触摸操作，右软键无作用
 			return true;
 		}
-		KeydroidxLog.d("KeyBind", "onSoftRight -> 返回");
+		if (inRecordCooldown()) {
+			KeydroidxLog.w(TAG, "录制刚结束冷却中，忽略右软键（防连键误退出本页）");
+			return true;
+		}
+		KeydroidxLog.d(TAG, "onSoftRight -> 返回");
 		// 右软键 = 返回
 		((KeydroidxDesktopActivity) requireActivity()).exitCurrent();
 		return true;
@@ -468,7 +499,11 @@ public class KeydroidxKeyBindFragment extends KeydroidxPageFragment implements K
 			doConfirm();
 			return true;
 		}
-		KeydroidxLog.d("KeyBind", "onBack -> 返回");
+		if (inRecordCooldown()) {
+			KeydroidxLog.w(TAG, "录制刚结束冷却中，忽略返回（防连键误退出本页）");
+			return true;
+		}
+		KeydroidxLog.d(TAG, "onBack -> 返回");
 		((KeydroidxDesktopActivity) requireActivity()).exitCurrent();
 		return true;
 	}
