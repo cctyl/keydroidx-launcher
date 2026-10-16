@@ -496,13 +496,13 @@ public final class KeydroidxBgManagerHelper {
 		return out;
 	}
 
-	/** 组装 ProcInfo 并查 CPU。 */
+	/** 组装 ProcInfo 并查 CPU（未在 cpuinfo 上榜的活跃进程统一记为 0% 挂起）。 */
 	private static ProcInfo buildProcInfo(String pkg, int pid, int pss, int rss,
 			String uptime, Map<Integer, Integer> cpuByPid) {
 		int cpu = -1;
 		if (cpuByPid != null) {
 			Integer c = cpuByPid.get(pid);
-			if (c != null) cpu = c;
+			cpu = (c != null) ? c : 0;
 		}
 		return new ProcInfo(pkg, pid, pss, rss, cpu, uptime);
 	}

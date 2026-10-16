@@ -1,8 +1,10 @@
 package ru.playsoftware.j2meloader.nokia;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
@@ -78,19 +81,14 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 
 	private static final String TAG = "BgManagerPage";
 
-	/** 卡片网格列数。 */
-	private static final int COLUMNS = 2;
-	/** 卡片总高（dp）：头部行 + 预览区。 */
-	private static final int CARD_H_DP = 70;
-	/** 头部行高（dp）。 */
-	private static final int HEAD_H_DP = 20;
-	/** 头部图标 / 预览区水印图标尺寸（dp）。 */
-	private static final int ICON_DP = 13;
-	private static final int PREVIEW_ICON_DP = 22;
-	/** 保护盾牌角标尺寸（dp）。 */
-	private static final int PROT_FLAG_DP = 11;
+	/** 单列列表（塞班 S60 / Jbak TaskMan 风格）。 */
+	private static final int COLUMNS = 1;
+	/** 列表行最小高度（dp）。 */
+	private static final int ROW_H_DP = 38;
+	/** 应用图标尺寸（dp）。 */
+	private static final int ICON_DP = 20;
 
-	private static final int COLOR_TEXT = 0xFFE8EEF5;
+	private static final int COLOR_TEXT = 0xFFFFFFFF;
 	private static final int COLOR_SUB = 0xFF90CAF9;
 	private static final int COLOR_ACCENT = 0xFF64B5F6;
 	private static final int COLOR_OK = 0xFF7DE2A0;
@@ -100,6 +98,16 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 	private ScrollView scroll;
 	private TextView tvMode;
 	private TextView tvHint;
+
+	// 顶部资源仪表盘
+	private View meterBox;
+	private TextView tvRamTitle;
+	private TextView tvRamPercent;
+	private LinearLayout ramBarTrack;
+	private View ramBarFill;
+	private View ramBarEmpty;
+	private TextView tvCpuSummary;
+
 	private View emptyBox;
 	private ImageView emptyIcon;
 	private TextView emptyTitle;
@@ -145,6 +153,18 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 		scroll = view.findViewById(R.id.recentScroll);
 		tvMode = view.findViewById(R.id.tvRecentMode);
 		tvHint = view.findViewById(R.id.tvRecentHint);
+
+		meterBox = view.findViewById(R.id.recentMeterBox);
+		tvRamTitle = view.findViewById(R.id.tvRamTitle);
+		tvRamPercent = view.findViewById(R.id.tvRamPercent);
+		ramBarTrack = view.findViewById(R.id.ramBarTrack);
+		ramBarFill = view.findViewById(R.id.ramBarFill);
+		ramBarEmpty = view.findViewById(R.id.ramBarEmpty);
+		tvCpuSummary = view.findViewById(R.id.tvCpuSummary);
+
+		if (meterBox != null) meterBox.setBackground(createMeterBoxBackground(requireContext()));
+		if (ramBarTrack != null) ramBarTrack.setBackground(createRamTrackBackground(requireContext()));
+
 		emptyBox = view.findViewById(R.id.recentEmptyBox);
 		emptyIcon = view.findViewById(R.id.recentEmptyIcon);
 		emptyTitle = view.findViewById(R.id.recentEmptyTitle);
@@ -225,6 +245,7 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 		Context ctx = getContext();
 		if (ctx == null || getView() == null) return;
 		renderHeader();
+		renderMeterBox(ctx);
 		if (tasks.isEmpty()) {
 			showEmptyState(ctx);
 			selectedView = null;
@@ -252,7 +273,83 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 
 		tvHint.setText(loading || !available
 				? ""
-				: "确认键切换 · 5 清理选中 · 0 清理全部\n拨号键呼出本页（桌面按下即进入）");
+				: "确认键切换 · 5 清理 · 0 清理全部");
+	}
+
+	/** 顶部资源仪表盘（塞班 S60 / Jbak 经典风格：系统真实 RAM + 后台 CPU 汇总）。 */
+	private void renderMeterBox(Context ctx) {
+		if (meterBox == null || tvRamTitle == null || tvRamPercent == null) return;
+		// 仅在明确检测到服务未激活时才隐藏；加载中保持常驻展示，彻底杜绝瞬间消失闪烁与布局跳动
+		if (!available && !loading) {
+			meterBox.setVisibility(View.GONE);
+			return;
+		}
+		meterBox.setVisibility(View.VISIBLE);
+
+		// 1. 读取系统真实内存指标（标准 ActivityManager API，minSdk 19 完美兼容）
+		long availBytes = 0;
+		long totalBytes = 0;
+		int usedPercent = 0;
+		try {
+			ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+			if (am != null) {
+				ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
+				am.getMemoryInfo(mi);
+				availBytes = mi.availMem;
+				totalBytes = mi.totalMem;
+				if (totalBytes > 0) {
+					usedPercent = (int) (100 * (totalBytes - availBytes) / totalBytes);
+				}
+			}
+		} catch (Throwable t) {
+			KeydroidxLog.w(TAG, "读取系统内存信息异常: " + t.getMessage());
+		}
+
+		String ramStr = "RAM [可用 " + formatBytes(availBytes) + " / " + formatBytes(totalBytes) + "]";
+		tvRamTitle.setText(ramStr);
+		tvRamPercent.setText(usedPercent + "%");
+
+		// 2. 进度条填充比率（基于权重实时自适应宽度）
+		if (ramBarFill != null && ramBarEmpty != null && ramBarTrack != null) {
+			int fillW = Math.max(1, Math.min(99, usedPercent));
+			int emptyW = 100 - fillW;
+			LinearLayout.LayoutParams fp = (LinearLayout.LayoutParams) ramBarFill.getLayoutParams();
+			LinearLayout.LayoutParams ep = (LinearLayout.LayoutParams) ramBarEmpty.getLayoutParams();
+			if (fp != null && ep != null) {
+				fp.weight = fillW;
+				ep.weight = emptyW;
+				ramBarTrack.requestLayout();
+			}
+		}
+
+		// 3. CPU 汇总或后台数
+		if (tvCpuSummary != null) {
+			int totalCpu = 0;
+			boolean hasCpu = false;
+			for (KeydroidxBgManagerHelper.BgTask t : tasks) {
+				if (t.cpuPct >= 0) {
+					totalCpu += t.cpuPct;
+					hasCpu = true;
+				}
+			}
+			if (hasCpu) {
+				tvCpuSummary.setText("CPU: " + totalCpu + "%");
+				tvCpuSummary.setTextColor(totalCpu > 15 ? 0xFFFFB74D : 0xFF81C784);
+			} else {
+				tvCpuSummary.setText(tasks.size() + " 个后台");
+				tvCpuSummary.setTextColor(COLOR_SUB);
+			}
+		}
+	}
+
+	private static String formatBytes(long bytes) {
+		if (bytes >= 1024L * 1024L * 1024L) {
+			float gb = (float) bytes / (1024L * 1024L * 1024L);
+			return String.format(Locale.US, "%.1fG", gb);
+		} else {
+			long mb = bytes / (1024L * 1024L);
+			return mb + "M";
+		}
 	}
 
 	/** 空态 / 未激活态 / 加载态（三者共用同一容器，文案与图标按状态切换）。 */
@@ -281,210 +378,201 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 		emptyAction.setVisibility(View.GONE);
 	}
 
-	/** 构建 2 列卡片网格（行 + 均分宽度的 cell）。 */
+	/** 构建单列全宽列表（塞班 S60 / Jbak TaskMan 风格）。 */
 	private void buildGrid(Context ctx) {
 		gridLayout.removeAllViews();
 		cellViews = new View[tasks.size()];
-		int cardH = KeydroidxDimens.dp(getResources(), CARD_H_DP);
-		int gap = KeydroidxDimens.dp(getResources(), 6);
+		int gap = KeydroidxDimens.dp(getResources(), 2);
 
-		LinearLayout row = null;
 		for (int i = 0; i < tasks.size(); i++) {
-			if (i % COLUMNS == 0) {
-				row = new LinearLayout(ctx);
-				row.setOrientation(LinearLayout.HORIZONTAL);
-				LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
-						ViewGroup.LayoutParams.MATCH_PARENT, cardH);
-				if (i > 0) rlp.topMargin = gap;
-				row.setLayoutParams(rlp);
-				gridLayout.addView(row);
-			}
-			View cell = createCard(ctx, tasks.get(i));
-			LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-					0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-			if (i % COLUMNS != 0) clp.setMarginStart(gap);
-			cell.setLayoutParams(clp);
+			View row = createRow(ctx, tasks.get(i));
+			LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+			if (i > 0) rlp.topMargin = gap;
+			row.setLayoutParams(rlp);
 			final int index = i;
-			cell.setOnClickListener(v -> {
+			row.setOnClickListener(v -> {
 				setFocusIndex(index);
 				onSelect();
 			});
-			if (row != null) row.addView(cell);
-			cellViews[i] = cell;
-		}
-		// 末行不满 2 个时补透明占位，避免末卡独占全宽
-		if (tasks.size() % COLUMNS != 0 && row != null) {
-			View filler = new Space(ctx);
-			LinearLayout.LayoutParams flp = new LinearLayout.LayoutParams(
-					0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-			flp.setMarginStart(gap);
-			filler.setLayoutParams(flp);
-			row.addView(filler);
+			gridLayout.addView(row);
+			cellViews[i] = row;
 		}
 	}
 
 	/**
-	 * 单张后台管理卡：头部行（图标 + 应用名 + 装饰 ×）+ 预览区
-	 * （居中半透明应用图标作占位）。已保护盾牌角标位于预览区右上角。
+	 * 单个后台进程行（塞班 S60 极客任务台）：
+	 * 左侧图标 + 中间（应用名加粗 + 运行时间 + 保护盾牌）+ 右侧（内存胶囊徽标 + CPU%）。
+	 * 无 PID，重点突出对用户有意义的资源开销与状态。
 	 */
-	private View createCard(Context ctx, KeydroidxBgManagerHelper.BgTask t) {
-		FrameLayout cell = new FrameLayout(ctx);
-		cell.setClickable(true);
-		cell.setBackground(createCardBackground(ctx));
-		int padH = KeydroidxDimens.dp(getResources(), 5);
+	private View createRow(Context ctx, KeydroidxBgManagerHelper.BgTask t) {
+		LinearLayout row = new LinearLayout(ctx);
+		row.setOrientation(LinearLayout.HORIZONTAL);
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.setClickable(true);
+		row.setFocusable(false);
+		row.setMinimumHeight(KeydroidxDimens.dp(getResources(), ROW_H_DP));
+		int padH = KeydroidxDimens.dp(getResources(), 6);
 		int padV = KeydroidxDimens.dp(getResources(), 3);
+		row.setPadding(padH, padV, padH, padV);
+		row.setBackground(createRowBackground(ctx));
 
-		LinearLayout inner = new LinearLayout(ctx);
-		inner.setOrientation(LinearLayout.VERTICAL);
-		inner.setPadding(padH, padV, padH, padV);
-		inner.setLayoutParams(new FrameLayout.LayoutParams(
-				ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-		// 头部行：小图标 + 应用名（撑满剩余宽）+ 装饰 ×
-		LinearLayout head = new LinearLayout(ctx);
-		head.setOrientation(LinearLayout.HORIZONTAL);
-		head.setGravity(Gravity.CENTER_VERTICAL);
-		head.setLayoutParams(new LinearLayout.LayoutParams(
-				ViewGroup.LayoutParams.MATCH_PARENT,
-				KeydroidxDimens.dp(getResources(), HEAD_H_DP)));
-
+		// 左侧：应用图标 20dp
 		ImageView icon = new ImageView(ctx);
 		int iconPx = KeydroidxDimens.dp(getResources(), ICON_DP);
-		icon.setLayoutParams(new LinearLayout.LayoutParams(iconPx, iconPx));
+		LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(iconPx, iconPx);
+		ip.setMarginEnd(KeydroidxDimens.dp(getResources(), 6));
+		icon.setLayoutParams(ip);
 		icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
 		icon.setImageDrawable(t.icon != null
 				? t.icon
 				: KeydroidxIcons.get(ctx, KeydroidxIcons.ICON_APP, 0xFFFFFFFF, ICON_DP));
-		head.addView(icon);
+		row.addView(icon);
+
+		// 中间两行：应用名 (12sp 加粗) + 运行时间 (9sp) + 保护盾牌
+		LinearLayout center = new LinearLayout(ctx);
+		center.setOrientation(LinearLayout.VERTICAL);
+		center.setGravity(Gravity.CENTER_VERTICAL);
+		LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+				0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+		center.setLayoutParams(cp);
 
 		TextView name = new TextView(ctx);
-		LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(
-				0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-		np.setMarginStart(KeydroidxDimens.dp(getResources(), 3));
-		np.setMarginEnd(KeydroidxDimens.dp(getResources(), 2));
-		name.setLayoutParams(np);
 		name.setText(t.name);
 		name.setTextColor(COLOR_TEXT);
-		KeydroidxFontManager.textSize(name, 11);
+		KeydroidxFontManager.textSize(name, 12);
+		name.setTypeface(null, Typeface.BOLD);
 		name.setSingleLine(true);
 		name.setEllipsize(TextUtils.TruncateAt.END);
-		head.addView(name);
+		name.setIncludeFontPadding(false);
+		center.addView(name);
 
-		// 右上角 ×：纯装饰（对齐系统最近任务样式），不可聚焦不可点
-		TextView close = new TextView(ctx);
-		close.setText("×");
-		close.setTextColor(COLOR_SUB);
-		KeydroidxFontManager.textSize(close, 13);
-		close.setIncludeFontPadding(false);
-		close.setClickable(false);
-		close.setFocusable(false);
-		close.setContentDescription(null);
-		LinearLayout.LayoutParams xlp = new LinearLayout.LayoutParams(
-				ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-		xlp.gravity = Gravity.CENTER_VERTICAL;
-		xlp.setMarginStart(KeydroidxDimens.dp(getResources(), 2));
-		close.setLayoutParams(xlp);
-		head.addView(close);
+		LinearLayout subRow = new LinearLayout(ctx);
+		subRow.setOrientation(LinearLayout.HORIZONTAL);
+		subRow.setGravity(Gravity.CENTER_VERTICAL);
+		LinearLayout.LayoutParams srp = new LinearLayout.LayoutParams(
+				ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+		srp.topMargin = KeydroidxDimens.dp(getResources(), 2);
+		subRow.setLayoutParams(srp);
 
-		inner.addView(head);
-
-		// 预览区：占满卡片剩余高度
-		FrameLayout preview = new FrameLayout(ctx);
-		LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
-				ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-		plp.topMargin = KeydroidxDimens.dp(getResources(), 3);
-		preview.setLayoutParams(plp);
-		preview.setBackground(createPreviewBackground(ctx));
-
-		ImageView watermark = new ImageView(ctx);
-		int wPx = KeydroidxDimens.dp(getResources(), PREVIEW_ICON_DP);
-		FrameLayout.LayoutParams wlp = new FrameLayout.LayoutParams(wPx, wPx);
-		wlp.gravity = Gravity.CENTER;
-		watermark.setLayoutParams(wlp);
-		watermark.setScaleType(ImageView.ScaleType.FIT_CENTER);
-		watermark.setImageDrawable(t.icon != null
-				? t.icon
-				: KeydroidxIcons.get(ctx, KeydroidxIcons.ICON_APP, 0xFFFFFFFF, PREVIEW_ICON_DP));
-		watermark.setAlpha(0.3f);
-		preview.addView(watermark);
-
-		// 详情行：内存 · CPU · 运行时间（预览区左下角）
-		String detail = formatDetails(t);
-		if (!detail.isEmpty()) {
-			TextView detailTv = new TextView(ctx);
-			FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(
-					ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-			dlp.gravity = Gravity.BOTTOM | Gravity.START;
-			dlp.setMargins(KeydroidxDimens.dp(getResources(), 3), 0,
-					0, KeydroidxDimens.dp(getResources(), 2));
-			detailTv.setLayoutParams(dlp);
-			detailTv.setText(detail);
-			detailTv.setTextColor(COLOR_SUB);
-			KeydroidxFontManager.textSize(detailTv, 8);
-			preview.addView(detailTv);
-		}
-
-		inner.addView(preview);
-
-		cell.addView(inner);
+		TextView uptime = new TextView(ctx);
+		uptime.setTag("uptime");
+		String upStr = (t.uptimeText != null && !t.uptimeText.isEmpty())
+				? "⏱ " + t.uptimeText : "⏱ 运行中";
+		uptime.setText(upStr);
+		uptime.setTextColor(COLOR_SUB);
+		KeydroidxFontManager.textSize(uptime, 9);
+		uptime.setSingleLine(true);
+		uptime.setIncludeFontPadding(false);
+		subRow.addView(uptime);
 
 		if (protectedSet.contains(t.pkg)) {
-			ImageView flag = new ImageView(ctx);
-			FrameLayout.LayoutParams fp = new FrameLayout.LayoutParams(
-					KeydroidxDimens.dp(getResources(), PROT_FLAG_DP),
-					KeydroidxDimens.dp(getResources(), PROT_FLAG_DP));
-			fp.gravity = Gravity.TOP | Gravity.END;
-			fp.topMargin = padV + KeydroidxDimens.dp(getResources(), HEAD_H_DP)
-					+ KeydroidxDimens.dp(getResources(), 3);
-			fp.rightMargin = KeydroidxDimens.dp(getResources(), 3);
-			flag.setLayoutParams(fp);
-			flag.setImageDrawable(KeydroidxIcons.get(ctx, KeydroidxIcons.ICON_SHIELD, COLOR_OK, PROT_FLAG_DP));
-			cell.addView(flag);
+			TextView protBadge = new TextView(ctx);
+			protBadge.setText(" 🛡️ 已保护");
+			protBadge.setTextColor(COLOR_OK);
+			KeydroidxFontManager.textSize(protBadge, 8);
+			protBadge.setSingleLine(true);
+			protBadge.setIncludeFontPadding(false);
+			subRow.addView(protBadge);
 		}
-		return cell;
-	}
+		center.addView(subRow);
+		row.addView(center);
 
-	/** 卡片常态底色：主题 cardBgColor + 圆角（焦点态改用 {@link KeydroidxTheme#createSelectionDrawable}）。 */
-	private Drawable createCardBackground(Context ctx) {
-		KeydroidxTheme.ThemeDef theme = KeydroidxTheme.getCurrentTheme(ctx);
-		GradientDrawable gd = new GradientDrawable();
-		gd.setShape(GradientDrawable.RECTANGLE);
-		gd.setColor(theme.cardBgColor);
-		gd.setCornerRadius(KeydroidxDimens.dp(getResources(), 6));
-		return gd;
-	}
+		// 右侧：内存胶囊徽标 + CPU%
+		LinearLayout right = new LinearLayout(ctx);
+		right.setOrientation(LinearLayout.VERTICAL);
+		right.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+		LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+				ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+		rp.setMarginStart(KeydroidxDimens.dp(getResources(), 6));
+		right.setLayoutParams(rp);
 
-	/** 预览区底色：卡片底色压暗，与头部形成层次。 */
-	private Drawable createPreviewBackground(Context ctx) {
-		KeydroidxTheme.ThemeDef theme = KeydroidxTheme.getCurrentTheme(ctx);
-		GradientDrawable gd = new GradientDrawable();
-		gd.setShape(GradientDrawable.RECTANGLE);
-		gd.setColor(darken(theme.cardBgColor, 0.65f));
-		gd.setCornerRadius(KeydroidxDimens.dp(getResources(), 4));
-		return gd;
-	}
+		TextView memBadge = new TextView(ctx);
+		memBadge.setTag("mem");
+		String memStr = t.pssMB > 0 ? (t.pssMB + "MB")
+				: (t.rssMB > 0 ? (t.rssMB + "MB") : "--");
+		memBadge.setText(memStr);
+		memBadge.setTextColor(COLOR_ACCENT);
+		KeydroidxFontManager.textSize(memBadge, 9);
+		memBadge.setSingleLine(true);
+		memBadge.setIncludeFontPadding(false);
+		memBadge.setTypeface(null, Typeface.BOLD);
+		int bpPadH = KeydroidxDimens.dp(getResources(), 3);
+		int bpPadV = KeydroidxDimens.dp(getResources(), 1);
+		memBadge.setPadding(bpPadH, bpPadV, bpPadH, bpPadV);
+		memBadge.setBackground(createMemBadgeDrawable(ctx, false));
+		right.addView(memBadge);
 
-	/** 颜色按比例压暗（保留 alpha）。 */
-	private static int darken(int color, float factor) {
-		int r = (int) (((color >> 16) & 0xFF) * factor);
-		int g = (int) (((color >> 8) & 0xFF) * factor);
-		int b = (int) ((color & 0xFF) * factor);
-		return (color & 0xFF000000) | (r << 16) | (g << 8) | b;
-	}
-
-	/** 卡片详情行：内存(PSS) · CPU% · 运行时间；全无则空串。 */
-	private static String formatDetails(KeydroidxBgManagerHelper.BgTask t) {
-		StringBuilder sb = new StringBuilder();
-		if (t.pssMB > 0) sb.append(t.pssMB).append("MB");
+		row.setTag(t);
 		if (t.cpuPct >= 0) {
-			if (sb.length() > 0) sb.append(" · ");
-			sb.append(t.cpuPct).append("%");
+			TextView cpuText = new TextView(ctx);
+			cpuText.setTag("cpu");
+			cpuText.setText("CPU " + t.cpuPct + "%");
+			int cpuColor;
+			if (t.cpuPct > 5) {
+				cpuColor = 0xFFFFB74D;
+			} else if (t.cpuPct > 0) {
+				cpuColor = 0xFF81C784;
+			} else {
+				cpuColor = 0xFF78909C; // 0% 休眠挂起进程采用柔和次级色
+			}
+			cpuText.setTextColor(cpuColor);
+			KeydroidxFontManager.textSize(cpuText, 8);
+			cpuText.setSingleLine(true);
+			cpuText.setIncludeFontPadding(false);
+			LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+			clp.topMargin = KeydroidxDimens.dp(getResources(), 1);
+			clp.gravity = Gravity.END;
+			cpuText.setLayoutParams(clp);
+			right.addView(cpuText);
 		}
-		if (t.uptimeText != null) {
-			if (sb.length() > 0) sb.append(" · ");
-			sb.append(t.uptimeText);
+		row.addView(right);
+
+		return row;
+	}
+
+	/** 列表行常态底色：半透明微暗色，避免纯透明浮动感。 */
+	private Drawable createRowBackground(Context ctx) {
+		GradientDrawable gd = new GradientDrawable();
+		gd.setShape(GradientDrawable.RECTANGLE);
+		gd.setColor(0x18000000);
+		gd.setCornerRadius(KeydroidxDimens.dp(getResources(), 2));
+		return gd;
+	}
+
+	/** 内存胶囊徽标底色：未选中为蓝透小框，选中时白底高对比反色。 */
+	private Drawable createMemBadgeDrawable(Context ctx, boolean focused) {
+		GradientDrawable gd = new GradientDrawable();
+		gd.setShape(GradientDrawable.RECTANGLE);
+		gd.setCornerRadius(KeydroidxDimens.dp(getResources(), 2));
+		if (focused) {
+			gd.setColor(0xFFFFFFFF);
+		} else {
+			gd.setColor(0x33000000);
+			gd.setStroke(KeydroidxDimens.dp(getResources(), 1), 0x3364B5F6);
 		}
-		return sb.toString();
+		return gd;
+	}
+
+	/** 顶部仪表盘外框底色。 */
+	private Drawable createMeterBoxBackground(Context ctx) {
+		GradientDrawable gd = new GradientDrawable();
+		gd.setShape(GradientDrawable.RECTANGLE);
+		gd.setColor(0x33000000);
+		gd.setStroke(KeydroidxDimens.dp(getResources(), 1), 0x22FFFFFF);
+		gd.setCornerRadius(KeydroidxDimens.dp(getResources(), 3));
+		return gd;
+	}
+
+	/** 内存进度条底槽。 */
+	private Drawable createRamTrackBackground(Context ctx) {
+		GradientDrawable gd = new GradientDrawable();
+		gd.setShape(GradientDrawable.RECTANGLE);
+		gd.setColor(0x800A1B2D);
+		gd.setStroke(KeydroidxDimens.dp(getResources(), 1), 0xFF325880);
+		gd.setCornerRadius(KeydroidxDimens.dp(getResources(), 1.5f));
+		return gd;
 	}
 
 	// ============================================================
@@ -502,12 +590,39 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 		Context ctx = getContext();
 		if (ctx == null || cellViews == null) return;
 		if (selectedView != null) {
-			selectedView.setBackground(createCardBackground(ctx));
+			selectedView.setBackground(createRowBackground(ctx));
+			View oldUp = selectedView.findViewWithTag("uptime");
+			if (oldUp instanceof TextView) ((TextView) oldUp).setTextColor(COLOR_SUB);
+			View oldMem = selectedView.findViewWithTag("mem");
+			if (oldMem instanceof TextView) {
+				oldMem.setBackground(createMemBadgeDrawable(ctx, false));
+				((TextView) oldMem).setTextColor(COLOR_ACCENT);
+			}
+			View oldCpu = selectedView.findViewWithTag("cpu");
+			if (oldCpu instanceof TextView) {
+				Object tagTask = selectedView.getTag();
+				if (tagTask instanceof KeydroidxBgManagerHelper.BgTask) {
+					int pct = ((KeydroidxBgManagerHelper.BgTask) tagTask).cpuPct;
+					((TextView) oldCpu).setTextColor(pct > 5 ? 0xFFFFB74D : (pct > 0 ? 0xFF81C784 : 0xFF78909C));
+				}
+			}
 			selectedView = null;
 		}
 		if (index < 0 || index >= cellViews.length || cellViews[index] == null) return;
-		cellViews[index].setBackground(KeydroidxTheme.createSelectionDrawable(ctx, 6));
-		selectedView = cellViews[index];
+		View cur = cellViews[index];
+		cur.setBackground(KeydroidxTheme.createSelectionDrawable(ctx, 3));
+		View newUp = cur.findViewWithTag("uptime");
+		if (newUp instanceof TextView) ((TextView) newUp).setTextColor(0xFFE3F2FD);
+		View newMem = cur.findViewWithTag("mem");
+		if (newMem instanceof TextView) {
+			newMem.setBackground(createMemBadgeDrawable(ctx, true));
+			((TextView) newMem).setTextColor(0xFF0D47A1);
+		}
+		View newCpu = cur.findViewWithTag("cpu");
+		if (newCpu instanceof TextView) {
+			((TextView) newCpu).setTextColor(0xFFE0E0E0);
+		}
+		selectedView = cur;
 	}
 
 	private void scrollToVisible(int index) {
@@ -548,16 +663,12 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 		int next;
 		switch (direction) {
 			case KeydroidxKeyBinding.ACTION_LEFT:
+			case KeydroidxKeyBinding.ACTION_UP:
 				next = focusIndex - 1;
 				break;
 			case KeydroidxKeyBinding.ACTION_RIGHT:
-				next = focusIndex + 1;
-				break;
-			case KeydroidxKeyBinding.ACTION_UP:
-				next = focusIndex - COLUMNS;
-				break;
 			case KeydroidxKeyBinding.ACTION_DOWN:
-				next = focusIndex + COLUMNS;
+				next = focusIndex + 1;
 				break;
 			default:
 				return true;
@@ -858,6 +969,14 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 	@Override
 	public String getSoftRightText() {
 		return "退出";
+	}
+
+	@Override
+	public CharSequence getSoftCenterText() {
+		if (!loading && available && !tasks.isEmpty()) {
+			return "切换";
+		}
+		return null;
 	}
 
 	// ============================================================

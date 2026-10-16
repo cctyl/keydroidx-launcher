@@ -19,7 +19,7 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="8dp"
-        android:paddingTop="4dp"
+        android:paddingTop="3dp"
         android:paddingEnd="8dp">
 
         <TextView
@@ -43,7 +43,87 @@
             android:textSize="@dimen/keydroidx_font_caption" />
     </LinearLayout>
 
-    <!-- 顶部信息区：操作提示（含拨号键说明），最多两行 -->
+    <!-- 顶部资源仪表盘（塞班 S60 / Jbak 经典风格） -->
+    <LinearLayout
+        android:id="@+id/recentMeterBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="6dp"
+        android:orientation="vertical"
+        android:paddingStart="6dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="4dp">
+
+        <!-- 内存指标文字行 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvRamTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="RAM"
+                android:textColor="#90CAF9"
+                android:textSize="@dimen/keydroidx_font_caption" />
+
+            <TextView
+                android:id="@+id/tvRamPercent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="--%"
+                android:textColor="#FFFFFF"
+                android:textSize="@dimen/keydroidx_font_caption" />
+        </LinearLayout>
+
+        <!-- 进度条与 CPU / 后台数量摘要 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- 自定义分段进度条底槽与填充 -->
+            <LinearLayout
+                android:id="@+id/ramBarTrack"
+                android:layout_width="0dp"
+                android:layout_height="5dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <View
+                    android:id="@+id/ramBarFill"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="50"
+                    android:background="#64B5F6" />
+
+                <View
+                    android:id="@+id/ramBarEmpty"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="50"
+                    android:background="@android:color/transparent" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvCpuSummary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textColor="#81C784"
+                android:textSize="@dimen/keydroidx_font_caption" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 顶部信息区：操作提示，单行紧凑 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -56,7 +136,8 @@
             android:id="@+id/tvRecentHint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:maxLines="2"
+            android:singleLine="true"
+            android:ellipsize="end"
             android:textColor="#90CAF9"
             android:textSize="@dimen/keydroidx_font_caption" />
     </LinearLayout>
