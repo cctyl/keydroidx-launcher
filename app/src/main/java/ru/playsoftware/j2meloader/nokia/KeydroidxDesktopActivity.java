@@ -613,18 +613,18 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 		int action = keyBinding.resolveAction(event);
 
 		if (action < 0) {
-			// 数字键 0 / 5：在最近任务页内一键清理未保护 / 清理选中任务
+			// 数字键 0 / 5：在后台管理页内一键清理未保护 / 清理选中任务
 			// （0、5 键默认未绑定任何动作，仅在目标页面生效）
 			int keyCode = event.getKeyCode();
 			if (keyCode == KeyEvent.KEYCODE_0 || keyCode == KeyEvent.KEYCODE_5) {
 				Fragment bgHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
-				if (bgHost instanceof KeydroidxRecentTasksFragment) {
+				if (bgHost instanceof KeydroidxBgManagerFragment) {
 					if (keyCode == KeyEvent.KEYCODE_0) {
-						KeydroidxLog.i("Desktop", "数字键 0：最近任务一键清理未保护");
-						((KeydroidxRecentTasksFragment) bgHost).onCleanKey();
+						KeydroidxLog.i("Desktop", "数字键 0：后台管理一键清理未保护");
+						((KeydroidxBgManagerFragment) bgHost).onCleanKey();
 					} else {
-						KeydroidxLog.i("Desktop", "数字键 5：最近任务清理选中");
-						((KeydroidxRecentTasksFragment) bgHost).onClearFocusedKey();
+						KeydroidxLog.i("Desktop", "数字键 5：后台管理清理选中");
+						((KeydroidxBgManagerFragment) bgHost).onClearFocusedKey();
 					}
 					lastHandledDownKeyCode = event.getKeyCode();
 					return true;
@@ -694,16 +694,16 @@ public class KeydroidxDesktopActivity extends KeydroidxBaseActivity
 			return super.dispatchKeyEvent(event);
 		}
 
-		// 拨号键（ACTION_HANGUP）在桌面语境统一按「最近任务」处理：
+		// 拨号键（ACTION_HANGUP）在桌面语境统一按「后台管理」处理：
 		// 挂机菜单（继续/退出/后台运行）只在 jar 应用内生效，由 :midlet 进程自行处理；
-		// 桌面主界面 / 功能表 / 各子页面内按下拨号键即打开最近任务卡片页。
+		// 桌面主界面 / 功能表 / 各子页面内按下拨号键即打开后台管理卡片页。
 		if (action == KeydroidxKeyBinding.ACTION_HANGUP) {
-			Fragment recentHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
-			if (recentHost instanceof KeydroidxRecentTasksFragment) {
-				KeydroidxLog.i("Desktop", "拨号键（最近任务）：已在该页，忽略");
+			Fragment bgHost = getSupportFragmentManager().findFragmentById(R.id.midPanel);
+			if (bgHost instanceof KeydroidxBgManagerFragment) {
+				KeydroidxLog.i("Desktop", "拨号键（后台管理）：已在该页，忽略");
 			} else {
-				KeydroidxLog.i("Desktop", "拨号键（最近任务）：打开最近任务页");
-				openFragment(new KeydroidxRecentTasksFragment());
+				KeydroidxLog.i("Desktop", "拨号键（后台管理）：打开后台管理页");
+				openFragment(new KeydroidxBgManagerFragment());
 			}
 			lastHandledDownKeyCode = event.getKeyCode();
 			return true;

@@ -155,7 +155,7 @@ public class KeydroidxFontSettingsFragment extends KeydroidxListPageFragment {
 	 * 删除二次确认（§16/§41/§42）。
 	 * <p>
 	 * 安全项「取消」放左软键（确认键与左软键等效，误按只会取消），破坏性动作「删除」
-	 * 必须显式按<b>右软键</b>——与「最近任务 → 清理此任务」等页面保持同一约定。
+	 * 必须显式按<b>右软键</b>——与「后台管理 → 清理此任务」等页面保持同一约定。
 	 */
 	private void confirmDeleteFont(final KeydroidxFontManager.FontItem item) {
 		Activity activity = getActivity();

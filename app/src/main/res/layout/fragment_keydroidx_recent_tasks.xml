@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 最近任务页：标题行（界面名 + 数据模式徽标）+ 摘要行（未保护/已保护 + 0 键提示）+ 卡片网格。
+<!-- 后台管理页：标题行（界面名 + 可用性徽标）+ 摘要行（操作提示）+ 卡片网格。
      卡片行为由代码动态构建（2 列）。
      规范：根宽 match_parent（响应式原生 DP）；根视图 focusable/focusableInTouchMode 防「首个方向键被吞」；
      非业务 ScrollView 必须禁焦，否则系统寻焦会把方向键丢给滚动容器。 -->
@@ -26,7 +26,7 @@
             android:id="@+id/tvRecentTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="最近任务"
+            android:text="后台管理"
             android:textColor="#FFFFFF"
             android:textSize="@dimen/keydroidx_font_title" />
 

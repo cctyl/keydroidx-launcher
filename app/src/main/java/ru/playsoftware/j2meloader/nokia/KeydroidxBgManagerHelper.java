@@ -169,8 +169,7 @@ public final class KeydroidxBgManagerHelper {
 
 	/**
 	 * 是否为不可清理的系统应用（纯系统应用，非用户更新过的系统应用）。
-	 * <p>包级可见：供「最近任务」页复用，保证两处对"系统应用"的口径完全一致
-	 * （见 {@link KeydroidxRecentTasksHelper#buildTasks}）。
+	 * <p>包级可见：供「后台管理」页复用，保证两处对"系统应用"的口径完全一致。
 	 */
 	private static boolean isSystemApp(ApplicationInfo ai) {
 		if (ai == null) return false;
@@ -240,6 +239,19 @@ public final class KeydroidxBgManagerHelper {
 		return out;
 	}
 
+	/**
+	 * 后台存活应用条目数（去重、排除桌面自身/系统应用/输入法），供桌面组件行显示。
+	 * 与 {@link #enumerateBackgroundTasks} 同源同规则，组件行计数与页面列表口径一致。
+	 * <b>必须在后台线程调用</b>（5.0+ 含 shizuku TCP）；未激活时返回 0（调用方应先判
+	 * {@link #isBgManagerAvailable()} 决定显示「未激活」还是数字）。
+	 */
+	public static int countBackgroundPackages(Context ctx) {
+		if (ctx == null) return 0;
+		// 走与页面完全相同的过滤路径（系统应用/非包名进程/输入法/桌面自身一致过滤），
+		// 计数与页面列表口径结构上不可能不一致。loadUi=false 跳过名称/图标加载。
+		return enumerateBackgroundTasks(ctx, null, false).size();
+	}
+
 	/** 存活进程枚举命令：走 binder 经 system_server，不受 /proc 挂载参数与 SELinux capable 限制。 */
 	private static final String CMD_ALIVE_PROCESSES = "dumpsys activity processes";
 	/** {@code ProcessRecord{268f37d 23109:com.bilibili.app.in/u0a172}} → 进程名（包名或 pkg:子进程）。 */
@@ -265,7 +277,7 @@ public final class KeydroidxBgManagerHelper {
 	 */
 	private static Set<String> enumerateAlivePackages(Context ctx) {
 		// 结果缓存：dumpsys activity processes 输出很大（q968 实测 ~260KB，约 6 倍于 ps -A），
-		// 而桌面计数 / 最近任务页 / 音乐组件经常在同一秒内并发触发；低端机（msm8909）上
+		// 而桌面计数 / 后台管理页 / 音乐组件经常在同一秒内并发触发；低端机（msm8909）上
 		// 连发会把 loadavg 打到 10+、整机卡顿。同 TTL 内共用一次结果，失败（null）不缓存。
 		synchronized (ALIVE_CACHE_LOCK) {
 			long now = SystemClock.elapsedRealtime();
@@ -347,8 +359,9 @@ public final class KeydroidxBgManagerHelper {
 	/**
 	 * 已清理记录（仅进程内存，桌面进程重启即清空）。
 	 * <p>除包名外还记录清理时刻（uptime 与墙上时钟<b>双时间基</b>）与清理时的系统任务栈 id，
-	 * 供「最近任务」页用 dumpsys 任务记录自身的 {@code lastActiveTime} 判定「用户是否重新用过它」
-	 * ——该判定<b>不依赖 {@code ps -A}</b>，与最近任务数据同一次 dumpsys 调用、零额外开销。
+	 * 供音乐组件做「刚被本应用清理、不要立即跨进程查询（会冷启动它）」的避让。
+	 * 早期「最近任务」页还用它做 dumpsys 任务记录的 lastActiveTime 自愈判定，该页已改为
+	 * 存活进程直读（{@link #enumerateBackgroundTasks}），自愈机器随之移除，本记录现仅服务音乐避让。
 	 */
 	static final class ClearedRecord {
 		/** 清理时的系统任务栈 id；未知为 &lt;=0。 */
@@ -399,7 +412,7 @@ public final class KeydroidxBgManagerHelper {
 
 	/**
 	 * 取未过期的已清理记录；过期即清除并返回 null。
-	 * 包级可见：供「最近任务」页做「清理时刻 vs 任务 lastActiveTime」的自愈判定。
+	 * 包级可见：供音乐组件判断「是否刚被清理」以决定是否避让跨进程查询。
 	 */
 	static ClearedRecord getClearedRecord(String pkg) {
 		if (pkg == null || pkg.isEmpty()) return null;
@@ -416,9 +429,9 @@ public final class KeydroidxBgManagerHelper {
 
 	/**
 	 * 当前存活的应用包名集合（只读，绝不拉起任何进程）。
-	 * <p>供「最近任务」页判定任务是否为空壳：{@code am force-stop} 在 Android 13 上只杀进程，
-	 * <b>系统任务记录不会删除</b>（任务变成 sz=0 的空壳留在 recents 里），若不做存活校验，
-	 * 页面会显示一堆已死应用（实测「桌面后台 1、最近任务 4」）。本集合与桌面组件的
+	 * <p>「后台管理」页直接读存活进程（{@link #enumerateBackgroundTasks}），force-stop 后进程
+	 * 即从枚举结果消失、卡片随之消失，无需任务记录自愈。本集合现仅服务音乐组件避让，
+	 * 与桌面组件后台计数共用同一存活判据，两处口径一致。
 	 * 后台计数用的是同一套存活判据，两处口径一致。
 	 * <b>必须在后台线程调用</b>（含 shell 命令 / IPC）。
 	 *
@@ -492,9 +505,22 @@ public final class KeydroidxBgManagerHelper {
 	 * @param protectedSet 保护名单（包名或挂机条目 key 集合）；可为 null
 	 */
 	public static List<BgTask> enumerateBackgroundTasks(Context ctx, Set<String> protectedSet) {
+		return enumerateBackgroundTasks(ctx, protectedSet, true);
+	}
+
+	/**
+	 * 枚举后台任务（含图标与保护状态），按名称排序。可在后台线程调用（内部有 PackageManager 查询 / shizuku 命令）。
+	 * 已卸载的残留进程与系统应用自动跳过。挂机 jar 条目（key 形如 {@code midlet:<appPath>}）不依赖
+	 * mini_shizuku / 版本路径，4.4 与 5.0+ 行为一致。
+	 *
+	 * @param protectedSet 保护名单（包名或挂机条目 key 集合）；可为 null
+	 * @param loadUi      true 加载应用名与图标（页面渲染用）；false 仅做过滤与计数（桌面组件用），
+	 *                   与页面列表走同一套过滤，计数与列表口径一致
+	 */
+	public static List<BgTask> enumerateBackgroundTasks(Context ctx, Set<String> protectedSet, boolean loadUi) {
 		List<BgTask> out = new ArrayList<>();
 		// 挂机 jar 条目优先加入（即使无其它后台应用也显示；自身进程全版本可枚举）
-		appendMidletTask(ctx, protectedSet, out);
+		appendMidletTask(ctx, protectedSet, out, loadUi);
 		try {
 			PackageManager pm = ctx.getPackageManager();
 			if (pm == null) return out;
@@ -504,15 +530,18 @@ public final class KeydroidxBgManagerHelper {
 					ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
 					// 排除系统应用：它们无法被清理，混在列表里只会误导用户
 					if (isSystemApp(ai)) continue;
-					String name = pm.getApplicationLabel(ai) != null
-							? pm.getApplicationLabel(ai).toString() : pkg;
+					String name = pkg;
 					Drawable icon = null;
-					try {
-						// 图标包优先（单应用覆盖 → 全局图标包），未命中再用应用自身图标
-						icon = KeydroidxIconResolver.resolvePackIcon(ctx, pkg, null, name);
-						if (icon == null) icon = pm.getApplicationIcon(ai);
-					} catch (Exception ignored) {
-						KeydroidxLog.w(TAG, "加载图标失败: " + ignored.getMessage());
+					if (loadUi) {
+						CharSequence label = pm.getApplicationLabel(ai);
+						name = label != null ? label.toString() : pkg;
+						try {
+							// 图标包优先（单应用覆盖 → 全局图标包），未命中再用应用自身图标
+							icon = KeydroidxIconResolver.resolvePackIcon(ctx, pkg, null, name);
+							if (icon == null) icon = pm.getApplicationIcon(ai);
+						} catch (Exception ignored) {
+							KeydroidxLog.w(TAG, "加载图标失败: " + ignored.getMessage());
+						}
 					}
 					boolean prot = protectedSet != null && protectedSet.contains(pkg);
 					out.add(new BgTask(pkg, name, icon, prot));
@@ -534,19 +563,19 @@ public final class KeydroidxBgManagerHelper {
 	}
 
 	/** 追加挂机 jar 条目（读跨进程状态文件 + 校验 :midlet 进程存活）。 */
-	private static void appendMidletTask(Context ctx, Set<String> protectedSet, List<BgTask> out) {
+	private static void appendMidletTask(Context ctx, Set<String> protectedSet, List<BgTask> out, boolean loadUi) {
 		try {
 			MidletStateStore.RunningInfo running = MidletStateStore.getRunning(ctx);
 			if (running == null) return;
 			String key = MidletStateStore.taskKey(running.appPath);
 			boolean prot = protectedSet != null && protectedSet.contains(key);
-			out.add(new BgTask(key, running.appName, loadMidletIcon(ctx, running.appPath), prot));
+			out.add(new BgTask(key, running.appName, loadUi ? loadMidletIcon(ctx, running.appPath) : null, prot));
 		} catch (Exception e) {
 			KeydroidxLog.w(TAG, "追加挂机 jar 条目失败: " + e);
 		}
 	}
 
-	/** 加载挂机 jar 图标（复用百宝箱 AppItem 图标），失败返回 null（UI 有兜底）。包级可见：最近任务页复用。 */
+	/** 加载挂机 jar 图标（复用百宝箱 AppItem 图标），失败返回 null（UI 有兜底）。包级可见：后台管理页复用。 */
 	static Drawable loadMidletIcon(Context ctx, String appPath) {
 		try {
 			AppItem item = AppUtils.findAppByPath(appPath);
@@ -637,14 +666,14 @@ public final class KeydroidxBgManagerHelper {
 
 	/**
 	 * 手动清理<b>单个</b>任务（<b>不受保护名单限制</b>）。
-	 * <p>供「最近任务」页的「清理此任务」使用：保护名单只挡批量清理（0 键 / 清理全部），
+	 * <p>供「后台管理」页的「清理此任务」使用：保护名单只挡批量清理（0 键 / 清理全部），
 	 * 用户对某个应用显式发起的手动清理仍然生效。
 	 * <b>必须在后台线程调用</b>（含 TCP / shell 命令）。
 	 *
 	 * @param pkg     包名；挂机 jar 条目可传条目 key
 	 * @param taskKey 任务标识（{@code midlet:<appPath>} 或包名）
 	 * @param taskId  系统任务栈 id（来自 dumpsys / getRecentTasks）；未知传 &lt;= 0。
-	 *                Android 5.0+ 用它把任务记录一并删除，卡片才会真正从「最近任务」消失——
+	 *                「后台管理」页读存活进程而非任务历史，force-stop 后进程消失卡片即消失，
 	 *                实测 {@code am force-stop} <b>只杀进程</b>，任务记录会以 {@code sz=0} 的
 	 *                形态继续留在系统 recents 里。
 	 * @return 是否已下发清理
@@ -669,12 +698,12 @@ public final class KeydroidxBgManagerHelper {
 			boolean ok = Shizuku.exec("am force-stop " + pkg);
 			if (ok && taskId > 0) {
 				// force-stop 不清任务记录（实测 Android 13 上任务变成 sz=0 仍留在 recents），
-				// 追加 removeTask 才能真正抹掉「最近任务」卡片（实测有效）。
+				// removeTask 仍保留以同步清除系统 recents 中的任务记录（避免用户下拉系统 recents 仍见鬼壳）。
 				// 老版本若不支持该子命令，仅报错不影响上面的进程清理。
 				Shizuku.exec("am stack remove " + taskId);
 			}
 			// 保留「已清理」标记：拿不到 taskId（或删栈失败）时，靠它把该条目从列表隐去
-			// （记录 taskId 与清理时刻，供最近任务页做「是否被重新使用」的自愈判定）
+			// （记录 taskId 与清理时刻，供音乐组件避让跨进程查询）
 			if (ok) markCleared(pkg, taskId);
 			KeydroidxLog.i(TAG, "手动清理单任务(force-stop"
 					+ (taskId > 0 ? "+removeTask" : "") + "): " + pkg + " ok=" + ok);

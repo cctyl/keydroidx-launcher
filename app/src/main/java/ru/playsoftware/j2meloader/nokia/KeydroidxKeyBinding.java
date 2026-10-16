@@ -22,7 +22,7 @@ public class KeydroidxKeyBinding {
 	public static final int ACTION_SOFT_LEFT = 5;
 	public static final int ACTION_SOFT_RIGHT = 6;
 	public static final int ACTION_LOCK_SCREEN = 7;
-	/** 拨号键（绿键）：桌面语境打开最近任务，jar 应用内弹出挂机三菜单 */
+	/** 拨号键（绿键）：桌面语境打开后台管理，jar 应用内弹出挂机三菜单 */
 	public static final int ACTION_HANGUP = 8;
 
 	public static final int ACTION_COUNT = 9;
@@ -50,7 +50,7 @@ public class KeydroidxKeyBinding {
 			KeyEvent.KEYCODE_CALL,                  // hangup 拨号键（默认绿色拨号键）
 	};
 
-	// 触屏模式虚拟键盘专属预设（按键完全确定，无需用户手动绑定：* 号键锁屏，拨号键最近任务）
+	// 触屏模式虚拟键盘专属预设（按键完全确定，无需用户手动绑定：* 号键锁屏，拨号键后台管理）
 	private static final int[] TOUCH_KEYCODES = {
 			KeyEvent.KEYCODE_DPAD_UP,               // up
 			KeyEvent.KEYCODE_DPAD_DOWN,             // down

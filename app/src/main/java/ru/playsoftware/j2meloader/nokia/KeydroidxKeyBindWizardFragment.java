@@ -27,7 +27,7 @@ import ru.playsoftware.j2meloader.R;
  * 状态机：INTRO（弹窗询问是否绑定）→ RECORDING（按 上/下/左/右/确认/左软键/右软键/锁屏/拨号键
  * 顺序逐个提示并捕获一次物理键）→ DONE（标记完成并返回桌面）。
  * <p>
- * 「最近任务」不进向导：拨号键在桌面语境即打开最近任务（见
+ * 「后台管理」不进向导：拨号键在桌面语境即打开后台管理（见
  * {@code KeydroidxDesktopActivity} 的 HANGUP→RECENT_APPS 改写），无需独立按键。
  * <p>
  * 每个录制步骤支持"跳过"：录制态下按返回键即跳过当前动作（保留默认值）并前进，
@@ -55,7 +55,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	/** INTRO 进入防抖：刚进入向导的确认/软键连键抖出的第二发，不得立刻触发「绑定/触屏模式」。 */
 	private static final long ENTRY_DEBOUNCE_MS = 800L;
 
-	/** 向导引导绑定的动作全集：桌面动作去掉「最近任务」（其复用拨号键，不单独引导）。 */
+	/** 向导引导绑定的动作全集：桌面动作去掉「后台管理」（其复用拨号键，不单独引导）。 */
 	private static final int[] WIZARD_ACTIONS = {
 			KeydroidxKeyBinding.ACTION_UP,
 			KeydroidxKeyBinding.ACTION_DOWN,
@@ -228,7 +228,7 @@ public class KeydroidxKeyBindWizardFragment extends KeydroidxPageFragment implem
 	private void updateStepDescription(int action) {
 		if (recordDesc == null) return;
 		if (action == KeydroidxKeyBinding.ACTION_HANGUP) {
-			recordDesc.setText("拨号键一键两用：桌面时按下打开最近任务；"
+			recordDesc.setText("拨号键一键两用：桌面时按下打开后台管理；"
 					+ "jar 应用内按下弹出菜单（继续 / 退出 / 后台运行）");
 			recordDesc.setVisibility(View.VISIBLE);
 		} else {
