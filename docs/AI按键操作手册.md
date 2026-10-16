@@ -67,7 +67,7 @@ action=HANGUP,     actionId=8, keyCode=5,  keyName=通话
 | `KEY_CENTER` | `SELECT` | 23 |
 | `KEY_LSK` | `SOFT_LEFT` | 1 |
 | `KEY_RSK` | `SOFT_RIGHT` | 2 |
-| `KEY_CALL` | `HANGUP`（桌面=最近任务；JAR 内=挂机菜单） | 5 |
+| `KEY_CALL` | `HANGUP`（桌面=后台管理；JAR 内=挂机菜单） | 5 |
 | `KEY_END` | `LOCK_SCREEN`（桌面=锁屏；子页面=回待机屏） | 6 |
 
 **兜底校验（可选）**：`adb -s <serial> logcat -d -s KeyBinding:*`，每按一次键会打印 `resolveAction 菜单 -> 左软键(5)`，用来确认「键送到了没有 / 解析成了什么」。`-d` 表示 dump 完就退出；**不要顺手加 `-c` 清空日志**——缓冲区是共享的，清空会把上一次操作的现场一起抹掉（过滤技巧见 §5.3）。
@@ -91,10 +91,10 @@ adb -s <serial> shell input keyevent 82     # 左软键 → 进功能表
 adb -s <serial> shell input keyevent 20     # 下
 adb -s <serial> shell input keyevent 66     # 确认
 adb -s <serial> shell input keyevent 4      # 右软键（＝本机 BACK）
-adb -s <serial> shell input keyevent 5      # 拨号键 → 最近任务
+adb -s <serial> shell input keyevent 5      # 拨号键 → 后台管理
 ```
 
-真机已实测：`82`→功能表；`22`→焦点右移；`5`→最近任务页；`4`→返回上一层。
+真机已实测：`82`→功能表；`22`→焦点右移；`5`→后台管理页；`4`→返回上一层。
 
 **关于 `am start` 的两种回显（都算成功，别当成失败）**：
 
@@ -137,7 +137,7 @@ adb -s <serial> shell input keyevent 5      # 拨号键 → 最近任务
     (KEY_LSK)      (页面标题)      (KEY_RSK)
 ```
 
-- **中间栏显示的是「当前页面名」**（如 `功能表`、`最近任务`），**不是软键**，不要去找对应它的物理键；个别页面（如意见反馈页）会在此声明中键动作（`提交`），此时才对应确认键。
+- **中间栏显示的是「当前页面名」**（如 `功能表`、`后台管理`），**不是软键**，不要去找对应它的物理键；个别页面（如意见反馈页）会在此声明中键动作（`提交`），此时才对应确认键。
 - 左右栏文字为 `null` 时该软键隐藏（空栏占位）。
 
 ### 3.3 操作三步法
@@ -152,7 +152,7 @@ adb -s <serial> shell input keyevent 5      # 拨号键 → 最近任务
 |---|---|---|
 | `功能表`（待机屏左） | `SOFT_LEFT` → 进功能表 | 82 |
 | `桌面设置`（待机屏右） | `SOFT_RIGHT` → 进桌面设置 | 4 |
-| `选项`（功能表/最近任务左） | `SOFT_LEFT` → 打开选项弹窗 | 82 |
+| `选项`（功能表/后台管理左） | `SOFT_LEFT` → 打开选项弹窗 | 82 |
 | `选择`（列表页左） | `SOFT_LEFT` → 等同确认 | 82 |
 | `退出` / `返回`（各页右） | `SOFT_RIGHT` → 返回上一层；待机屏无此键 | 4 |
 
@@ -427,10 +427,10 @@ adb -s $S shell input keyevent 66          # 确认：执行当前高亮项并�
 adb -s $S shell input keyevent 4           # 右软键 / BACK：取消关闭（弹窗里两者等价）
 ```
 
-### 例 C：随时回待机屏 / 打开最近任务
+### 例 C：随时回待机屏 / 打开后台管理
 
 ```powershell
-adb -s $S shell input keyevent 5           # 拨号键 → 最近任务页（弹窗内也可用于关闭）
+adb -s $S shell input keyevent 5           # 拨号键 → 后台管理页（弹窗内也可用于关闭）
 adb -s $S shell input keyevent 4           # 右软键「退出」→ 回上一层
 adb -s $S shell input keyevent 3           # HOME：任何一屏都直接回待机屏（最稳，推荐）
 adb -s $S shell input keyevent 17          # LOCK_SCREEN（本机实测=17）：待机屏=真锁屏，子页面内=回待机屏；发之前先截图确认当前屏
