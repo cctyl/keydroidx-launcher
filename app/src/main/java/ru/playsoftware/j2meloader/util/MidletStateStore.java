@@ -28,17 +28,22 @@ public final class MidletStateStore {
 	private static final String KEY_APP_PATH = "appPath";
 	private static final String KEY_APP_NAME = "appName";
 	private static final String KEY_PID = "pid";
+	private static final String KEY_START_TIME = "startTime";
 
 	private MidletStateStore() {}
 
-	/** 挂机中的 jar 信息（appPath + 显示名）。 */
+	/** 挂机中的 jar 信息（appPath + 显示名 + pid + 启动时间戳）。 */
 	public static class RunningInfo {
 		public final String appPath;
 		public final String appName;
+		public final int pid;
+		public final long startTime;
 
-		RunningInfo(String appPath, String appName) {
+		RunningInfo(String appPath, String appName, int pid, long startTime) {
 			this.appPath = appPath;
 			this.appName = appName;
+			this.pid = pid;
+			this.startTime = startTime;
 		}
 	}
 
@@ -52,6 +57,7 @@ public final class MidletStateStore {
 		props.setProperty(KEY_APP_PATH, appPath == null ? "" : appPath);
 		props.setProperty(KEY_APP_NAME, appName == null ? "" : appName);
 		props.setProperty(KEY_PID, String.valueOf(android.os.Process.myPid()));
+		props.setProperty(KEY_START_TIME, String.valueOf(System.currentTimeMillis()));
 		File file = stateFile(context);
 		File tmp = new File(file.getParentFile(), FILE_NAME + ".tmp");
 		try (FileOutputStream fos = new FileOutputStream(tmp)) {
@@ -99,8 +105,15 @@ public final class MidletStateStore {
 		try {
 			pid = Integer.parseInt(props.getProperty(KEY_PID, "-1"));
 		} catch (NumberFormatException e) {
-			KeydroidxLog.w(TAG, "parse pid failed failed: " + e.getMessage());
+			KeydroidxLog.w(TAG, "parse pid failed: " + e.getMessage());
 			pid = -1;
+		}
+		long startTime;
+		try {
+			startTime = Long.parseLong(props.getProperty(KEY_START_TIME, "0"));
+		} catch (NumberFormatException e) {
+			KeydroidxLog.w(TAG, "parse startTime failed: " + e.getMessage());
+			startTime = 0;
 		}
 		if (appPath.isEmpty()) return null;
 		if (!isMidletProcessAlive(context, pid)) {
@@ -110,7 +123,7 @@ public final class MidletStateStore {
 			file.delete();
 			return null;
 		}
-		return new RunningInfo(appPath, appName);
+		return new RunningInfo(appPath, appName, pid, startTime);
 	}
 
 	/**

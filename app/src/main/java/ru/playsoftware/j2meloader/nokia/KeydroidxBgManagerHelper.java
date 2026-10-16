@@ -752,8 +752,6 @@ public final class KeydroidxBgManagerHelper {
 	 */
 	public static List<BgTask> enumerateBackgroundTasks(Context ctx, Set<String> protectedSet, boolean loadUi) {
 		List<BgTask> out = new ArrayList<>();
-		// 挂机 jar 条目优先加入（即使无其它后台应用也显示；自身进程全版本可枚举）
-		appendMidletTask(ctx, protectedSet, out, loadUi);
 		try {
 			PackageManager pm = ctx.getPackageManager();
 			if (pm == null) return out;
@@ -762,6 +760,10 @@ public final class KeydroidxBgManagerHelper {
 			Map<String, ProcInfo> details = (loadUi
 					&& Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
 					? fetchProcessDetails(ctx) : null;
+
+			// 挂机 jar 条目优先加入（复用 details 中的 :midlet 进程详情，或降级同 uid 原生查询）
+			appendMidletTask(ctx, protectedSet, out, loadUi, details);
+
 			Set<String> pkgs = details != null ? details.keySet()
 					: enumerateBackgroundPackages(ctx);
 			for (String pkg : pkgs) {
@@ -806,14 +808,72 @@ public final class KeydroidxBgManagerHelper {
 		return out;
 	}
 
-	/** 追加挂机 jar 条目（读跨进程状态文件 + 校验 :midlet 进程存活）。 */
-	private static void appendMidletTask(Context ctx, Set<String> protectedSet, List<BgTask> out, boolean loadUi) {
+	/** 追加挂机 jar 条目（读跨进程状态文件 + 关联 :midlet 进程内存/CPU/启动时间）。 */
+	private static void appendMidletTask(Context ctx, Set<String> protectedSet, List<BgTask> out,
+			boolean loadUi, Map<String, ProcInfo> details) {
 		try {
 			MidletStateStore.RunningInfo running = MidletStateStore.getRunning(ctx);
 			if (running == null) return;
 			String key = MidletStateStore.taskKey(running.appPath);
 			boolean prot = protectedSet != null && protectedSet.contains(key);
-			out.add(new BgTask(key, running.appName, loadUi ? loadMidletIcon(ctx, running.appPath) : null, prot));
+			Drawable icon = loadUi ? loadMidletIcon(ctx, running.appPath) : null;
+
+			int pssMB = 0;
+			int rssMB = 0;
+			int cpuPct = -1;
+			String uptimeText = null;
+
+			// 1. 优先从 dumpsys details 中读取已解析的 :midlet 进程指标
+			String midletProcKey = ctx.getPackageName() + ":midlet";
+			ProcInfo pi = (details != null) ? details.get(midletProcKey) : null;
+			if (pi != null) {
+				pssMB = pi.pssMB;
+				rssMB = pi.rssMB;
+				cpuPct = pi.cpuPct;
+				uptimeText = pi.uptimeText;
+			}
+
+			// 2. details 未命中或处于 4.4 / 无 mini_shizuku 时：同 UID 进程指标原生查询兜底
+			if (running.pid > 0) {
+				if (pssMB <= 0) {
+					try {
+						ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+						if (am != null) {
+							android.os.Debug.MemoryInfo[] mems = am.getProcessMemoryInfo(new int[]{running.pid});
+							if (mems != null && mems.length > 0 && mems[0] != null) {
+								pssMB = Math.round(mems[0].getTotalPss() / 1024f);
+							}
+						}
+					} catch (Throwable t) {
+						KeydroidxLog.w(TAG, "读取 midlet 进程内存异常: " + t.getMessage());
+					}
+				}
+				if (cpuPct < 0) {
+					Map<Integer, Integer> cpuByPid = fetchCpuPercents();
+					if (cpuByPid != null) {
+						Integer c = cpuByPid.get(running.pid);
+						cpuPct = (c != null) ? c : 0;
+					}
+				}
+			}
+
+			// 3. 运行时间：若 dumpsys 未拿到，由状态文件记录的 startTime 实时换算
+			if (uptimeText == null && running.startTime > 0) {
+				long elapsedSec = Math.max(0, (System.currentTimeMillis() - running.startTime) / 1000);
+				long mm = elapsedSec / 60;
+				long ss = elapsedSec % 60;
+				long hh = mm / 60;
+				mm = mm % 60;
+				if (hh > 0) {
+					uptimeText = hh + "h" + mm + "m";
+				} else if (mm > 0) {
+					uptimeText = mm + "m" + (ss > 0 ? ss + "s" : "");
+				} else {
+					uptimeText = ss + "s";
+				}
+			}
+
+			out.add(new BgTask(key, running.appName, icon, prot, pssMB, rssMB, cpuPct, uptimeText));
 		} catch (Exception e) {
 			KeydroidxLog.w(TAG, "追加挂机 jar 条目失败: " + e);
 		}
