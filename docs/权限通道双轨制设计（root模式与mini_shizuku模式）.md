@@ -632,6 +632,8 @@ root 服务端泄露 K（鉴权密钥）的后果 = **任意 root 命令执行**
 | 28 | `input keyevent <INT>` | 同上 |
 | 29 | `reboot( -p\| recovery\| bootloader)?` | 电源：重启 / 关机 / Recovery / Fastboot |
 | 30 | `setprop sys.powerctl (shutdown\|reboot(,recovery\|,bootloader)?)` | 电源：部分 ROM `reboot` 不接受参数时的回退 |
+| 31 | `dumpsys activity processes` | 后台管理：存活应用枚举与 PSS/RSS/启动时间跨行关联解析（`KeydroidxBgManagerHelper`） |
+| 32 | `dumpsys cpuinfo` | 后台管理：活跃进程 CPU 占用率滚动均值采样（`KeydroidxBgManagerHelper`） |
 
 - 包名参数服务端侧**再校验一次**（不信任客户端），不匹配直接拒绝并记日志。
 - root 服务端收到白名单外的 `EXEC|`/`EXEC_OUT|` → 拒绝执行 + `Log.w` 记录来源。
