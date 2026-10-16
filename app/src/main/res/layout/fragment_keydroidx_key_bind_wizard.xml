@@ -230,7 +230,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:gravity="start"
+                    android:gravity="center"
                     android:lineSpacingMultiplier="1.25"
                     android:text="许多高级功能都需要开启 mini_shizuku 的支持，\n例如：挂机键拦截、后台管理、快捷开关等。\n\n你可以在「桌面设置」→「高级设置」中找到它。"
                     android:textColor="#E0E0E0"
