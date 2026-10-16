@@ -70,6 +70,7 @@ public class MsgProcess implements Runnable {
             "dumpsys activity recents",                                   // 最近任务
             "dumpsys activity activities",                                // 最近任务（recents 无输出时的兜底）
             "dumpsys activity processes",                                 // 存活应用枚举（binder 进程表，不受 /proc hidepid 限制）
+            "dumpsys cpuinfo",                                              // 后台管理页：进程 CPU 滚动均值（按 pid 关联回进程表）
             "ps -A",                                                      // 存活应用枚举（旧通道；root 下受 /proc hidepid 限制，保留作诊断）
             // —— 进程 / 任务 ——
             "am force-stop " + P_PKG,

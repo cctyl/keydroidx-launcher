@@ -408,6 +408,22 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 		watermark.setAlpha(0.3f);
 		preview.addView(watermark);
 
+		// 详情行：内存 · CPU · 运行时间（预览区左下角）
+		String detail = formatDetails(t);
+		if (!detail.isEmpty()) {
+			TextView detailTv = new TextView(ctx);
+			FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(
+					ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+			dlp.gravity = Gravity.BOTTOM | Gravity.START;
+			dlp.setMargins(KeydroidxDimens.dp(getResources(), 3), 0,
+					0, KeydroidxDimens.dp(getResources(), 2));
+			detailTv.setLayoutParams(dlp);
+			detailTv.setText(detail);
+			detailTv.setTextColor(COLOR_SUB);
+			KeydroidxFontManager.textSize(detailTv, 8);
+			preview.addView(detailTv);
+		}
+
 		inner.addView(preview);
 
 		cell.addView(inner);
@@ -454,6 +470,21 @@ public class KeydroidxBgManagerFragment extends KeydroidxPageFragment {
 		int g = (int) (((color >> 8) & 0xFF) * factor);
 		int b = (int) ((color & 0xFF) * factor);
 		return (color & 0xFF000000) | (r << 16) | (g << 8) | b;
+	}
+
+	/** 卡片详情行：内存(PSS) · CPU% · 运行时间；全无则空串。 */
+	private static String formatDetails(KeydroidxBgManagerHelper.BgTask t) {
+		StringBuilder sb = new StringBuilder();
+		if (t.pssMB > 0) sb.append(t.pssMB).append("MB");
+		if (t.cpuPct >= 0) {
+			if (sb.length() > 0) sb.append(" · ");
+			sb.append(t.cpuPct).append("%");
+		}
+		if (t.uptimeText != null) {
+			if (sb.length() > 0) sb.append(" · ");
+			sb.append(t.uptimeText);
+		}
+		return sb.toString();
 	}
 
 	// ============================================================

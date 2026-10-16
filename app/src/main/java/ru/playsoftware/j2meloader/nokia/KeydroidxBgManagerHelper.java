@@ -20,7 +20,9 @@ import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -145,12 +147,29 @@ public final class KeydroidxBgManagerHelper {
 		public final String name;
 		public Drawable icon;
 		public boolean prot;
+		/** PSS（MB）；0=未知。 */
+		public final int pssMB;
+		/** RSS（MB）；0=未知。 */
+		public final int rssMB;
+		/** CPU 滚动均值%（dumpsys cpuinfo）；-1=未取。 */
+		public final int cpuPct;
+		/** 启动距今（如 "6h7m"）；null=未知。 */
+		public final String uptimeText;
 
 		public BgTask(String pkg, String name, Drawable icon, boolean prot) {
+			this(pkg, name, icon, prot, 0, 0, -1, null);
+		}
+
+		public BgTask(String pkg, String name, Drawable icon, boolean prot,
+				int pssMB, int rssMB, int cpuPct, String uptimeText) {
 			this.pkg = pkg;
 			this.name = name;
 			this.icon = icon;
 			this.prot = prot;
+			this.pssMB = pssMB;
+			this.rssMB = rssMB;
+			this.cpuPct = cpuPct;
+			this.uptimeText = uptimeText;
 		}
 	}
 
@@ -344,6 +363,220 @@ public final class KeydroidxBgManagerHelper {
 		return out;
 	}
 
+	// ---- 进程详情（内存/启动时间/CPU，供后台管理页显示）----
+
+	/** ProcessRecord 详情块首行（形如 {@code *APP* UID 10109 ProcessRecord{hash pid:pkg/uid}}）。
+	 * <p><b>必须以 {@code *...*} 开头</b>，以排除 dump 末尾「PID #N: ProcessRecord{...}」汇总段
+	 * （该段无 lastPss 等详情行，若当块头会以后覆盖详情段填好的 ProcInfo，使 pss 归 0）。 */
+	private static final Pattern P_PROCESS_HDR =
+			Pattern.compile("^\\s*\\*[^*]+\\*.*ProcessRecord\\{[0-9a-fA-F]+ (\\d+):([a-zA-Z0-9_.]+)");
+	/** lastPss=23MB → PSS。 */
+	private static final Pattern P_LAST_PSS =
+			Pattern.compile("lastPss=(\\d+(?:\\.\\d+)?)\\s*([KMG]?)B");
+	/** lastRss=55MB → RSS。 */
+	private static final Pattern P_LAST_RSS =
+			Pattern.compile("lastRss=(\\d+(?:\\.\\d+)?)\\s*([KMG]?)B");
+	/** startUptimeTime=-6h7m38s469ms → 启动距今（uptime 基）。 */
+	private static final Pattern P_START_UPTIME =
+			Pattern.compile("startUptimeTime=(-[0-9hms]+)");
+	/** dumpsys cpuinfo 行：2.7% 19306/name → CPU% 与 pid。 */
+	private static final Pattern P_CPUINFO_LINE =
+			Pattern.compile("^\\s*([\\d.]+)%\\s+(\\d+)/");
+	/** {@link #fetchProcessDetails} 取 CPU 滚动均值的命令。 */
+	private static final String CMD_CPUINFO = "dumpsys cpuinfo";
+
+	/** 单个存活进程的详情。CPU 为 dumpsys cpuinfo 的滚动均值（-1=未取）。 */
+	public static final class ProcInfo {
+		public final String pkg;
+		public final int pid;
+		public final int pssMB;
+		public final int rssMB;
+		public final int cpuPct;
+		public final String uptimeText;
+		ProcInfo(String pkg, int pid, int pssMB, int rssMB, int cpuPct, String uptimeText) {
+			this.pkg = pkg;
+			this.pid = pid;
+			this.pssMB = pssMB;
+			this.rssMB = rssMB;
+			this.cpuPct = cpuPct;
+			this.uptimeText = uptimeText;
+		}
+	}
+
+	/**
+	 * 取存活进程详情（pid/内存/启动时间/CPU），供后台管理页显示。5.0+ 经 mini_shizuku 执行
+	 * {@code dumpsys activity processes}（按 ProcessRecord 块跨行关联内存/启动时间）+
+	 * {@code dumpsys cpuinfo}（按 pid 关联 CPU 滚动均值）。
+	 * <p>与 {@link #fetchAlivePackages} 的区别：那个只抠包名（首行正则，供计数/缓存/存活判断）；
+	 * 本方法跨行关联块内字段，代价是一次额外 dumpsys processes + 一次 cpuinfo，仅页面加载时调用。
+	 * 失败返回 null，调用方回退到无详情的包名集合（仍能显示卡片，只是不带内存/CPU/运行时间）。
+	 */
+	private static Map<String, ProcInfo> fetchProcessDetails(Context ctx) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return null;
+		String self = ctx.getPackageName();
+		String procDump;
+		try {
+			procDump = Shizuku.execWithOutput(CMD_ALIVE_PROCESSES);
+		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "fetchProcessDetails dumpsys processes 失败: " + e.getMessage());
+			return null;
+		}
+		if (procDump == null || procDump.isEmpty()) return null;
+		String imePkg = getDefaultImePackage(ctx);
+		Map<Integer, Integer> cpuByPid = fetchCpuPercents();
+		Map<String, ProcInfo> out = parseProcessDump(procDump, self, cpuByPid);
+		if (out == null || out.isEmpty()) {
+			KeydroidxLog.w(TAG, "fetchProcessDetails 解析到 0 个进程（疑似输出异常）");
+			return null;
+		}
+		// 输入法进程常驻但不算"后台应用"，与 enumerateBackgroundPackages 口径一致
+		if (imePkg != null) out.remove(imePkg);
+		return out;
+	}
+
+	/**
+	 * 按 ProcessRecord 块解析进程表：块首行取 pid+pkg，块内 lastPss/lastRss/startUptimeTime
+	 * 跨行关联到当前块；CPU 按 pid 从 {@code cpuByPid} 查。排除桌面自身。
+	 */
+	private static Map<String, ProcInfo> parseProcessDump(String dump, String self,
+			Map<Integer, Integer> cpuByPid) {
+		Map<String, ProcInfo> out = new LinkedHashMap<>();
+		String curPkg = null;
+		int curPid = 0;
+		int curPss = 0;
+		int curRss = 0;
+		String curUp = null;
+		boolean inBlock = false;
+		for (String raw : dump.split("\n")) {
+			if (raw == null) continue;
+			String line = raw.trim();
+			if (line.isEmpty()) continue;
+			Matcher hdr = P_PROCESS_HDR.matcher(line);
+			if (hdr.find()) {
+				if (inBlock && curPkg != null && !curPkg.equals(self)) {
+					out.put(curPkg, buildProcInfo(curPkg, curPid, curPss, curRss, curUp, cpuByPid));
+				}
+				inBlock = true;
+				curPkg = null;
+				curPid = 0;
+				curPss = 0;
+				curRss = 0;
+				curUp = null;
+				try {
+					curPid = Integer.parseInt(hdr.group(1));
+				} catch (NumberFormatException e) {
+					KeydroidxLog.w(TAG, "解析 pid 失败: " + e.getMessage());
+				}
+				curPkg = hdr.group(2);
+				continue;
+			}
+			if (!inBlock) continue;
+			if (curPid == 0 && line.startsWith("pid=")) {
+				try {
+					curPid = Integer.parseInt(line.substring(4).trim());
+				} catch (NumberFormatException e) {
+					KeydroidxLog.w(TAG, "解析 pid= 失败: " + e.getMessage());
+				}
+			} else if (curPss == 0) {
+				Matcher pm = P_LAST_PSS.matcher(line);
+				if (pm.find()) curPss = parseMemMB(pm);
+			}
+			if (curRss == 0) {
+				Matcher rm = P_LAST_RSS.matcher(line);
+				if (rm.find()) curRss = parseMemMB(rm);
+			}
+			if (curUp == null) {
+				Matcher um = P_START_UPTIME.matcher(line);
+				if (um.find()) curUp = formatUptime(um.group(1));
+			}
+		}
+		if (inBlock && curPkg != null && !curPkg.equals(self)) {
+			out.put(curPkg, buildProcInfo(curPkg, curPid, curPss, curRss, curUp, cpuByPid));
+		}
+		return out;
+	}
+
+	/** 组装 ProcInfo 并查 CPU。 */
+	private static ProcInfo buildProcInfo(String pkg, int pid, int pss, int rss,
+			String uptime, Map<Integer, Integer> cpuByPid) {
+		int cpu = -1;
+		if (cpuByPid != null) {
+			Integer c = cpuByPid.get(pid);
+			if (c != null) cpu = c;
+		}
+		return new ProcInfo(pkg, pid, pss, rss, cpu, uptime);
+	}
+
+	/**
+	 * 解析 {@code dumpsys cpuinfo} 得 pid → CPU%（滚动均值）。输出按 % 降序，
+	 * 同 pid 取首个（即最高值）。
+	 */
+	private static Map<Integer, Integer> fetchCpuPercents() {
+		String dump;
+		try {
+			dump = Shizuku.execWithOutput(CMD_CPUINFO);
+		} catch (Exception e) {
+			KeydroidxLog.w(TAG, "dumpsys cpuinfo 执行失败: " + e.getMessage());
+			return null;
+		}
+		if (dump == null || dump.isEmpty()) return null;
+		Map<Integer, Integer> out = new HashMap<>();
+		for (String raw : dump.split("\n")) {
+			if (raw == null) continue;
+			Matcher m = P_CPUINFO_LINE.matcher(raw);
+			if (m.find()) {
+				try {
+					int pid = Integer.parseInt(m.group(2));
+					if (out.containsKey(pid)) continue;
+					double pct = Double.parseDouble(m.group(1));
+					out.put(pid, (int) Math.round(pct));
+				} catch (NumberFormatException e) {
+					KeydroidxLog.w(TAG, "解析 cpuinfo 行失败: " + e.getMessage());
+				}
+			}
+		}
+		return out;
+	}
+
+	/** 内存字段（lastPss/lastRss）解析为 MB；KB→/1024、GB→*1024。 */
+	private static int parseMemMB(Matcher m) {
+		try {
+			double v = Double.parseDouble(m.group(1));
+			String u = m.group(2);
+			if ("K".equals(u)) return (int) Math.round(v / 1024.0);
+			if ("G".equals(u)) return (int) Math.round(v * 1024.0);
+			return (int) Math.round(v); // "M" 或空（PSS 通常已 MB）
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+
+	/**
+	 * {@code startUptimeTime=-6h7m38s469ms} → {@code "6h7m"}（启动距今，已去秒与毫秒）。
+	 * &lt;1h 时保留秒：{@code -53m21s} → {@code "53m21s"}；&lt;1m → {@code "38s"}。
+	 */
+	private static String formatUptime(String raw) {
+		if (raw == null || raw.isEmpty()) return null;
+		String s = raw.replaceFirst("(\\d+)ms$", "");
+		long hh = parseUptimePart(s, "h");
+		long mm = parseUptimePart(s, "m");
+		long ss = parseUptimePart(s, "s");
+		if (hh > 0) return hh + "h" + mm + "m";
+		if (mm > 0) return mm + "m" + (ss > 0 ? ss + "s" : "");
+		if (ss > 0) return ss + "s";
+		return null;
+	}
+
+	/** 从 {@code "6h7m38s"} 这类串里取指定单位（h/m/s）前的整数。 */
+	private static long parseUptimePart(String s, String unit) {
+		Matcher m = Pattern.compile("(\\d+)" + unit).matcher(s);
+		try {
+			return m.find() ? Long.parseLong(m.group(1)) : 0;
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+
 	// ---- 清理结果记忆（带自愈信息） ----
 
 	/**
@@ -524,7 +757,13 @@ public final class KeydroidxBgManagerHelper {
 		try {
 			PackageManager pm = ctx.getPackageManager();
 			if (pm == null) return out;
-			Set<String> pkgs = enumerateBackgroundPackages(ctx);
+			// loadUi（页面）且 5.0+：走详情 map（含内存/启动时间/CPU），失败回退到轻量 set；
+			// 否则（计数 loadUi=false 或 4.4）走轻量 set，不付额外 dumpsys 开销
+			Map<String, ProcInfo> details = (loadUi
+					&& Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+					? fetchProcessDetails(ctx) : null;
+			Set<String> pkgs = details != null ? details.keySet()
+					: enumerateBackgroundPackages(ctx);
 			for (String pkg : pkgs) {
 				try {
 					ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
@@ -544,7 +783,12 @@ public final class KeydroidxBgManagerHelper {
 						}
 					}
 					boolean prot = protectedSet != null && protectedSet.contains(pkg);
-					out.add(new BgTask(pkg, name, icon, prot));
+					ProcInfo pi = details != null ? details.get(pkg) : null;
+					out.add(new BgTask(pkg, name, icon, prot,
+							pi != null ? pi.pssMB : 0,
+							pi != null ? pi.rssMB : 0,
+							pi != null ? pi.cpuPct : -1,
+							pi != null ? pi.uptimeText : null));
 				} catch (PackageManager.NameNotFoundException e) {
 					KeydroidxLog.w(TAG, "add failed: " + e.getMessage());
 					// 非应用进程（init/守护进程）或已卸载残留，跳过
