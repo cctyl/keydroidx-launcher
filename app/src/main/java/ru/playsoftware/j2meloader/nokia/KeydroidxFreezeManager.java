@@ -33,6 +33,9 @@ import ru.playsoftware.mini_shizuku.Shizuku;
  * <p>
  * 支持通过 mini_shizuku (Shell / ADB 权限) 或 DevicePolicyManager (设备管理员/免Root/小黑屋模式)
  * 实现应用的无缝冻结与解冻启动。
+ * <p><b>保护范围</b>：只保护「当前正在运行的桌面包」（自身被停用后本进程无法自救，只能 adb 或
+ * 另一个变体恢复）与 Shizuku 核心服务。另一个启动器变体（release ↔ debug）可以正常加入名单并冻结，
+ * 但它同样是一个桌面，属于破坏性操作，<b>必须由调用方（功能表选项）先做二次确认</b>。
  */
 public class KeydroidxFreezeManager {
 
@@ -53,6 +56,8 @@ public class KeydroidxFreezeManager {
 	private static final Pattern PKG_PATTERN = Pattern.compile("^[a-zA-Z0-9_.]+$");
 	private static final String PREF_NAME = "nokia_freeze_config";
 	private static final String KEY_FROZEN_LIST = "frozen_packages";
+	/** debug 变体的包名后缀；「另一个启动器变体」按自身包名 ± 该后缀推导，不硬编码包名字面量 */
+	private static final String DEBUG_PKG_SUFFIX = ".debug";
 
 	/** 解冻后轮询等待包真正可启动的间隔（毫秒） */
 	private static final int UNFREEZE_WAIT_STEP_MS = 100;
@@ -109,6 +114,22 @@ public class KeydroidxFreezeManager {
 		if (saved != null) {
 			frozenList.addAll(saved);
 		}
+		// 脏数据清洗：名单是持久化的，可能来自旧版本、手工改 prefs 或跨设备迁移。
+		// 若其中混入自身包（或 Shizuku / 非法包名），一键冻结会把自己当场停用——本进程被停用后
+		// 无法自救，只能 adb 或另一个变体恢复。这里在读入时就剔除并回写，堵住这条唯一的自冻路径。
+		int removed = 0;
+		java.util.Iterator<String> it = frozenList.iterator();
+		while (it.hasNext()) {
+			String pkg = it.next();
+			if (!isValidPackageName(pkg) || isProtectedPackage(pkg)) {
+				it.remove();
+				removed++;
+			}
+		}
+		if (removed > 0) {
+			KeydroidxLog.w(TAG, "冻结名单清洗: 剔除 " + removed + " 个保护/非法条目");
+			saveList();
+		}
 	}
 
 	private synchronized void saveList() {
@@ -130,15 +151,13 @@ public class KeydroidxFreezeManager {
 	}
 
 	/**
-	 * 检查包名是否属于保护包（本启动器各变体、Shizuku 核心服务等，严禁冻结）
+	 * 检查包名是否属于保护包（<b>仅</b>当前正在运行的桌面包、Shizuku 核心服务）。
+	 * <p>不要在这里硬编码 release/debug 两个包名：那会连带禁止跨变体冻结（debug 冻不了 release）。
+	 * 另一个启动器变体走 {@link #isOtherLauncherVariant}，由调用方二次确认后再执行。
 	 */
 	public boolean isProtectedPackage(String packageName) {
 		if (packageName == null || packageName.trim().isEmpty()) return true;
 		if (packageName.equals(appContext.getPackageName())) return true;
-		if ("io.github.cctyl.nokia".equals(packageName)
-				|| "io.github.cctyl.nokia.debug".equals(packageName)) {
-			return true;
-		}
 		if ("moe.shizuku.privileged.api".equals(packageName)) {
 			return true;
 		}
@@ -146,13 +165,36 @@ public class KeydroidxFreezeManager {
 	}
 
 	/**
-	 * 添加到冻结名单
+	 * 是否为「另一个启动器变体」（release ↔ debug）。
+	 * <p>按自身包名推导，不写字面量：{@code io.github.cctyl.nokia.debug} 去掉 {@code .debug}
+	 * 即 release；反之追加后缀。新增 flavor 后缀时同样适用，不会漏判。
+	 * <p>自身包名不算「另一个变体」——它由 {@link #isProtectedPackage} 的自身保护拦下。
 	 */
-	public synchronized void addToFreezeList(String packageName) {
-		if (isProtectedPackage(packageName)) return; // 禁止将保护包加入冻结名单
-		frozenList.add(packageName);
-		saveList();
-		notifyStateChanged();
+	public boolean isOtherLauncherVariant(String packageName) {
+		if (packageName == null || packageName.trim().isEmpty()) return false;
+		String self = appContext.getPackageName();
+		String other = self.endsWith(DEBUG_PKG_SUFFIX)
+				? self.substring(0, self.length() - DEBUG_PKG_SUFFIX.length())
+				: self + DEBUG_PKG_SUFFIX;
+		return other.equals(packageName);
+	}
+
+	/**
+	 * 添加到冻结名单。
+	 *
+	 * @return true=已成功加入（含幂等重复加入）；false=保护包或非法包名，未写入
+	 */
+	public synchronized boolean addToFreezeList(String packageName) {
+		if (!isValidPackageName(packageName) || isProtectedPackage(packageName)) {
+			KeydroidxLog.w(TAG, "addToFreezeList: 拒绝加入（保护包或非法包名）: " + packageName);
+			return false;
+		}
+		boolean added = frozenList.add(packageName);
+		if (added) {
+			saveList();
+			notifyStateChanged();
+		}
+		return true;
 	}
 
 	/**
@@ -479,9 +521,22 @@ public class KeydroidxFreezeManager {
 	}
 
 	/**
-	 * 一键冻结所有名单中的应用
+	 * 一键冻结所有名单中的应用（安全默认：<b>不</b>冻结另一个启动器变体）。
+	 * <p>等价于 {@link #freezeAll(FreezeCallback, boolean) freezeAll(callback, false)}：
+	 * 桌面快捷开关这类「盲操作」入口不该连带停用另一个桌面（它的入口会整体消失）。
+	 * 需要冻结变体时走功能表单包「立即冻结」，由 UI 二次确认后传 true。
 	 */
 	public void freezeAll(FreezeCallback callback) {
+		freezeAll(callback, false);
+	}
+
+	/**
+	 * 一键冻结所有名单中的应用。
+	 *
+	 * @param includeLauncherVariants true=连另一个启动器变体一起冻结（调用方必须已完成二次确认）；
+	 *                                false=跳过变体，并在提示里引导用户去功能表单独冻结
+	 */
+	public void freezeAll(FreezeCallback callback, boolean includeLauncherVariants) {
 		executor.execute(() -> {
 			Set<String> list;
 			synchronized (this) {
@@ -499,8 +554,15 @@ public class KeydroidxFreezeManager {
 			// 避免对不存在的包下发无效命令（服务端会回 "Unknown package"，进而多起一次 su）
 			List<String> targets = new ArrayList<>();
 			int missing = 0;
+			int skippedLauncher = 0;
 			for (String pkg : list) {
 				if (isProtectedPackage(pkg) || !isValidPackageName(pkg)) continue;
+				// 另一个启动器变体：安全默认跳过（无界面调用尤其不能静默停用对方的桌面入口）
+				if (!includeLauncherVariants && isOtherLauncherVariant(pkg)) {
+					skippedLauncher++;
+					KeydroidxLog.w(TAG, "freezeAll: 跳过桌面变体，需在功能表中单独确认冻结: " + pkg);
+					continue;
+				}
 				if (isPackageInstalled(pkg)) {
 					targets.add(pkg);
 				} else {
@@ -509,9 +571,19 @@ public class KeydroidxFreezeManager {
 				}
 			}
 			final int missingCount = missing;
+			final int skippedCount = skippedLauncher;
 			if (targets.isEmpty()) {
 				mainHandler.post(() -> {
-					String msg = "冻结名单中的 " + missingCount + " 个应用在本机均不存在";
+					String msg;
+					if (skippedCount > 0 && missingCount == 0) {
+						msg = "冻结名单中的桌面变体需在功能表中单独冻结";
+					} else {
+						msg = "冻结名单中的 " + missingCount + " 个应用在本机均不存在";
+						// 两类跳过同时存在时不能把变体那部分藏掉：用户很可能就是为它才点的冻结
+						if (skippedCount > 0) {
+							msg += "（已跳过 " + skippedCount + " 个桌面变体，可在功能表中单独冻结）";
+						}
+					}
 					Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show();
 					if (callback != null) callback.onResult(false, msg);
 				});
@@ -544,9 +616,13 @@ public class KeydroidxFreezeManager {
 				// 绕过 PMS 状态更新延迟。功能表不在前台时广播丢失，由其
 				// onPageCreated 读 getKnownFrozenSet() 兜底（见 KeydroidxMenuFragment）。
 				notifyStateChanged(done, true);
-				// 跳过数量只记日志（上方 freezeAll: 跳过本机不存在的包），不在完成提示里露出：
+				// 不存在的包只记日志（上方 freezeAll: 跳过本机不存在的包），不在完成提示里露出：
 				// 名单里的残余条目属既有数据，不必每次操作都提醒用户（2026-10-09 用户要求）。
+				// 但桌面变体被跳过是「本次确实少冻了一个用户想冻的东西」，必须显式告知去向。
 				String msg = "已一键冻结 " + success + "/" + total + " 个应用";
+				if (skippedCount > 0) {
+					msg += "（已跳过 " + skippedCount + " 个桌面变体，可在功能表中单独冻结）";
+				}
 				Toast.makeText(appContext, msg, Toast.LENGTH_SHORT).show();
 				if (callback != null) {
 					callback.onResult(success > 0, msg);

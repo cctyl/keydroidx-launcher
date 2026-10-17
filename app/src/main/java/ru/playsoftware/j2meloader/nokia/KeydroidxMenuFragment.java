@@ -33,6 +33,7 @@ import androidx.fragment.app.Fragment;
 
 import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
+import io.github.cctyl.nokia.common.ui.dialog.KeydroidxConfirmDialog;
 import io.github.cctyl.nokia.common.ui.focus.KeydroidxFocusHost;
 import io.github.cctyl.nokia.common.util.KeydroidxDimens;
 import java.util.ArrayList;
@@ -1671,47 +1672,61 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 		List<KeydroidxOptionsDialog.OptionItem> options = new ArrayList<>();
 
 		// 冻结 / 移出冻结列表选项
-		boolean inFreezeList = KeydroidxFreezeManager.getInstance(requireContext()).isInFreezeList(pkg);
-		boolean isFrozen = KeydroidxFreezeManager.getInstance(requireContext()).isAppFrozen(pkg);
-		if (inFreezeList) {
-			if (isFrozen) {
-				options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_freeze,
-						"解冻应用", true, false, () -> {
-					KeydroidxFreezeManager.getInstance(requireContext()).unfreezeApp(pkg, (success, msg) -> {
-						if (isAdded()) {
-							Toast.makeText(requireContext(), success ? ("已解冻: " + item.label) : ("解冻失败: " + msg), Toast.LENGTH_SHORT).show();
-							invalidateFrozenCache();
-							buildCurrentPage();
+		KeydroidxFreezeManager freezeMgr = KeydroidxFreezeManager.getInstance(requireContext());
+		// 保护包（当前正在运行的桌面自身、Shizuku）不渲染任何冻结项：
+		// 它们永远冻不了，显示出来只会换来「点了没反应」的假成功（历史 bug）。
+		if (!freezeMgr.isProtectedPackage(pkg)) {
+			boolean inFreezeList = freezeMgr.isInFreezeList(pkg);
+			boolean isFrozen = freezeMgr.isAppFrozen(pkg);
+			if (inFreezeList) {
+				if (isFrozen) {
+					options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_freeze,
+							"解冻应用", true, false, () -> {
+						freezeMgr.unfreezeApp(pkg, (success, msg) -> {
+							if (isAdded()) {
+								Toast.makeText(requireContext(), success ? ("已解冻: " + item.label) : ("解冻失败: " + msg), Toast.LENGTH_SHORT).show();
+								invalidateFrozenCache();
+								buildCurrentPage();
+							}
+						});
+					}));
+				} else {
+					options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_freeze,
+							"立即冻结", true, false, () -> {
+						if (freezeMgr.isOtherLauncherVariant(pkg)) {
+							// 冻结另一个桌面变体 = 停用对方整个包：桌面入口消失、正在跑的 JAR 被强杀，
+							// 属于破坏性操作，必须先二次确认（左取消 / 右冻结）。
+							confirmFreezeLauncherVariant(item, pkg);
+						} else {
+							freezeMgr.freezeApp(pkg, (success, msg) -> {
+								if (isAdded()) {
+									Toast.makeText(requireContext(), success ? ("已冻结: " + item.label) : ("冻结失败: " + msg), Toast.LENGTH_SHORT).show();
+									invalidateFrozenCache();
+									buildCurrentPage();
+								}
+							});
 						}
-					});
+					}));
+				}
+				options.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_close_clear_cancel,
+						"移出冻结列表", true, false, () -> {
+					freezeMgr.removeFromFreezeList(pkg);
+					Toast.makeText(requireContext(), "已移出冻结列表", Toast.LENGTH_SHORT).show();
+					invalidateFrozenCache();
+					buildCurrentPage();
 				}));
 			} else {
 				options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_freeze,
-						"立即冻结", true, false, () -> {
-					KeydroidxFreezeManager.getInstance(requireContext()).freezeApp(pkg, (success, msg) -> {
-						if (isAdded()) {
-							Toast.makeText(requireContext(), success ? ("已冻结: " + item.label) : ("冻结失败: " + msg), Toast.LENGTH_SHORT).show();
-							invalidateFrozenCache();
-							buildCurrentPage();
-						}
-					});
+						"加入冻结列表", true, false, () -> {
+					// 按真实结果提示：保护包 / 非法包名会被 manager 拒绝，不能再无条件弹「已加入」
+					boolean added = freezeMgr.addToFreezeList(pkg);
+					Toast.makeText(requireContext(),
+							added ? "已加入冻结列表" : "无法加入冻结列表：该应用受保护",
+							Toast.LENGTH_SHORT).show();
+					invalidateFrozenCache();
+					buildCurrentPage();
 				}));
 			}
-			options.add(new KeydroidxOptionsDialog.OptionItem(android.R.drawable.ic_menu_close_clear_cancel,
-					"移出冻结列表", true, false, () -> {
-				KeydroidxFreezeManager.getInstance(requireContext()).removeFromFreezeList(pkg);
-				Toast.makeText(requireContext(), "已移出冻结列表", Toast.LENGTH_SHORT).show();
-				invalidateFrozenCache();
-				buildCurrentPage();
-			}));
-		} else {
-			options.add(new KeydroidxOptionsDialog.OptionItem(R.drawable.ic_keydroidx_freeze,
-					"加入冻结列表", true, false, () -> {
-				KeydroidxFreezeManager.getInstance(requireContext()).addToFreezeList(pkg);
-				Toast.makeText(requireContext(), "已加入冻结列表", Toast.LENGTH_SHORT).show();
-				invalidateFrozenCache();
-				buildCurrentPage();
-			}));
 		}
 		// 更换图标：先选图标包（内置 S60 + 已装图标包），再在图标网格里挑一个图标，
 		// 保存为该应用的图标覆盖（只影响这一个应用；不选则保持全局图标包解析结果）
@@ -1760,6 +1775,35 @@ public class KeydroidxMenuFragment extends KeydroidxPageFragment {
 			}
 		}));
 		KeydroidxOptionsDialog.show(getParentFragmentManager(), item.label, options);
+	}
+
+	/**
+	 * 冻结另一个启动器变体前的二次确认。
+	 * <p>选项弹窗的 {@code trigger()} 是「先执行 action 再 dismiss」，所以确认框要 post 到
+	 * 当前消息之后，等选项弹窗真正关闭再 show，否则两个 Dialog 窗口会叠在一起。
+	 * <p>按键语义（{@link KeydroidxConfirmDialog}）：左软键与确认键都映射到「取消」，
+	 * 右软键才是「冻结」——破坏性动作固定放右软键，避免误按确认键就把另一个桌面停用。
+	 */
+	private void confirmFreezeLauncherVariant(final KeydroidxAppItem item, final String pkg) {
+		new Handler(Looper.getMainLooper()).post(() -> {
+			if (!isAdded() || getActivity() == null || getActivity().isFinishing()) return;
+			new KeydroidxConfirmDialog(requireContext(), "冻结另一个桌面？",
+					"要停用「" + item.label + "」吗？它正在运行的应用会被立即结束；"
+							+ "若它是默认桌面，系统会改用其它桌面。"
+							+ "两个桌面互相冻结时需用 adb 命令恢复。")
+					.setPositiveButton("取消", null)
+					.setNegativeButton("冻结", () -> KeydroidxFreezeManager.getInstance(requireContext())
+							.freezeApp(pkg, (success, msg) -> {
+								if (isAdded()) {
+									Toast.makeText(requireContext(),
+											success ? ("已冻结: " + item.label) : ("冻结失败: " + msg),
+											Toast.LENGTH_SHORT).show();
+									invalidateFrozenCache();
+									buildCurrentPage();
+								}
+							}))
+					.show();
+		});
 	}
 
 	@Override

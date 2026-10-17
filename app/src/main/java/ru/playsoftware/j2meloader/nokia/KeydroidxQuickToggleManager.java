@@ -971,7 +971,9 @@ public class KeydroidxQuickToggleManager {
 	public static void toggleFreezeAll(final Context context) {
 		if (context == null) return;
 		final Context appCtx = context.getApplicationContext();
-		KeydroidxFreezeManager.getInstance(appCtx).freezeAll(null);
+		// 安全默认：桌面快捷开关是盲操作，不连带冻结另一个启动器变体（对方桌面入口会整体消失）。
+		// 需要冻结变体时走功能表单包「立即冻结」的二次确认路径。
+		KeydroidxFreezeManager.getInstance(appCtx).freezeAll(null, false);
 	}
 
 	public static void toggleUnfreezeAll(final Context context) {
