@@ -2,6 +2,8 @@ package ru.playsoftware.j2meloader.nokia;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
@@ -29,6 +31,8 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 
 	private EditText etCustomScale;
 	private TextView tvPreviewText;
+	/** 已调度延迟退栈：防止 250ms 窗口内的重复按键引发双重 popBackStack。 */
+	private boolean mExitScheduled;
 
 	@Override
 	protected int getLayoutRes() {
@@ -62,8 +66,7 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 
 	@Override
 	public boolean onSoftRight() {
-		hideIme();
-		requireActivity().getSupportFragmentManager().popBackStack();
+		exitPage();
 		return true;
 	}
 
@@ -131,6 +134,7 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 	}
 
 	private boolean saveAndExit() {
+		if (mExitScheduled) return true;
 		if (etCustomScale == null) return false;
 		String input = etCustomScale.getText().toString().trim();
 		if (TextUtils.isEmpty(input)) {
@@ -146,7 +150,6 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 			}
 
 			KeydroidxSettingsStorage.setFontScale(requireContext(), scale);
-			hideIme();
 
 			Toast.makeText(requireContext(), "字体大小已设置为 " + String.format(Locale.US, "%.2f", scale) + "x", Toast.LENGTH_SHORT).show();
 			// 就地重应用代替 recreate()：不再重建 Resources/重解码位图，
@@ -155,7 +158,7 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 			host.applyFontChangeInPlace();
 			// 保存成功后自动退出本页：返回上一层「外观与显示」，
 			// 其视图在出栈重建时自动按新倍率渲染，行文案也随 getItemDisplayName 刷新。
-			requireActivity().getSupportFragmentManager().popBackStack();
+			exitPage();
 			return true;
 		} catch (Exception e) {
 			KeydroidxLog.w(TAG, "makeText failed: " + e.getMessage());
@@ -164,14 +167,34 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 		}
 	}
 
-	private void hideIme() {
-		if (etCustomScale != null) {
+	/**
+	 * 退出本页：先给输入法收尾，再延迟退栈。
+	 * <p>
+	 * 现场结论（2026-10-17，5990a29a + 国笔 GBIme）：输入框有内容时直接
+	 * {@code hideSoftInputFromWindow + 立即 popBackStack}，GBIme 的 IME 窗口不会随
+	 * IMS 的 hide 真正销毁（mHasSurface=true、mViewVisibility=VISIBLE，残留在
+	 * [0,240][240,320]），此后所有物理返回键被它整体吞掉（logcat 可见 GBIme
+	 * "hard key:up::4"），直到其内部状态机自行消化（用户实测连按 5 次才退出）。
+	 * 对照路径：先逐字删空输入框再退出（GBIme 自行结束编辑会话并拆窗）从不吞键。
+	 * 因此这里模拟同一条干净路径：清空内容 → 清焦点 → 隐藏 IME → 延迟退栈，
+	 * 给 GBIme 留出拆窗时间后再销毁本页。
+	 */
+	private void exitPage() {
+		if (mExitScheduled) return;
+		mExitScheduled = true;
+		if (etCustomScale != null && isAdded()) {
+			etCustomScale.setText("");
+			etCustomScale.clearFocus();
 			InputMethodManager imm = (InputMethodManager) requireContext()
 					.getSystemService(Context.INPUT_METHOD_SERVICE);
-			if (imm != null) {
+			if (imm != null && etCustomScale.getWindowToken() != null) {
 				imm.hideSoftInputFromWindow(etCustomScale.getWindowToken(), 0);
 			}
-			etCustomScale.clearFocus();
 		}
+		new Handler(Looper.getMainLooper()).postDelayed(() -> {
+			if (isAdded()) {
+				requireActivity().getSupportFragmentManager().popBackStack();
+			}
+		}, 250);
 	}
 }
