@@ -65,7 +65,7 @@ public class FileUtils {
 				try {
 					copyFileUsingChannel(file, to);
 				} catch (IOException e) {
-					e.printStackTrace();
+					KeydroidxLog.w(TAG, "copyFiles 复制失败: " + file + " -> " + to, e);
 				}
 			}
 		}

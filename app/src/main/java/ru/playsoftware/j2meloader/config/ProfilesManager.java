@@ -87,7 +87,7 @@ public class ProfilesManager {
 			}
 			if (keyboard) FileUtils.copyFileUsingChannel(from.getKeyLayout(), dstKeyLayout);
 		} catch (FileNotFoundException e) {
-			e.printStackTrace();
+			KeydroidxLog.w(TAG, "load: profile 文件缺失或不可读: " + from.getDir(), e);
 		}
 	}
 
@@ -103,7 +103,7 @@ public class ProfilesManager {
 			if (config) FileUtils.copyFileUsingChannel(srcConfig, profile.getConfig());
 			if (keyboard) FileUtils.copyFileUsingChannel(srcKeyLayout, profile.getKeyLayout());
 		} catch (FileNotFoundException e) {
-			e.printStackTrace();
+			KeydroidxLog.w(TAG, "save: profile 文件缺失或不可读: " + fromPath, e);
 		}
 	}
 
@@ -115,6 +115,10 @@ public class ProfilesManager {
 			try (FileReader reader = new FileReader(file)) {
 				params = gson.fromJson(reader, ProfileModel.class);
 				params.dir = dir;
+			} catch (FileNotFoundException e) {
+				// exists() 为 true 却打不开：多为存储权限缺失或文件权限被外部工具改坏，
+				// 属预期内的环境问题，按日志规范记 w（不落「待上传」标记）。
+				KeydroidxLog.w(TAG, "loadConfig: 配置文件不可读，跳过: " + file, e);
 			} catch (Exception e) {
 				KeydroidxLog.e(TAG, "loadConfig: ", e);
 			}
@@ -134,6 +138,8 @@ public class ProfilesManager {
 					if (saveConfig(params) && oldFile.delete()) {
 						KeydroidxLog.d(TAG, "loadConfig: old config file deleted");
 					}
+				} catch (FileNotFoundException e) {
+					KeydroidxLog.w(TAG, "loadConfig: 旧配置文件不可读，跳过: " + oldFile, e);
 				} catch (Exception e) {
 					KeydroidxLog.e(TAG, "loadConfig: ", e);
 				}
@@ -175,6 +181,9 @@ public class ProfilesManager {
 			gson.toJson(p, writer);
 			writer.close();
 			return true;
+		} catch (FileNotFoundException e) {
+			// 写不进去基本是存储权限缺失/目录不存在：预期内，记 w 不触发上报。
+			KeydroidxLog.w(TAG, "saveConfig: 配置文件不可写，跳过: " + p.dir, e);
 		} catch (Exception e) {
 			KeydroidxLog.e(TAG, "saveConfig: ", e);
 		}

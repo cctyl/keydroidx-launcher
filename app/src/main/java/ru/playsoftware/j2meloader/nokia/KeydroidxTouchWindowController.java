@@ -421,9 +421,23 @@ public final class KeydroidxTouchWindowController {
 	 * 从数据源根除两套键盘重叠问题。
 	 */
 	public static void syncTouchModeToJ2meProfiles(Context context, boolean isTouchMode) {
-		if (!isTouchMode) return;
+		if (!isTouchMode || context == null) return;
+		// 存储权限缺失时读 config.json 必然抛 FileNotFoundException(Permission denied)：
+		// 本联动只是数据层「防重保险」（引擎层 MicroLoader.applyConfiguration 已按触屏模式
+		// 强制关闭 J2ME 原生虚拟键盘），因此直接跳过，等用户真正使用 JAR 时经存储门禁授权，
+		// 避免把权限问题当成程序缺陷落盘上报。
+		if (KeydroidxStorageGate.needsStoragePermission(context.getApplicationContext())) {
+			KeydroidxLog.i(TAG, "存储权限未授予，跳过触屏模式 profile 联动");
+			return;
+		}
 		new Thread(() -> {
 			try {
+				// 0. 模板目录不可读（权限视图异常/被外部工具改坏）时直接跳过
+				File profilesRoot = new File(Config.getProfilesDir());
+				if (!profilesRoot.isDirectory() || !profilesRoot.canRead()) {
+					KeydroidxLog.i(TAG, "模板目录不可读，跳过触屏模式 profile 联动: " + profilesRoot);
+					return;
+				}
 				// 1. 关闭全局 Profile 的 ShowKeyboard
 				File globalDir = new File(Config.getProfilesDir(), KeydroidxGlobalProfile.PROFILE_NAME);
 				if (globalDir.exists()) {
@@ -436,7 +450,7 @@ public final class KeydroidxTouchWindowController {
 				}
 				// 2. 遍历已安装应用的配置目录，自动关闭单应用已开启的原生虚拟键盘
 				File configsDir = new File(new File(Config.getProfilesDir()).getParentFile(), Config.MIDLET_CONFIGS_DIR);
-				if (configsDir.exists() && configsDir.isDirectory()) {
+				if (configsDir.isDirectory() && configsDir.canRead()) {
 					File[] appDirs = configsDir.listFiles();
 					if (appDirs != null) {
 						for (File dir : appDirs) {
@@ -452,7 +466,7 @@ public final class KeydroidxTouchWindowController {
 					}
 				}
 			} catch (Throwable t) {
-				KeydroidxLog.w(TAG, "syncTouchModeToJ2meProfiles 异常: " + t.getMessage());
+				KeydroidxLog.w(TAG, "syncTouchModeToJ2meProfiles 异常", t);
 			}
 		}, "sync-touch-profiles").start();
 	}
