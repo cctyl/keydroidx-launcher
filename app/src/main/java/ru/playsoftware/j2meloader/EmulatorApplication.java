@@ -53,6 +53,8 @@ import io.github.cctyl.nokia.common.log.KeydroidxLog;
 import io.github.cctyl.nokia.common.ui.KeydroidxTheme;
 import io.github.cctyl.nokia.common.update.KeydroidxAutoUpdateChecker;
 import io.github.cctyl.nokia.common.update.KeydroidxUpdateConfig;
+import io.reactivex.exceptions.UndeliverableException;
+import io.reactivex.plugins.RxJavaPlugins;
 import ru.playsoftware.j2meloader.nokia.LauncherThemeProvider;
 import ru.playsoftware.mini_shizuku.Shizuku;
 import ru.playsoftware.j2meloader.nokia.KeydroidxSettingsStorage;
@@ -89,6 +91,15 @@ public class EmulatorApplication extends Application {
 		// 主进程与 :midlet 子进程都注册标记；只有主进程会上传（见下方 uploadPendingIfAny）。
 		KeydroidxCrashReporter.install(this);
 		installCrashHandler();
+
+		// RxJava 全局未投递异常兜底：消费者（如安装弹窗）已 dispose 后，流内才抛出的异常会走
+		// RxJavaPlugins.onError，默认实现抛给线程未捕获处理器 → FATAL 崩溃
+		// （实测案例：安装中取消 → dispose 中断 dexer → "Translation has been interrupted" /
+		// converted.dex ENOENT，见 user_report/132_2026-10-15）。
+		// 该类异常本质是「用户已取消、预期内、降级继续」→ 记 w 日志后吞掉；
+		// 真实业务错误仍由各自 onError/KeydroidxLog.e 正常落盘上报，不受影响。
+		// 必须用 w（兜底回调无场景上下文且可能高频，禁止 e：防误占每日上报配额与递归风险）。
+		installRxJavaErrorHandler();
 
 		ContextHolder.setApplication(this);
 
@@ -149,6 +160,46 @@ public class EmulatorApplication extends Application {
 		}
 		long elapsed = System.currentTimeMillis() - appStart;
 		android.util.Log.i(TAG, "attachBaseContext 完成，耗时 " + elapsed + "ms");
+	}
+
+	/**
+	 * 注册 RxJava 全局未投递异常兜底（官方推荐做法）。
+	 * <p>
+	 * 任意 Single/Observable 在消费者已 dispose 后才产生的异常会进入本回调，
+	 * 默认实现会抛给线程未捕获处理器导致 FATAL 崩溃。典型触发场景：
+	 * 安装弹窗取消后，computation 线程上的 dexer 被中断，异常无处投递。
+	 * 此类异常按日志分级准则记 w（预期内、降级继续），既不崩溃也不落崩溃标记。
+	 */
+	private void installRxJavaErrorHandler() {
+		try {
+			RxJavaPlugins.setErrorHandler(throwable -> {
+				// 二次包装防御：UndeliverableException 是 RxJava 对回调内异常的标准包装；
+				// 若上层已自行包装，逐层剥开判断根因是否仍属未投递异常。
+				Throwable cause = throwable;
+				boolean undeliverable = false;
+				while (cause != null) {
+					if (cause instanceof UndeliverableException) {
+						undeliverable = true;
+						break;
+					}
+					cause = cause.getCause();
+				}
+				if (undeliverable) {
+					KeydroidxLog.w(TAG, "RxJava 未投递异常（流已取消/disposed，已忽略）: "
+							+ throwable.getMessage());
+				} else {
+					// 非未投递类异常进入兜底回调意味着业务流 onError 之外还有错误逃逸，
+					// 无法区分场景且可能高频，统一按 w 处理（不崩溃、不落上报标记），
+					// 真实业务错误仍由各自 onError 里的 KeydroidxLog.e 正常上报。
+					KeydroidxLog.w(TAG, "RxJava 全局错误兜底捕获: "
+							+ throwable.getMessage(), throwable);
+				}
+			});
+			android.util.Log.i(TAG, "RxJava 全局错误兜底已安装");
+		} catch (Throwable t) {
+			// 兜底安装失败不影响应用其他功能（RxJava 会回落默认行为）
+			android.util.Log.w(TAG, "installRxJavaErrorHandler 失败", t);
+		}
 	}
 
 	/** 每日一次自动检查更新（仅主进程，延迟触发以避开冷启动关键路径）。 */

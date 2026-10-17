@@ -108,6 +108,11 @@ public class AppInstaller {
 
 	/** Load and check app info from source */
 	void loadInfo(SingleEmitter<Integer> emitter) throws IOException, ConverterException {
+		if (emitter.isDisposed()) {
+			// 用户已取消：直接放弃，避免白跑下载/解析重活（取消后异常投递由全局兜底消化）
+			KeydroidxLog.i(TAG, "loadInfo 已取消（emitter disposed），跳过");
+			return;
+		}
 		if (id != -1) {
 			currentApp = appRepository.get(id);
 			if (currentApp == null) {
@@ -166,6 +171,10 @@ public class AppInstaller {
 
 	Single<Integer> updateInfo(Uri jarUri) {
 		return Single.create(emitter -> {
+			if (emitter.isDisposed()) {
+				KeydroidxLog.i(TAG, "updateInfo 已取消（emitter disposed），跳过");
+				return;
+			}
 			srcJar = FileUtils.getFileForUri(context, jarUri);
 			manifest = loadManifest(srcJar);
 			if (!manifest.equals(newDesc)) {
@@ -291,6 +300,12 @@ public class AppInstaller {
 		}
 		if (!cacheDir.exists() && !cacheDir.mkdirs()) {
 			throw new ConverterException("Can't create cache dir");
+		}
+		if (emitter.isDisposed()) {
+			// 用户已取消：进入 dex 转换这类不可中断的重活前放弃，
+			// 避免取消后仍跑满整个转换（中断产生的异常由全局 Rx 兜底消化）
+			KeydroidxLog.i(TAG, "install 已取消（emitter disposed），跳过");
+			return;
 		}
 		tmpDir = new File(targetDir.getParent(), ".tmp");
 		if (!tmpDir.isDirectory() && !tmpDir.mkdirs())

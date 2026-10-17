@@ -375,8 +375,32 @@ public class KeydroidxInstallerDialog extends DialogFragment {
 	private void cancelInstall() {
 		KeydroidxLog.i(TAG, "用户取消安装（state=" + uiState + "）");
 		compositeDisposable.dispose();
-		cleanupInstaller();
+		cleanupInstallerAsync();
 		dismiss();
+	}
+
+	/**
+	 * 异步清理安装临时目录（.tmp / cacheDir）。
+	 * <p>
+	 * dispose() 只会中断 computation 线程，dexer 可能仍在收尾；若在主线程同步删除 .tmp，
+	 * 会与残余 dex 写入竞争同一目录（线上实测产生 converted.dex ENOENT 未投递异常）。
+	 * 清理挪到 io 线程执行：不阻塞主线程，即使仍与 dexer 竞态，产生的异常也已被
+	 * EmulatorApplication 的全局 Rx 兜底消化为 w 日志，不再崩溃。
+	 */
+	private void cleanupInstallerAsync() {
+		final AppInstaller installerRef = installer;
+		installer = null;
+		if (installerRef == null) {
+			return;
+		}
+		Schedulers.io().scheduleDirect(() -> {
+			try {
+				installerRef.deleteTemp();
+				installerRef.clearCache();
+			} catch (Throwable t) {
+				KeydroidxLog.w(TAG, "清理安装临时目录失败: " + t.getMessage());
+			}
+		});
 	}
 
 	private void cleanupInstaller() {
