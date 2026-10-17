@@ -634,8 +634,15 @@ public class KeydroidxSettingsStorage {
 				.getFloat(KEY_FONT_SCALE, 1f);
 	}
 
-	/** 保存用户字体缩放系数。 */
+	/**
+	 * 保存用户字体缩放系数。
+	 * 必须同步 common {@link KeydroidxFontManager} 的静态缩放源 sFontScale（与 {@link #setFontId}
+	 * 同一模式）：7264060 起字号变更为「就地重应用」（applyFontChangeInPlace）不再 recreate()，
+	 * attachBaseContext 不会重新执行；若只落盘不刷静态，sFontScale 将停留在 Activity 启动时的旧值，
+	 * 就地重应用按旧倍率重刷整棵视图树，表现为「调字号毫无反应」。
+	 */
 	public static void setFontScale(Context ctx, float scale) {
+		KeydroidxFontManager.setFontScale(scale);
 		ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 				.edit().putFloat(KEY_FONT_SCALE, scale).apply();
 		notifySettingsChanged(ctx);
