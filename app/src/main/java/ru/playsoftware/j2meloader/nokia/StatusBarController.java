@@ -41,6 +41,7 @@ import ru.playsoftware.j2meloader.R;
  * <p>
  * 双卡信号通过 SubscriptionManager 取得活动 SIM 列表，为每个 SIM 创建独立的
  * TelephonyManager 并监听其信号强度变化；单卡/无权限时退化为默认 TelephonyManager。
+ * 无卡/未就绪槽位的显隐与空信号格渲染由 updateSignalVisibility 统一计算（详见其注释）。
  * WiFi、蓝牙、飞行模式通过广播 + 轮询实时更新。
  * <p>
  * 部分机型（如 MIUI）在 Activity 启动瞬间订阅尚未就绪，或运行时权限是异步授予的，
@@ -268,30 +269,41 @@ public class StatusBarController {
 			if (!subs.isEmpty()) {
 				usedSubscriptionPath = true;
 				for (int i = 0; i < subs.size() && i < 2; i++) {
-					int subId = subs.get(i).getSubscriptionId();
+					SubscriptionInfo info = subs.get(i);
+					int subId = info.getSubscriptionId();
+					// 按真实槽位索引挂载（「1」=槽 1、「2」=槽 2），避免卡只插槽 2 时
+					// 信号画进「1」组；索引异常时退回列表顺序。
+					int slotIndex = info.getSimSlotIndex();
+					if (slotIndex != 0 && slotIndex != 1) {
+						slotIndex = i;
+					}
 					KeydroidxLog.d(TAG, "  sub i=" + i + " subId=" + subId
-							+ " slot=" + subs.get(i).getSimSlotIndex());
+							+ " slot=" + slotIndex);
 					if (i > 0 && !canCreateForSubId) {
 						// API 22/23 无法按订阅分卡监听，只能监听默认卡（卡 1），
-						// 第二张卡图标保持空。
-						listener2.setLevel(0);
+						// 该订阅所在槽位之外的另一槽图标保持空。
+						getListener(slotIndex).setLevel(0);
 						break;
 					}
 					TelephonyManager tm = canCreateForSubId
 							? telephonyManager.createForSubscriptionId(subId)
 							: telephonyManager;
-					PhoneStateListener l = (i == 0) ? listener1 : listener2;
-					tm.listen(l, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
-					// 记录每张卡对应的 TM，供读取运营商名使用。
-					if (i == 0) {
+					tm.listen(getListener(slotIndex),
+							PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+					// 记录每个槽位对应的 TM，供读取运营商名/就绪判断使用。
+					if (slotIndex == 0) {
 						probeTm1 = tm;
 					} else {
 						probeTm2 = tm;
 					}
 				}
-				// 仅有 1 张卡时，第二张卡图标保持空。
+				// 仅有 1 张卡时，另一槽位图标保持空。
 				if (subs.size() <= 1) {
-					listener2.setLevel(0);
+					int assignedSlot = subs.get(0).getSimSlotIndex();
+					if (assignedSlot != 0 && assignedSlot != 1) {
+						assignedSlot = 0;
+					}
+					(assignedSlot == 0 ? listener2 : listener1).setLevel(0);
 				}
 			}
 		}
@@ -302,6 +314,8 @@ public class StatusBarController {
 			probeSubIdsAndListen();
 			startSignalPolling();
 		}
+		// 先按槽位就绪状态同步信号组显隐与空格渲染，再应用缓存等级。
+		updateSignalVisibility();
 		refreshSignals();
 	}
 
@@ -315,9 +329,13 @@ public class StatusBarController {
 			List<SubscriptionInfo> subs = getActiveSubs();
 			for (int i = 0; i < subs.size() && i < 2; i++) {
 				int subId = subs.get(i).getSubscriptionId();
+				// 与注册路径一致的按槽位映射（索引异常时退回列表顺序）。
+				int slotIndex = subs.get(i).getSimSlotIndex();
+				if (slotIndex != 0 && slotIndex != 1) {
+					slotIndex = i;
+				}
 				TelephonyManager tm = telephonyManager.createForSubscriptionId(subId);
-				PhoneStateListener l = (i == 0) ? listener1 : listener2;
-				tm.listen(l, PhoneStateListener.LISTEN_NONE);
+				tm.listen(getListener(slotIndex), PhoneStateListener.LISTEN_NONE);
 			}
 		}
 		// 始终取消默认监听（以防 fallback 路径注册了它）。
@@ -329,6 +347,11 @@ public class StatusBarController {
 		if (probeTm2 != null) {
 			probeTm2.listen(listener2, PhoneStateListener.LISTEN_NONE);
 		}
+	}
+
+	/** 按槽位索引取对应信号监听（槽 1 → listener1，槽 2 → listener2）。 */
+	private SignalListener getListener(int slot) {
+		return (slot == 0) ? listener1 : listener2;
 	}
 
 	/**
@@ -450,6 +473,8 @@ public class StatusBarController {
 		cellInfoPoller = new Runnable() {
 			@Override
 			public void run() {
+				// 兜底路径设备（厂商屏蔽订阅读取）插拔卡无系统回调，靠轮询同步显隐。
+				updateSignalVisibility();
 				pollTmSignal(probeTm1, listener1);
 				pollTmSignal(probeTm2, listener2);
 				pollHandler.postDelayed(this, CELL_INFO_POLL_MS);
@@ -674,19 +699,93 @@ public class StatusBarController {
 		ivBluetooth.setVisibility(on ? View.VISIBLE : View.GONE);
 	}
 
+	/**
+	 * 判断指定卡槽是否有就绪的 SIM（与 updateCarrierSlot 的就绪口径一致）。
+	 * <p>
+	 * 优先用该槽位注册信号监听时记录的 TelephonyManager（probeTm1/probeTm2）读
+	 * getSimState()；缺失时 API 22+ 用 SubscriptionManager 按 slot 查活动订阅兜底
+	 * （覆盖 API 22/23 双卡只能监听默认卡、probeTm2 为 null 的场景）；更老版本
+	 * （单卡机）回退默认 TelephonyManager——注意双卡设备上默认 TM 指向默认订阅
+	 * 而非固定槽位，不能用于槽位就绪判断。
+	 */
+	@SuppressLint("MissingPermission")
+	private boolean isSlotReady(int slot) {
+		TelephonyManager tm = (slot == 0) ? probeTm1 : probeTm2;
+		if (tm == null && slot == 0 && subscriptionManager == null) {
+			// API 19-21：无 SubscriptionManager，仅单卡机，默认 TM 即唯一卡槽。
+			tm = telephonyManager;
+		}
+		if (tm != null) {
+			try {
+				if (tm.getSimState() == TelephonyManager.SIM_STATE_READY) {
+					return true;
+				}
+			} catch (Exception e) {
+				KeydroidxLog.w(TAG, "isSlotReady getSimState failed", e);
+			}
+		}
+		if (Build.VERSION.SDK_INT >= 22 && subscriptionManager != null) {
+			try {
+				SubscriptionInfo info =
+						subscriptionManager.getActiveSubscriptionInfoForSimSlotIndex(slot);
+				return info != null;
+			} catch (Exception e) {
+				KeydroidxLog.w(TAG, "isSlotReady query subscription failed", e);
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 统一计算信号组（「1」「2」标号 + 信号格）显隐与空格渲染：
+	 * <ul>
+	 * <li>飞行模式：两组均隐藏（迁移自 updateAirplane 的原逻辑，行为不变）；</li>
+	 * <li>任一槽位有就绪 SIM：仅显示有卡槽位的组，空槽整组隐藏（单卡插一张卡的场景）；</li>
+	 * <li>所有槽位均无卡：两组均显示（保留「1」「2」标号），信号格强制渲染空图标
+	 * ic_signal_0——部分机型无卡仍上报信号强度，必须由就绪门控拦截。</li>
+	 * </ul>
+	 * 由订阅变化、权限授予、飞行模式变化、3 秒轮询等现有钩子驱动，支持运行时插拔卡。
+	 */
+	private void updateSignalVisibility() {
+		if (sim1Container == null && sim2Container == null) {
+			return;
+		}
+		if (isAirplaneModeOn()) {
+			setSignalGroupVisibility(sim1Container, false);
+			setSignalGroupVisibility(sim2Container, false);
+			listener1.setReady(false);
+			listener2.setReady(false);
+			return;
+		}
+		boolean ready1 = isSlotReady(0);
+		boolean ready2 = isSlotReady(1);
+		boolean hasReady = ready1 || ready2;
+		KeydroidxLog.d(TAG, "updateSignalVisibility ready1=" + ready1
+				+ " ready2=" + ready2);
+		setSignalGroupVisibility(sim1Container, !hasReady || ready1);
+		setSignalGroupVisibility(sim2Container, !hasReady || ready2);
+		listener1.setReady(ready1);
+		listener2.setReady(ready2);
+	}
+
+	/** 仅在可见性变化时写视图，避免轮询时机触发无效 requestLayout。 */
+	private static void setSignalGroupVisibility(View v, boolean visible) {
+		if (v == null) {
+			return;
+		}
+		int target = visible ? View.VISIBLE : View.GONE;
+		if (v.getVisibility() != target) {
+			v.setVisibility(target);
+		}
+	}
+
 	private void updateAirplane() {
 		boolean airplane = isAirplaneModeOn();
 		if (ivAirplane != null) {
 			ivAirplane.setVisibility(airplane ? View.VISIBLE : View.GONE);
 		}
-		// 飞行模式下隐藏信号栏（SIM 图标 + 标号）。
-		int sigVis = airplane ? View.GONE : View.VISIBLE;
-		if (sim1Container != null) {
-			sim1Container.setVisibility(sigVis);
-		}
-		if (sim2Container != null) {
-			sim2Container.setVisibility(sigVis);
-		}
+		// 信号组显隐（含飞行模式分支）统一交给 updateSignalVisibility 计算。
+		updateSignalVisibility();
 	}
 
 	@SuppressLint("MissingPermission")
@@ -781,6 +880,10 @@ public class StatusBarController {
 	private class SignalListener extends PhoneStateListener {
 		private final int slot;
 		private int level = 0;
+		// 槽位是否有就绪 SIM：未就绪时强制渲染空信号格（无卡机型仍会上报信号强度）。
+		private boolean ready = false;
+		// 上次渲染的等级：相同等级跳过 setImageResource，避免轮询时机触发无效重绘。
+		private int appliedLevel = 0;
 
 		SignalListener(int slot) {
 			this.slot = slot;
@@ -791,14 +894,27 @@ public class StatusBarController {
 		}
 
 		void setLevel(int level) {
-			this.level = level;
+			this.level = ready ? level : 0;
+			apply();
+		}
+
+		void setReady(boolean ready) {
+			if (this.ready == ready) {
+				return;
+			}
+			this.ready = ready;
+			if (!ready) {
+				level = 0;
+			}
+			// 强制下一帧刷新，避免残留旧等级图标。
+			appliedLevel = -1;
 			apply();
 		}
 
 		@Override
 		public void onSignalStrengthsChanged(SignalStrength signalStrength) {
 			super.onSignalStrengthsChanged(signalStrength);
-			if (signalStrength != null) {
+			if (ready && signalStrength != null) {
 				if (Build.VERSION.SDK_INT >= 29) {
 					level = signalStrength.getLevel();
 				} else {
@@ -811,9 +927,16 @@ public class StatusBarController {
 
 		void apply() {
 			ImageView iv = (slot == 0) ? ivSignal1 : ivSignal2;
-			if (iv != null) {
-				iv.setImageResource(signalLevelToDrawable(level));
+			if (iv == null) {
+				return;
 			}
+			// 未就绪槽位强制空信号格（ic_signal_0），忽略系统上报的 level。
+			int shown = ready ? level : 0;
+			if (shown == appliedLevel) {
+				return;
+			}
+			appliedLevel = shown;
+			iv.setImageResource(signalLevelToDrawable(shown));
 		}
 	}
 }
