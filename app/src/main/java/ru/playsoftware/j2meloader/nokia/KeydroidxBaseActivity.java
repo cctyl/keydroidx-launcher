@@ -104,10 +104,16 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 			newConfig.densityDpi = fixed;
 			newConfig.fontScale = 1.0f;
 			super.attachBaseContext(newBase.createConfigurationContext(newConfig));
-		} else {
+		} else if (config.fontScale != 1.0f) {
 			Configuration cfg = new Configuration(config);
 			cfg.fontScale = 1.0f;
 			super.attachBaseContext(newBase.createConfigurationContext(cfg));
+		} else {
+			// 系统配置本就符合要求（标准密度 + fontScale=1.0）：直接复用原始 base context。
+			// 复用同一 Resources 意味着 drawable 缓存跨 recreate 保留——否则每次 recreate()
+			// 都会重建 Resources 并把 nodpi 位图全量重新解码（单次 2~4MB 瞬时分配），
+			// 是低内存设备上「改字号/换字体后 inflate OOM」的放大器（2026-10-17 复现结论）。
+			super.attachBaseContext(newBase);
 		}
 	}
 
@@ -318,6 +324,34 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 			bc.setText(text);
 			bc.setVisibility(View.VISIBLE);
 			fitCenterTextToWidth(bc);
+		}
+	}
+
+	/**
+	 * 字号变更后就地重应用：按新 sFontScale 重设当前窗口整棵 View 树的字体与字号。
+	 * <p>
+	 * 为什么不用 {@link #recreate()}：每次 recreate 会经 attachBaseContext 重建
+	 * Context/Resources，drawable 缓存随之作废，nodpi 位图全量重新解码（单次 2~4MB
+	 * 瞬时分配）。低内存设备上堆一旦同时被其他模块占用，连续 recreate 极易在
+	 * inflate/BitmapFactory 处抛 OutOfMemoryError（2026-10-17 自定义字号页复现）。
+	 * 字号是纯 View 层属性：sFontScale 由 KeydroidxFontManager 静态承载，设计字号
+	 * 记录在 TextView tag 中，就地重应用零分配放大、不漂移，且焦点/输入态全保留。
+	 * 新创建的页面无需处理——KeydroidxPageFragment.onViewCreated 本就按当前
+	 * sFontScale 应用字体；独立弹窗在 onShow 时自行应用。
+	 */
+	public void applyFontChangeInPlace() {
+		if (isFinishing() || isDestroyed() || getWindow() == null) {
+			return;
+		}
+		View decor = getWindow().getDecorView();
+		if (decor == null) {
+			return;
+		}
+		KeydroidxFontManager.applyToViewTree(decor);
+		// 恢复时钟的刻意覆盖：点阵字体 descent 度量异常会把顶栏行盒撑高（见 setupKeydroidxUi 注释），
+		// recreate() 路径由 onCreate 重新覆盖，就地路径必须同样恢复。
+		if (tvTime != null) {
+			tvTime.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
 		}
 	}
 

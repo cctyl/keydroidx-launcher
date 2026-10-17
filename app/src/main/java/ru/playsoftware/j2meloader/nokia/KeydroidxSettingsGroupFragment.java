@@ -471,7 +471,11 @@ public class KeydroidxSettingsGroupFragment extends KeydroidxListPageFragment {
 			items.add(new KeydroidxOptionsDialog.OptionItem(0, itemLabel, true, false, () -> {
 				KeydroidxSettingsStorage.setFontScale(requireContext(), scale);
 				KeydroidxLog.i("SettingsGroup", "字体大小已设置: " + label + " scale=" + scale);
-				((KeydroidxDesktopActivity) requireActivity()).recreate();
+				// 就地重应用代替 recreate()：避免重建 Resources/重解码位图引发 OOM（2026-10-17 复现结论）
+				((KeydroidxDesktopActivity) requireActivity()).applyFontChangeInPlace();
+				if (tvNames != null && tvNames.length > 0 && tvNames[0] != null) {
+					tvNames[0].setText(getItemDisplayName(0));
+				}
 			}));
 		}
 		// 增加自定义倍率选项（支持手动输入 0.5 ~ 3.5x）

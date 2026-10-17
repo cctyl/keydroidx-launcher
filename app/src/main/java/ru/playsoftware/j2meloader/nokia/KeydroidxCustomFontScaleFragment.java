@@ -149,7 +149,13 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 			hideIme();
 
 			Toast.makeText(requireContext(), "字体大小已设置为 " + String.format(Locale.US, "%.2f", scale) + "x", Toast.LENGTH_SHORT).show();
-			((KeydroidxDesktopActivity) requireActivity()).recreate();
+			// 就地重应用代替 recreate()：不再重建 Resources/重解码位图，
+			// 消除低内存设备上 inflate 阶段 OOM 的放大器（2026-10-17 复现结论）。
+			KeydroidxDesktopActivity host = (KeydroidxDesktopActivity) requireActivity();
+			host.applyFontChangeInPlace();
+			// 保存成功后自动退出本页：返回上一层「外观与显示」，
+			// 其视图在出栈重建时自动按新倍率渲染，行文案也随 getItemDisplayName 刷新。
+			requireActivity().getSupportFragmentManager().popBackStack();
 			return true;
 		} catch (Exception e) {
 			KeydroidxLog.w(TAG, "makeText failed: " + e.getMessage());
