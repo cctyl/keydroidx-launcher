@@ -5,6 +5,7 @@
      运营商名(中国移动/联通等)在时钟区左列（simCarrierContainer），由 StatusBarController 统一管理。 -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -71,7 +72,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
-                android:text="16:30"
+                tools:text="16:30"
                 android:textColor="#FFFFFF"
                 android:textSize="@dimen/keydroidx_font_display" />
         </LinearLayout>
@@ -90,7 +91,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
-                android:text="2026年10月6日"
+                tools:text="2026年10月6日"
                 android:textColor="#FFFFFF"
                 android:textSize="@dimen/keydroidx_font_small_title" />
 
@@ -102,7 +103,7 @@
                 android:ellipsize="end"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:text="星期二 · 农历八月初六"
+                tools:text="星期二 · 农历八月初六"
                 android:textColor="#B8C8EA"
                 android:textSize="@dimen/keydroidx_font_caption" />
         </LinearLayout>

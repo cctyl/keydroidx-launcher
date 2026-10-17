@@ -263,6 +263,9 @@ public class KeydroidxDesktopFragment extends KeydroidxPageFragment {
 		tvDesktopClock = view.findViewById(R.id.tvDesktopClock);
 		tvDesktopDate = view.findViewById(R.id.tvDesktopDate);
 		tvDesktopLunar = view.findViewById(R.id.tvDesktopLunar);
+		// 缓存生命周期 = 视图生命周期：碎片 replace 后视图重建（带 XML 占位文案），
+		// lastDateText 仍为今天会导致首次刷新被去重跳过、占位假日期残留（跨天才自愈），故先重置
+		lastDateText = "";
 		refreshClockTexts();
 		// 运营商视图在大时钟区内：碎片 replace 重建后旧引用失效，重绑并立即刷新一次
 		((KeydroidxDesktopActivity) requireActivity()).refreshCarrierViews();
