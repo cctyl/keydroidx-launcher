@@ -89,7 +89,15 @@ public class KeydroidxCustomFontScaleFragment extends KeydroidxPageFragment {
 		etCustomScale.setText(String.format(Locale.US, "%.2f", currentScale));
 		etCustomScale.setSelection(etCustomScale.getText().length());
 
-		updatePreview(currentScale);
+		// 预览字号必须等基类 onViewCreated 的 applyFontToViewHierarchy 跑完之后再设：
+		// 本钩子先于该遍历执行，若此处直接设原始字号，会被遍历当作「设计字号」记入 tag
+		// 再乘一次 sFontScale，预览呈现 12×scale×sFontScale 的双重缩放。
+		// post 到遍历之后覆盖为真实值 12×scale；此后编辑输入框时的实时预览不受影响。
+		tvPreviewText.post(() -> {
+			if (isAdded() && tvPreviewText != null) {
+				updatePreview(currentScale);
+			}
+		});
 
 		etCustomScale.addTextChangedListener(new TextWatcher() {
 			@Override

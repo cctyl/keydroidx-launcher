@@ -343,6 +343,14 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 		if (isFinishing() || isDestroyed() || getWindow() == null) {
 			return;
 		}
+		// 防线：以存储值为准重同步静态缩放源。sFontScale 常规同步点在
+		// KeydroidxSettingsStorage.setFontScale，但本方法的正确性不应依赖调用方的同步纪律——
+		// 7264060 曾因缺失同步导致「调字号毫无反应」（就地重应用按旧倍率空转）。
+		try {
+			KeydroidxFontManager.setFontScale(KeydroidxSettingsStorage.getFontScale(this));
+		} catch (Exception ignored) {
+			KeydroidxLog.w(TAG, "applyFontChangeInPlace 同步 sFontScale 失败: " + ignored.getMessage());
+		}
 		View decor = getWindow().getDecorView();
 		if (decor == null) {
 			return;
@@ -352,6 +360,12 @@ public abstract class KeydroidxBaseActivity extends AppCompatActivity {
 		// recreate() 路径由 onCreate 重新覆盖，就地路径必须同样恢复。
 		if (tvTime != null) {
 			tvTime.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+		}
+		// 底栏中间标题的「缩字号适配」在 recreate() 路径由 refreshPageBar 重跑；
+		// 就地路径补充一次，防止放大字号后长标题（如「桌面组件设置」）溢出截断。
+		TextView bottomCenter = findViewById(R.id.bottomCenter);
+		if (bottomCenter != null && bottomCenter.getVisibility() == View.VISIBLE) {
+			fitCenterTextToWidth(bottomCenter);
 		}
 	}
 
